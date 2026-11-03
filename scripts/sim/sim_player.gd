@@ -53,6 +53,7 @@ var windup_kind: int = 0
 var windup_power: float = 0.0
 var windup_aim: Vector2 = Vector2.ZERO
 var windup_finesse: bool = false
+var kick_kind: int = 0            # último toque: InputFrame.PASS/THROUGH/LOB/SHOOT (para a animação)
 var skill: int = Skill.NONE
 var skill_t: float = 0.0
 var skill_dir: Vector2 = Vector2.RIGHT

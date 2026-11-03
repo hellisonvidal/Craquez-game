@@ -49,7 +49,7 @@ static func _ensure() -> void:
 				"rating": float(t["rating"]), "roster": t.get("roster", []),
 				"league": String(lg["name"]), "country": String(lg.get("country", "")),
 			})
-		_leagues.append({"id": String(lg["id"]), "name": String(lg["name"]), "first": first, "count": _flat.size() - first})
+		_leagues.append({"id": String(lg["id"]), "name": String(lg["name"]), "sport": String(lg.get("sport", "football")), "first": first, "count": _flat.size() - first})
 
 
 static func count() -> int:

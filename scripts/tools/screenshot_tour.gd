@@ -12,9 +12,29 @@ func run(dir: String, main_node: Node) -> void:
 	DirAccess.make_dir_recursive_absolute(out_dir)
 	Settings.quality = Settings.Quality.ULTRA
 	Settings.apply()
-	main._show_menu()
-	await _wait(1.5)
+	# abertura e telas do menu
+	main._show_intro()
+	await _wait(1.6)
+	await _shot("00a_claude")
+	main._current.show_page(1)
+	await _wait(2.0)
+	await _shot("00b_ia_gratuito")
+	main._show_menu(MainMenu.Page.TITLE)
+	await _wait(1.0)
+	await _shot("00c_titulo")
+	main._current.show_page(MainMenu.Page.MODES)
+	await _wait(0.8)
+	await _shot("00d_modos")
+	main._current._pick_mode(GameModes.FIELD, false)
+	await _wait(0.8)
+	await _shot("00e_config")
+	main._current.show_page(MainMenu.Page.TEAMS)
+	await _wait(1.0)
 	await _shot("01_menu")
+	main._current._pick_mode(GameModes.FUTSAL, false)
+	main._current.show_page(MainMenu.Page.TEAMS)
+	await _wait(1.0)
+	await _shot("01b_times_futsal")
 
 	await _match(GameModes.FIELD, _t("bra", 8), _t("bra", 13), ["cpu", "cpu"], 11, [[6.0, "02_campo_saida"], [18.0, "03_campo_jogo"], [30.0, "04_campo_ataque"]])
 	# de perto: quem está com a bola (ou o mais próximo dela)
@@ -25,7 +45,7 @@ func run(dir: String, main_node: Node) -> void:
 		await _wait(0.9)
 		await _shot("04_%d_perto" % i)
 	main._current.view.closeup_id = -1
-	await _match(GameModes.FUTSAL, _t("eng", 14), _t("eng", 13), ["cpu", "cpu"], 5, [[8.0, "05_futsal"], [20.0, "06_futsal_jogo"]])
+	await _match(GameModes.FUTSAL, _t("fbr", 1), _t("fbr", 0), ["cpu", "cpu"], 5, [[8.0, "05_futsal"], [20.0, "06_futsal_jogo"]])
 	await _match(GameModes.STREET, _t("arg", 6), _t("arg", 21), ["cpu", "cpu"], 7, [[8.0, "07_street"], [20.0, "08_street_jogo"]])
 
 	# celular (Android): proporção 20:9 com controles de toque

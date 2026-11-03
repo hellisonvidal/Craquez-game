@@ -18,7 +18,14 @@ func _ready() -> void:
 			_start_match({"mode": mode, "team_a": 0, "team_b": 1, "devices": ["cpu", "cpu"],
 				"seed": 3, "half_minutes": 0.25})
 			return
-	_show_menu()
+	_show_intro()
+
+
+## Abertura: "Feito com Claude" → aviso "feito com IA, gratuito" → título.
+func _show_intro() -> void:
+	var intro := IntroScreens.new()
+	intro.finished.connect(func(): _show_menu.call_deferred(MainMenu.Page.TITLE))
+	_swap(intro)
 
 
 func _swap(n: Node) -> void:
@@ -28,8 +35,9 @@ func _swap(n: Node) -> void:
 	add_child(n)
 
 
-func _show_menu() -> void:
+func _show_menu(start_page: int = MainMenu.Page.MODES) -> void:
 	var m := MainMenu.new()
+	m.start_page = start_page
 	m.start_match.connect(_start_match)
 	_swap(m)
 

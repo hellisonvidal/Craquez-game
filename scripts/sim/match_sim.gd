@@ -564,6 +564,7 @@ func _begin_windup(p: SimPlayer, kind: int, power: float, aim: Vector2, finesse:
 			p.windup = 0.08
 	p.windup_total = p.windup
 	p.windup_kind = kind
+	p.kick_kind = kind
 	p.windup_power = power
 	p.windup_aim = aim
 	p.windup_finesse = finesse
@@ -597,6 +598,7 @@ func _release_ball(p: SimPlayer) -> void:
 
 
 func _pass(p: SimPlayer, aim: Vector2, power: float, through: bool, lofted: bool) -> void:
+	p.kick_kind = InputFrame.LOB if lofted else (InputFrame.THROUGH if through else InputFrame.PASS)
 	if aim.length_squared() < 0.01:
 		aim = p.facing
 	aim = aim.normalized()
@@ -665,6 +667,7 @@ func _pass(p: SimPlayer, aim: Vector2, power: float, through: bool, lofted: bool
 
 
 func _shoot(p: SimPlayer, aim: Vector2, power: float, finesse: bool = false) -> void:
+	p.kick_kind = InputFrame.SHOOT
 	var dir := team_dir(p.team)
 	var gx := half_len * dir
 	var aim_y: float

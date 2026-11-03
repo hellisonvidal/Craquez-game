@@ -673,7 +673,7 @@ func _process(delta: float) -> void:
 	var b := sim.ball
 	for i in rigs.size():
 		var p: SimPlayer = sim.players[i]
-		rigs[i].animate(p, b.pos, b.z, delta)
+		rigs[i].animate(p, b.pos, b.z, delta, b.owner == p.id)
 		if i < _shadows.size():
 			_place_shadows(_shadows[i], p.pos, rigs[i].rotation.y, p.slide > 0.0 or p.stun > 0.3)
 	_update_officials(delta)

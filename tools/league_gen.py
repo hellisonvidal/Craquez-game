@@ -209,6 +209,7 @@ FOREIGN_POOL = {
     "US": ["AR", "BR", "CO", "MX", "UY", "CA", "ES", "EN", "GH", "JP", "KR", "FR"],
     "BR": ["AR", "UY", "CO", "PT"],
     "AR": ["UY", "CO", "BR"],
+    "PT": ["BR", "ES", "AR", "CI", "SN"],
 }
 
 # aparência: pesos por tom de pele (8 tons de face_gen.SKIN_TONES, claro → escuro)
@@ -221,6 +222,56 @@ SKIN_W = {
     "GH": [0, 0, 0, 1, 6, 22, 38, 33], "MA": [4, 16, 32, 28, 14, 4, 1, 1], "CO": [8, 18, 26, 22, 12, 7, 4, 3],
     "MX": [6, 16, 30, 28, 12, 5, 2, 1], "JP": [20, 50, 26, 4, 0, 0, 0, 0], "KR": [22, 50, 24, 4, 0, 0, 0, 0],
 }
+
+# ---------------------------------------------------------------- futsal pelo mundo
+FUTSAL_LEAGUES = [
+    {"id": "fbr", "name": "Liga Nacional de Futsal (BR)", "country": "BR", "foreign": 0.05, "teams": [
+        ("Carlos Barbosa Futsal", "CBA", "#111827", "#f8fafc", 0.84), ("Sorocaba Magnus", "MAG", "#1e3a8a", "#facc15", 0.85),
+        ("Timão Futsal", "TFS", "#f8fafc", "#111827", 0.80), ("Joinville Tricolor", "JEC", "#dc2626", "#111827", 0.80),
+        ("Pato Branco Futsal", "PAT", "#16a34a", "#f8fafc", 0.79), ("Cascavel Serpente", "CAS", "#facc15", "#111827", 0.79),
+        ("Erechim Atlântico", "ATL", "#1d4ed8", "#f8fafc", 0.78), ("Jaraguá Futsal", "JAR", "#1e3a8a", "#dc2626", 0.77),
+        ("Praia Futsal MG", "PRA", "#facc15", "#1e3a8a", 0.77), ("Beltrão Marreco", "MRC", "#dc2626", "#f8fafc", 0.76),
+        ("Foz Cataratas", "FOZ", "#0ea5e9", "#f8fafc", 0.75), ("Minas Futsal", "MIN", "#f8fafc", "#1e3a8a", 0.75),
+        ("São José Futsal", "SJF", "#1e40af", "#f8fafc", 0.74), ("Campo Mourão Futsal", "CMF", "#15803d", "#facc15", 0.73),
+        ("Tubarão Futsal", "TUB", "#7c3aed", "#f8fafc", 0.72), ("Dourados Futsal", "DOU", "#facc15", "#15803d", 0.72),
+    ]},
+    {"id": "fes", "name": "Liga de Futsal (ESP)", "country": "ES", "foreign": 0.35, "teams": [
+        ("Barcelona Futsal", "BFS", "#1e3a8a", "#a50044", 0.86), ("Madrid Interiores", "INT", "#1d4ed8", "#f8fafc", 0.84),
+        ("Palma Futsal", "PAL", "#f97316", "#111827", 0.84), ("Murcia Futsal", "MUR", "#dc2626", "#f8fafc", 0.82),
+        ("Cartagena Futsal", "CAR", "#111827", "#facc15", 0.82), ("Valdepeñas Futsal", "VAL", "#7f1d1d", "#f8fafc", 0.77),
+        ("Jaén Futsal", "JAE", "#facc15", "#111827", 0.76), ("Pamplona Futsal", "OSA", "#b91c1c", "#1e3a8a", 0.75),
+        ("Sevilla Verdiblancos FS", "BTF", "#16a34a", "#f8fafc", 0.74), ("Santa Coloma Futsal", "STC", "#dc2626", "#111827", 0.75),
+        ("Peñíscola Futsal", "PEN", "#0ea5e9", "#f8fafc", 0.74), ("Burela Futsal", "BUR", "#1d4ed8", "#f8fafc", 0.72),
+        ("Manzanares Futsal", "MZN", "#16a34a", "#111827", 0.72), ("Córdoba Futsal", "COR", "#15803d", "#f8fafc", 0.72),
+        ("Tudela Futsal", "RIB", "#facc15", "#1e3a8a", 0.71), ("La Nucía Futsal", "NUC", "#1e3a8a", "#f8fafc", 0.71),
+    ]},
+    {"id": "fpt", "name": "Liga de Futsal (POR)", "country": "PT", "foreign": 0.3, "teams": [
+        ("Lisboa Leões Futsal", "SCP", "#15803d", "#f8fafc", 0.86), ("Lisboa Águias Futsal", "SLB", "#dc2626", "#f8fafc", 0.85),
+        ("Braga Arsenalistas", "SCB", "#dc2626", "#f8fafc", 0.79), ("Porto Salvo Leões", "LPS", "#16a34a", "#facc15", 0.74),
+        ("Ponte de Sor Eléctrico", "ELE", "#facc15", "#1e3a8a", 0.73), ("Lombos Futsal", "QDL", "#1d4ed8", "#facc15", 0.72),
+        ("Fundão Futsal", "FUN", "#111827", "#facc15", 0.72), ("Burinhosa Futsal", "BRN", "#1e3a8a", "#f8fafc", 0.71),
+        ("Modicus Futsal", "MOD", "#7c3aed", "#f8fafc", 0.71), ("Torres Vedras Futsal", "TOR", "#1d4ed8", "#f8fafc", 0.70),
+        ("Caxinas Futsal", "CAX", "#0ea5e9", "#f8fafc", 0.70), ("Vila do Conde Futsal", "RVA", "#15803d", "#f8fafc", 0.69),
+    ]},
+    {"id": "fit", "name": "Serie A Futsal (ITA)", "country": "IT", "foreign": 0.55, "teams": [
+        ("Roma Active Futsal", "ACT", "#111827", "#facc15", 0.80), ("Eboli Futsal", "EBO", "#1e3a8a", "#facc15", 0.79),
+        ("Sala Consilina Futsal", "SCO", "#dc2626", "#f8fafc", 0.75), ("Pomezia Futsal", "POM", "#1d4ed8", "#f8fafc", 0.74),
+        ("Capurso Futsal", "CAP", "#f8fafc", "#dc2626", 0.75), ("Torino L84", "L84", "#111827", "#f8fafc", 0.77),
+        ("Napoli Futsal", "NAP", "#38bdf8", "#f8fafc", 0.77), ("Benevento Futsal", "BEN", "#facc15", "#dc2626", 0.73),
+        ("Pescara Abate", "ABA", "#0ea5e9", "#f8fafc", 0.78), ("Giovinazzo Futsal", "GIO", "#16a34a", "#f8fafc", 0.72),
+        ("Padova Petrarca", "PET", "#dc2626", "#f8fafc", 0.73), ("Treviso Futsal", "TRE", "#facc15", "#1d4ed8", 0.73),
+        ("Catania Meta Futsal", "CAT", "#ea580c", "#1e3a8a", 0.79), ("Roma 1927 Futsal", "R27", "#7f1d1d", "#f59e0b", 0.74),
+    ]},
+    {"id": "far", "name": "Primera A Futsal (ARG)", "country": "AR", "foreign": 0.05, "teams": [
+        ("Xeneize Futsal", "XEN", "#1e3a8a", "#facc15", 0.79), ("Ciclón Futsal", "CIC", "#1e3a8a", "#b91c1c", 0.80),
+        ("Pinocho Futsal", "PIN", "#16a34a", "#f8fafc", 0.77), ("Kimberley Futsal", "KIM", "#111827", "#f8fafc", 0.74),
+        ("Ferro Oeste Futsal", "FER", "#15803d", "#f8fafc", 0.74), ("Academia Futsal", "ACA", "#7dd3fc", "#f8fafc", 0.75),
+        ("Millonario Futsal", "MIL", "#f8fafc", "#dc2626", 0.76), ("Rojo Futsal", "ROJ", "#dc2626", "#111827", 0.74),
+        ("Hebraica Futsal", "HEB", "#1d4ed8", "#f8fafc", 0.72), ("Newbery Futsal", "JNB", "#facc15", "#111827", 0.71),
+        ("Glorias Futsal", "GLO", "#1e3a8a", "#f8fafc", 0.70), ("Villa La Ñata Futsal", "VLN", "#dc2626", "#facc15", 0.70),
+    ]},
+]
+FUTSAL_POSITIONS = ["GK", "GK", "DF", "DF", "DF", "MF", "MF", "MF", "MF", "MF", "FW", "FW", "FW", "FW"]
 POSITIONS = ["GK", "GK", "DF", "DF", "DF", "DF", "DF", "DF", "MF", "MF", "MF", "MF", "MF", "MF", "FW", "FW", "FW", "FW"]
 NUMBERS = {"GK": [1, 12, 23], "DF": [2, 3, 4, 5, 6, 13, 14, 15, 22, 24], "MF": [8, 10, 16, 17, 18, 20, 21, 25, 26],
            "FW": [7, 9, 11, 19, 27, 29, 30]}
@@ -304,19 +355,21 @@ def main() -> None:
     lib = face_gen.write_library(lib_n, 2026, ROOT / "assets" / "faces")
     out = {"season": SEASON, "note": "Nomes alterados (sem licença). Edite à vontade.", "leagues": []}
     total = 0
-    for L in LEAGUES:
-        lg = {"id": L["id"], "name": L["name"], "country": L["country"], "teams": []}
+    all_leagues = [(L, "football") for L in LEAGUES] + [(L, "futsal") for L in FUTSAL_LEAGUES]
+    for L, sport in all_leagues:
+        positions = FUTSAL_POSITIONS if sport == "futsal" else POSITIONS
+        lg = {"id": L["id"], "name": L["name"], "country": L["country"], "sport": sport, "teams": []}
         for ti, (name, short, c1, c2, rating) in enumerate(L["teams"]):
             r = random.Random(hash((L["id"], ti, 2026)) & 0xFFFFFFFF)
             r.seed(f"{L['id']}-{ti}-{name}")
             used: set = set()
             nums: dict = {k: list(v) for k, v in NUMBERS.items()}
             roster = []
-            for pi, pos in enumerate(POSITIONS):
+            for pi, pos in enumerate(positions):
                 nat = L["country"] if r.random() > L["foreign"] else r.choice(FOREIGN_POOL[L["country"]])
                 f = face_for(r, nat)
                 num = nums[pos].pop(0) if nums[pos] else 30 + pi
-                star = 0.05 if pi in (8, 9, 14, 15) else 0.0
+                star = 0.05 if (pi in (8, 9, 14, 15) if sport == "football" else pi in (5, 6, 10)) else 0.0
                 roster.append({"n": player_name(r, nat, used), "num": num, "pos": pos, "nat": nat,
                                "f": f, "fid": nearest_face(lib, f), "a": attrs(r, rating + star, pos)})
                 total += 1
