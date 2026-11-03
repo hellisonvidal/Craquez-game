@@ -30,6 +30,8 @@ class Ctrl:
 	var auto_t: float = 0.0
 	var help_t: float = 0.0       # 2º marcador chamado
 	var shoot_held: bool = false
+	var finesse_held: bool = false
+	var prev_rs: Vector2 = Vector2.ZERO
 
 
 var mode: Dictionary = {}
@@ -382,10 +384,23 @@ func _process_controller(t: int, f: InputFrame) -> void:
 	var p: SimPlayer = players[c.player]
 	p.intent = f.move.limit_length(1.0)
 	p.want_sprint = f.has(InputFrame.SPRINT)
+	p.shielding = f.has(InputFrame.SHIELD)
+	for q in players:
+		if q.team == t and q.id != p.id:
+			q.shielding = false
+	c.finesse_held = f.has(InputFrame.FINESSE)
 	if f.move.length() > 0.25:
 		c.aim = f.move.normalized()
 	elif c.aim == Vector2.ZERO:
 		c.aim = p.facing
+	if p.windup > 0.0:
+		# ainda dá para corrigir a mira enquanto arma a perna
+		p.windup_aim = c.aim
+	# "flick" do analógico direito = drible
+	var rs := f.rstick
+	if rs.length() > 0.7 and c.prev_rs.length() < 0.45 and ball.owner == p.id and penalty_team < 0:
+		_start_skill(p, rs.normalized())
+	c.prev_rs = rs
 	if penalty_team >= 0:
 		# na cobrança ninguém anda; só o batedor mira e chuta
 		p.intent = Vector2.ZERO
@@ -411,7 +426,8 @@ func _process_controller(t: int, f: InputFrame) -> void:
 		if ball.owner == p.id:
 			var kind := c.pending
 			c.pending = 0
-			_do_kick(p, kind, c.pending_power, c.aim)
+			# de primeira: sem tempo de armar
+			_do_kick(p, kind, c.pending_power, c.aim, c.finesse_held)
 		elif c.pending_t <= 0.0:
 			c.pending = 0
 
@@ -438,7 +454,7 @@ func _on_release(t: int, p: SimPlayer, b: int) -> void:
 	c.charging = 0
 	c.charge = 0.0
 	if ball.owner == p.id:
-		_do_kick(p, b, power, c.aim)
+		_begin_windup(p, b, power, c.aim, c.finesse_held)
 	else:
 		# guarda a ação: se a bola chegar logo, executa de primeira
 		c.pending = b
@@ -485,7 +501,27 @@ func _auto_switch(t: int) -> void:
 
 # ---------------------------------------------------------------- ações com bola
 
-func _do_kick(p: SimPlayer, kind: int, power: float, aim: Vector2) -> void:
+## Começa o movimento do chute/passe: a bola só sai depois da "armação"
+## (como no EA FC/eFootball), e o atleta desacelera enquanto isso.
+func _begin_windup(p: SimPlayer, kind: int, power: float, aim: Vector2, finesse: bool) -> void:
+	if p.windup > 0.0 or p.skill != SimPlayer.Skill.NONE:
+		return
+	match kind:
+		InputFrame.SHOOT:
+			p.windup = lerpf(0.12, 0.2, power)
+		InputFrame.LOB:
+			p.windup = 0.13
+		_:
+			p.windup = 0.08
+	p.windup_total = p.windup
+	p.windup_kind = kind
+	p.windup_power = power
+	p.windup_aim = aim
+	p.windup_finesse = finesse
+	_emit("windup", {"team": p.team, "id": p.id, "kind": kind})
+
+
+func _do_kick(p: SimPlayer, kind: int, power: float, aim: Vector2, finesse: bool = false) -> void:
 	if ball.owner != p.id:
 		return
 	match kind:
@@ -496,7 +532,7 @@ func _do_kick(p: SimPlayer, kind: int, power: float, aim: Vector2) -> void:
 		InputFrame.LOB:
 			_pass(p, aim, power, false, true)
 		InputFrame.SHOOT:
-			_shoot(p, aim, power)
+			_shoot(p, aim, power, finesse)
 
 
 func _release_ball(p: SimPlayer) -> void:
@@ -579,7 +615,7 @@ func _pass(p: SimPlayer, aim: Vector2, power: float, through: bool, lofted: bool
 	_emit("kick", {"power": power, "kind": "lob" if lofted else "pass", "team": p.team})
 
 
-func _shoot(p: SimPlayer, aim: Vector2, power: float) -> void:
+func _shoot(p: SimPlayer, aim: Vector2, power: float, finesse: bool = false) -> void:
 	var dir := team_dir(p.team)
 	var gx := half_len * dir
 	var aim_y: float
@@ -588,24 +624,45 @@ func _shoot(p: SimPlayer, aim: Vector2, power: float) -> void:
 	else:
 		# sem direção: busca o canto oposto ao lado em que está
 		aim_y = -signf(p.pos.y if absf(p.pos.y) > 0.5 else 1.0) * goal_half * 0.55
+	if finesse:
+		# colocado: sempre no canto, com curva para dentro
+		var side := signf(aim_y) if absf(aim_y) > 0.1 else 1.0
+		aim_y = side * goal_half * 0.84
 	var target := Vector2(gx + dir * 0.5, aim_y)
 	var to := target - ball.pos
 	var d := maxf(to.length(), 1.0)
 	var dirv := to / d
 	var spd := lerpf(13.0, 31.0, power) * (0.78 + 0.3 * p.shot)
+	if finesse:
+		spd *= 0.8
 	# pressão: adversário perto atrapalha
 	var opp := nearest_opponent(p)
 	var pressure := 0.0
 	if opp != null:
 		pressure = clampf(1.0 - opp.pos.distance_to(p.pos) / 3.0, 0.0, 1.0)
 	var err := (0.02 + 0.07 * power * power) * (1.3 - p.shot) * (1.0 + pressure * 0.8) * (1.4 if p.sprinting else 1.0)
+	# corpo virado para longe do alvo = chute pior (precisa ajeitar o corpo)
+	var body := absf(p.facing.angle_to(dirv))
+	err *= 1.0 + maxf(0.0, body - 0.6) * 0.9
+	if finesse:
+		err *= 0.65
 	dirv = dirv.rotated(rng.gauss() * err)
+	var curl := 0.0
+	if finesse:
+		# sai por fora do alvo e faz a curva para o meio do gol
+		var perp := Vector2(-dirv.y, dirv.x)
+		curl = signf(perp.dot(Vector2(gx, 0.0) - target)) if absf(target.y) > 0.1 else 1.0
+		dirv = dirv.rotated(-curl * clampf(0.9 / d, 0.02, 0.09))
 	ball.vel = dirv * spd
 	var t_flight := d / (spd * 0.9)
 	var h := lerpf(0.15, 2.7, pow(power, 1.8)) + rng.gauss() * 0.25 * power
+	if finesse:
+		h = lerpf(0.6, 1.9, power) + rng.gauss() * 0.15
 	h = maxf(h, 0.0)
 	ball.vz = clampf((h + 0.5 * SimBall.G * t_flight * t_flight) / t_flight, 0.0, 14.0)
 	ball.spin = rng.gauss() * 1.2
+	if finesse:
+		ball.spin = curl * (2.2 + 0.8 * p.shot)
 	stats_shots[p.team] += 1
 	_release_ball(p)
 	_emit("kick", {"power": power, "kind": "shot", "team": p.team})
@@ -614,7 +671,7 @@ func _shoot(p: SimPlayer, aim: Vector2, power: float) -> void:
 # ---------------------------------------------------------------- defesa
 
 func _standing_tackle(p: SimPlayer) -> void:
-	if p.tackle_anim > 0.0 or p.stun > 0.0 or p.slide > 0.0:
+	if p.tackle_anim > 0.0 or p.stun > 0.0 or p.slide > 0.0 or p.off_balance > 0.0:
 		return
 	p.tackle_anim = 0.35
 	p.vel += p.facing * 1.5
@@ -633,6 +690,12 @@ func _standing_tackle(p: SimPlayer) -> void:
 		_foul(p, o)
 		return
 	var chance := 0.42 + 0.4 * p.defense - 0.32 * o.control + (0.0 if from_behind else 0.12)
+	if o.shielding:
+		chance -= 0.12 + 0.12 * o.control
+	if o.skill == SimPlayer.Skill.ROULETTE:
+		chance -= 0.3
+	if p.shielding:
+		chance += 0.08   # bote depois de conter é mais preciso
 	if rng.chance(chance):
 		ball.owner = -1
 		var away := (p.facing * 0.6 + (ball.pos - o.pos).normalized() * 0.4).normalized()
@@ -647,7 +710,7 @@ func _standing_tackle(p: SimPlayer) -> void:
 
 
 func _start_slide(p: SimPlayer) -> void:
-	if p.slide > 0.0 or p.stun > 0.0 or p.is_keeper:
+	if p.slide > 0.0 or p.stun > 0.0 or p.is_keeper or p.off_balance > 0.0:
 		return
 	p.slide = 0.6
 	p.slide_hit_ball = false
@@ -926,6 +989,28 @@ func _move_player(p: SimPlayer) -> void:
 	p.tackle_anim = maxf(0.0, p.tackle_anim - DT)
 	p.kick_anim = maxf(0.0, p.kick_anim - DT)
 	p.dive = maxf(0.0, p.dive - DT)
+	p.skill_cd = maxf(0.0, p.skill_cd - DT)
+	p.burst = maxf(0.0, p.burst - DT)
+	p.off_balance = maxf(0.0, p.off_balance - DT)
+	p.touch_t = maxf(0.0, p.touch_t - DT)
+	if p.windup > 0.0:
+		p.windup -= DT
+		if p.windup <= 0.0:
+			p.windup = 0.0
+			if ball.owner == p.id and state == State.PLAYING:
+				_do_kick(p, p.windup_kind, p.windup_power, p.windup_aim, p.windup_finesse)
+	if p.skill != SimPlayer.Skill.NONE:
+		if p.stun > 0.0 or p.slide > 0.0 or (p.skill != SimPlayer.Skill.KNOCK and ball.owner != p.id):
+			p.skill = SimPlayer.Skill.NONE   # perdeu a bola / derrubado: cancela o drible
+		elif p.skill == SimPlayer.Skill.KNOCK:
+			p.skill_t += DT
+			if p.skill_t >= SimPlayer.SKILL_TIME[SimPlayer.Skill.KNOCK]:
+				p.skill = SimPlayer.Skill.NONE
+				p.skill_cd = 0.25
+	if p.skill != SimPlayer.Skill.NONE and p.skill != SimPlayer.Skill.KNOCK:
+		_skill_move(p)
+		_clamp_player(p)
+		return
 	if p.stun > 0.0:
 		p.stun -= DT
 		p.vel = p.vel.move_toward(Vector2.ZERO, 14.0 * DT)
@@ -948,13 +1033,25 @@ func _move_player(p: SimPlayer) -> void:
 	max_s *= 0.8 + 0.2 * p.stamina
 	if has_ball:
 		max_s *= lerpf(0.86, 0.94, p.control)
+		if p.shielding:
+			# condução curta / proteção: lento, bola colada
+			max_s = minf(max_s, p.jog_speed() * 0.6)
+	elif p.shielding and ball.owner >= 0 and players[ball.owner].team != p.team:
+		# contenção (jockey): de frente para a bola, passos curtos
+		max_s = minf(max_s, p.jog_speed() * 0.78)
+	if p.windup > 0.0:
+		max_s *= 0.55
+	if p.burst > 0.0:
+		max_s *= 1.07
+	if p.off_balance > 0.0:
+		max_s *= 0.3
 	if p.is_keeper and p.dive > 0.0:
 		max_s = 9.5
 	if p.hold > 0.0:
 		max_s *= 0.4
 	var target_v := intent * max_s
 	var spd := p.vel.length()
-	var acc := lerpf(5.0, 8.5, p.accel)
+	var acc := lerpf(5.0, 8.5, p.accel) * (1.6 if p.burst > 0.0 else 1.0) * (0.4 if p.off_balance > 0.0 else 1.0)
 	var brake := 12.0
 	var rate := acc
 	if target_v.length() < spd - 0.2 or target_v.dot(p.vel) < 0.0:
@@ -968,6 +1065,18 @@ func _move_player(p: SimPlayer) -> void:
 	p.pos += p.vel * DT
 	var face_target := p.vel if p.vel.length() > 0.4 else intent
 	var turn_rate := lerpf(11.0, 4.0, clampf(p.vel.length() / 9.0, 0.0, 1.0)) * (0.8 if has_ball else 1.0)
+	if p.shielding and not p.is_keeper:
+		if has_ball:
+			var opp := nearest_opponent(p)
+			if opp != null and opp.pos.distance_to(p.pos) < 2.0 and intent.length() < 0.5:
+				# de costas para o marcador
+				face_target = p.pos - opp.pos
+				turn_rate = 7.0
+		elif ball.owner >= 0 and players[ball.owner].team != p.team:
+			face_target = ball.pos - p.pos
+			turn_rate = 12.0
+	if p.windup > 0.0:
+		turn_rate *= 0.4
 	p.facing = _rotate_toward(p.facing, face_target.normalized(), turn_rate * DT).normalized()
 	if p.sprinting:
 		p.stamina = maxf(0.0, p.stamina - 0.055 * DT)
@@ -1016,8 +1125,15 @@ func _dribble() -> void:
 	if o.stun > 0.0 or o.slide > 0.0 or o.pos.distance_to(ball.pos) > 1.7:
 		ball.owner = -1
 		return
+	if o.skill != SimPlayer.Skill.NONE:
+		_skill_ball(o)
+		return
 	var spd := o.vel.length()
 	var ahead := 0.42 + spd * 0.07 + (0.45 if o.sprinting else 0.0)
+	if o.shielding:
+		ahead = 0.34 + spd * 0.03
+	if o.windup > 0.0:
+		ahead = 0.4
 	var target := o.pos + o.facing * ahead
 	var k := 6.0 + 6.0 * o.control
 	var desired := o.vel + (target - ball.pos) * k
@@ -1108,7 +1224,20 @@ func _take(p: SimPlayer) -> void:
 		return
 	var prev_owner := ball.owner
 	ball.owner = p.id
-	ball.vel = p.vel * 0.85 + (ball.vel - p.vel) * 0.12
+	var want := p.intent
+	if p.shielding:
+		# amortece e mata a bola
+		ball.vel = p.vel * 0.5
+	elif want.length() > 0.35 and rel > 2.0:
+		# domínio orientado: o primeiro toque já leva a bola para onde o analógico aponta
+		var miss := clampf((rel - 6.0) / 18.0, 0.0, 0.7) * (1.15 - p.control)
+		var d := want.normalized().rotated(rng.gauss() * miss * 0.9)
+		ball.vel = p.vel * 0.5 + d * (2.0 + (2.6 if p.want_sprint else 0.6))
+		p.facing = _rotate_toward(p.facing, d, 1.2)
+	else:
+		ball.vel = p.vel * 0.85 + (ball.vel - p.vel) * 0.12
+	if rel > 2.0:
+		p.touch_t = 0.3
 	ball.vz = 0.0
 	ball.last_touch_team = p.team
 	ball.last_touch_id = p.id
@@ -1118,6 +1247,117 @@ func _take(p: SimPlayer) -> void:
 		ctrl[p.team].charging = 0
 	if prev_owner >= 0 and players[prev_owner].team != p.team:
 		_emit("steal", {"team": p.team})
+
+
+# ---------------------------------------------------------------- dribles (analógico direito)
+## Direção do "flick" relativa ao corpo:
+##   frente → toque longo e arrancada | trás → puxada (giro de 180°)
+##   lado → corte/rolinho para o lado
+##   LT/L2 + lado → pedalada (finta que desequilibra o marcador)
+##   LT/L2 + trás → roleta (giro protegendo a bola)
+func _start_skill(p: SimPlayer, rs: Vector2) -> void:
+	if p.skill != SimPlayer.Skill.NONE or p.skill_cd > 0.0 or p.windup > 0.0 or p.hold > 0.0 or p.stun > 0.0:
+		return
+	var fwd := p.facing.normalized()
+	var perp := Vector2(-fwd.y, fwd.x)
+	var f := rs.dot(fwd)
+	var side := rs.dot(perp)
+	var kind: int
+	if f > 0.6:
+		kind = SimPlayer.Skill.KNOCK
+	elif f < -0.6:
+		kind = SimPlayer.Skill.ROULETTE if p.shielding else SimPlayer.Skill.DRAG
+	else:
+		kind = SimPlayer.Skill.STEPOVER if p.shielding else SimPlayer.Skill.ROLL
+	p.skill = kind
+	p.skill_t = 0.0
+	p.skill_dir = fwd
+	p.skill_side = signf(side) if absf(side) > 0.1 else 1.0
+	_emit("skill", {"team": p.team, "id": p.id, "kind": kind})
+	match kind:
+		SimPlayer.Skill.KNOCK:
+			ball.owner = -1
+			ball.vel = fwd * (p.vel.length() + 4.2 + 1.6 * p.control)
+			ball.last_touch_team = p.team
+			ball.last_touch_id = p.id
+			p.kick_cd = 0.16
+			p.kick_anim = 0.25
+			p.burst = 0.75
+		SimPlayer.Skill.STEPOVER:
+			# quem estiver na frente pode cair na finta
+			for o in players:
+				if o.team == p.team or o.is_keeper or o.stun > 0.0:
+					continue
+				var to := o.pos - p.pos
+				var dist := to.length()
+				if dist < 3.4 and to.dot(fwd) > 0.0:
+					var chance := 0.3 + 0.45 * p.control - 0.3 * o.defense
+					if rng.chance(chance):
+						o.off_balance = 0.65
+						o.vel += perp * p.skill_side * 2.2
+						_emit("fooled", {"team": o.team, "id": o.id})
+
+
+func _skill_move(p: SimPlayer) -> void:
+	p.skill_t += DT
+	var dur: float = SimPlayer.SKILL_TIME[p.skill]
+	var u := clampf(p.skill_t / dur, 0.0, 1.0)
+	var fwd := p.skill_dir
+	var perp := Vector2(-fwd.y, fwd.x) * p.skill_side
+	var v := Vector2.ZERO
+	match p.skill:
+		SimPlayer.Skill.DRAG:
+			v = -fwd * 1.6 * sin(u * PI)
+			var tgt := perp if u < 0.5 else -fwd
+			p.facing = _rotate_toward(p.facing, tgt, 10.0 * DT).normalized()
+		SimPlayer.Skill.ROLL:
+			v = perp * lerpf(1.2, 4.6, sin(u * PI * 0.5)) + fwd * 1.2
+			if u > 0.55:
+				p.facing = _rotate_toward(p.facing, (fwd + perp).normalized(), 7.0 * DT).normalized()
+		SimPlayer.Skill.STEPOVER:
+			v = fwd * 1.3 + perp * sin(u * TAU) * 0.9
+		SimPlayer.Skill.ROULETTE:
+			v = perp * 2.6 * sin(u * PI) + fwd * 0.8
+			p.facing = fwd.rotated(-p.skill_side * TAU * u)
+	p.vel = p.vel.lerp(v, minf(1.0, 18.0 * DT))
+	p.pos += p.vel * DT
+	if u >= 1.0:
+		var exit_dir := fwd
+		match p.skill:
+			SimPlayer.Skill.DRAG:
+				exit_dir = -fwd
+			SimPlayer.Skill.ROLL:
+				exit_dir = (fwd + perp).normalized()
+			SimPlayer.Skill.STEPOVER:
+				# sai para o lado contrário da finta
+				exit_dir = (fwd - perp * 0.9).normalized()
+				p.burst = 0.5
+		p.facing = exit_dir
+		p.vel = exit_dir * maxf(p.vel.length(), 3.2)
+		p.skill = SimPlayer.Skill.NONE
+		p.skill_cd = 0.3
+
+
+## Bola "presa" ao movimento do drible.
+func _skill_ball(o: SimPlayer) -> void:
+	var dur: float = SimPlayer.SKILL_TIME[o.skill]
+	var u := clampf(o.skill_t / dur, 0.0, 1.0)
+	var fwd := o.skill_dir
+	var perp := Vector2(-fwd.y, fwd.x) * o.skill_side
+	var target := o.pos + o.facing * 0.42
+	match o.skill:
+		SimPlayer.Skill.DRAG:
+			target = o.pos + fwd * lerpf(0.45, -0.5, u)
+		SimPlayer.Skill.ROLL:
+			target = o.pos + fwd * 0.35 + perp * lerpf(-0.15, 0.6, u)
+		SimPlayer.Skill.STEPOVER:
+			target = o.pos + fwd * 0.45
+		SimPlayer.Skill.ROULETTE:
+			target = o.pos + fwd * 0.3 * cos(u * PI) + perp * 0.35 * sin(u * PI)
+	ball.vel = o.vel + (target - ball.pos) * 14.0
+	ball.z = 0.0
+	ball.vz = 0.0
+	ball.spin = 0.0
 
 
 func _header(p: SimPlayer) -> void:

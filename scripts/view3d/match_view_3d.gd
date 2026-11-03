@@ -26,9 +26,9 @@ var _cam_cfg: Dictionary = {}
 var closeup_id: int = -1
 
 const CAMS := {
-	"field": {"height": 15.5, "back": 21.0, "fov": 31.0, "clamp": 22.0, "look_z": 0.45},
-	"futsal": {"height": 9.0, "back": 10.5, "fov": 38.0, "clamp": 7.0, "look_z": 0.4},
-	"street": {"height": 8.5, "back": 9.0, "fov": 40.0, "clamp": 5.0, "look_z": 0.35},
+	"field": {"height": 21.0, "back": 22.0, "fov": 29.0, "clamp": 22.0, "look_z": 0.45},
+	"futsal": {"height": 10.5, "back": 10.5, "fov": 36.0, "clamp": 7.0, "look_z": 0.4},
+	"street": {"height": 11.0, "back": 9.5, "fov": 38.0, "clamp": 5.0, "look_z": 0.35},
 }
 
 
@@ -272,9 +272,6 @@ func _build_stadium() -> void:
 			mast.height = 34.0
 			_mesh(mast, Toon.mat(Color("#94a3b8"), true), p + Vector3(0, 17.0, 0))
 			_box(Vector3(5.0, 3.0, 0.6), Color("#f1f5f9"), p + Vector3(0, 34.5, 0))
-	# banco de reservas
-	for sx: float in [-1.0, 1.0]:
-		_box(Vector3(7.0, 1.6, 1.4), Color("#1d4ed8"), Vector3(sx * 9.0, 0.8, -(hw + 2.6)))
 
 
 func _build_gym() -> void:
@@ -290,10 +287,10 @@ func _build_gym() -> void:
 		var l := Label3D.new()
 		l.text = "CRAQUEZ FUTSAL"
 		l.font_size = 120
-		l.pixel_size = 0.012
+		l.pixel_size = 0.007
 		l.modulate = Color("#e2e8f0")
 		l.shaded = false
-		l.position = Vector3(-hl * 0.7 + i * hl * 0.7, 4.6, -(hw + 7.7))
+		l.position = Vector3(-hl * 0.7 + i * hl * 0.7, 5.0, -(hw + 7.7))
 		add_child(l)
 	# protetores atrás dos gols
 	for s: float in [-1.0, 1.0]:

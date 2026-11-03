@@ -6,7 +6,7 @@ extends RefCounted
 
 var seed_value: int = 0
 var mode_id: String = ""
-var frames: PackedByteArray = PackedByteArray()   # 6 bytes por tick (3 por time)
+var frames: PackedByteArray = PackedByteArray()   # 2 quadros por tick (InputFrame.SIZE bytes cada)
 
 
 func record(f0: InputFrame, f1: InputFrame) -> void:
@@ -15,9 +15,9 @@ func record(f0: InputFrame, f1: InputFrame) -> void:
 
 
 func tick_count() -> int:
-	return frames.size() / 6
+	return frames.size() / (InputFrame.SIZE * 2)
 
 
 func frames_at(tick: int) -> Array:
-	var o := tick * 6
-	return [InputFrame.from_bytes(frames, o), InputFrame.from_bytes(frames, o + 3)]
+	var o := tick * InputFrame.SIZE * 2
+	return [InputFrame.from_bytes(frames, o), InputFrame.from_bytes(frames, o + InputFrame.SIZE)]

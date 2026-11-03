@@ -10,6 +10,9 @@ const BTNS := [
 	{"label": "ENFIADA", "bit": InputFrame.THROUGH, "pos": Vector2(-160, -240), "r": 40, "col": Color("#eab308")},
 	{"label": "CORRER", "bit": InputFrame.SPRINT, "pos": Vector2(-60, -75), "r": 44, "col": Color("#a855f7")},
 	{"label": "TROCAR", "bit": InputFrame.SWITCH, "pos": Vector2(-260, -190), "r": 36, "col": Color("#64748b")},
+	{"label": "DRIBLE", "bit": -1, "pos": Vector2(-350, -110), "r": 38, "col": Color("#ec4899")},
+	{"label": "PROTEGER", "bit": InputFrame.SHIELD, "pos": Vector2(-350, -215), "r": 34, "col": Color("#0ea5e9")},
+	{"label": "COLOCADO", "bit": InputFrame.FINESSE, "pos": Vector2(-255, -290), "r": 32, "col": Color("#f97316")},
 ]
 
 var _stick_touch := -1
@@ -23,6 +26,15 @@ func _ready() -> void:
 	set_anchors_preset(Control.PRESET_FULL_RECT)
 	mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_font = ThemeDB.fallback_font
+	# dentro de CanvasLayer as âncoras não dão tamanho: acompanha a tela
+	_fit()
+	get_viewport().size_changed.connect(_fit)
+
+
+func _fit() -> void:
+	position = Vector2.ZERO
+	size = get_viewport_rect().size
+	queue_redraw()
 	# o primeiro desenho acontece com tamanho 0: redesenha quando a tela ganha tamanho/gira
 	resized.connect(queue_redraw)
 
@@ -64,7 +76,11 @@ func _update() -> void:
 		var v := (_stick_pos - _stick_origin) / 70.0
 		f.move = v.limit_length(1.0) if v.length() > 0.15 else Vector2.ZERO
 	for k in _btn_touch:
-		f.buttons |= int(_btn_touch[k])
+		var bit := int(_btn_touch[k])
+		if bit == -1:
+			f.rstick = f.move   # drible na direção do analógico virtual
+		else:
+			f.buttons |= bit
 	InputRouter.touch_frame = f
 	queue_redraw()
 
@@ -78,7 +94,7 @@ func _draw() -> void:
 		draw_arc(c, 75, 0, TAU, 32, Color(1, 1, 1, 0.2), 3)
 	var held := InputRouter.touch_frame.buttons
 	for b in BTNS:
-		var on := (held & int(b["bit"])) != 0
+		var on := (held & int(b["bit"])) != 0 if int(b["bit"]) > 0 else InputRouter.touch_frame.rstick != Vector2.ZERO
 		var col: Color = b["col"]
 		var r: float = b["r"]
 		draw_circle(_btn_center(b), r, col if on else Color(col, 0.45))

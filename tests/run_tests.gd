@@ -14,6 +14,10 @@ func _initialize() -> void:
 	_test_determinism()
 	_test_penalty()
 	_test_offside()
+	_test_windup()
+	_test_skills()
+	_test_finesse()
+	_test_shield()
 	_test_online()
 	for m in GameModes.ALL:
 		_test_full_match(m)
@@ -33,11 +37,13 @@ func check(cond: bool, msg: String) -> void:
 func _test_input_frame() -> void:
 	var f := InputFrame.new()
 	f.move = Vector2(0.5, -1.0)
-	f.buttons = InputFrame.PASS | InputFrame.SPRINT
+	f.buttons = InputFrame.PASS | InputFrame.SPRINT | InputFrame.FINESSE
+	f.rstick = Vector2(-1.0, 0.25)
 	var g := InputFrame.from_bytes(f.to_bytes())
 	check(g.buttons == f.buttons, "InputFrame: botões sobrevivem à serialização")
 	check(g.move.distance_to(f.move) < 0.01, "InputFrame: direção quantizada ~igual")
-	check(f.to_bytes().size() == 3, "InputFrame: 3 bytes por tick")
+	check(g.rstick.distance_to(f.rstick) < 0.01, "InputFrame: analógico direito sobrevive")
+	check(f.to_bytes().size() == 6, "InputFrame: 6 bytes por tick")
 
 
 func _test_ball_roll() -> void:
@@ -205,6 +211,132 @@ func _test_offside() -> void:
 	var fut := MatchSim.new()
 	fut.setup(GameModes.FUTSAL, Teams.get_team(0), Teams.get_team(1), 12, 120.0)
 	check(not bool(fut.mode["offside"]), "Impedimento: não existe no futsal")
+
+
+## Campo vazio com um atleta do time 0 dono da bola no meio-campo, olhando para +x.
+func _solo(seed_value: int = 21) -> Array:
+	var sim := MatchSim.new()
+	sim.setup(GameModes.FIELD, Teams.get_team(0), Teams.get_team(1), seed_value, 300.0)
+	sim.state = MatchSim.State.PLAYING
+	sim.protect_t = 0.0
+	for p in sim.players:
+		p.pos = Vector2(-40.0 if p.team == 0 else 40.0, float(p.index) * 4.0 - 20.0)
+		p.vel = Vector2.ZERO
+	var me: SimPlayer = sim.players[9]
+	me.pos = Vector2(0, 0)
+	me.facing = Vector2.RIGHT
+	sim.ball.pos = me.pos + Vector2(0.45, 0)
+	sim.ball.vel = Vector2.ZERO
+	sim.ball.owner = me.id
+	sim.ctrl[0].player = me.id
+	return [sim, me]
+
+
+func _run(sim: MatchSim, f0: InputFrame, ticks: int) -> Array:
+	var ev: Array = []
+	for i in ticks:
+		sim.step([f0, InputFrame.new()])
+		ev.append_array(sim.events)
+	return ev
+
+
+func _test_windup() -> void:
+	var r := _solo()
+	var sim: MatchSim = r[0]
+	var me: SimPlayer = r[1]
+	var hold := InputFrame.new()
+	hold.buttons = InputFrame.SHOOT
+	hold.move = Vector2(1, 0)
+	_run(sim, hold, 20)
+	var rel := InputFrame.new()
+	rel.move = Vector2(1, 0)
+	sim.step([rel, InputFrame.new()])
+	var kicked_now := false
+	for e in sim.events:
+		if e["type"] == "kick":
+			kicked_now = true
+	check(not kicked_now and me.windup > 0.0, "Chute: soltar o botão arma a perna antes (sem chute instantâneo)")
+	var ev := _run(sim, rel, 20)
+	var kicked := false
+	for e in ev:
+		if e["type"] == "kick" and e.get("kind", "") == "shot":
+			kicked = true
+	check(kicked and sim.ball.owner == -1, "Chute: bola sai ao fim da armação")
+
+
+func _test_skills() -> void:
+	# puxada: flick para trás → vira ~180° com a bola
+	var r := _solo()
+	var sim: MatchSim = r[0]
+	var me: SimPlayer = r[1]
+	var flick := InputFrame.new()
+	flick.rstick = Vector2(-1, 0)
+	sim.step([flick, InputFrame.new()])
+	check(me.skill == SimPlayer.Skill.DRAG, "Drible: analógico direito para trás = puxada")
+	_run(sim, InputFrame.new(), 40)
+	check(me.facing.dot(Vector2.LEFT) > 0.8, "Puxada: atleta termina virado para trás (%.2f)" % me.facing.dot(Vector2.LEFT))
+	check(sim.ball.owner == me.id, "Puxada: bola continua dominada")
+	# toque longo: flick para frente → bola vai à frente e atleta arranca
+	r = _solo()
+	sim = r[0]
+	me = r[1]
+	flick = InputFrame.new()
+	flick.rstick = Vector2(1, 0)
+	sim.step([flick, InputFrame.new()])
+	check(sim.ball.owner == -1 and sim.ball.vel.x > 4.0, "Toque longo: bola empurrada à frente")
+	check(me.burst > 0.0, "Toque longo: arrancada")
+	# corte lateral: flick para o lado → bola e atleta deslocam de lado
+	r = _solo()
+	sim = r[0]
+	me = r[1]
+	flick = InputFrame.new()
+	flick.rstick = Vector2(0, 1)
+	sim.step([flick, InputFrame.new()])
+	_run(sim, InputFrame.new(), 30)
+	check(me.pos.y > 0.6 and sim.ball.owner == me.id, "Corte lateral: desloca para o lado com a bola (y=%.2f)" % me.pos.y)
+	# pedalada: LT + lado engana o marcador de frente (estatisticamente)
+	var fooled := 0
+	for sd in 20:
+		r = _solo(100 + sd)
+		sim = r[0]
+		me = r[1]
+		var def: SimPlayer = sim.players[11 + 3]
+		def.pos = Vector2(2.0, 0.0)
+		def.facing = Vector2.LEFT
+		flick = InputFrame.new()
+		flick.rstick = Vector2(0, -1)
+		flick.buttons = InputFrame.SHIELD
+		sim.step([flick, InputFrame.new()])
+		if def.off_balance > 0.0:
+			fooled += 1
+	check(fooled >= 4 and fooled <= 18, "Pedalada: desequilibra o marcador às vezes (%d/20)" % fooled)
+
+
+func _test_finesse() -> void:
+	var r := _solo()
+	var sim: MatchSim = r[0]
+	var me: SimPlayer = r[1]
+	me.pos = Vector2(sim.half_len - 18.0, 6.0)
+	sim.ball.pos = me.pos + Vector2(0.45, 0)
+	sim._shoot(me, Vector2(1, -0.6), 0.6, true)
+	check(absf(sim.ball.spin) > 1.5, "Colocado: bola sai com efeito (%.2f)" % sim.ball.spin)
+	var y0 := sim.ball.vel.normalized().y
+	for i in 30:
+		sim.ball.step(MatchSim.DT, sim.mode)
+	var y1 := sim.ball.vel.normalized().y
+	check(absf(y1 - y0) > 0.02, "Colocado: trajetória faz curva (%.3f → %.3f)" % [y0, y1])
+
+
+func _test_shield() -> void:
+	var r := _solo()
+	var sim: MatchSim = r[0]
+	var me: SimPlayer = r[1]
+	var f := InputFrame.new()
+	f.move = Vector2(1, 0)
+	f.buttons = InputFrame.SHIELD
+	_run(sim, f, 90)
+	check(me.vel.length() < me.jog_speed() * 0.65, "Proteção: condução lenta e curta (%.1f m/s)" % me.vel.length())
+	check(sim.ball.owner == me.id and me.pos.distance_to(sim.ball.pos) < 0.8, "Proteção: bola colada no pé")
 
 
 ## Duas sessões ENet reais no mesmo processo (localhost): handshake + 600 ticks em lockstep.

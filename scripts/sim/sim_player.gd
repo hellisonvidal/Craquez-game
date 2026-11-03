@@ -4,6 +4,10 @@ extends RefCounted
 
 const RADIUS := 0.38
 
+# dribles (analógico direito)
+enum Skill { NONE, KNOCK, DRAG, ROLL, STEPOVER, ROULETTE }
+const SKILL_TIME := [0.0, 0.25, 0.5, 0.42, 0.55, 0.62]
+
 var id: int = 0
 var team: int = 0
 var index: int = 0               # posição na escalação
@@ -40,6 +44,23 @@ var kick_anim: float = 0.0
 var hold: float = 0.0       # goleiro segurando a bola
 var dive: float = 0.0       # goleiro mergulhando
 var run_phase: float = 0.0  # só visual (animação de corrida)
+
+# estilo EA FC: preparação do chute, dribles, proteção, desequilíbrio
+var windup: float = 0.0           # perna armando: a bola sai quando zera
+var windup_total: float = 0.0
+var windup_kind: int = 0
+var windup_power: float = 0.0
+var windup_aim: Vector2 = Vector2.ZERO
+var windup_finesse: bool = false
+var skill: int = Skill.NONE
+var skill_t: float = 0.0
+var skill_dir: Vector2 = Vector2.RIGHT
+var skill_side: float = 1.0
+var skill_cd: float = 0.0
+var burst: float = 0.0            # arrancada depois de "tocar e correr"
+var off_balance: float = 0.0      # defensor enganado pela finta
+var shielding: bool = false     # LT/L2: protege a bola (com) ou contém (sem)
+var touch_t: float = 0.0          # domínio (só visual)
 
 
 func top_speed() -> float:

@@ -60,6 +60,10 @@ func on_event(e: Dictionary) -> void:
 			play("kick", 0.5 + pw * 0.5 if shot else 0.35 + pw * 0.3, 0.85 + randf() * 0.1 if shot else 1.05 + randf() * 0.1)
 		"header":
 			play("kick", 0.4, 1.4)
+		"skill":
+			play("kick", 0.18, 1.5 + randf() * 0.2)
+		"fooled":
+			play("ooh", 0.45)
 		"bounce":
 			play("bounce", 0.35, 0.9 + randf() * 0.2)
 		"post":

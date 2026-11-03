@@ -9,6 +9,8 @@ var skill: float = 0.6        # 0..1 (dificuldade)
 var _hold_btn: int = 0
 var _hold_ticks: int = 0
 var _cooldown: int = 0
+var _finesse: bool = false
+var _skill_cd: int = 0
 
 
 func _init(t: int = 1, difficulty: float = 0.6) -> void:
@@ -32,12 +34,16 @@ func make_input(sim: MatchSim) -> InputFrame:
 	_cooldown = maxi(0, _cooldown - 1)
 
 	# terminando de segurar um botão (chute/passe carregado)
+	_skill_cd = maxi(0, _skill_cd - 1)
 	if _hold_btn != 0:
 		f.buttons |= _hold_btn
+		if _finesse:
+			f.buttons |= InputFrame.FINESSE
 		_hold_ticks -= 1
 		if _hold_ticks <= 0:
 			f.buttons &= ~_hold_btn
 			_hold_btn = 0
+			_finesse = false
 			_cooldown = 20
 
 	if sim.ball.owner == p.id:
@@ -55,12 +61,32 @@ func make_input(sim: MatchSim) -> InputFrame:
 		f.move = mv.normalized()
 		if opp_d > 3.5:
 			f.buttons |= InputFrame.SPRINT
+		# drible quando o marcador chega de frente
+		if opp != null and opp_d < 2.6 and _skill_cd == 0 and _hold_btn == 0 and p.skill == SimPlayer.Skill.NONE:
+			var ahead := (opp.pos - p.pos).normalized().dot(p.facing)
+			if ahead > 0.3 and _noise(sim, 9) < 0.04 + skill * 0.06:
+				var perp := Vector2(-p.facing.y, p.facing.x)
+				var r := _noise(sim, 10)
+				if r < 0.4:
+					f.rstick = perp * (1.0 if _noise(sim, 11) > 0.5 else -1.0)
+				elif r < 0.7:
+					f.rstick = perp * (1.0 if _noise(sim, 12) > 0.5 else -1.0)
+					f.buttons |= InputFrame.SHIELD
+				elif r < 0.85:
+					f.rstick = -p.facing
+				else:
+					f.rstick = -p.facing
+					f.buttons |= InputFrame.SHIELD
+				_skill_cd = 50
 		if _hold_btn == 0 and _cooldown == 0:
 			var shoot_range := sim.half_len * lerpf(0.32, 0.45, skill)
 			if to_goal.length() < shoot_range and absf(p.pos.y) < sim.half_w * 0.6:
 				# aponta para um canto
 				f.move = Vector2(dir, (0.6 if _noise(sim, 1) > 0.5 else -0.6))
 				_press(f, InputFrame.SHOOT, int(lerpf(18.0, 40.0, to_goal.length() / shoot_range)))
+				_finesse = _noise(sim, 13) < 0.25 + skill * 0.2
+				if _finesse:
+					f.buttons |= InputFrame.FINESSE
 			elif opp_d < 2.2 and _noise(sim, 2) < 0.06 + skill * 0.08:
 				f.move = Vector2(dir, (_noise(sim, 3) - 0.5) * 1.6).normalized()
 				_press(f, InputFrame.PASS if _noise(sim, 4) > 0.25 else InputFrame.LOB, 8 + int(_noise(sim, 5) * 14.0))
@@ -76,6 +102,10 @@ func make_input(sim: MatchSim) -> InputFrame:
 		if d > 3.0:
 			f.buttons |= InputFrame.SPRINT
 		var owner := sim.owner_player()
+		if owner != null and owner.team != team and p.pos.distance_to(owner.pos) < 3.5:
+			# contenção: não dá o bote de qualquer jeito
+			f.buttons |= InputFrame.SHIELD
+			f.buttons &= ~InputFrame.SPRINT
 		if owner != null and owner.team != team and _cooldown == 0:
 			var bd := p.pos.distance_to(sim.ball.pos)
 			if bd < 1.3 and _noise(sim, 6) < 0.05 + skill * 0.06:

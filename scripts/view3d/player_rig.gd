@@ -28,7 +28,10 @@ var _prev_vel: Vector2 = Vector2.ZERO
 var _prev_dir: float = 0.0
 var _lean_f: float = 0.0
 var _bank: float = 0.0
-var _kick_t: float = -1.0
+var _kick_t: float = 0.0
+var _kicking: bool = false
+var _windup_total: float = 0.15
+var _prev_windup: float = 0.0
 var _kick_side: int = 1      # 1 = direito, 0 = esquerdo
 var _kick_power: float = 0.5
 var _prev_kick_anim: float = 0.0
@@ -120,18 +123,20 @@ func build(p: SimPlayer, kit: Dictionary) -> void:
 	for s in 2:
 		var sx := -0.1 if s == 0 else 0.1
 		var th := _pivot(hips, Vector3(sx, -0.04, 0))
-		_part(th, _capsule(0.088, 0.26), m_shorts, Vector3(0, -0.1, 0))
-		_part(th, _capsule(0.074, 0.46), m_skin, Vector3(0, -0.22, 0))
+		_part(th, _capsule(0.1, 0.28), m_shorts, Vector3(0, -0.1, 0))
+		_part(th, _capsule(0.086, 0.46), m_skin, Vector3(0, -0.22, 0), Vector3(1.0, 1.0, 1.08))
 		var sh := _pivot(th, Vector3(0, -0.44, 0))
-		_part(sh, _capsule(0.064, 0.44), m_socks, Vector3(0, -0.21, 0))
+		_part(sh, _sphere(0.07), m_skin, Vector3.ZERO)
+		_part(sh, _capsule(0.07, 0.44), m_socks, Vector3(0, -0.21, 0.008), Vector3(1.0, 1.0, 1.1))
 		var ft := _pivot(sh, Vector3(0, -0.42, 0))
-		_part(ft, _box(Vector3(0.1, 0.075, 0.27)), m_boot, Vector3(0, -0.02, -0.06))
+		_part(ft, _capsule(0.05, 0.25), m_boot, Vector3(0, -0.025, -0.05), Vector3(1.0, 1.0, 0.85), Vector3(PI / 2, 0, 0))
 		thigh.append(th)
 		shin.append(sh)
 		foot.append(ft)
 	# tronco
 	spine = _pivot(hips, Vector3(0, 0.04, 0))
-	_part(spine, _capsule(0.17, 0.62), m_shirt, Vector3(0, 0.27, 0), Vector3(1.32, 1.0, 0.78))
+	_part(spine, _capsule(0.17, 0.64), m_shirt, Vector3(0, 0.28, 0), Vector3(1.34, 1.0, 0.8))
+	_part(spine, _sphere(0.2), m_shirt, Vector3(0, 0.42, 0), Vector3(1.15, 0.6, 0.72))
 	# número nas costas
 	number_label = Label3D.new()
 	number_label.text = str(p.number)
@@ -148,10 +153,13 @@ func build(p: SimPlayer, kit: Dictionary) -> void:
 	for s in 2:
 		var sx := -0.235 if s == 0 else 0.235
 		var ua := _pivot(spine, Vector3(sx, 0.5, 0))
-		_part(ua, _capsule(0.062, 0.2), m_shirt, Vector3(0, -0.06, 0))
-		_part(ua, _capsule(0.052, 0.3), m_skin if not kit.get("long_sleeves", false) else m_shirt, Vector3(0, -0.14, 0))
+		var m_arm: Material = m_skin if not kit.get("long_sleeves", false) else m_shirt
+		_part(ua, _sphere(0.078), m_shirt, Vector3(0, -0.01, 0))
+		_part(ua, _capsule(0.072, 0.2), m_shirt, Vector3(0, -0.07, 0))
+		_part(ua, _capsule(0.058, 0.3), m_arm, Vector3(0, -0.14, 0))
 		var fa := _pivot(ua, Vector3(0, -0.28, 0))
-		_part(fa, _capsule(0.046, 0.27), m_skin if not kit.get("long_sleeves", false) else m_shirt, Vector3(0, -0.12, 0))
+		_part(fa, _sphere(0.054), m_arm, Vector3.ZERO)
+		_part(fa, _capsule(0.051, 0.27), m_arm, Vector3(0, -0.12, 0))
 		_part(fa, _sphere(0.052), m_hand, Vector3(0, -0.27, 0))
 		upper_arm.append(ua)
 		forearm.append(fa)
@@ -193,6 +201,13 @@ func build(p: SimPlayer, kit: Dictionary) -> void:
 	rotation.y = _yaw
 
 
+## Pé do chute: o do lado da bola (ou o preferido, se a bola estiver no meio).
+func _foot_for(side_ball: float) -> int:
+	if absf(side_ball) <= 0.06:
+		return 0 if lefty else 1
+	return 1 if side_ball > 0.0 else 0
+
+
 static func _wrap(a: float) -> float:
 	return wrapf(a, -PI, PI)
 
@@ -226,17 +241,24 @@ func animate(p: SimPlayer, ball_pos: Vector2, ball_z: float, dt: float) -> void:
 	_breath += dt * (2.0 + sn * 3.0)
 
 	# gatilhos de ação (bordas dos timers da simulação)
-	if p.kick_anim > _prev_kick_anim + 0.1:
+	var rel := ball_pos - p.pos
+	var side_ball := rel.dot(Vector2(-fwd.y, fwd.x))
+	if p.windup > 0.0 and _prev_windup <= 0.0:
+		# começou a armar o chute: a bola sai quando o pé chegar nela
+		_kicking = true
+		_kick_t = -p.windup
+		_windup_total = p.windup
+		_kick_side = _foot_for(side_ball)
+		_kick_power = clampf(p.windup_power, 0.25, 1.0) if p.windup_kind == InputFrame.SHOOT else 0.35
+	_prev_windup = p.windup
+	if p.kick_anim > _prev_kick_anim + 0.1 and (not _kicking or _kick_t > 0.12):
+		_kicking = true
 		_kick_t = 0.0
-		var rel := ball_pos - p.pos
-		var side := rel.dot(Vector2(-fwd.y, fwd.x))
-		_kick_side = 1 if (side > 0.05 or (absf(side) <= 0.05 and not lefty)) else 0
-		if absf(side) <= 0.05:
-			_kick_side = 0 if lefty else 1
-		_kick_power = clampf(p.kick_cd * 2.5, 0.3, 1.0)
+		_kick_side = _foot_for(side_ball)
+		_kick_power = 0.4
 		if ball_z > 1.2:
 			_head_t = 0.0
-			_kick_t = -1.0
+			_kicking = false
 	_prev_kick_anim = p.kick_anim
 	if p.tackle_anim > _prev_tackle + 0.1:
 		_tackle_t = 0.0
@@ -252,6 +274,7 @@ func animate(p: SimPlayer, ball_pos: Vector2, ball_z: float, dt: float) -> void:
 	var leg_x: Array[float] = [0.0, 0.0]
 	var knee_x: Array[float] = [0.0, 0.0]
 	var foot_x: Array[float] = [0.0, 0.0]
+	var leg_z_extra: Array[float] = [0.0, 0.0]
 	for s in 2:
 		var ph := phase + (PI if s == 1 else 0.0)
 		leg_x[s] = amp * sin(ph) + 0.08 * sn
@@ -286,22 +309,28 @@ func animate(p: SimPlayer, ball_pos: Vector2, ball_z: float, dt: float) -> void:
 		arm_x = [0.45, 0.45]
 		elbow_x = [0.6, 0.6]
 
-	# ---------- chute
-	if _kick_t >= 0.0:
+	# ---------- chute (armação → contato em t=0 → finalização)
+	if _kicking:
 		_kick_t += dt
 		var k := _kick_side
 		var o := 1 - k
 		var t := _kick_t
 		var dur := 0.42
 		if t > dur:
-			_kick_t = -1.0
+			_kicking = false
 		else:
-			# t=0 é o contato: perna já vindo; segue pelo alto e volta
 			var swing := 0.0
 			var knee := 0.0
-			if t < 0.06:
-				swing = lerpf(-0.2, 0.9, t / 0.06)
-				knee = lerpf(-1.2, -0.15, t / 0.06)
+			if t < 0.0:
+				# perna vai para trás, pé de apoio planta ao lado da bola
+				var u := clampf(1.0 + t / maxf(_windup_total, 0.01), 0.0, 1.0)
+				var e := u * u * (3.0 - 2.0 * u)
+				swing = lerpf(leg_x[k], -0.55 - 0.35 * _kick_power, e)
+				knee = lerpf(knee_x[k], -1.5, e)
+				spine_x = lerpf(spine_x, -0.12, e)
+			elif t < 0.06:
+				swing = lerpf(-0.5, 0.9, t / 0.06)
+				knee = lerpf(-1.3, -0.15, t / 0.06)
 			elif t < 0.2:
 				var u := (t - 0.06) / 0.14
 				swing = lerpf(0.9, 0.9 + 0.7 * _kick_power, sin(u * PI * 0.5))
@@ -312,15 +341,85 @@ func animate(p: SimPlayer, ball_pos: Vector2, ball_z: float, dt: float) -> void:
 				knee = lerpf(-0.35, knee_x[k], u)
 			leg_x[k] = swing
 			knee_x[k] = knee
-			foot_x[k] = 0.35
-			leg_x[o] = -0.12
-			knee_x[o] = -0.3
-			spine_x = 0.12 * _kick_power - 0.05
-			spine_y = (0.25 if k == 1 else -0.25) * (1.0 - t / dur)
+			foot_x[k] = -0.3 if t >= 0.0 else 0.2
+			leg_x[o] = -0.08
+			knee_x[o] = -0.32
+			foot_x[o] = 0.1
+			if t >= 0.0:
+				spine_x = 0.12 * _kick_power - 0.05
+			spine_y = (0.25 if k == 1 else -0.25) * (1.0 - absf(t) / dur)
 			arm_z = [-0.75, 0.75]
 			arm_x[o] = 0.6
 			arm_x[k] = -0.3
 			hip_y -= 0.03
+
+	# ---------- dribles (analógico direito)
+	if p.skill != SimPlayer.Skill.NONE and p.skill != SimPlayer.Skill.KNOCK:
+		var dur_s: float = SimPlayer.SKILL_TIME[p.skill]
+		var u := clampf(p.skill_t / dur_s, 0.0, 1.0)
+		var k := 1 if p.skill_side < 0.0 else 0
+		var o := 1 - k
+		match p.skill:
+			SimPlayer.Skill.DRAG:
+				# sola na bola puxando para trás
+				leg_x[k] = lerpf(0.55, -0.1, u)
+				knee_x[k] = lerpf(-0.25, -0.9, u)
+				foot_x[k] = 0.55
+				leg_x[o] = -0.05
+				knee_x[o] = -0.45
+				spine_x = 0.05
+				arm_z = [-0.6, 0.6]
+			SimPlayer.Skill.ROLL:
+				leg_x[k] = 0.35
+				knee_x[k] = -0.5
+				foot_x[k] = 0.4
+				leg_z_extra[k] = (0.45 if k == 0 else -0.45) * sin(u * PI)
+				arm_z = [-0.55, 0.55]
+				spine_x = -0.15
+			SimPlayer.Skill.STEPOVER:
+				# perna passa por cima da bola em arco
+				var e := sin(u * PI)
+				leg_x[k] = 0.25 + 0.45 * e
+				knee_x[k] = -0.4 - 1.0 * e
+				leg_z_extra[k] = (-0.55 if k == 0 else 0.55) * sin(u * TAU)
+				leg_x[o] = 0.0
+				knee_x[o] = -0.4
+				root_roll = (0.18 if k == 0 else -0.18) * sin(u * TAU)
+				spine_y = 0.35 * sin(u * TAU)
+				arm_z = [-0.7, 0.7]
+				hip_y -= 0.05
+			SimPlayer.Skill.ROULETTE:
+				leg_x[k] = 0.3
+				knee_x[k] = -0.6
+				foot_x[k] = 0.5
+				leg_x[o] = -0.1
+				knee_x[o] = -0.4
+				arm_z = [-1.0, 1.0]
+				arm_x = [0.2, 0.2]
+				spine_x = -0.1
+				hip_y -= 0.04
+
+	# ---------- proteção / contenção / desequilíbrio / domínio
+	if p.shielding and p.skill == SimPlayer.Skill.NONE and not _kicking and p.slide <= 0.0:
+		hip_y -= 0.08
+		arm_z = [-0.75, 0.75]
+		arm_x = [0.15, 0.15]
+		elbow_x = [0.5, 0.5]
+		spine_x = -0.2 if spd < 2.0 else spine_x
+		for s in 2:
+			knee_x[s] = minf(knee_x[s], -0.45)
+			leg_z_extra[s] = -0.12 if s == 0 else 0.12
+	if p.off_balance > 0.0:
+		var e := clampf(p.off_balance / 0.65, 0.0, 1.0)
+		root_roll += 0.35 * e * (1.0 if int(p.id) % 2 == 0 else -1.0)
+		arm_z = [-1.4 * e, 1.4 * e]
+		spine_x -= 0.2 * e
+	if p.touch_t > 0.0 and not _kicking and p.skill == SimPlayer.Skill.NONE:
+		var e := sin(clampf(p.touch_t / 0.3, 0.0, 1.0) * PI)
+		var k := 0 if lefty else 1
+		leg_x[k] = lerpf(leg_x[k], 0.55, e)
+		knee_x[k] = lerpf(knee_x[k], -0.5, e)
+		foot_x[k] = lerpf(foot_x[k], 0.3, e)
 
 	# ---------- cabeceio
 	if _head_t >= 0.0:
@@ -410,7 +509,7 @@ func animate(p: SimPlayer, ball_pos: Vector2, ball_z: float, dt: float) -> void:
 	_rot(spine, spine_x, spine_y, 0.0)
 	_rot(neck, neck_x, -spine_y * 0.6, 0.0)
 	for s in 2:
-		_rot(thigh[s], leg_x[s], 0.0, (-0.04 if s == 0 else 0.04))
+		_rot(thigh[s], leg_x[s], 0.0, (-0.04 if s == 0 else 0.04) + leg_z_extra[s])
 		_rot(shin[s], knee_x[s])
 		_rot(foot[s], foot_x[s])
 		_rot(upper_arm[s], arm_x[s], 0.0, arm_z[s])

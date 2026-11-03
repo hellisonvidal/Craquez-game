@@ -115,7 +115,7 @@ func _build() -> void:
 	vb.add_child(play)
 	_build_online(vb)
 	var help := Label.new()
-	help.text = "Controle: A/✕ passe · B/◯ chute · X/▢ alto · Y/△ enfiada · RT/R2 correr · LB/L1 trocar\nTeclado P1: WASD · J K L I · Shift · Q    |    P2: setas · Num 1 2 3 5 · Num 0 · Num 4\n◀ ▶ (ou clique) muda a opção"
+	help.text = "Controle: A/✕ passe · B/◯ chute · X/▢ alto · Y/△ enfiada · RT/R2 correr · LB/L1 trocar · LT/L2 proteger/conter · RB/R1 colocado\nAnalógico direito: dribles (frente: arrancada · trás: puxada · lado: corte · LT+lado: pedalada · LT+trás: roleta)\nTeclado P1: WASD · J K L I · Shift correr · Q trocar · C proteger · U colocado · E+direção drible    |    P2: setas · Num 1 2 3 5 · Num 0 · Num 4 · Num 7 · Num 9 · Num 6"
 	help.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	help.add_theme_font_size_override("font_size", 14)
 	help.modulate = Color("#94a3b8")

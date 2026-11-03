@@ -48,16 +48,16 @@ static func read(dev: String) -> InputFrame:
 		return _read_pad(dev.substr(4).to_int())
 	match dev:
 		"kb1":
-			return _read_keys(KEY_W, KEY_S, KEY_A, KEY_D, KEY_J, KEY_K, KEY_L, KEY_I, KEY_SHIFT, KEY_Q, KEY_P)
+			return _read_keys(KEY_W, KEY_S, KEY_A, KEY_D, KEY_J, KEY_K, KEY_L, KEY_I, KEY_SHIFT, KEY_Q, KEY_P, KEY_E, KEY_C, KEY_U)
 		"kb2":
-			return _read_keys(KEY_UP, KEY_DOWN, KEY_LEFT, KEY_RIGHT, KEY_KP_1, KEY_KP_2, KEY_KP_3, KEY_KP_5, KEY_KP_0, KEY_KP_4, KEY_BACKSPACE)
+			return _read_keys(KEY_UP, KEY_DOWN, KEY_LEFT, KEY_RIGHT, KEY_KP_1, KEY_KP_2, KEY_KP_3, KEY_KP_5, KEY_KP_0, KEY_KP_4, KEY_BACKSPACE, KEY_KP_6, KEY_KP_7, KEY_KP_9)
 		"touch":
 			return touch_frame.copy()
 	return InputFrame.new()
 
 
 static func _read_keys(up: Key, down: Key, left: Key, right: Key, pass_k: Key, shoot_k: Key, lob_k: Key,
-		through_k: Key, sprint_k: Key, switch_k: Key, pause_k: Key) -> InputFrame:
+		through_k: Key, sprint_k: Key, switch_k: Key, pause_k: Key, skill_k: Key, shield_k: Key, finesse_k: Key) -> InputFrame:
 	var f := InputFrame.new()
 	var v := Vector2(
 		float(Input.is_physical_key_pressed(right)) - float(Input.is_physical_key_pressed(left)),
@@ -70,6 +70,10 @@ static func _read_keys(up: Key, down: Key, left: Key, right: Key, pass_k: Key, s
 	if Input.is_physical_key_pressed(sprint_k): f.buttons |= InputFrame.SPRINT
 	if Input.is_physical_key_pressed(switch_k): f.buttons |= InputFrame.SWITCH
 	if Input.is_physical_key_pressed(pause_k): f.buttons |= InputFrame.PAUSE
+	if Input.is_physical_key_pressed(shield_k): f.buttons |= InputFrame.SHIELD
+	if Input.is_physical_key_pressed(finesse_k): f.buttons |= InputFrame.FINESSE
+	# teclado não tem analógico direito: tecla de drible + direção
+	if Input.is_physical_key_pressed(skill_k): f.rstick = f.move
 	return f
 
 
@@ -94,9 +98,15 @@ static func _read_pad(id: int) -> InputFrame:
 	if Input.is_joy_button_pressed(id, JOY_BUTTON_B): f.buttons |= InputFrame.SHOOT
 	if Input.is_joy_button_pressed(id, JOY_BUTTON_X): f.buttons |= InputFrame.LOB
 	if Input.is_joy_button_pressed(id, JOY_BUTTON_Y): f.buttons |= InputFrame.THROUGH
-	if Input.get_joy_axis(id, JOY_AXIS_TRIGGER_RIGHT) > 0.4 or Input.is_joy_button_pressed(id, JOY_BUTTON_RIGHT_SHOULDER):
+	if Input.get_joy_axis(id, JOY_AXIS_TRIGGER_RIGHT) > 0.4:
 		f.buttons |= InputFrame.SPRINT
+	if Input.get_joy_axis(id, JOY_AXIS_TRIGGER_LEFT) > 0.4:
+		f.buttons |= InputFrame.SHIELD
+	if Input.is_joy_button_pressed(id, JOY_BUTTON_RIGHT_SHOULDER): f.buttons |= InputFrame.FINESSE
 	if Input.is_joy_button_pressed(id, JOY_BUTTON_LEFT_SHOULDER): f.buttons |= InputFrame.SWITCH
+	# analógico direito (dribles)
+	var r := Vector2(Input.get_joy_axis(id, JOY_AXIS_RIGHT_X), Input.get_joy_axis(id, JOY_AXIS_RIGHT_Y))
+	f.rstick = r if r.length() > 0.3 else Vector2.ZERO
 	if Input.is_joy_button_pressed(id, JOY_BUTTON_START): f.buttons |= InputFrame.PAUSE
 	return f
 

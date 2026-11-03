@@ -13,7 +13,7 @@ signal config_received(cfg: Dictionary)
 signal ready_received
 
 const PORT := 27015
-const PROTOCOL := "craquez-1"
+const PROTOCOL := "craquez-2"
 const T_HELLO := 1
 const T_CONFIG := 2
 const T_READY := 3
@@ -174,8 +174,8 @@ func poll() -> void:
 				var first := pkt.decode_u32(1)
 				var n := pkt.decode_u8(5)
 				for i in n:
-					var o := 6 + i * 3
-					if o + 3 > pkt.size():
+					var o := 6 + i * InputFrame.SIZE
+					if o + InputFrame.SIZE > pkt.size():
 						break
 					var t := first + i
 					if not _remote.has(t):
