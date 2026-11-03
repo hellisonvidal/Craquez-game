@@ -12,6 +12,8 @@ func _initialize() -> void:
 	_test_magnus_curve()
 	_test_goal_detection()
 	_test_determinism()
+	_test_penalty()
+	_test_offside()
 	for m in GameModes.ALL:
 		_test_full_match(m)
 	print("\n%d verificações, %d falhas" % [_count, _fails])
@@ -136,3 +138,69 @@ func _test_full_match(mode_id: String) -> void:
 	check(ok, "%s: bola sempre em posição válida" % mode_id)
 	check(sim.state == MatchSim.State.FULLTIME, "%s: partida CPU x CPU chega ao fim" % mode_id)
 	check(kicks > 0, "%s: houve chutes/passes (%d), placar %d x %d" % [mode_id, kicks, sim.score[0], sim.score[1]])
+
+
+func _test_penalty() -> void:
+	var sim := MatchSim.new()
+	sim.setup(GameModes.FIELD, Teams.get_team(0), Teams.get_team(1), 11, 120.0)
+	sim.state = MatchSim.State.PLAYING
+	var victim: SimPlayer = sim.players[9]          # atacante do time 0 (ataca +x no 1º tempo)
+	var offender: SimPlayer = sim.players[11 + 2]   # zagueiro do time 1
+	victim.pos = Vector2(sim.half_len - 6.0, 2.0)
+	offender.pos = victim.pos + Vector2(-0.5, 0)
+	sim._foul(offender, victim)
+	check(sim.penalty_team == 0, "Pênalti: falta na área marca pênalti")
+	check(sim.ball.pos.distance_to(Vector2(sim.half_len - 11.0, 0)) < 0.01, "Pênalti: bola na marca dos 11 m")
+	var empty := InputFrame.new()
+	var shoot := InputFrame.new()
+	shoot.buttons = InputFrame.SHOOT
+	shoot.move = Vector2(1, -0.6)
+	var shots := 0
+	for i in 200:
+		var f0 := empty
+		if i >= 100 and i < 125:
+			f0 = shoot
+		# defensor tentando andar: não pode
+		var f1 := InputFrame.new()
+		f1.move = Vector2(-1, 0)
+		sim.step([f0, f1])
+		for e in sim.events:
+			if e["type"] == "kick" and e.get("kind", "") == "shot":
+				shots += 1
+	check(shots == 1, "Pênalti: batedor cobra com o botão de chute")
+	check(sim.penalty_team == -1, "Pênalti: lance volta ao normal depois da cobrança")
+
+
+func _test_offside() -> void:
+	var sim := MatchSim.new()
+	sim.setup(GameModes.FIELD, Teams.get_team(0), Teams.get_team(1), 12, 120.0)
+	sim.state = MatchSim.State.PLAYING
+	sim.protect_t = 0.0
+	for p in sim.players:
+		if p.team == 1:
+			p.pos = Vector2(10.0, 25.0 if p.index % 2 == 0 else -25.0)
+			if p.is_keeper:
+				p.pos = Vector2(sim.half_len - 1.0, 0)
+		else:
+			p.pos = Vector2(-20.0, float(p.index) * 3.0 - 15.0)
+	var passer: SimPlayer = sim.players[5]
+	var receiver: SimPlayer = sim.players[9]
+	passer.pos = Vector2(0, 0)
+	receiver.pos = Vector2(28.0, 0.0)
+	sim.ball.pos = passer.pos + Vector2(0.5, 0)
+	sim.ball.owner = passer.id
+	sim._pass(passer, Vector2(1, 0), 0.5, false, false)
+	check(receiver.id in sim.offside_ids, "Impedimento: atacante à frente da penúltima linha marcado no passe")
+	var called := false
+	for i in 400:
+		sim.step([InputFrame.new(), InputFrame.new()])
+		for e in sim.events:
+			if e["type"] == "offside":
+				called = true
+		if called:
+			break
+	check(called, "Impedimento: apitado quando o impedido recebe")
+	check(sim.ball.owner >= 0 and sim.players[sim.ball.owner].team == 1, "Impedimento: tiro livre para a defesa")
+	var fut := MatchSim.new()
+	fut.setup(GameModes.FUTSAL, Teams.get_team(0), Teams.get_team(1), 12, 120.0)
+	check(not bool(fut.mode["offside"]), "Impedimento: não existe no futsal")

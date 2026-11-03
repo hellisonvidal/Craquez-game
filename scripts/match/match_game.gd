@@ -11,6 +11,7 @@ var sim: MatchSim
 var view: MatchView
 var hud: Hud
 var touch: TouchControls
+var sfx: Sfx
 var session: NetSession = LocalSession.new()
 var replay := ReplayBuffer.new()
 var brains: Array = [null, null]
@@ -41,6 +42,9 @@ func start(cfg: Dictionary) -> void:
 	add_child(view)
 	view.human_team = [brains[0] == null, brains[1] == null]
 	view.setup(sim, colors)
+	sfx = Sfx.new()
+	add_child(sfx)
+	sfx.start_crowd(cfg["mode"])
 	hud = Hud.new()
 	add_child(hud)
 	hud.setup(sim, [String(ta["short"]), String(tb["short"])], colors)
@@ -81,9 +85,19 @@ func _physics_process(_delta: float) -> void:
 	session.poll()
 	replay.record(frames[0], frames[1])
 	sim.step(frames)
+	_after_step()
+
+
+func _after_step() -> void:
 	for e in sim.events:
 		_on_event(e)
 		hud.on_event(e)
+		sfx.on_event(e)
+	# torcida reage à bola perto do gol e ao gol
+	var near := clampf((absf(sim.ball.pos.x) / sim.half_len - 0.55) / 0.45, 0.0, 1.0)
+	if sim.state == MatchSim.State.GOAL:
+		near = 1.0
+	sfx.set_excitement(near)
 
 
 func _on_event(e: Dictionary) -> void:

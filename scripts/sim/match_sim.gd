@@ -56,6 +56,14 @@ var protect_team: int = -1
 var protect_t: float = 0.0
 var pass_receiver: int = -1
 var pass_receiver_t: float = 0.0
+# pênalti
+var penalty_team: int = -1
+var penalty_taker: int = -1
+var penalty_t: float = 0.0
+# impedimento: quem estava impedido no momento do último passe
+var offside_team: int = -1
+var offside_ids: Array[int] = []
+var no_offside_kick: bool = false
 var last_scorer: int = -1
 var last_goal_team: int = -1
 var stats_shots: Array[int] = [0, 0]
@@ -187,6 +195,9 @@ func _reset_for_kickoff(t: int) -> void:
 	ball.spin = 0.0
 	ball.owner = -1
 	pass_receiver = -1
+	penalty_team = -1
+	offside_ids.clear()
+	offside_team = -1
 	for p in players:
 		p.pos = _formation_world(p)
 		var center_r: float = mode["center_r"]
@@ -263,6 +274,9 @@ func _setup_restart(t: int, spot: Vector2, kind: String) -> void:
 		p.stun = minf(p.stun, 0.2)
 	protect_team = t
 	protect_t = 2.5
+	offside_ids.clear()
+	offside_team = -1
+	no_offside_kick = kind in ["throwin", "corner", "goalkick"]
 	state = State.RESTART
 	state_timer = 0.7
 	_emit("whistle", {"kind": kind, "team": t})
@@ -318,6 +332,11 @@ func _step_playing(frames: Array) -> void:
 	pass_receiver_t -= DT
 	if pass_receiver_t <= 0.0:
 		pass_receiver = -1
+	if penalty_team >= 0:
+		penalty_t -= DT
+		if penalty_t <= 0.0 and ball.owner == penalty_taker:
+			var tk: SimPlayer = players[penalty_taker]
+			_shoot(tk, Vector2(team_dir(tk.team), 0.7 if rng.chance(0.5) else -0.7), 0.55)
 	if clock >= half_seconds and not _ball_in_danger():
 		if half == 1:
 			state = State.HALFTIME
@@ -367,6 +386,12 @@ func _process_controller(t: int, f: InputFrame) -> void:
 		c.aim = f.move.normalized()
 	elif c.aim == Vector2.ZERO:
 		c.aim = p.facing
+	if penalty_team >= 0:
+		# na cobrança ninguém anda; só o batedor mira e chuta
+		p.intent = Vector2.ZERO
+		p.want_sprint = false
+		if t != penalty_team:
+			return
 
 	# goleiro com a bola nas mãos: o humano pode repor com passe
 	var keeper_hold := ball.owner >= 0 and players[ball.owner].is_keeper and players[ball.owner].team == t and players[ball.owner].hold > 0.0
@@ -482,6 +507,8 @@ func _release_ball(p: SimPlayer) -> void:
 	p.kick_anim = 0.25
 	p.hold = 0.0
 	protect_t = 0.0
+	_mark_offside(p)
+	penalty_team = -1
 
 
 func _pass(p: SimPlayer, aim: Vector2, power: float, through: bool, lofted: bool) -> void:
@@ -660,11 +687,103 @@ func _foul(offender: SimPlayer, victim: SimPlayer) -> void:
 	var spot := victim.pos
 	spot.x = clampf(spot.x, -half_len + 1.0, half_len - 1.0)
 	spot.y = clampf(spot.y, -half_w + 1.0, half_w - 1.0)
-	# simplificação: falta dentro da área vira falta na entrada da área
+	# falta dentro da própria área = pênalti
 	var gx := -half_len * team_dir(offender.team)
-	if bool(mode["keeper"]) and absf(spot.x - gx) < float(mode["box_depth"]) and absf(spot.y) < float(mode["box_half"]):
-		spot.x = gx + team_dir(offender.team) * (float(mode["box_depth"]) + 1.0)
+	if float(mode.get("penalty_dist", 0.0)) > 0.0 and absf(spot.x - gx) < float(mode["box_depth"]) and absf(spot.y) < float(mode["box_half"]):
+		_setup_penalty(victim.team, victim)
+		return
 	_setup_restart(victim.team, spot, "freekick")
+
+
+func _setup_penalty(t: int, taker: SimPlayer) -> void:
+	var dir := team_dir(t)
+	var gx := half_len * dir
+	var spot := Vector2(gx - dir * float(mode["penalty_dist"]), 0.0)
+	ball.pos = spot
+	ball.vel = Vector2.ZERO
+	ball.z = 0.0
+	ball.vz = 0.0
+	ball.spin = 0.0
+	ball.owner = taker.id
+	ball.last_touch_team = t
+	pass_receiver = -1
+	offside_ids.clear()
+	offside_team = -1
+	# todos fora da área, atrás da bola; goleiro na linha
+	var line_x := gx - dir * (float(mode["box_depth"]) + 2.0)
+	var k := 0
+	for p in players:
+		p.vel = Vector2.ZERO
+		p.stun = 0.0
+		p.slide = 0.0
+		p.hold = 0.0
+		if p == taker:
+			p.pos = spot - Vector2(dir * 0.7, 0.0)
+			p.facing = Vector2(dir, 0.0)
+		elif p.is_keeper and p.team != t:
+			p.pos = Vector2(gx - dir * 0.3, 0.0)
+			p.facing = Vector2(-dir, 0.0)
+		elif p.is_keeper:
+			continue
+		else:
+			var row := k / 6
+			p.pos = Vector2(line_x - dir * (row * 1.5 + 0.5), -half_w * 0.5 + float(k % 6) * half_w * 0.2)
+			p.facing = Vector2(dir, 0.0)
+			k += 1
+	ctrl[t].player = taker.id
+	for c in ctrl:
+		c.charging = 0
+		c.pending = 0
+	penalty_team = t
+	penalty_taker = taker.id
+	penalty_t = 8.0
+	protect_team = t
+	protect_t = 999.0
+	state = State.RESTART
+	state_timer = 1.4
+	_emit("whistle", {"kind": "penalty", "team": t})
+
+
+func _mark_offside(p: SimPlayer) -> void:
+	offside_ids.clear()
+	offside_team = -1
+	if not bool(mode.get("offside", false)) or no_offside_kick or penalty_team >= 0:
+		no_offside_kick = false
+		return
+	var dir := team_dir(p.team)
+	var rels: Array[float] = []
+	for o in players:
+		if o.team != p.team:
+			rels.append(o.pos.x * dir)
+	rels.sort()
+	var second_last: float = rels[rels.size() - 2] if rels.size() >= 2 else half_len
+	var line := maxf(second_last, ball.pos.x * dir)
+	for m in players:
+		if m.team == p.team and m != p:
+			var r := m.pos.x * dir
+			if r > 0.0 and r > line + 0.3:
+				offside_ids.append(m.id)
+	if not offside_ids.is_empty():
+		offside_team = p.team
+
+
+## true = lance parado por impedimento.
+func _check_offside(p: SimPlayer) -> bool:
+	if offside_team < 0:
+		return false
+	if p.team == offside_team and p.id in offside_ids:
+		_emit("offside", {"team": p.team})
+		var spot := p.pos
+		spot.x = clampf(spot.x, -half_len + 1.0, half_len - 1.0)
+		spot.y = clampf(spot.y, -half_w + 1.0, half_w - 1.0)
+		offside_ids.clear()
+		offside_team = -1
+		_setup_restart(1 - p.team, spot, "offside")
+		return true
+	# adversário tocou ou companheiro em posição legal recebeu: nova fase
+	offside_ids.clear()
+	offside_team = -1
+	return false
 
 
 # ---------------------------------------------------------------- IA sem bola
@@ -673,6 +792,10 @@ func _ai_all(frozen: bool) -> void:
 	for p in players:
 		var human := ctrl[p.team].player == p.id
 		if human and state == State.PLAYING:
+			continue
+		if penalty_team >= 0 and not p.is_keeper:
+			p.intent = Vector2.ZERO
+			p.want_sprint = false
 			continue
 		if p.is_keeper:
 			_ai_keeper(p, frozen)
@@ -754,6 +877,9 @@ func _ai_keeper(p: SimPlayer, frozen: bool) -> void:
 	var dir := team_dir(p.team)
 	var gx := -half_len * dir
 	var goal := Vector2(gx, 0)
+	if penalty_team >= 0 and p.team != penalty_team:
+		_steer_to(p, Vector2(gx + dir * 0.3, 0.0), false)
+		return
 	if ball.owner == p.id:
 		p.intent = Vector2.ZERO
 		p.facing = Vector2(dir, 0)
@@ -943,6 +1069,8 @@ func _possession() -> void:
 
 
 func _take(p: SimPlayer) -> void:
+	if _check_offside(p):
+		return
 	var rel := (ball.vel - p.vel).length()
 	var keeper_zone := p.is_keeper and in_own_box(p)
 	var limit := 9.0 + 12.0 * p.control
@@ -993,6 +1121,8 @@ func _take(p: SimPlayer) -> void:
 
 
 func _header(p: SimPlayer) -> void:
+	if _check_offside(p):
+		return
 	var c: Ctrl = ctrl[p.team]
 	var dir := team_dir(p.team)
 	var out: Vector2

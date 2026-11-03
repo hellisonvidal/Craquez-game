@@ -170,8 +170,13 @@ func on_event(e: Dictionary) -> void:
 				_banner_sub.text = "Troca de lado"
 				_banner_face.texture = null
 				_flash(2.8)
-			elif kind in ["corner", "freekick", "goalkick", "throwin"]:
-				var txt := {"corner": "Escanteio", "freekick": "Falta", "goalkick": "Tiro de meta", "throwin": "Lateral"}
+			elif kind == "penalty":
+				_banner_lbl.text = "PÊNALTI!"
+				_banner_sub.text = names[int(e.get("team", 0))] + " cobra"
+				_banner_face.texture = null
+				_flash(1.6)
+			elif kind in ["corner", "freekick", "goalkick", "throwin", "offside"]:
+				var txt := {"corner": "Escanteio", "freekick": "Falta", "goalkick": "Tiro de meta", "throwin": "Lateral", "offside": "Impedimento"}
 				_banner_lbl.text = txt[kind]
 				_banner_sub.text = names[int(e.get("team", 0))]
 				_banner_face.texture = null

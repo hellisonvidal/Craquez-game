@@ -13,6 +13,7 @@ var half_minutes: float = 3.0
 var vibration: bool = true
 var show_touch: bool = false
 var cpu_skill: float = 0.6
+var sfx_volume: float = 0.8
 
 ## Flags de detalhe derivadas do preset (consultadas pela renderização).
 var detail := {
@@ -88,6 +89,7 @@ func load_settings() -> void:
 	vibration = cfg.get_value("input", "vibration", vibration)
 	show_touch = cfg.get_value("input", "show_touch", show_touch)
 	cpu_skill = cfg.get_value("match", "cpu_skill", cpu_skill)
+	sfx_volume = cfg.get_value("audio", "sfx_volume", sfx_volume)
 
 
 func save_settings() -> void:
@@ -97,4 +99,5 @@ func save_settings() -> void:
 	cfg.set_value("input", "vibration", vibration)
 	cfg.set_value("input", "show_touch", show_touch)
 	cfg.set_value("match", "cpu_skill", cpu_skill)
+	cfg.set_value("audio", "sfx_volume", sfx_volume)
 	cfg.save(PATH)

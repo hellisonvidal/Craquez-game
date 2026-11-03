@@ -96,7 +96,7 @@ func _build() -> void:
 	_faces.add_theme_constant_override("separation", 8)
 	vb.add_child(_faces)
 
-	for key in ["mode", "team_a", "team_b", "p1", "p2", "minutes", "skill", "quality"]:
+	for key in ["mode", "team_a", "team_b", "p1", "p2", "minutes", "skill", "quality", "sound"]:
 		var b := Button.new()
 		b.custom_minimum_size = Vector2(0, 46)
 		b.add_theme_font_size_override("font_size", 20)
@@ -161,6 +161,10 @@ func _cycle(key: String, d: int) -> void:
 			Settings.quality = posmod(Settings.quality + d, Settings.QUALITY_NAMES.size())
 			Settings.apply()
 			FaceLibrary.clear_cache()
+		"sound":
+			Settings.sfx_volume = snappedf(posmod(roundi(Settings.sfx_volume * 10.0) + d * 2, 12) / 10.0, 0.1)
+			if Settings.sfx_volume > 1.0:
+				Settings.sfx_volume = 0.0
 	Settings.save_settings()
 	_refresh()
 
@@ -180,6 +184,7 @@ func _refresh() -> void:
 	_buttons["quality"].text = "Gráficos:  ◀ %s ▶" % Settings.QUALITY_NAMES[Settings.quality]
 	if Settings.quality == Settings.Quality.AUTO:
 		_buttons["quality"].text += "  (%s)" % Settings.QUALITY_NAMES[Settings.effective_quality]
+	_buttons["sound"].text = "Som:  ◀ %s ▶" % ("desligado" if Settings.sfx_volume <= 0.01 else "%d%%" % roundi(Settings.sfx_volume * 100.0))
 	# vitrine de rostos do elenco
 	for c in _faces.get_children():
 		c.queue_free()
