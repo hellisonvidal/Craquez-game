@@ -232,7 +232,7 @@ func _solo(seed_value: int = 21) -> Array:
 	return [sim, me]
 
 
-func _run(sim: MatchSim, f0: InputFrame, ticks: int) -> Array:
+func _run_ticks(sim: MatchSim, f0: InputFrame, ticks: int) -> Array:
 	var ev: Array = []
 	for i in ticks:
 		sim.step([f0, InputFrame.new()])
@@ -247,7 +247,7 @@ func _test_windup() -> void:
 	var hold := InputFrame.new()
 	hold.buttons = InputFrame.SHOOT
 	hold.move = Vector2(1, 0)
-	_run(sim, hold, 20)
+	_run_ticks(sim, hold, 20)
 	var rel := InputFrame.new()
 	rel.move = Vector2(1, 0)
 	sim.step([rel, InputFrame.new()])
@@ -256,7 +256,7 @@ func _test_windup() -> void:
 		if e["type"] == "kick":
 			kicked_now = true
 	check(not kicked_now and me.windup > 0.0, "Chute: soltar o botão arma a perna antes (sem chute instantâneo)")
-	var ev := _run(sim, rel, 20)
+	var ev := _run_ticks(sim, rel, 20)
 	var kicked := false
 	for e in ev:
 		if e["type"] == "kick" and e.get("kind", "") == "shot":
@@ -273,7 +273,7 @@ func _test_skills() -> void:
 	flick.rstick = Vector2(-1, 0)
 	sim.step([flick, InputFrame.new()])
 	check(me.skill == SimPlayer.Skill.DRAG, "Drible: analógico direito para trás = puxada")
-	_run(sim, InputFrame.new(), 40)
+	_run_ticks(sim, InputFrame.new(), 40)
 	check(me.facing.dot(Vector2.LEFT) > 0.8, "Puxada: atleta termina virado para trás (%.2f)" % me.facing.dot(Vector2.LEFT))
 	check(sim.ball.owner == me.id, "Puxada: bola continua dominada")
 	# toque longo: flick para frente → bola vai à frente e atleta arranca
@@ -292,7 +292,7 @@ func _test_skills() -> void:
 	flick = InputFrame.new()
 	flick.rstick = Vector2(0, 1)
 	sim.step([flick, InputFrame.new()])
-	_run(sim, InputFrame.new(), 30)
+	_run_ticks(sim, InputFrame.new(), 30)
 	check(me.pos.y > 0.6 and sim.ball.owner == me.id, "Corte lateral: desloca para o lado com a bola (y=%.2f)" % me.pos.y)
 	# pedalada: LT + lado engana o marcador de frente (estatisticamente)
 	var fooled := 0
@@ -334,7 +334,7 @@ func _test_shield() -> void:
 	var f := InputFrame.new()
 	f.move = Vector2(1, 0)
 	f.buttons = InputFrame.SHIELD
-	_run(sim, f, 90)
+	_run_ticks(sim, f, 90)
 	check(me.vel.length() < me.jog_speed() * 0.65, "Proteção: condução lenta e curta (%.1f m/s)" % me.vel.length())
 	check(sim.ball.owner == me.id and me.pos.distance_to(sim.ball.pos) < 0.8, "Proteção: bola colada no pé")
 
