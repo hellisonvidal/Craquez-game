@@ -17,6 +17,9 @@ var skill_i := 1
 var _buttons: Dictionary = {}
 var _faces: HBoxContainer
 var _devices: Array[String] = []
+var _session: EnetSession
+var _ip_edit: LineEdit
+var _net_status: Label
 
 
 func _ready() -> void:
@@ -110,6 +113,7 @@ func _build() -> void:
 	play.add_theme_font_size_override("font_size", 28)
 	play.pressed.connect(_on_play)
 	vb.add_child(play)
+	_build_online(vb)
 	var help := Label.new()
 	help.text = "Controle: A/✕ passe · B/◯ chute · X/▢ alto · Y/△ enfiada · RT/R2 correr · LB/L1 trocar\nTeclado P1: WASD · J K L I · Shift · Q    |    P2: setas · Num 1 2 3 5 · Num 0 · Num 4\n◀ ▶ (ou clique) muda a opção"
 	help.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
@@ -123,6 +127,125 @@ func _build() -> void:
 		vb.add_child(quit)
 	_refresh()
 	play.grab_focus()
+
+
+func _build_online(vb: VBoxContainer) -> void:
+	var sep := HSeparator.new()
+	vb.add_child(sep)
+	var title := Label.new()
+	title.text = "ONLINE (mesma rede ou IP direto · porta %d UDP)" % EnetSession.PORT
+	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	title.modulate = Color("#38bdf8")
+	vb.add_child(title)
+	var hb := HBoxContainer.new()
+	hb.add_theme_constant_override("separation", 8)
+	vb.add_child(hb)
+	var host := Button.new()
+	host.text = "Criar sala"
+	host.custom_minimum_size = Vector2(150, 46)
+	host.pressed.connect(_on_host)
+	hb.add_child(host)
+	_ip_edit = LineEdit.new()
+	_ip_edit.placeholder_text = "IP do anfitrião (ex.: 192.168.0.10)"
+	_ip_edit.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	_ip_edit.text_submitted.connect(func(_t): _on_join())
+	hb.add_child(_ip_edit)
+	var join := Button.new()
+	join.text = "Entrar"
+	join.custom_minimum_size = Vector2(110, 46)
+	join.pressed.connect(_on_join)
+	hb.add_child(join)
+	_net_status = Label.new()
+	_net_status.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_net_status.autowrap_mode = TextServer.AUTOWRAP_WORD
+	_net_status.modulate = Color("#94a3b8")
+	vb.add_child(_net_status)
+
+
+func _process(_delta: float) -> void:
+	if _session != null:
+		_session.poll()
+		if _session != null and _net_status.text.find(_session.status) == -1:
+			_update_net_status()
+
+
+func _update_net_status() -> void:
+	var txt := _session.status
+	if _session.is_host and not _session.connected:
+		var ips := EnetSession.local_ips()
+		txt += "\nSeu IP: " + (", ".join(PackedStringArray(ips)) if not ips.is_empty() else "(sem rede local)")
+	_net_status.text = txt
+
+
+func _reset_session() -> void:
+	if _session != null:
+		_session.close()
+	_session = null
+
+
+func _on_host() -> void:
+	_reset_session()
+	_session = EnetSession.new()
+	if _session.host() != OK:
+		_net_status.text = _session.status
+		_session = null
+		return
+	_session.peer_connected.connect(_host_send_config)
+	_session.ready_received.connect(_host_start)
+	_update_net_status()
+
+
+func _on_join() -> void:
+	var ip := _ip_edit.text.strip_edges()
+	if ip.is_empty():
+		_net_status.text = "Digite o IP de quem criou a sala"
+		return
+	_reset_session()
+	_session = EnetSession.new()
+	if _session.join(ip) != OK:
+		_net_status.text = _session.status
+		_session = null
+		return
+	_session.config_received.connect(_client_got_config)
+	_update_net_status()
+
+
+func _net_cfg() -> Dictionary:
+	return {
+		"mode": GameModes.ALL[mode_i], "team_a": team_a, "team_b": team_b,
+		"seed": int(Time.get_unix_time_from_system()) & 0xFFFFFF, "half_minutes": minutes_opts[minutes_i],
+	}
+
+
+var _host_cfg: Dictionary = {}
+
+
+func _host_send_config() -> void:
+	_host_cfg = _net_cfg()
+	_session.send_config(_host_cfg)
+
+
+func _host_start() -> void:
+	var cfg := _host_cfg.duplicate()
+	cfg["devices"] = [_devices[p1_dev], "remote"]
+	cfg["session"] = _session
+	_session = null   # a partida assume a sessão
+	start_match.emit(cfg)
+
+
+func _client_got_config(c: Dictionary) -> void:
+	_session.send_ready()
+	var cfg := {
+		"mode": String(c["mode"]), "team_a": int(c["team_a"]), "team_b": int(c["team_b"]),
+		"seed": int(c["seed"]), "half_minutes": float(c["half_minutes"]),
+		"devices": ["remote", _devices[p1_dev]], "session": _session,
+	}
+	_session = null
+	start_match.emit(cfg)
+
+
+func _exit_tree() -> void:
+	_reset_session()
 
 
 func _on_btn_input(ev: InputEvent, key: String) -> void:

@@ -2,7 +2,7 @@
 
 Jogo de futebol 2D (vista 3/4 "2.5D") com física realista, para **Windows** e **Android**.
 Modos **Campo (11×11)**, **Futsal (5×5)** e **Street (3×3 com tabela no muro)**.
-PvP local hoje, arquitetura pronta para **PvP online**. Suporte a controles **Xbox / PlayStation**, teclado e toque.
+PvP local, contra CPU e **PvP online** (por IP). Suporte a controles **Xbox / PlayStation**, teclado e toque.
 
 ![Faces vetoriais geradas pelo Craquez](docs/img/faces_sheet.png)
 
@@ -14,7 +14,9 @@ PvP local hoje, arquitetura pronta para **PvP online**. Suporte a controles **Xb
 | **Física** | Bola 2.5D com gravidade, arrasto do ar, efeito Magnus (curva), quique por superfície (grama/madeira/asfalto), atrito de rolagem, traves e travessão |
 | **Movimento** | Aceleração/frenagem, inércia em mudanças de direção, giro mais lento em velocidade, fôlego (stamina), condução de bola com toques |
 | **Hardware modesto** | Renderer *GL Compatibility* (OpenGL 3.3 / GLES 3). Presets Baixa (854×480, 30 fps) → Ultra (nativo, MSAA 4x, 144 fps) e detecção automática |
-| **Online-ready** | Simulação determinística em passo fixo (60 Hz) que só recebe `InputFrame`s de 3 bytes. Ver [docs/ONLINE.md](docs/ONLINE.md) |
+| **Online** | Lockstep sobre ENet/UDP com entradas de 3 bytes, redundância e hash anti-dessincronia. Ver [docs/ONLINE.md](docs/ONLINE.md) |
+| **Som** | Sintetizado em código: chute, apitos, trave, torcida que reage ao lance |
+| **Regras** | Faltas, pênalti (campo/futsal), impedimento (campo), lateral, escanteio, tiro de meta |
 
 ## Como rodar
 

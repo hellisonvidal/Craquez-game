@@ -183,6 +183,13 @@ func on_event(e: Dictionary) -> void:
 				_flash(0.9)
 
 
+func show_message(title: String, sub: String, t: float) -> void:
+	_banner_lbl.text = title
+	_banner_sub.text = sub
+	_banner_face.texture = null
+	_flash(t)
+
+
 func _flash(t: float) -> void:
 	_banner.visible = true
 	_banner_t = t

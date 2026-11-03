@@ -39,6 +39,16 @@ func send_checksum(_tick: int, _hash: int) -> void:
 	pass
 
 
+## Hash recebido do outro lado para `tick` (ou null).
+func remote_checksum(_tick: int) -> Variant:
+	return null
+
+
+## Reenvia as últimas entradas (proteção contra pacote perdido quando a partida trava esperando).
+func resend_recent() -> void:
+	pass
+
+
 func poll() -> void:
 	pass
 

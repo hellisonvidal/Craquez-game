@@ -12,11 +12,15 @@
 - [x] Rostos vetoriais procedurais (48)
 - [x] Testes headless + CI com builds Windows/Android
 
+## v0.2
+- [x] Áudio sintetizado (chute, apito, trave, torcida dinâmica, gol)
+- [x] Pênalti e impedimento
+- [x] PvP online por IP (ENet + lockstep, hash anti-dessincronia)
+
 ## Próximos
-- [ ] Áudio (chute, apito, torcida dinâmica)
-- [ ] Impedimento, pênalti, cartões
+- [ ] Cartões
 - [ ] Sprites de jogadores desenhados (spritesheet 8 direções em 4K, com fallback vetorial)
 - [ ] Editor de times/jogadores e rostos
 - [ ] Replays e melhores momentos (usando `ReplayBuffer`)
-- [ ] Online: ENet + rollback (ver ONLINE.md)
+- [ ] Online: rollback, código de sala/relay (ver ONLINE.md)
 - [ ] Assinatura de release Android (keystore em GitHub Secrets) e publicação

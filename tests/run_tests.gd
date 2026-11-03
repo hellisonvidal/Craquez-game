@@ -14,6 +14,7 @@ func _initialize() -> void:
 	_test_determinism()
 	_test_penalty()
 	_test_offside()
+	_test_online()
 	for m in GameModes.ALL:
 		_test_full_match(m)
 	print("\n%d verificações, %d falhas" % [_count, _fails])
@@ -204,3 +205,73 @@ func _test_offside() -> void:
 	var fut := MatchSim.new()
 	fut.setup(GameModes.FUTSAL, Teams.get_team(0), Teams.get_team(1), 12, 120.0)
 	check(not bool(fut.mode["offside"]), "Impedimento: não existe no futsal")
+
+
+## Duas sessões ENet reais no mesmo processo (localhost): handshake + 600 ticks em lockstep.
+func _test_online() -> void:
+	var h := EnetSession.new()
+	var c := EnetSession.new()
+	check(h.host(27999) == OK, "Online: anfitrião abre a porta")
+	check(c.join("127.0.0.1", 27999) == OK, "Online: convidado inicia conexão")
+	var got: Dictionary = {}
+	var ready_flag: Array[bool] = [false]
+	c.config_received.connect(func(x: Dictionary): got.merge(x))
+	h.ready_received.connect(func(): ready_flag[0] = true)
+	for i in 400:
+		h.poll()
+		c.poll()
+		if h.connected and c.connected:
+			break
+		OS.delay_msec(5)
+	check(h.connected and c.connected, "Online: conexão estabelecida")
+	h.send_config({"mode": "futsal", "team_a": 2, "team_b": 5, "seed": 4242, "half_minutes": 1.0})
+	for i in 400:
+		h.poll()
+		c.poll()
+		if not got.is_empty():
+			break
+		OS.delay_msec(5)
+	check(int(got.get("seed", 0)) == 4242, "Online: configuração da partida chega ao convidado")
+	c.send_ready()
+	for i in 200:
+		h.poll()
+		c.poll()
+		if ready_flag[0]:
+			break
+		OS.delay_msec(5)
+	check(ready_flag[0], "Online: anfitrião recebe READY")
+
+	var sim_h := MatchSim.new()
+	sim_h.setup("futsal", Teams.get_team(2), Teams.get_team(5), 4242, 60.0)
+	var sim_c := MatchSim.new()
+	sim_c.setup(String(got["mode"]), Teams.get_team(int(got["team_a"])), Teams.get_team(int(got["team_b"])), int(got["seed"]), 60.0)
+	var ls_h := Lockstep.new(h, sim_h, h.local_team(), 3)
+	var ls_c := Lockstep.new(c, sim_c, c.local_team(), 3)
+	var desyncs: Array[int] = []
+	ls_h.desync.connect(func(t: int): desyncs.append(t))
+	ls_c.desync.connect(func(t: int): desyncs.append(t))
+	var bh := CpuBrain.new(0, 0.8)
+	var bc := CpuBrain.new(1, 0.6)
+	const TARGET := 600
+	for i in 6000:
+		h.poll()
+		c.poll()
+		ls_h.push_local(bh.make_input(sim_h))
+		ls_c.push_local(bc.make_input(sim_c))
+		ls_h.advance(Callable(), mini(3, TARGET - sim_h.tick))
+		ls_c.advance(Callable(), mini(3, TARGET - sim_c.tick))
+		if sim_h.tick >= TARGET and sim_c.tick >= TARGET:
+			break
+		OS.delay_msec(1)
+	# troca dos últimos hashes
+	for i in 50:
+		h.poll()
+		c.poll()
+		ls_h.advance(Callable(), 0)
+		ls_c.advance(Callable(), 0)
+		OS.delay_msec(2)
+	check(sim_h.tick == TARGET and sim_c.tick == TARGET, "Online: as duas máquinas avançam (%d / %d ticks)" % [sim_h.tick, sim_c.tick])
+	check(StateHash.of(sim_h) == StateHash.of(sim_c), "Online: estados idênticos nas duas máquinas (lockstep)")
+	check(desyncs.is_empty(), "Online: nenhuma dessincronia detectada pelos hashes")
+	h.close()
+	c.close()

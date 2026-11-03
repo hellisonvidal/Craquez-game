@@ -1,19 +1,29 @@
-# Preparação para PvP online
+# PvP online
 
-O que **já existe**:
+## Como jogar (v0.2)
 
-1. **Simulação determinística** em passo fixo — verificado por teste (`tests/run_tests.gd`, "Determinismo").
-2. **Entrada mínima**: `InputFrame` = 3 bytes/tick (≈ 180 B/s por jogador a 60 Hz).
-3. **`NetSession`** (`scripts/net/net_session.gd`): contrato que a partida usa; hoje `LocalSession`.
-4. **`ReplayBuffer`**: grava entradas por tick → replays e reprodução de dessincronias.
-5. **`StateHash`**: hash do estado para checar sincronia a cada N ticks.
+1. Os dois abrem o Craquez. Quem vai **hospedar** escolhe modo/times/tempo e clica em **Criar sala** — o menu mostra o IP local.
+2. O outro digita esse IP e clica em **Entrar**. A partida começa sozinha nas duas telas.
+3. Mesma rede Wi-Fi/LAN funciona direto. Pela internet, o anfitrião precisa liberar/redirecionar a **porta 27015 UDP**
+   no roteador (ou usar uma VPN de jogos tipo ZeroTier/Tailscale/Radmin e o IP dela).
 
-Plano de implementação:
+Anfitrião = time da casa (P1), convidado = visitante. Cada um usa o controle/teclado/toque escolhido em "Jogador 1".
 
-1. `EnetSession` (Godot `ENetMultiplayerPeer`, UDP) para LAN/IP direto; depois WebRTC ou relay para NAT.
-2. **Atraso de entrada** de 2–3 ticks + **rollback** (salvar/restaurar `MatchSim` — adicionar `snapshot()`/`restore()`),
-   re-simulando quando a entrada real do adversário difere da prevista (repetir a última).
-3. Trocar `float` por ponto fixo **se** for jogar entre arquiteturas diferentes (PC x Android ARM):
-   floats IEEE costumam bater na mesma build, mas não é garantido entre CPUs/compiladores.
-   Alternativa mais simples: servidor autoritativo (host) + correção de estado a cada ~100 ms.
-4. Matchmaking: começar com "código de sala"; depois serviço dedicado.
+## Como funciona
+
+* **Lockstep com atraso de entrada** (`scripts/net/lockstep.gd`): a entrada capturada agora vale para 3 ticks no futuro
+  (≈ 50 ms). A simulação só avança um tick quando tem as entradas dos dois lados → as duas máquinas simulam a mesma partida.
+* **Rede** (`scripts/net/enet_session.gd`): ENet/UDP. Cada pacote de entradas leva as últimas 8 (redundância), então perder
+  pacotes não trava; se travar esperando, reenvia.
+* **Banda**: ~3 bytes × 60 ticks × redundância ≈ 2–3 KB/s. Funciona até em 3G.
+* **Anti-dessincronia**: a cada 60 ticks os dois trocam um hash do estado; divergência aparece na tela.
+* Testado no CI: duas sessões ENet reais em localhost jogam 600 ticks CPU×CPU e terminam com estado idêntico.
+
+## Limitações e próximos passos
+
+1. **Latência alta** (> 80 ms) deixa os controles "pesados", porque o lockstep espera. Próximo passo: **rollback**
+   (prever a entrada do adversário, simular adiante e corrigir) — precisa de `MatchSim.snapshot()/restore()`.
+2. **PC × Android**: a simulação usa `float`. Na mesma build costuma bater, mas entre CPUs diferentes (x86 × ARM) não é
+   garantido. Se aparecer "Dessincronia" nesse cenário, a solução é ponto fixo na simulação ou servidor autoritativo.
+3. **Matchmaking / NAT**: hoje é IP direto. Próximo: servidor de "código de sala" com relay, ou WebRTC.
+4. Pausa online não para a partida (só abre o menu localmente).
