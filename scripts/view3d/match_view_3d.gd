@@ -745,6 +745,7 @@ class MarkerOverlay:
 
 	func _ready() -> void:
 		set_anchors_preset(Control.PRESET_FULL_RECT)
+		size = get_viewport().get_visible_rect().size
 		mouse_filter = Control.MOUSE_FILTER_IGNORE
 		_font = ThemeDB.fallback_font
 

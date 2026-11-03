@@ -486,7 +486,7 @@ func animate(p: SimPlayer, ball_pos: Vector2, ball_z: float, dt: float) -> void:
 	_bone(B.SPINE, spine_x * 0.5, spine_y * 0.5 - hip_yaw * 0.5)
 	_bone(B.CHEST, spine_x * 0.5, spine_y * 0.5 - hip_yaw * 0.5)
 	# +X inclina a cabeça para trás: compensa a inclinação do tronco; olhar para baixo é negativo
-	var nx := clampf(neck_x * 0.6 - spine_x * 0.35, -0.3, 0.35) - look_down
+	var nx := clampf(neck_x * 0.5 - spine_x * 0.3, -0.3, 0.16) - look_down
 	_bone(B.NECK, nx * 0.5, _head_yaw * 0.4 - spine_y * 0.4)
 	_bone(B.HEAD, nx * 0.5, _head_yaw * 0.6 - spine_y * 0.2)
 	var th: Array[int] = [B.THIGH_L, B.THIGH_R]

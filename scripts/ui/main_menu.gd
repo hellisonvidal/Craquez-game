@@ -24,6 +24,10 @@ var _net_status: Label
 
 func _ready() -> void:
 	set_anchors_preset(Control.PRESET_FULL_RECT)
+	# o pai é um Node (não Control): no Godot 4.4 as âncoras não dão tamanho,
+	# então o menu acompanha o tamanho da tela explicitamente
+	_fit()
+	get_viewport().size_changed.connect(_fit)
 	minutes_i = maxi(0, minutes_opts.find(Settings.half_minutes))
 	# padrão: clássico do Brasileirão (se o banco de ligas carregou)
 	var lgs := Teams.leagues()
@@ -36,6 +40,11 @@ func _ready() -> void:
 	_refresh_devices()
 	_build()
 	Input.joy_connection_changed.connect(_on_joy_changed)
+
+
+func _fit() -> void:
+	position = Vector2.ZERO
+	size = get_viewport().get_visible_rect().size
 
 
 func _on_joy_changed(_id: int, _connected: bool) -> void:
