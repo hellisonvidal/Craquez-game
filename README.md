@@ -20,7 +20,7 @@ PvP local, contra CPU e **PvP online** (por IP). Suporte a controles **Xbox / Pl
 
 ## Como rodar
 
-1. Instale o [Godot 4.3](https://godotengine.org/download) (versão padrão, não a .NET).
+1. Instale o [Godot 4.4](https://godotengine.org/download) (versão padrão, não a .NET).
 2. Abra o Godot → **Importar** → selecione `project.godot` desta pasta.
 3. Aperte **F5**.
 

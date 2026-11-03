@@ -6,12 +6,12 @@ on:
   pull_request:
 
 env:
-  GODOT_VERSION: "4.3"
+  GODOT_VERSION: "4.4.1"
 
 jobs:
   test:
     runs-on: ubuntu-latest
-    container: barichello/godot-ci:4.3
+    container: barichello/godot-ci:4.4.1
     steps:
       - uses: actions/checkout@v4
       - name: Importar projeto
@@ -30,7 +30,7 @@ jobs:
   export-windows:
     needs: test
     runs-on: ubuntu-latest
-    container: barichello/godot-ci:4.3
+    container: barichello/godot-ci:4.4.1
     steps:
       - uses: actions/checkout@v4
       - name: Preparar Godot
@@ -51,7 +51,7 @@ jobs:
   export-android:
     needs: test
     runs-on: ubuntu-latest
-    container: barichello/godot-ci:4.3
+    container: barichello/godot-ci:4.4.1
     steps:
       - uses: actions/checkout@v4
       - name: Preparar Godot + Android
@@ -82,7 +82,7 @@ jobs:
   screenshots:
     needs: test
     runs-on: ubuntu-latest
-    container: barichello/godot-ci:4.3
+    container: barichello/godot-ci:4.4.1
     steps:
       - uses: actions/checkout@v4
       - name: Instalar tela virtual + OpenGL por software
