@@ -218,11 +218,13 @@ func _cycler(parent: Control, key: String, caption: String) -> HBoxContainer:
 	var hb := HBoxContainer.new()
 	hb.add_theme_constant_override("separation", 8)
 	parent.add_child(hb)
-	var cap := Label.new()
-	cap.text = caption
-	cap.custom_minimum_size = Vector2(230, 0)
-	cap.add_theme_color_override("font_color", Color("#94a3b8"))
-	hb.add_child(cap)
+	if caption != "":
+		var cap := Label.new()
+		cap.text = caption
+		cap.custom_minimum_size = Vector2(230, 0)
+		cap.size_flags_horizontal = Control.SIZE_SHRINK_BEGIN
+		cap.add_theme_color_override("font_color", Color("#94a3b8"))
+		hb.add_child(cap)
 	var left := Button.new()
 	left.text = "◀"
 	left.focus_mode = Control.FOCUS_NONE
@@ -384,8 +386,9 @@ func _page_teams() -> void:
 		panel.add_child(inner)
 		var head := _small(inner, "CASA" if side == 0 else "VISITANTE", Color("#facc15") if side == 0 else Color("#38bdf8"), 26)
 		head.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-		_cycler(inner, "league_a" if side == 0 else "league_b", "Liga")
-		_cycler(inner, "team_a" if side == 0 else "team_b", "Time")
+		_cycler(inner, "league_a" if side == 0 else "league_b", "")
+		_cycler(inner, "team_a" if side == 0 else "team_b", "")
+		(_labels["team_a" if side == 0 else "team_b"] as Button).add_theme_font_size_override("font_size", 30)
 		var kit := KitBadge.new()
 		kit.custom_minimum_size = Vector2(0, 120)
 		inner.add_child(kit)
@@ -611,8 +614,8 @@ func _refresh() -> void:
 	var tb := Teams.get_team(team_b)
 	var p2: String = _p2_options()[clampi(p2_dev, 0, _p2_options().size() - 1)]
 	_set_label("mode", GameModes.display_name(GameModes.ALL[mode_i]))
-	_set_label("league_a", String(ta.get("league", "—")))
-	_set_label("league_b", String(tb.get("league", "—")))
+	_set_label("league_a", "Liga: " + String(ta.get("league", "—")))
+	_set_label("league_b", "Liga: " + String(tb.get("league", "—")))
 	_set_label("team_a", String(ta["name"]))
 	_set_label("team_b", String(tb["name"]))
 	_set_label("p1", InputRouter.device_label(_devices[p1_dev]))

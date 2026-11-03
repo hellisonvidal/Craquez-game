@@ -17,6 +17,9 @@ var _banner_lbl: Label
 var _banner_face: TextureRect
 var _banner_sub: Label
 var _banner_t := 0.0
+var _toast: PanelContainer
+var _toast_lbl: Label
+var _toast_t := 0.0
 var _pause: PanelContainer
 var _end: PanelContainer
 var _end_lbl: Label
@@ -99,6 +102,16 @@ func _build() -> void:
 	_banner_sub.add_theme_font_size_override("font_size", 22)
 	bv.add_child(_banner_sub)
 
+	# aviso compacto (lateral, escanteio, falta...) logo abaixo do placar
+	_toast = PanelContainer.new()
+	_toast.add_theme_stylebox_override("panel", _panel(Color(0.02, 0.03, 0.06, 0.8)))
+	_toast.visible = false
+	add_child(_toast)
+	_toast_lbl = Label.new()
+	_toast_lbl.add_theme_font_size_override("font_size", 22)
+	_toast_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_toast.add_child(_toast_lbl)
+
 	_pause = _menu_panel("PAUSA", [["Continuar", resume_requested], ["Sair para o menu", quit_requested]])
 	_end = _menu_panel("FIM DE JOGO", [["Revanche", rematch_requested], ["Menu principal", quit_requested]])
 	_end_lbl = _end.get_child(0).get_child(0) as Label
@@ -177,10 +190,9 @@ func on_event(e: Dictionary) -> void:
 				_flash(1.6)
 			elif kind in ["corner", "freekick", "goalkick", "throwin", "offside"]:
 				var txt := {"corner": "Escanteio", "freekick": "Falta", "goalkick": "Tiro de meta", "throwin": "Lateral", "offside": "Impedimento"}
-				_banner_lbl.text = txt[kind]
-				_banner_sub.text = names[int(e.get("team", 0))]
-				_banner_face.texture = null
-				_flash(0.9)
+				_toast_lbl.text = "%s  ·  %s" % [txt[kind], names[int(e.get("team", 0))]]
+				_toast_t = 1.6
+				_toast.visible = true
 
 
 func show_message(title: String, sub: String, t: float) -> void:
@@ -204,6 +216,13 @@ func _process(delta: float) -> void:
 		match_min = 20.0
 	var game_t := sim.clock / sim.half_seconds * match_min + (sim.half - 1) * match_min
 	_clock_lbl.text = "%02d:%02d  %dºT" % [int(game_t), int(fmod(game_t, 1.0) * 60.0), sim.half]
+	if _toast_t > 0.0:
+		_toast_t -= delta
+		var vw := get_viewport().get_visible_rect().size.x
+		_toast.position = Vector2((vw - _toast.size.x) * 0.5, 96)
+		_toast.modulate.a = clampf(_toast_t * 3.0, 0.0, 1.0)
+		if _toast_t <= 0.0:
+			_toast.visible = false
 	if _banner_t > 0.0:
 		_banner_t -= delta
 		if _banner_t <= 0.0:

@@ -53,6 +53,7 @@ func show_page(i: int) -> void:
 	var vb := VBoxContainer.new()
 	vb.alignment = BoxContainer.ALIGNMENT_CENTER
 	vb.add_theme_constant_override("separation", 14)
+	vb.custom_minimum_size = Vector2(minf(1500.0, size.x - 80.0), 0)
 	center.add_child(vb)
 	if i == 0:
 		_label(vb, "desenvolvido com", 30, Color("#5b544a"))
