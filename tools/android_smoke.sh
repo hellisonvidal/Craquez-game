@@ -9,6 +9,7 @@ adb wait-for-device
 adb shell getprop ro.product.cpu.abilist
 adb shell wm size
 adb install -r -g "$APK" || { echo "FALHA NA INSTALAÇÃO"; exit 1; }
+adb shell settings put secure immersive_mode_confirmations confirmed
 adb logcat -c
 adb shell monkey -p $PKG -c android.intent.category.LAUNCHER 1
 sleep 30
