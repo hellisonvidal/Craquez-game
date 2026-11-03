@@ -8,6 +8,8 @@ uniform vec4 seat_color : source_color = vec4(0.10, 0.12, 0.17, 1.0);
 uniform vec4 team_a : source_color = vec4(0.9, 0.2, 0.2, 1.0);
 uniform vec4 team_b : source_color = vec4(0.2, 0.4, 0.9, 1.0);
 uniform float fill = 0.88;
+uniform float bias = 0.5;      // 1 = só torcida do time A, 0 = só do B
+uniform float light = 1.0;
 
 float h21(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
 
@@ -20,7 +22,8 @@ void fragment() {
 	if (r < fill) {
 		float jump = max(0.0, sin(TIME * (5.0 + 4.0 * r) + r * 40.0)) * excitement * 0.35;
 		float by = f.y + jump;
-		vec3 shirt = r < fill * 0.45 ? team_a.rgb : (r < fill * 0.85 ? team_b.rgb : vec3(0.9));
+		float pick = h21(cell + 5.0);
+		vec3 shirt = pick < 0.88 ? (pick < 0.88 * bias ? team_a.rgb : team_b.rgb) : vec3(0.9);
 		shirt *= 0.7 + 0.5 * h21(cell + 3.0);
 		vec3 skin = mix(vec3(0.95, 0.75, 0.6), vec3(0.35, 0.22, 0.15), h21(cell + 11.0));
 		// corpo
@@ -32,5 +35,5 @@ void fragment() {
 	}
 	// sombreamento por fileira (profundidade)
 	c *= 0.75 + 0.25 * UV.y;
-	ALBEDO = c;
+	ALBEDO = c * light;
 }

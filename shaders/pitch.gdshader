@@ -14,6 +14,7 @@ uniform int layout = 0;      // 0 campo, 1 futsal, 2 street
 uniform float goal_half = 3.66;
 uniform float line_w = 0.12;
 uniform float stripes = 1.0;
+uniform float night = 0.0;
 
 varying vec2 wp;
 
@@ -93,5 +94,10 @@ void fragment() {
 	vec3 lc = surface == 1 ? vec3(0.97, 0.97, 0.95) : vec3(0.96);
 	if (surface == 2) lc = vec3(0.95, 0.85, 0.25);
 	c = mix(c, lc, lm * 0.95);
+	if (night > 0.0) {
+		float e = length(p / vec2(hl + 6.0, hw + 6.0));
+		c *= 1.0 - night * 0.28 * smoothstep(0.55, 1.35, e);
+		c *= 1.0 + night * 0.05;
+	}
 	ALBEDO = c;
 }

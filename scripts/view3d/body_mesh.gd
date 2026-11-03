@@ -133,8 +133,8 @@ static func _loft(st: SurfaceTool, base: int, cx: float, rings: Array, weight_fn
 
 static func _new_st() -> SurfaceTool:
 	var st := SurfaceTool.new()
-	st.begin(Mesh.PRIMITIVE_TRIANGLES)
 	st.set_skin_weight_count(SurfaceTool.SKIN_4_WEIGHTS)
+	st.begin(Mesh.PRIMITIVE_TRIANGLES)
 	return st
 
 
