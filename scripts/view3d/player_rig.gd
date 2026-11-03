@@ -43,6 +43,8 @@ func build(p: SimPlayer, kit: Dictionary) -> void:
 	pid = p.id
 	lefty = (p.face_id % 5) == 0
 	var build_k := float((p.face_id * 7 + p.number) % 3) * 0.5   # 0 magro, 0.5 médio, 1 forte
+	if int(kit.get("build", -1)) >= 0:
+		build_k = float(kit["build"]) * 0.5
 	if p.is_keeper:
 		build_k = 1.0
 	scale = Vector3.ONE * (0.97 + 0.07 * float(p.face_id % 7) / 6.0)

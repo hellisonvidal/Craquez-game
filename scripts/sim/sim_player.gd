@@ -15,6 +15,7 @@ var is_keeper: bool = false
 var number: int = 1
 var name: String = ""
 var face_id: int = 0
+var face: Array = []              # [pele, cor do cabelo, estilo, barba, olhos, porte] (data/leagues.json)
 var base: Vector2 = Vector2.ZERO # posição na formação (normalizada)
 
 # atributos 0..1

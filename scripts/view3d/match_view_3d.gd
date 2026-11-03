@@ -518,7 +518,7 @@ func _place_shadows(list: Array, pos: Vector2, yaw: float, lying: bool) -> void:
 
 
 func _kit_for(p: SimPlayer) -> Dictionary:
-	var m: Dictionary = FaceLibrary.meta(p.face_id)
+	var m: Dictionary = FaceLibrary.player_meta(p)
 	var cols: Array = team_colors[p.team] if p.team >= 0 else [Color("#111827"), Color("#111827")]
 	var shirt: Color = cols[0]
 	var second: Color = cols[1]
@@ -531,6 +531,7 @@ func _kit_for(p: SimPlayer) -> Dictionary:
 		"beard": {"none": 0.0, "stubble": 0.45, "mustache": 0.35, "chin": 0.5, "goatee": 0.6, "full": 0.85}.get(String(m.get("beard", "none")), 0.5),
 		"eye": EYE_COLORS[int(m.get("eye_color", 0)) % EYE_COLORS.size()],
 		"boots": BOOT_COLORS[(p.face_id * 3 + p.number) % BOOT_COLORS.size()],
+		"build": int(m.get("build", -1)),
 	}
 
 

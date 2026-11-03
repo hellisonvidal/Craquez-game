@@ -275,6 +275,8 @@ def write_library(count: int, seed: int, out_dir: Path) -> list[FaceParams]:
     for i in range(count):
         p = random_params(seed * 100003 + i)
         (out_dir / f"face_{i:03d}.svg").write_text(build_svg(p), encoding="utf-8")
+        # o jogo lê o SVG cru e rasteriza no tamanho do preset: não importar como textura
+        (out_dir / f"face_{i:03d}.svg.import").write_text('[remap]\n\nimporter="skip"\n', encoding="utf-8")
         faces.append(p)
     meta = []
     for f in faces:

@@ -89,6 +89,8 @@ func setup(mode_id: String, team_a: Dictionary, team_b: Dictionary, seed_value: 
 	var name_pool: Array = Teams.NAMES.duplicate()
 	for t in 2:
 		var rating: float = team_info[t]["rating"]
+		var roster: Array = team_info[t].get("roster", [])
+		var used := {}
 		for i in formation.size():
 			var p := SimPlayer.new()
 			p.id = players.size()
@@ -108,9 +110,55 @@ func setup(mode_id: String, team_a: Dictionary, team_b: Dictionary, seed_value: 
 			p.passing = clampf(rating + rng.gauss() * 0.08, 0.35, 0.99)
 			p.control = clampf(rating + rng.gauss() * 0.08, 0.35, 0.99)
 			p.defense = clampf(rating + rng.gauss() * 0.1 + (0.08 if p.base.x < -0.6 else -0.04), 0.3, 0.99)
+			if not roster.is_empty():
+				# escala o elenco real do time: melhor disponível em cada posição
+				var want := "GK" if p.is_keeper else ("DF" if p.base.x < -0.6 else ("MF" if p.base.x < -0.3 else "FW"))
+				var e := _pick_from_roster(roster, want, used, not bool(mode["keeper"]))
+				if not e.is_empty():
+					p.name = String(e["n"])
+					p.number = int(e["num"])
+					p.face_id = int(e.get("fid", p.face_id))
+					p.face = e.get("f", [])
+					var a: Array = e.get("a", [])
+					if a.size() >= 6:
+						p.pace = float(a[0])
+						p.accel = float(a[1])
+						p.shot = float(a[2])
+						p.passing = float(a[3])
+						p.control = float(a[4])
+						p.defense = float(a[5])
 			players.append(p)
 	kickoff_team = 0
 	_reset_for_kickoff(0)
+
+
+## Escolhe do elenco o melhor atleta ainda livre para a posição (média dos atributos).
+static func _pick_from_roster(roster: Array, want: String, used: Dictionary, no_keepers: bool) -> Dictionary:
+	var best: Dictionary = {}
+	var best_i := -1
+	var best_s := -1.0
+	for pass_i in 2:
+		for i in roster.size():
+			if used.has(i):
+				continue
+			var e: Dictionary = roster[i]
+			var pos := String(e.get("pos", ""))
+			if no_keepers and pos == "GK":
+				continue
+			if pass_i == 0 and pos != want:
+				continue
+			var sc := 0.0
+			for v in e.get("a", []):
+				sc += float(v)
+			if sc > best_s:
+				best_s = sc
+				best = e
+				best_i = i
+		if not best.is_empty():
+			break
+	if best_i >= 0:
+		used[best_i] = true
+	return best
 
 
 # ---------------------------------------------------------------- utilidades

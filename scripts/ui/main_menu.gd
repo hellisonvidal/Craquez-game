@@ -25,6 +25,14 @@ var _net_status: Label
 func _ready() -> void:
 	set_anchors_preset(Control.PRESET_FULL_RECT)
 	minutes_i = maxi(0, minutes_opts.find(Settings.half_minutes))
+	# padrão: clássico do Brasileirão (se o banco de ligas carregou)
+	var lgs := Teams.leagues()
+	for lg: Dictionary in lgs:
+		if String(lg["id"]) == "bra":
+			team_a = int(lg["first"]) + 8
+			team_b = int(lg["first"]) + 13
+	team_a = posmod(team_a, Teams.count())
+	team_b = posmod(team_b, Teams.count())
 	_refresh_devices()
 	_build()
 	Input.joy_connection_changed.connect(_on_joy_changed)
@@ -99,7 +107,7 @@ func _build() -> void:
 	_faces.add_theme_constant_override("separation", 8)
 	vb.add_child(_faces)
 
-	for key in ["mode", "team_a", "team_b", "p1", "p2", "minutes", "skill", "quality", "sound"]:
+	for key in ["mode", "league_a", "team_a", "league_b", "team_b", "p1", "p2", "minutes", "skill", "quality", "sound"]:
 		var b := Button.new()
 		b.custom_minimum_size = Vector2(0, 46)
 		b.add_theme_font_size_override("font_size", 20)
@@ -258,18 +266,18 @@ func _on_btn_input(ev: InputEvent, key: String) -> void:
 
 
 func _cycle(key: String, d: int) -> void:
-	var n := Teams.LIST.size()
+	var n := Teams.count()
 	match key:
 		"mode":
 			mode_i = posmod(mode_i + d, GameModes.ALL.size())
+		"league_a":
+			team_a = _league_step(team_a, d, team_b)
+		"league_b":
+			team_b = _league_step(team_b, d, team_a)
 		"team_a":
-			team_a = posmod(team_a + d, n)
-			if team_a == team_b:
-				team_a = posmod(team_a + d, n)
+			team_a = _team_step(team_a, d, team_b, n)
 		"team_b":
-			team_b = posmod(team_b + d, n)
-			if team_a == team_b:
-				team_b = posmod(team_b + d, n)
+			team_b = _team_step(team_b, d, team_a, n)
 		"p1":
 			p1_dev = posmod(p1_dev + d, _devices.size())
 		"p2":
@@ -292,6 +300,32 @@ func _cycle(key: String, d: int) -> void:
 	_refresh()
 
 
+## Próximo time dentro da mesma liga (evita repetir o adversário).
+func _team_step(cur: int, d: int, other: int, n: int) -> int:
+	var lgs := Teams.leagues()
+	if lgs.is_empty():
+		var v := posmod(cur + d, n)
+		return posmod(v + d, n) if v == other else v
+	var lg: Dictionary = lgs[Teams.league_of(cur)]
+	var first := int(lg["first"])
+	var cnt := int(lg["count"])
+	var v := first + posmod(cur - first + d, cnt)
+	if v == other:
+		v = first + posmod(v - first + d, cnt)
+	return v
+
+
+func _league_step(cur: int, d: int, other: int) -> int:
+	var lgs := Teams.leagues()
+	if lgs.is_empty():
+		return cur
+	var li := posmod(Teams.league_of(cur) + d, lgs.size())
+	var v := int(lgs[li]["first"])
+	if v == other:
+		v += 1
+	return v
+
+
 func _refresh() -> void:
 	var ta := Teams.get_team(team_a)
 	var tb := Teams.get_team(team_b)
@@ -299,6 +333,12 @@ func _refresh() -> void:
 	_buttons["mode"].text = "Modo:  ◀ %s ▶" % GameModes.display_name(GameModes.ALL[mode_i])
 	_buttons["team_a"].text = "Casa:  ◀ %s ▶" % ta["name"]
 	_buttons["team_b"].text = "Visitante:  ◀ %s ▶" % tb["name"]
+	var has_leagues := not Teams.leagues().is_empty()
+	_buttons["league_a"].visible = has_leagues
+	_buttons["league_b"].visible = has_leagues
+	if has_leagues:
+		_buttons["league_a"].text = "Liga (casa):  ◀ %s ▶" % ta.get("league", "")
+		_buttons["league_b"].text = "Liga (visitante):  ◀ %s ▶" % tb.get("league", "")
 	_buttons["p1"].text = "Jogador 1:  ◀ %s ▶" % InputRouter.device_label(_devices[p1_dev])
 	_buttons["p2"].text = "Jogador 2:  ◀ %s ▶" % InputRouter.device_label(p2)
 	_buttons["minutes"].text = "Tempo:  ◀ %d min cada ▶" % int(minutes_opts[minutes_i])
@@ -317,7 +357,14 @@ func _refresh() -> void:
 		tr.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
 		tr.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
 		var team_idx := team_a if i < 3 else team_b
-		tr.texture = FaceLibrary.texture((team_idx * 13 + (i % 3) * 5) % FaceLibrary.COUNT, 256)
+		var roster: Array = Teams.get_team(team_idx).get("roster", [])
+		if roster.size() > 14:
+			# destaques do elenco: meias e atacantes
+			var e: Dictionary = roster[[9, 14, 15][i % 3]]
+			tr.texture = FaceLibrary.texture(int(e.get("fid", 0)), 256)
+			tr.tooltip_text = "%s (%d)" % [e.get("n", ""), int(e.get("num", 0))]
+		else:
+			tr.texture = FaceLibrary.texture((team_idx * 13 + (i % 3) * 5) % FaceLibrary.COUNT, 256)
 		_faces.add_child(tr)
 
 
