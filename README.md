@@ -1,6 +1,6 @@
 # ⚽ Craquez
 
-Jogo de futebol 2D (vista 3/4 "2.5D") com física realista, para **Windows** e **Android**.
+Jogo de futebol em 3D com visual desenhado (cel-shading), jogabilidade no estilo EA FC / eFootball, para **Windows** e **Android**.
 Modos **Campo (11×11)**, **Futsal (5×5)** e **Street (3×3 com tabela no muro)**.
 PvP local, contra CPU e **PvP online** (por IP). Suporte a controles **Xbox / PlayStation**, teclado e toque.
 
@@ -10,7 +10,9 @@ PvP local, contra CPU e **PvP online** (por IP). Suporte a controles **Xbox / Pl
 
 | | |
 |---|---|
-| **Gráficos 2D UHD** | Tudo vetorial (campo, jogadores, rostos SVG) → nítido de 480p a 4K, sem pesar no download |
+| **Visual** | 3D com sombreamento "desenhado" e contorno; atletas com esqueleto e músculos, rosto desenhado; estádio noturno com refletores, árbitro e assistentes |
+| **Ligas 2026/27** | Série A Itália, Premier League, La Liga, Ligue 1, Série A e B do Brasil, MLS e Liga Argentina — 178 clubes com a composição real da temporada e as cores reais (nomes alterados, sem licença). Edite em `data/leagues.json` |
+| **Jogabilidade** | Dribles no analógico direito, proteção/contenção (LT/L2), chute colocado (RB/R1), armação do chute, domínio orientado |
 | **Física** | Bola 2.5D com gravidade, arrasto do ar, efeito Magnus (curva), quique por superfície (grama/madeira/asfalto), atrito de rolagem, traves e travessão |
 | **Movimento** | Aceleração/frenagem, inércia em mudanças de direção, giro mais lento em velocidade, fôlego (stamina), condução de bola com toques |
 | **Hardware modesto** | Renderer *GL Compatibility* (OpenGL 3.3 / GLES 3). Presets Baixa (854×480, 30 fps) → Ultra (nativo, MSAA 4x, 144 fps) e detecção automática |
@@ -35,7 +37,10 @@ Builds automáticas: a cada push, o GitHub Actions roda os testes e gera o `.exe
 | Chute — segure p/ força (defesa: carrinho) | B | ◯ | K | Num 2 |
 | Passe alto / cruzamento | X | ▢ | L | Num 3 |
 | Enfiada (defesa: chamar 2º marcador) | Y | △ | I | Num 5 |
-| Correr | RT / RB | R2 / R1 | Shift | Num 0 |
+| Correr | RT | R2 | Shift | Num 0 |
+| Proteger bola / conter (defesa) | LT | L2 | C | Num 7 |
+| Chute colocado (com curva) | RB | R1 | U | Num 9 |
+| Dribles | Analógico direito | Analógico direito | E + direção | Num 6 + direção |
 | Trocar jogador | LB | L1 | Q | Num 4 |
 | Pausa | Start | Options | P / Esc | Backspace |
 
@@ -69,3 +74,21 @@ python3 tools/face_gen.py --count 96 --seed 7
 ```
 
 Gera novos rostos procedurais (tom de pele, cabelo, barba, olhos, formato do rosto). São placeholders de qualidade — o pipeline aceita rostos desenhados à mão em SVG no mesmo formato (512×512).
+
+## Ligas e times (2026/27)
+
+`data/leagues.json` traz as 8 ligas com a composição real de clubes da temporada 2026/27
+(promovidos e rebaixados incluídos) e as cores reais dos uniformes. Os **nomes dos clubes
+são alterados** e os **jogadores são fictícios** — nomes, escudos e rostos de clubes e
+atletas reais são protegidos e exigem licença. Assim como nos "option files" do PES, você
+pode editar o arquivo à vontade (nome, sigla, cores, nome/número/atributos dos jogadores).
+
+Para regenerar tudo do zero: `python3 tools/league_gen.py` (gera também os rostos 2D).
+
+Dribles com o analógico direito (relativos ao corpo do jogador):
+
+| Direção | Sem LT/L2 | Com LT/L2 |
+|---|---|---|
+| Frente | Toque longo + arrancada | Toque longo + arrancada |
+| Trás | Puxada (giro de 180°) | Roleta |
+| Lado | Corte lateral | Pedalada (pode desequilibrar o marcador) |
