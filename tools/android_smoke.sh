@@ -6,6 +6,9 @@ mkdir -p $OUT
 PKG=com.hellisonvidal.craquez
 APK=$(ls apk/*.apk | head -1)
 adb wait-for-device
+# espera o Android terminar de iniciar (temas/serviços recriam apps abertos cedo demais)
+until [ "$(adb shell getprop sys.boot_completed | tr -d '\r')" = "1" ]; do sleep 2; done
+sleep 60
 adb shell getprop ro.product.cpu.abilist
 adb shell wm size
 adb install -r -g "$APK" || { echo "FALHA NA INSTALAÇÃO"; exit 1; }
