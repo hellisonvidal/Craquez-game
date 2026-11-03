@@ -461,7 +461,7 @@ class KitBadge:
 
 func _unhandled_input(event: InputEvent) -> void:
 	if page == Page.TITLE:
-		var press := (event is InputEventKey and event.pressed and not event.echo) \
+		var press: bool = (event is InputEventKey and event.pressed and not event.echo) \
 			or (event is InputEventJoypadButton and event.pressed) \
 			or (event is InputEventMouseButton and event.pressed) \
 			or (event is InputEventScreenTouch and event.pressed)
@@ -619,7 +619,7 @@ func _refresh() -> void:
 	_set_label("p2", InputRouter.device_label(p2))
 	_set_label("minutes", "%d min cada tempo" % int(minutes_opts[minutes_i]))
 	_set_label("skill", skill_opts[skill_i][0])
-	var q := Settings.QUALITY_NAMES[Settings.quality]
+	var q: String = Settings.QUALITY_NAMES[Settings.quality]
 	if Settings.quality == Settings.Quality.AUTO:
 		q += "  (%s)" % Settings.QUALITY_NAMES[Settings.effective_quality]
 	_set_label("quality", q)
