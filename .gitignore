@@ -1,0 +1,10 @@
+.godot/
+export/
+build/
+*.apk
+*.aab
+*.exe
+*.pck
+*.keystore
+.DS_Store
+__pycache__/
