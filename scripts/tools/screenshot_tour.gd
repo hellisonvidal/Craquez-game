@@ -16,7 +16,7 @@ func run(dir: String, main_node: Node) -> void:
 	await _wait(1.5)
 	await _shot("01_menu")
 
-	await _match(GameModes.FIELD, 0, 1, ["cpu", "cpu"], 11, [[6.0, "02_campo_saida"], [18.0, "03_campo_jogo"], [30.0, "04_campo_ataque"]])
+	await _match(GameModes.FIELD, _t("bra", 8), _t("bra", 13), ["cpu", "cpu"], 11, [[6.0, "02_campo_saida"], [18.0, "03_campo_jogo"], [30.0, "04_campo_ataque"]])
 	# de perto: quem está com a bola (ou o mais próximo dela)
 	for i in 3:
 		var game: Node = main._current
@@ -25,13 +25,13 @@ func run(dir: String, main_node: Node) -> void:
 		await _wait(0.9)
 		await _shot("04_%d_perto" % i)
 	main._current.view.closeup_id = -1
-	await _match(GameModes.FUTSAL, 2, 3, ["cpu", "cpu"], 5, [[8.0, "05_futsal"], [20.0, "06_futsal_jogo"]])
-	await _match(GameModes.STREET, 4, 5, ["cpu", "cpu"], 7, [[8.0, "07_street"], [20.0, "08_street_jogo"]])
+	await _match(GameModes.FUTSAL, _t("eng", 14), _t("eng", 13), ["cpu", "cpu"], 5, [[8.0, "05_futsal"], [20.0, "06_futsal_jogo"]])
+	await _match(GameModes.STREET, _t("arg", 6), _t("arg", 21), ["cpu", "cpu"], 7, [[8.0, "07_street"], [20.0, "08_street_jogo"]])
 
 	# celular (Android): proporção 20:9 com controles de toque
 	get_window().size = Vector2i(2400, 1080)
 	await _wait(0.5)
-	await _match(GameModes.FIELD, 6, 7, ["touch", "cpu"], 21, [[10.0, "09_android_toque"]])
+	await _match(GameModes.FIELD, _t("ita", 7), _t("ita", 11), ["touch", "cpu"], 21, [[10.0, "09_android_toque"]])
 	var tc: Control = main._current.touch
 	if tc != null:
 		print("touch: visible=", tc.is_visible_in_tree(), " size=", tc.size, " pos=", tc.global_position)
@@ -42,13 +42,21 @@ func run(dir: String, main_node: Node) -> void:
 	get_window().size = Vector2i(1920, 1080)
 	Settings.quality = Settings.Quality.LOW
 	Settings.apply()
-	await _match(GameModes.FIELD, 0, 2, ["cpu", "cpu"], 11, [[18.0, "10_qualidade_baixa"]])
+	await _match(GameModes.FIELD, _t("esp", 15), _t("esp", 3), ["cpu", "cpu"], 11, [[18.0, "10_qualidade_baixa"]])
 
 	# caça um gol para mostrar o banner com a face do artilheiro
 	Settings.quality = Settings.Quality.ULTRA
 	Settings.apply()
 	await _goal_hunt()
 	get_tree().quit()
+
+
+## Índice global do k-ésimo time da liga `id` (ou k, se o banco de ligas não carregou).
+func _t(id: String, k: int) -> int:
+	for lg: Dictionary in Teams.leagues():
+		if String(lg["id"]) == id:
+			return int(lg["first"]) + k
+	return k
 
 
 func _match(mode: String, a: int, b: int, devices: Array, seed_value: int, shots: Array) -> void:
