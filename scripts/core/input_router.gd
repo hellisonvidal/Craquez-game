@@ -48,7 +48,7 @@ static func read(dev: String) -> InputFrame:
 		return _read_pad(dev.substr(4).to_int())
 	match dev:
 		"kb1":
-			return _read_keys(KEY_W, KEY_S, KEY_A, KEY_D, KEY_J, KEY_K, KEY_L, KEY_I, KEY_SHIFT, KEY_Q, KEY_ESCAPE)
+			return _read_keys(KEY_W, KEY_S, KEY_A, KEY_D, KEY_J, KEY_K, KEY_L, KEY_I, KEY_SHIFT, KEY_Q, KEY_P)
 		"kb2":
 			return _read_keys(KEY_UP, KEY_DOWN, KEY_LEFT, KEY_RIGHT, KEY_KP_1, KEY_KP_2, KEY_KP_3, KEY_KP_5, KEY_KP_0, KEY_KP_4, KEY_BACKSPACE)
 		"touch":

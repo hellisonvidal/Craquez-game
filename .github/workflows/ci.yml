@@ -1,0 +1,57 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    container: barichello/godot-ci:4.3
+    steps:
+      - uses: actions/checkout@v4
+      - name: Importar projeto
+        run: godot --headless --path . --import || true
+      - name: Testes da simulação
+        run: godot --headless --path . -s tests/run_tests.gd
+
+  export-windows:
+    needs: test
+    runs-on: ubuntu-latest
+    container: barichello/godot-ci:4.3
+    steps:
+      - uses: actions/checkout@v4
+      - name: Templates
+        run: |
+          mkdir -p ~/.local/share/godot/export_templates
+          cp -r /root/.local/share/godot/export_templates/* ~/.local/share/godot/export_templates/ || true
+      - name: Exportar Windows
+        run: |
+          mkdir -p build/windows
+          godot --headless --path . --import || true
+          godot --headless --path . --export-release "Windows Desktop" build/windows/Craquez.exe
+      - uses: actions/upload-artifact@v4
+        with:
+          name: craquez-windows
+          path: build/windows
+
+  export-android:
+    needs: test
+    runs-on: ubuntu-latest
+    container: barichello/godot-ci:4.3
+    steps:
+      - uses: actions/checkout@v4
+      - name: Templates
+        run: |
+          mkdir -p ~/.local/share/godot/export_templates
+          cp -r /root/.local/share/godot/export_templates/* ~/.local/share/godot/export_templates/ || true
+      - name: Exportar APK (debug)
+        run: |
+          mkdir -p build/android
+          godot --headless --path . --import || true
+          godot --headless --path . --export-debug "Android" build/android/Craquez-debug.apk
+      - uses: actions/upload-artifact@v4
+        with:
+          name: craquez-android-debug
+          path: build/android
