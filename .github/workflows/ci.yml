@@ -78,3 +78,25 @@ jobs:
         with:
           name: craquez-android-debug
           path: build/android
+
+  screenshots:
+    needs: test
+    runs-on: ubuntu-latest
+    container: barichello/godot-ci:4.3
+    steps:
+      - uses: actions/checkout@v4
+      - name: Instalar tela virtual + OpenGL por software
+        run: |
+          apt-get update -qq
+          DEBIAN_FRONTEND=noninteractive apt-get install -y -qq xvfb xauth libgl1-mesa-dri libglx-mesa0 libegl1 libgl1 > /dev/null
+      - name: Tirar screenshots
+        run: |
+          godot --headless --path . --import || true
+          mkdir -p shots
+          xvfb-run -a -s "-screen 0 2400x1080x24" godot --path . --rendering-driver opengl3 \
+            --resolution 1920x1080 --audio-driver Dummy -- --shots=$GITHUB_WORKSPACE/shots 2>&1 | tee shots.log
+          ls -la shots
+      - uses: actions/upload-artifact@v4
+        with:
+          name: craquez-screenshots
+          path: shots

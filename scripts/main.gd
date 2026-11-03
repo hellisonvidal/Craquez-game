@@ -7,6 +7,11 @@ var _current: Node
 func _ready() -> void:
 	# Teste de fumaça (CI):  godot --headless -- --autoplay=futsal
 	for a in OS.get_cmdline_user_args():
+		if a.begins_with("--shots="):
+			var tour = load("res://scripts/tools/screenshot_tour.gd").new()
+			add_child(tour)
+			tour.run(a.get_slice("=", 1), self)
+			return
 		if a.begins_with("--autoplay"):
 			var mode := a.get_slice("=", 1) if "=" in a else GameModes.FIELD
 			_show_menu()
