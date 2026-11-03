@@ -1,24 +1,17 @@
-## Atleta 3D articulado, montado por código (sem modelos externos) e animado
-## de forma procedural a partir do estado da simulação: passada proporcional
-## à velocidade, inclinação na arrancada e nas curvas, balanço de braços,
-## chute com o pé certo, carrinho, queda, mergulho do goleiro, cabeceio.
+## Atleta 3D: malha contínua com esqueleto (BodyMesh) e animação procedural
+## dirigida pela simulação — passada com giro de quadril, arrancada inclinada,
+## freada, corte com pé plantado, corrida lateral/de costas, cabeça seguindo
+## a bola, chute com armação, dribles, proteção, carrinho, goleiro.
 class_name PlayerRig
 extends Node3D
 
 const HIP_Y := 0.95
+const B := BodyMesh.B
 
 var pid: int = 0
 var lefty: bool = false
-
-# ossos (pivôs)
-var hips: Node3D
-var spine: Node3D
-var neck: Node3D
-var thigh: Array[Node3D] = []
-var shin: Array[Node3D] = []
-var foot: Array[Node3D] = []
-var upper_arm: Array[Node3D] = []
-var forearm: Array[Node3D] = []
+var skel: Skeleton3D
+var body: MeshInstance3D
 var number_label: Label3D
 
 # estado da animação (só visual)
@@ -26,8 +19,11 @@ var phase: float = 0.0
 var _yaw: float = 0.0
 var _prev_vel: Vector2 = Vector2.ZERO
 var _prev_dir: float = 0.0
+var _turn_rate: float = 0.0
 var _lean_f: float = 0.0
 var _bank: float = 0.0
+var _cut: float = 0.0
+var _head_yaw: float = 0.0
 var _kick_t: float = 0.0
 var _kicking: bool = false
 var _windup_total: float = 0.15
@@ -39,166 +35,81 @@ var _prev_tackle: float = 0.0
 var _tackle_t: float = -1.0
 var _head_t: float = -1.0
 var _breath: float = 0.0
+var _rest: Array[Vector3] = []
 
 
-static var _meshes: Dictionary = {}
-
-
-static func _capsule(r: float, h: float) -> CapsuleMesh:
-	var key := "c%.3f_%.3f" % [r, h]
-	if not _meshes.has(key):
-		var m := CapsuleMesh.new()
-		m.radius = r
-		m.height = h
-		m.radial_segments = 12
-		m.rings = 4
-		_meshes[key] = m
-	return _meshes[key]
-
-
-static func _sphere(r: float) -> SphereMesh:
-	var key := "s%.3f" % r
-	if not _meshes.has(key):
-		var m := SphereMesh.new()
-		m.radius = r
-		m.height = r * 2.0
-		m.radial_segments = 16
-		m.rings = 8
-		_meshes[key] = m
-	return _meshes[key]
-
-
-static func _box(s: Vector3) -> BoxMesh:
-	var key := "b%s" % s
-	if not _meshes.has(key):
-		var m := BoxMesh.new()
-		m.size = s
-		_meshes[key] = m
-	return _meshes[key]
-
-
-func _part(parent: Node3D, mesh: Mesh, mat: Material, pos: Vector3, scl: Vector3 = Vector3.ONE, rot: Vector3 = Vector3.ZERO) -> MeshInstance3D:
-	var mi := MeshInstance3D.new()
-	mi.mesh = mesh
-	mi.material_override = mat
-	mi.position = pos
-	mi.scale = scl
-	mi.rotation = rot
-	mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
-	parent.add_child(mi)
-	return mi
-
-
-func _pivot(parent: Node3D, pos: Vector3) -> Node3D:
-	var n := Node3D.new()
-	n.position = pos
-	parent.add_child(n)
-	return n
-
-
-## kit: {shirt, shorts, socks, skin, hair, hair_style, number, keeper, gloves}
+## kit: {shirt, shorts, socks, skin, hair, hair_style, number, keeper, gloves, beard, eye}
 func build(p: SimPlayer, kit: Dictionary) -> void:
 	pid = p.id
 	lefty = (p.face_id % 5) == 0
-	var shirt: Color = kit["shirt"]
-	var shorts: Color = kit["shorts"]
-	var socks: Color = kit["socks"]
+	var build_k := float((p.face_id * 7 + p.number) % 3) * 0.5   # 0 magro, 0.5 médio, 1 forte
+	if p.is_keeper:
+		build_k = 1.0
+	scale = Vector3.ONE * (0.97 + 0.07 * float(p.face_id % 7) / 6.0)
+	skel = BodyMesh.make_skeleton()
+	add_child(skel)
+	for i in skel.get_bone_count():
+		_rest.append(skel.get_bone_rest(i).origin)
+	body = MeshInstance3D.new()
+	body.mesh = BodyMesh.get_mesh(build_k, String(kit.get("hair_style", "short")))
+	body.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	skel.add_child(body)
+	body.skeleton = NodePath("..")
 	var skin: Color = kit["skin"]
-	var hair: Color = kit["hair"]
-	var boots := Color("#16181d")
-	var m_shirt := Toon.mat(shirt)
-	var m_shorts := Toon.mat(shorts)
-	var m_socks := Toon.mat(socks)
-	var m_skin := Toon.mat(skin)
-	var m_hair := Toon.mat(hair, true, 0.12)
-	var m_boot := Toon.mat(boots, true, 0.3, 0.6)
-	var m_hand := Toon.mat(kit.get("gloves", skin))
-	var scale_h := 0.96 + 0.08 * float(p.face_id % 7) / 6.0
-	scale = Vector3.ONE * scale_h
-
-	hips = _pivot(self, Vector3(0, HIP_Y, 0))
-	# calção
-	_part(hips, _capsule(0.16, 0.42), m_shorts, Vector3(0, -0.04, 0), Vector3(1.0, 0.62, 0.72), Vector3(0, 0, PI / 2))
-	# pernas
-	for s in 2:
-		var sx := -0.1 if s == 0 else 0.1
-		var th := _pivot(hips, Vector3(sx, -0.04, 0))
-		_part(th, _capsule(0.1, 0.28), m_shorts, Vector3(0, -0.1, 0))
-		_part(th, _capsule(0.086, 0.46), m_skin, Vector3(0, -0.22, 0), Vector3(1.0, 1.0, 1.08))
-		var sh := _pivot(th, Vector3(0, -0.44, 0))
-		_part(sh, _sphere(0.07), m_skin, Vector3.ZERO)
-		_part(sh, _capsule(0.07, 0.44), m_socks, Vector3(0, -0.21, 0.008), Vector3(1.0, 1.0, 1.1))
-		var ft := _pivot(sh, Vector3(0, -0.42, 0))
-		_part(ft, _capsule(0.05, 0.25), m_boot, Vector3(0, -0.025, -0.05), Vector3(1.0, 1.0, 0.85), Vector3(PI / 2, 0, 0))
-		thigh.append(th)
-		shin.append(sh)
-		foot.append(ft)
-	# tronco
-	spine = _pivot(hips, Vector3(0, 0.04, 0))
-	_part(spine, _capsule(0.17, 0.64), m_shirt, Vector3(0, 0.28, 0), Vector3(1.34, 1.0, 0.8))
-	_part(spine, _sphere(0.2), m_shirt, Vector3(0, 0.42, 0), Vector3(1.15, 0.6, 0.72))
-	# número nas costas
+	var shirt_m := Toon.mat(kit["shirt"])
+	var arm_m: Material = shirt_m if kit.get("long_sleeves", false) else Toon.mat(skin)
+	var mats := {
+		BodyMesh.S.SHIRT: shirt_m,
+		BodyMesh.S.SLEEVES: shirt_m,
+		BodyMesh.S.SHORTS: Toon.mat(kit["shorts"]),
+		BodyMesh.S.SKIN: Toon.mat(skin),
+		BodyMesh.S.SOCKS: Toon.mat(kit["socks"]),
+		BodyMesh.S.BOOTS: Toon.mat(kit.get("boots", Color("#16181d")), true, 0.3, 0.6),
+		BodyMesh.S.HAIR: Toon.mat(kit["hair"], true, 0.15),
+		BodyMesh.S.ARMS: arm_m,
+		BodyMesh.S.HANDS: Toon.mat(kit.get("gloves", skin)),
+		BodyMesh.S.HEAD: _face_mat(kit),
+	}
+	for sidx in mats:
+		if sidx < body.mesh.get_surface_count():
+			body.set_surface_override_material(sidx, mats[sidx])
+	# número nas costas, preso ao osso do peito
+	var att := BoneAttachment3D.new()
+	att.bone_name = "chest"
+	skel.add_child(att)
 	number_label = Label3D.new()
 	number_label.text = str(p.number)
-	number_label.font_size = 64
-	number_label.outline_size = 10
-	number_label.pixel_size = 0.0042
+	number_label.font_size = 72
+	number_label.outline_size = 8
+	number_label.pixel_size = 0.0034
 	number_label.modulate = kit.get("number_color", Color.WHITE)
-	number_label.outline_modulate = Color(0, 0, 0, 0.6)
-	number_label.position = Vector3(0, 0.33, 0.135)
+	number_label.outline_modulate = Color(0, 0, 0, 0.5)
+	number_label.position = Vector3(0, 0.06, 0.133)
 	number_label.double_sided = false
 	number_label.shaded = false
-	spine.add_child(number_label)
-	# braços
-	for s in 2:
-		var sx := -0.235 if s == 0 else 0.235
-		var ua := _pivot(spine, Vector3(sx, 0.5, 0))
-		var m_arm: Material = m_skin if not kit.get("long_sleeves", false) else m_shirt
-		_part(ua, _sphere(0.078), m_shirt, Vector3(0, -0.01, 0))
-		_part(ua, _capsule(0.072, 0.2), m_shirt, Vector3(0, -0.07, 0))
-		_part(ua, _capsule(0.058, 0.3), m_arm, Vector3(0, -0.14, 0))
-		var fa := _pivot(ua, Vector3(0, -0.28, 0))
-		_part(fa, _sphere(0.054), m_arm, Vector3.ZERO)
-		_part(fa, _capsule(0.051, 0.27), m_arm, Vector3(0, -0.12, 0))
-		_part(fa, _sphere(0.052), m_hand, Vector3(0, -0.27, 0))
-		upper_arm.append(ua)
-		forearm.append(fa)
-	# pescoço + cabeça
-	neck = _pivot(spine, Vector3(0, 0.56, 0))
-	_part(neck, _capsule(0.055, 0.14), m_skin, Vector3(0, 0.04, 0))
-	var head := _pivot(neck, Vector3(0, 0.15, 0))
-	_part(head, _sphere(0.115), m_skin, Vector3.ZERO, Vector3(0.92, 1.1, 1.0))
-	# orelhas
-	_part(head, _sphere(0.03), m_skin, Vector3(-0.105, 0.0, 0.01), Vector3(0.6, 1.0, 1.0))
-	_part(head, _sphere(0.03), m_skin, Vector3(0.105, 0.0, 0.01), Vector3(0.6, 1.0, 1.0))
-	# olhos e sobrancelhas (lido de longe como rosto)
-	var m_eye := Toon.mat(Color("#14100e"), false, 0.0)
-	for ex: float in [-0.04, 0.04]:
-		_part(head, _sphere(0.016), m_eye, Vector3(ex, 0.015, -0.103))
-		_part(head, _box(Vector3(0.04, 0.009, 0.01)), Toon.mat(hair, false, 0.0), Vector3(ex, 0.048, -0.104))
-	_part(head, _sphere(0.02), m_skin, Vector3(0, -0.02, -0.112), Vector3(0.8, 1.0, 1.0))
-	var style: String = kit.get("hair_style", "short")
-	match style:
-		"bald":
-			pass
-		"buzz":
-			_part(head, _sphere(0.118), m_hair, Vector3(0, 0.03, 0.012), Vector3(0.94, 0.95, 0.98))
-		"afro":
-			_part(head, _sphere(0.17), m_hair, Vector3(0, 0.07, 0.03))
-		"long", "dreads":
-			_part(head, _sphere(0.125), m_hair, Vector3(0, 0.035, 0.018), Vector3(0.98, 1.0, 1.0))
-			_part(head, _box(Vector3(0.22, 0.24, 0.07)), m_hair, Vector3(0, -0.08, 0.08))
-		"mohawk":
-			_part(head, _box(Vector3(0.04, 0.08, 0.22)), m_hair, Vector3(0, 0.11, 0.02))
-		"bun":
-			_part(head, _sphere(0.122), m_hair, Vector3(0, 0.03, 0.015), Vector3(0.97, 1.0, 1.0))
-			_part(head, _sphere(0.055), m_hair, Vector3(0, 0.1, 0.09))
-		"curly":
-			_part(head, _sphere(0.135), m_hair, Vector3(0, 0.045, 0.02), Vector3(1.0, 0.95, 1.0))
-		_:
-			_part(head, _sphere(0.123), m_hair, Vector3(0, 0.035, 0.016), Vector3(0.97, 0.98, 1.0))
+	att.add_child(number_label)
 	_yaw = atan2(-p.facing.x, -p.facing.y)
 	rotation.y = _yaw
+
+
+static var _face_cache: Dictionary = {}
+
+
+static func _face_mat(kit: Dictionary) -> ShaderMaterial:
+	var key := "%s|%s|%s|%.1f|%s" % [(kit["skin"] as Color).to_html(), (kit["hair"] as Color).to_html(),
+		(kit.get("eye", Color("#5b3a1e")) as Color).to_html(), float(kit.get("beard", 0.0)), Settings.detail.get("outline", true)]
+	if _face_cache.has(key):
+		return _face_cache[key]
+	var m := ShaderMaterial.new()
+	m.shader = preload("res://shaders/face.gdshader")
+	m.set_shader_parameter("skin", kit["skin"])
+	m.set_shader_parameter("hair_col", kit["hair"])
+	m.set_shader_parameter("eye_col", kit.get("eye", Color("#5b3a1e")))
+	m.set_shader_parameter("beard", float(kit.get("beard", 0.0)))
+	if Settings.detail.get("outline", true):
+		m.next_pass = Toon.outline_mat()
+	_face_cache[key] = m
+	return m
 
 
 ## Pé do chute: o do lado da bola (ou o preferido, se a bola estiver no meio).
@@ -212,12 +123,10 @@ static func _wrap(a: float) -> float:
 	return wrapf(a, -PI, PI)
 
 
-func _rot(n: Node3D, x: float, y: float = 0.0, z: float = 0.0) -> void:
-	n.rotation = Vector3(x, y, z)
+func _bone(i: int, x: float, y: float = 0.0, z: float = 0.0) -> void:
+	skel.set_bone_pose_rotation(i, Quaternion.from_euler(Vector3(x, y, z)))
 
 
-## Atualiza pose a partir do atleta da simulação. `ball_rel` = bola em
-## relação ao atleta (metros, plano do chão).
 func animate(p: SimPlayer, ball_pos: Vector2, ball_z: float, dt: float) -> void:
 	position = Vector3(p.pos.x, 0.0, p.pos.y)
 	var target_yaw := atan2(-p.facing.x, -p.facing.y)
@@ -232,11 +141,20 @@ func animate(p: SimPlayer, ball_pos: Vector2, ball_z: float, dt: float) -> void:
 	var fwd := p.facing.normalized() if p.facing.length() > 0.01 else Vector2.RIGHT
 	var a_f := acc.dot(fwd)
 	var a_l := acc.dot(Vector2(-fwd.y, fwd.x))
-	_lean_f = lerpf(_lean_f, clampf(a_f * 0.025, -0.25, 0.3), minf(1.0, dt * 6.0))
-	_bank = lerpf(_bank, clampf(a_l * 0.035, -0.4, 0.4) * sn, minf(1.0, dt * 6.0))
+	_lean_f = lerpf(_lean_f, clampf(a_f * 0.03, -0.3, 0.32), minf(1.0, dt * 7.0))
+	_bank = lerpf(_bank, clampf(a_l * 0.04, -0.45, 0.45) * sn, minf(1.0, dt * 7.0))
+	# taxa de giro da direção da corrida → corte
+	if spd > 2.5:
+		var d := p.vel.angle()
+		_turn_rate = lerpf(_turn_rate, absf(_wrap(d - _prev_dir)) / maxf(dt, 0.001), minf(1.0, dt * 10.0))
+		_prev_dir = d
+	else:
+		_turn_rate = lerpf(_turn_rate, 0.0, minf(1.0, dt * 6.0))
+		_prev_dir = p.vel.angle() if spd > 0.3 else _prev_dir
+	_cut = lerpf(_cut, clampf((_turn_rate - 1.6) / 3.0, 0.0, 1.0) * clampf(spd / 5.0, 0.0, 1.0), minf(1.0, dt * 9.0))
 
 	# passada: comprimento cresce com a velocidade
-	var step_len := lerpf(0.55, 1.95, sn)
+	var step_len := lerpf(0.5, 2.05, sn) * (1.0 - 0.3 * _cut)
 	phase = fmod(phase + PI * spd / step_len * dt, TAU)
 	_breath += dt * (2.0 + sn * 3.0)
 
@@ -268,35 +186,63 @@ func animate(p: SimPlayer, ball_pos: Vector2, ball_z: float, dt: float) -> void:
 	var root_pitch := 0.0
 	var root_roll := _bank
 
-	# ---------- base: corrida / parado
-	var amp := lerpf(0.12, 0.95, sn) if spd > 0.15 else 0.0
-	var knee_amp := lerpf(0.25, 1.9, sn)
+	# ---------- base: locomoção
+	# velocidade no referencial do corpo: frente / lado (corrida de lado e de costas)
+	var right := Vector2(-fwd.y, fwd.x)
+	var v_f := p.vel.dot(fwd)
+	var v_r := p.vel.dot(right)
+	var fwd_k := v_f / maxf(spd, 0.01)
+	var side_k := v_r / maxf(spd, 0.01)
+	var amp := lerpf(0.16, 1.0, sn) if spd > 0.15 else 0.0
+	var knee_amp := lerpf(0.35, 2.0, sn)
 	var leg_x: Array[float] = [0.0, 0.0]
 	var knee_x: Array[float] = [0.0, 0.0]
 	var foot_x: Array[float] = [0.0, 0.0]
 	var leg_z_extra: Array[float] = [0.0, 0.0]
 	for s in 2:
 		var ph := phase + (PI if s == 1 else 0.0)
-		leg_x[s] = amp * sin(ph) + 0.08 * sn
-		knee_x[s] = -(0.12 + knee_amp * maxf(0.0, cos(ph)) * (0.35 + 0.65 * sn) + 0.25 * sn * maxf(0.0, -sin(ph)))
-		foot_x[s] = -0.6 * (leg_x[s] + knee_x[s]) * 0.5 + 0.1
+		var swing_v := sin(ph)
+		# perna de trás estica (impulsão), a da frente recolhe e estende antes de pisar
+		leg_x[s] = amp * swing_v * fwd_k + 0.1 * sn * fwd_k
+		knee_x[s] = -(0.1 + knee_amp * maxf(0.0, cos(ph)) * (0.3 + 0.7 * sn) + 0.3 * sn * maxf(0.0, -swing_v))
+		foot_x[s] = clampf(-(leg_x[s] + knee_x[s]) * 0.55, -0.6, 0.6) + (0.35 * sn * maxf(0.0, -swing_v))
+		# passos laterais: pernas abrem/fecham juntas
+		leg_z_extra[s] = 0.45 * amp * side_k * swing_v * (1.0 if s == 0 else -1.0) * 0.5 + 0.18 * side_k * amp
 	if spd <= 0.15:
-		# posição de expectativa: joelhos levemente flexionados
+		# expectativa: joelhos flexionados, peso alternando
+		var sway := sin(_breath * 0.4) * 0.04
 		for s in 2:
-			leg_x[s] = 0.14
-			knee_x[s] = -0.26
+			leg_x[s] = 0.12 + (sway if s == 0 else -sway)
+			knee_x[s] = -0.24
 			foot_x[s] = 0.12
-	var bob := 0.045 * sn * absf(cos(phase))
-	var hip_y := HIP_Y - 0.025 - 0.05 * sn + bob + sin(_breath) * 0.004
-	var spine_x := -(0.06 + 0.32 * sn) - _lean_f
-	var spine_y := 0.18 * sn * sin(phase)
-	var arm_x: Array[float] = [-0.75 * amp * sin(phase + PI) * 1.1, -0.75 * amp * sin(phase) * 1.1]
+	var bob := 0.05 * sn * absf(cos(phase))
+	var hip_y := HIP_Y - 0.02 - 0.06 * sn + bob + sin(_breath) * 0.004
+	# arrancada inclina para frente, freada joga o corpo para trás
+	var spine_x := -(0.05 + 0.3 * sn * maxf(0.0, fwd_k)) - _lean_f
+	var spine_y := 0.22 * sn * sin(phase) * fwd_k
+	var hip_yaw := -0.16 * sn * sin(phase) * fwd_k
+	var arm_x: Array[float] = [0.0, 0.0]
 	for s in 2:
-		arm_x[s] = 0.75 * amp * sin(phase + (0.0 if s == 1 else PI))
-	var arm_z: Array[float] = [-0.12 - 0.05 * sn, 0.12 + 0.05 * sn]
-	var elbow_x: Array[float] = [0.35 + 1.0 * sn, 0.35 + 1.0 * sn]
-	var neck_x := 0.12 + 0.2 * sn
-
+		arm_x[s] = 0.85 * amp * sin(phase + (0.0 if s == 1 else PI)) * (0.4 + 0.6 * absf(fwd_k))
+	var arm_z: Array[float] = [-0.1 - 0.06 * sn - 0.25 * absf(side_k) * sn, 0.1 + 0.06 * sn + 0.25 * absf(side_k) * sn]
+	var elbow_x: Array[float] = [0.3 + 1.25 * sn, 0.3 + 1.25 * sn]
+	var neck_x := 0.08 + 0.22 * sn * maxf(0.0, fwd_k)
+	# corte / mudança brusca de direção: abaixa, inclina e planta o pé de fora
+	if _cut > 0.05:
+		hip_y -= 0.1 * _cut
+		var outside := 0 if _bank > 0.0 else 1
+		leg_z_extra[outside] += (-0.4 if outside == 0 else 0.4) * _cut
+		knee_x[outside] = minf(knee_x[outside], -0.5 * _cut)
+		knee_x[1 - outside] = minf(knee_x[1 - outside], -0.7 * _cut)
+		arm_z[outside] += (-0.5 if outside == 0 else 0.5) * _cut
+		spine_x -= 0.15 * _cut
+	# freada forte: corpo para trás, pernas à frente
+	if _lean_f < -0.12 and spd > 1.0:
+		var b := clampf(-_lean_f / 0.25, 0.0, 1.0)
+		for s in 2:
+			leg_x[s] = lerpf(leg_x[s], 0.35, b * 0.6)
+			knee_x[s] = minf(knee_x[s], -0.45 * b)
+		hip_y -= 0.06 * b
 	# goleiro: postura de base
 	if p.is_keeper and spd < 3.0 and p.dive <= 0.0 and p.hold <= 0.0:
 		for s in 2:
@@ -502,15 +448,30 @@ func animate(p: SimPlayer, ball_pos: Vector2, ball_z: float, dt: float) -> void:
 		elbow_x = [1.2, 1.2]
 		spine_x = -0.25
 
+	# ---------- cabeça acompanha a bola
+	var to_ball := ball_pos - p.pos
+	var look := 0.0
+	if to_ball.length() > 0.5:
+		look = clampf(-atan2(to_ball.dot(right), to_ball.dot(fwd)), -1.1, 1.1)
+	_head_yaw = lerpf(_head_yaw, look, minf(1.0, dt * 6.0))
+	var look_down := clampf(0.25 - to_ball.length() * 0.02, 0.0, 0.25) if ball_z < 1.0 else -0.15
+
 	# ---------- aplica
-	hips.position.y = hip_y + root_y
-	hips.rotation = Vector3(root_pitch, 0, 0)
+	skel.set_bone_pose_position(B.HIPS, Vector3(0, hip_y + root_y, 0))
+	skel.set_bone_pose_rotation(B.HIPS, Quaternion.from_euler(Vector3(root_pitch, hip_yaw, 0)))
 	rotation = Vector3(0, _yaw, root_roll)
-	_rot(spine, spine_x, spine_y, 0.0)
-	_rot(neck, neck_x, -spine_y * 0.6, 0.0)
+	_bone(B.SPINE, spine_x * 0.5, spine_y * 0.5 - hip_yaw * 0.5)
+	_bone(B.CHEST, spine_x * 0.5, spine_y * 0.5 - hip_yaw * 0.5)
+	_bone(B.NECK, neck_x * 0.5 + look_down * 0.5, _head_yaw * 0.4 - spine_y * 0.4)
+	_bone(B.HEAD, neck_x * 0.5 + look_down * 0.5, _head_yaw * 0.6 - spine_y * 0.2)
+	var th: Array[int] = [B.THIGH_L, B.THIGH_R]
+	var sh: Array[int] = [B.SHIN_L, B.SHIN_R]
+	var ft: Array[int] = [B.FOOT_L, B.FOOT_R]
+	var ua: Array[int] = [B.UARM_L, B.UARM_R]
+	var fa: Array[int] = [B.FARM_L, B.FARM_R]
 	for s in 2:
-		_rot(thigh[s], leg_x[s], 0.0, (-0.04 if s == 0 else 0.04) + leg_z_extra[s])
-		_rot(shin[s], knee_x[s])
-		_rot(foot[s], foot_x[s])
-		_rot(upper_arm[s], arm_x[s], 0.0, arm_z[s])
-		_rot(forearm[s], elbow_x[s])
+		_bone(th[s], leg_x[s], -hip_yaw * 0.3, (-0.03 if s == 0 else 0.03) + leg_z_extra[s])
+		_bone(sh[s], knee_x[s])
+		_bone(ft[s], foot_x[s])
+		_bone(ua[s], arm_x[s], 0.0, arm_z[s])
+		_bone(fa[s], elbow_x[s], (0.25 if s == 0 else -0.25) * minf(1.0, elbow_x[s]))

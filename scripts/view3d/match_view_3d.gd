@@ -5,6 +5,8 @@ class_name MatchView3D
 extends Node3D
 
 const LIGHT_DIR := Vector3(-0.35, 0.85, 0.45)
+const EYE_COLORS := [Color("#4a2c17"), Color("#2b1a0e"), Color("#3f6e8c"), Color("#5c7a3a"), Color("#6b4423")]
+const BOOT_COLORS := [Color("#111318"), Color("#f8fafc"), Color("#16181d"), Color("#facc15"), Color("#ef4444"), Color("#22d3ee"), Color("#111318")]
 
 var sim: MatchSim
 var team_colors: Array = [[Color.RED, Color.WHITE], [Color.BLUE, Color.WHITE]]
@@ -364,6 +366,9 @@ func _build_players() -> void:
 			"hair": Color(String(m.get("hair_hex", "#1a1210"))),
 			"hair_style": String(m.get("hair_style", "short")),
 			"number_color": second if second.get_luminance() > 0.5 or shirt.get_luminance() < 0.5 else Color("#0f172a"),
+			"beard": {"none": 0.0, "stubble": 0.45, "mustache": 0.35, "chin": 0.5, "goatee": 0.6, "full": 0.85}.get(String(m.get("beard", "none")), 0.5),
+			"eye": EYE_COLORS[int(m.get("eye_color", 0)) % EYE_COLORS.size()],
+			"boots": BOOT_COLORS[(p.face_id * 3 + p.number) % BOOT_COLORS.size()],
 		}
 		if p.is_keeper:
 			kit["shirt"] = Color("#22c55e") if p.team == 0 else Color("#f59e0b")
