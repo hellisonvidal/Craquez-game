@@ -433,6 +433,7 @@ func _process_controller(t: int, f: InputFrame) -> void:
 	p.intent = f.move.limit_length(1.0)
 	p.want_sprint = f.has(InputFrame.SPRINT)
 	p.shielding = f.has(InputFrame.SHIELD)
+	p.face_ball = false
 	for q in players:
 		if q.team == t and q.id != p.id:
 			q.shielding = false
@@ -975,13 +976,19 @@ func _intercept_point(p: SimPlayer) -> Vector2:
 func _steer_to(p: SimPlayer, target: Vector2, urgent: bool) -> void:
 	var to := target - p.pos
 	var d := to.length()
-	if d < 0.4:
+	# histerese: parado só sai do lugar se o alvo se afastar de verdade
+	var moving := p.vel.length() > 0.5
+	if d < (0.35 if moving else 0.9):
 		p.intent = Vector2.ZERO
 		if ball.pos.distance_to(p.pos) > 0.1:
-			p.facing = _rotate_toward(p.facing, (ball.pos - p.pos).normalized(), 0.1)
+			p.facing = _rotate_toward(p.facing, (ball.pos - p.pos).normalized(), 0.05)
 	else:
-		p.intent = (to / d) * clampf(d / 3.0, 0.2, 1.0)
-	p.want_sprint = urgent or d > 9.0
+		# chegada suave: desacelera nos últimos metros
+		p.intent = (to / d) * clampf(d / 4.0, 0.15, 1.0)
+	# pique com histerese (não liga/desliga a cada passo)
+	p.want_sprint = urgent or d > (7.0 if p.sprinting else 11.0)
+	# sem urgência e perto do lance: acompanha a jogada de frente para a bola
+	p.face_ball = not urgent and d < 10.0 and ball.pos.distance_to(p.pos) < 35.0
 
 
 func _ai_keeper(p: SimPlayer, frozen: bool) -> void:
@@ -1089,6 +1096,11 @@ func _move_player(p: SimPlayer) -> void:
 		max_s = minf(max_s, p.jog_speed() * 0.78)
 	if p.windup > 0.0:
 		max_s *= 0.55
+	if p.face_ball and not has_ball and intent.length() > 0.1:
+		# andar de costas/de lado é mais lento que de frente
+		var back := clampf(-intent.normalized().dot(p.facing), 0.0, 1.0)
+		var side := 1.0 - absf(intent.normalized().dot(p.facing))
+		max_s *= 1.0 - 0.4 * back - 0.15 * side
 	if p.burst > 0.0:
 		max_s *= 1.07
 	if p.off_balance > 0.0:
@@ -1112,6 +1124,8 @@ func _move_player(p: SimPlayer) -> void:
 	p.vel += (target_v - p.vel).limit_length(rate * DT)
 	p.pos += p.vel * DT
 	var face_target := p.vel if p.vel.length() > 0.4 else intent
+	if p.face_ball and not has_ball and not p.sprinting and ctrl[p.team].player != p.id:
+		face_target = ball.pos - p.pos
 	var turn_rate := lerpf(11.0, 4.0, clampf(p.vel.length() / 9.0, 0.0, 1.0)) * (0.8 if has_ball else 1.0)
 	if p.shielding and not p.is_keeper:
 		if has_ball:

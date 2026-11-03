@@ -60,6 +60,7 @@ var skill_side: float = 1.0
 var skill_cd: float = 0.0
 var burst: float = 0.0            # arrancada depois de "tocar e correr"
 var off_balance: float = 0.0      # defensor enganado pela finta
+var face_ball: bool = false      # IA sem a bola: desloca olhando para o lance (recua/anda de lado)
 var shielding: bool = false     # LT/L2: protege a bola (com) ou contém (sem)
 var touch_t: float = 0.0          # domínio (só visual)
 

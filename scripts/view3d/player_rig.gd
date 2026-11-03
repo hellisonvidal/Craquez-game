@@ -36,6 +36,11 @@ var _tackle_t: float = -1.0
 var _head_t: float = -1.0
 var _breath: float = 0.0
 var _rest: Array[Vector3] = []
+var _pose: Array[Quaternion] = []     # rotação atual de cada osso (suavizada)
+var _blend_k: float = 1.0             # fração do caminho até a pose-alvo neste quadro
+var _hip_y_s: float = HIP_Y
+var _root_roll_s: float = 0.0
+var _prev_yaw: float = 0.0
 
 
 ## kit: {shirt, shorts, socks, skin, hair, hair_style, number, keeper, gloves, beard, eye}
@@ -52,6 +57,7 @@ func build(p: SimPlayer, kit: Dictionary) -> void:
 	add_child(skel)
 	for i in skel.get_bone_count():
 		_rest.append(skel.get_bone_rest(i).origin)
+		_pose.append(Quaternion.IDENTITY)
 	body = MeshInstance3D.new()
 	body.mesh = BodyMesh.get_mesh(build_k, String(kit.get("hair_style", "short")))
 	body.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
@@ -125,8 +131,11 @@ static func _wrap(a: float) -> float:
 	return wrapf(a, -PI, PI)
 
 
+## Leva o osso em direção à pose-alvo (suaviza entradas/saídas de chute, drible, queda).
 func _bone(i: int, x: float, y: float = 0.0, z: float = 0.0) -> void:
-	skel.set_bone_pose_rotation(i, Quaternion.from_euler(Vector3(x, y, z)))
+	var target := Quaternion.from_euler(Vector3(x, y, z))
+	_pose[i] = _pose[i].slerp(target, _blend_k)
+	skel.set_bone_pose_rotation(i, _pose[i])
 
 
 func animate(p: SimPlayer, ball_pos: Vector2, ball_z: float, dt: float) -> void:
@@ -156,8 +165,18 @@ func animate(p: SimPlayer, ball_pos: Vector2, ball_z: float, dt: float) -> void:
 	_cut = lerpf(_cut, clampf((_turn_rate - 1.6) / 3.0, 0.0, 1.0) * clampf(spd / 5.0, 0.0, 1.0), minf(1.0, dt * 9.0))
 
 	# passada: comprimento cresce com a velocidade
-	var step_len := lerpf(0.5, 2.05, sn) * (1.0 - 0.3 * _cut)
+	# comprimento do passo = quanto o pé realmente percorre com a amplitude atual
+	# da coxa (perna ~0,9 m): o pé de apoio fica "plantado", sem patinar
+	var amp_now := lerpf(0.16, 1.0, sn) if spd > 0.15 else 0.0
+	var step_len := maxf(0.35, 2.0 * 0.9 * sin(amp_now) * 0.92 + 0.25 * sn) * (1.0 - 0.25 * _cut)
+	# girando parado: passinhos para acompanhar o corpo
+	var yaw_rate := absf(_wrap(_yaw - _prev_yaw)) / maxf(dt, 0.001)
+	_prev_yaw = _yaw
+	if spd < 1.0 and yaw_rate > 1.5:
+		phase = fmod(phase + yaw_rate * 1.2 * dt, TAU)
 	phase = fmod(phase + PI * spd / step_len * dt, TAU)
+	# rápido o bastante para não amortecer a passada (~3 Hz), lento o bastante para não "estalar"
+	_blend_k = 1.0 - exp(-dt * 34.0)
 	_breath += dt * (2.0 + sn * 3.0)
 
 	# gatilhos de ação (bordas dos timers da simulação)
@@ -459,9 +478,11 @@ func animate(p: SimPlayer, ball_pos: Vector2, ball_z: float, dt: float) -> void:
 	var look_down := clampf(0.25 - to_ball.length() * 0.02, 0.0, 0.25) if ball_z < 1.0 else -0.15
 
 	# ---------- aplica
-	skel.set_bone_pose_position(B.HIPS, Vector3(0, hip_y + root_y, 0))
-	skel.set_bone_pose_rotation(B.HIPS, Quaternion.from_euler(Vector3(root_pitch, hip_yaw, 0)))
-	rotation = Vector3(0, _yaw, root_roll)
+	_hip_y_s = lerpf(_hip_y_s, hip_y + root_y, _blend_k)
+	_root_roll_s = lerp_angle(_root_roll_s, root_roll, _blend_k)
+	skel.set_bone_pose_position(B.HIPS, Vector3(0, _hip_y_s, 0))
+	_bone(B.HIPS, root_pitch, hip_yaw, 0.0)
+	rotation = Vector3(0, _yaw, _root_roll_s)
 	_bone(B.SPINE, spine_x * 0.5, spine_y * 0.5 - hip_yaw * 0.5)
 	_bone(B.CHEST, spine_x * 0.5, spine_y * 0.5 - hip_yaw * 0.5)
 	# +X inclina a cabeça para trás: compensa a inclinação do tronco; olhar para baixo é negativo
