@@ -139,6 +139,10 @@ func _test_full_match(mode_id: String) -> void:
 				kicks += 1
 		if is_nan(sim.ball.pos.x) or absf(sim.ball.pos.x) > sim.half_len + 5.0 or absf(sim.ball.pos.y) > sim.half_w + 5.0:
 			ok = false
+			var ow: SimPlayer = sim.players[sim.ball.owner] if sim.ball.owner >= 0 else null
+			printerr("  diag: tick=%d state=%d ball=%s vel=%s z=%.2f owner=%d skill=%d windup=%.2f hold=%.2f events=%s" % [
+				sim.tick, sim.state, sim.ball.pos, sim.ball.vel, sim.ball.z, sim.ball.owner,
+				ow.skill if ow else -1, ow.windup if ow else -1.0, ow.hold if ow else -1.0, sim.events])
 			break
 		if sim.state == MatchSim.State.FULLTIME:
 			break
