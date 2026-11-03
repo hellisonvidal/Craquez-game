@@ -1118,6 +1118,7 @@ func _dribble() -> void:
 	var o: SimPlayer = players[ball.owner]
 	if o.is_keeper and o.hold > 0.0:
 		ball.pos = o.pos + o.facing * 0.35
+		ball.pos.x = clampf(ball.pos.x, -half_len + ball.radius, half_len - ball.radius)
 		ball.z = 1.0
 		ball.vz = 0.0
 		ball.vel = o.vel
@@ -1415,7 +1416,9 @@ func _goal_and_bounds(prev: Vector2) -> void:
 	var wb: float = mode["wall_bounce"]
 	for side: float in [-1.0, 1.0]:
 		var line := half_len * side
-		if prev.x * side < half_len and ball.pos.x * side >= half_len:
+		# cruzou a linha neste passo — ou já está fora dela, longe das traves
+		# (ex.: bola solta por trás da linha), o que também é saída
+		if ball.pos.x * side >= half_len and (prev.x * side < half_len or absf(ball.pos.y) >= goal_half):
 			var inside_posts := absf(ball.pos.y) < goal_half - r
 			if inside_posts and ball.z < goal_h - r:
 				_goal_scored(1 if team_dir(0) * side < 0.0 else 0)
