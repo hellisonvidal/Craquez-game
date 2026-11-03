@@ -9,7 +9,7 @@ signal exit_to_menu
 ##          seed, half_minutes, session (opcional: EnetSession)}
 var config: Dictionary = {}
 var sim: MatchSim
-var view: MatchView
+var view: MatchView3D
 var hud: Hud
 var touch: TouchControls
 var sfx: Sfx
@@ -45,7 +45,7 @@ func start(cfg: Dictionary) -> void:
 	# uniformes parecidos? o visitante usa as cores invertidas
 	if (ta["c1"] as Color).is_equal_approx(tb["c1"]) or _similar(ta["c1"], tb["c1"]):
 		colors[1] = [tb["c2"], tb["c1"]]
-	view = MatchView.new()
+	view = MatchView3D.new()
 	add_child(view)
 	view.human_team = [brains[0] == null, brains[1] == null]
 	view.setup(sim, colors)

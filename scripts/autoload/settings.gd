@@ -18,7 +18,7 @@ var sfx_volume: float = 0.8
 ## Flags de detalhe derivadas do preset (consultadas pela renderização).
 var detail := {
 	"shadows": true, "crowd": true, "stripes": true, "net": true, "player_detail": 2,
-	"face_px": 512, "trail": true,
+	"face_px": 512, "trail": true, "outline": true,
 }
 
 
@@ -52,32 +52,36 @@ func apply() -> void:
 			win.content_scale_mode = Window.CONTENT_SCALE_MODE_VIEWPORT
 			win.content_scale_size = Vector2i(854, 480)
 			get_viewport().msaa_2d = Viewport.MSAA_DISABLED
+			get_viewport().msaa_3d = Viewport.MSAA_DISABLED
 			Engine.max_fps = 30
 			detail = {"shadows": false, "crowd": false, "stripes": false, "net": false,
-				"player_detail": 0, "face_px": 128, "trail": false}
+				"player_detail": 0, "face_px": 128, "trail": false, "outline": false}
 		Quality.MEDIUM:
 			win.content_scale_mode = Window.CONTENT_SCALE_MODE_VIEWPORT
 			win.content_scale_size = Vector2i(1280, 720)
 			get_viewport().msaa_2d = Viewport.MSAA_DISABLED
+			get_viewport().msaa_3d = Viewport.MSAA_DISABLED
 			Engine.max_fps = 60
 			detail = {"shadows": true, "crowd": false, "stripes": true, "net": true,
-				"player_detail": 1, "face_px": 256, "trail": false}
+				"player_detail": 1, "face_px": 256, "trail": false, "outline": true}
 		Quality.HIGH:
 			# resolução nativa (nítido em 1080p/1440p)
 			win.content_scale_mode = Window.CONTENT_SCALE_MODE_CANVAS_ITEMS
 			win.content_scale_size = Vector2i(1280, 720)
 			get_viewport().msaa_2d = Viewport.MSAA_2X
+			get_viewport().msaa_3d = Viewport.MSAA_2X
 			Engine.max_fps = 60
 			detail = {"shadows": true, "crowd": true, "stripes": true, "net": true,
-				"player_detail": 2, "face_px": 512, "trail": true}
+				"player_detail": 2, "face_px": 512, "trail": true, "outline": true}
 		_:
 			# nativo até 4K, MSAA 4x, até 144 fps
 			win.content_scale_mode = Window.CONTENT_SCALE_MODE_CANVAS_ITEMS
 			win.content_scale_size = Vector2i(1280, 720)
 			get_viewport().msaa_2d = Viewport.MSAA_4X
+			get_viewport().msaa_3d = Viewport.MSAA_4X
 			Engine.max_fps = 144
 			detail = {"shadows": true, "crowd": true, "stripes": true, "net": true,
-				"player_detail": 2, "face_px": 1024, "trail": true}
+				"player_detail": 2, "face_px": 1024, "trail": true, "outline": true}
 
 
 func load_settings() -> void:

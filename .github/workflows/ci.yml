@@ -96,6 +96,8 @@ jobs:
           xvfb-run -a -s "-screen 0 2400x1080x24" godot --path . --rendering-driver opengl3 \
             --resolution 1920x1080 --audio-driver Dummy -- --shots=$GITHUB_WORKSPACE/shots 2>&1 | tee shots.log
           ls -la shots
+          echo "---- erros ----"
+          grep -nE "ERROR|Error|error" shots.log | head -60 || true
       - uses: actions/upload-artifact@v4
         with:
           name: craquez-screenshots
