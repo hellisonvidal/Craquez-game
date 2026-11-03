@@ -5,6 +5,14 @@ var _current: Node
 
 
 func _ready() -> void:
+	# Teste de fumaça (CI):  godot --headless -- --autoplay=futsal
+	for a in OS.get_cmdline_user_args():
+		if a.begins_with("--autoplay"):
+			var mode := a.get_slice("=", 1) if "=" in a else GameModes.FIELD
+			_show_menu()
+			_start_match({"mode": mode, "team_a": 0, "team_b": 1, "devices": ["cpu", "cpu"],
+				"seed": 3, "half_minutes": 0.25})
+			return
 	_show_menu()
 
 

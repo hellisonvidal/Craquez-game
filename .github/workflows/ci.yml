@@ -5,6 +5,9 @@ on:
     branches: [main]
   pull_request:
 
+env:
+  GODOT_VERSION: "4.3"
+
 jobs:
   test:
     runs-on: ubuntu-latest
@@ -12,9 +15,17 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: Importar projeto
-        run: godot --headless --path . --import || true
+        run: godot --headless --path . --import 2>&1 | tee import.log || true
       - name: Testes da simulação
         run: godot --headless --path . -s tests/run_tests.gd
+      - name: Teste de fumaça (menu + partidas com renderização)
+        run: |
+          for m in field futsal street; do
+            godot --headless --path . --quit-after 2400 -- --autoplay=$m 2>&1 | tee smoke_$m.log
+          done
+          if grep -E "SCRIPT ERROR|Parse Error|Invalid call|Invalid access|Invalid get|Invalid set" import.log smoke_*.log; then
+            echo "Erros de script encontrados"; exit 1
+          fi
 
   export-windows:
     needs: test
@@ -22,10 +33,11 @@ jobs:
     container: barichello/godot-ci:4.3
     steps:
       - uses: actions/checkout@v4
-      - name: Templates
+      - name: Preparar Godot
         run: |
-          mkdir -p ~/.local/share/godot/export_templates
-          cp -r /root/.local/share/godot/export_templates/* ~/.local/share/godot/export_templates/ || true
+          mkdir -p ~/.local/share/godot/export_templates ~/.config
+          cp -r /root/.config/godot ~/.config/godot || true
+          cp -r /root/.local/share/godot/export_templates/* ~/.local/share/godot/export_templates/
       - name: Exportar Windows
         run: |
           mkdir -p build/windows
@@ -42,10 +54,21 @@ jobs:
     container: barichello/godot-ci:4.3
     steps:
       - uses: actions/checkout@v4
-      - name: Templates
+      - name: Preparar Godot + Android
         run: |
-          mkdir -p ~/.local/share/godot/export_templates
-          cp -r /root/.local/share/godot/export_templates/* ~/.local/share/godot/export_templates/ || true
+          mkdir -p ~/.local/share/godot/export_templates ~/.config
+          cp -r /root/.config/godot ~/.config/godot || true
+          cp -r /root/.local/share/godot/export_templates/* ~/.local/share/godot/export_templates/
+          keytool -keyalg RSA -genkeypair -alias androiddebugkey -keypass android -keystore debug.keystore \
+            -storepass android -dname "CN=Android Debug,O=Android,C=US" -validity 9999 -deststoretype pkcs12
+          JAVA_HOME_DIR=$(dirname $(dirname $(readlink -f $(which java))))
+          SETTINGS=$(ls ~/.config/godot/editor_settings-4*.tres | head -1)
+          echo "Editor settings: $SETTINGS ; java: $JAVA_HOME_DIR"
+          grep -q "java_sdk_path" "$SETTINGS" || echo "export/android/java_sdk_path = \"$JAVA_HOME_DIR\"" >> "$SETTINGS"
+          grep -q "android_sdk_path" "$SETTINGS" || echo "export/android/android_sdk_path = \"/usr/lib/android-sdk\"" >> "$SETTINGS"
+          echo "GODOT_ANDROID_KEYSTORE_DEBUG_PATH=$GITHUB_WORKSPACE/debug.keystore" >> $GITHUB_ENV
+          echo "GODOT_ANDROID_KEYSTORE_DEBUG_USER=androiddebugkey" >> $GITHUB_ENV
+          echo "GODOT_ANDROID_KEYSTORE_DEBUG_PASSWORD=android" >> $GITHUB_ENV
       - name: Exportar APK (debug)
         run: |
           mkdir -p build/android
