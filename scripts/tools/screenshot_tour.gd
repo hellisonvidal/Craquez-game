@@ -12,6 +12,7 @@ func run(dir: String, main_node: Node) -> void:
 	DirAccess.make_dir_recursive_absolute(out_dir)
 	Settings.quality = Settings.Quality.ULTRA
 	Settings.apply()
+	main._show_menu()
 	await _wait(1.5)
 	await _shot("01_menu")
 

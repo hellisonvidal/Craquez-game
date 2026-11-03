@@ -23,6 +23,8 @@ func _ready() -> void:
 	set_anchors_preset(Control.PRESET_FULL_RECT)
 	mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_font = ThemeDB.fallback_font
+	# o primeiro desenho acontece com tamanho 0: redesenha quando a tela ganha tamanho/gira
+	resized.connect(queue_redraw)
 
 
 func _btn_center(b: Dictionary) -> Vector2:
