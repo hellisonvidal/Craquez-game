@@ -127,6 +127,11 @@ func setup(mode_id: String, team_a: Dictionary, team_b: Dictionary, seed_value: 
 						p.passing = float(a[3])
 						p.control = float(a[4])
 						p.defense = float(a[5])
+					for tn in e.get("t", []):
+						p.traits |= int(SimPlayer.TRAIT_NAMES.get(String(tn), 0))
+					if p.has_trait(SimPlayer.Trait.VELOCISTA):
+						p.pace = minf(0.99, p.pace + 0.04)
+						p.accel = minf(0.99, p.accel + 0.03)
 			players.append(p)
 	kickoff_team = 0
 	_reset_for_kickoff(0)
@@ -647,7 +652,7 @@ func _pass(p: SimPlayer, aim: Vector2, power: float, through: bool, lofted: bool
 	var to_t := target - ball.pos
 	var d := maxf(to_t.length(), 0.5)
 	var dirv := to_t / d
-	var err := rng.gauss() * 0.03 * (1.25 - p.passing) * (0.6 + power) * (1.6 if p.sprinting else 1.0)
+	var err := rng.gauss() * 0.03 * (1.25 - p.passing) * (0.6 + power) * (1.6 if p.sprinting else 1.0) * (0.65 if p.has_trait(SimPlayer.Trait.MAESTRO) else 1.0)
 	dirv = dirv.rotated(err)
 	if lofted:
 		var flight := 0.75 + d / 30.0 + power * 0.25
@@ -693,6 +698,13 @@ func _shoot(p: SimPlayer, aim: Vector2, power: float, finesse: bool = false) -> 
 	if opp != null:
 		pressure = clampf(1.0 - opp.pos.distance_to(p.pos) / 3.0, 0.0, 1.0)
 	var err := (0.02 + 0.07 * power * power) * (1.3 - p.shot) * (1.0 + pressure * 0.8) * (1.4 if p.sprinting else 1.0)
+	if p.has_trait(SimPlayer.Trait.FINALIZADOR):
+		err *= 0.8
+	if finesse and p.has_trait(SimPlayer.Trait.COLOCADO):
+		err *= 0.75
+	if p.has_trait(SimPlayer.Trait.LONGA_DISTANCIA) and d > 20.0:
+		spd *= 1.1
+		err *= 0.85
 	# corpo virado para longe do alvo = chute pior (precisa ajeitar o corpo)
 	var body := absf(p.facing.angle_to(dirv))
 	err *= 1.0 + maxf(0.0, body - 0.6) * 0.9
@@ -714,7 +726,7 @@ func _shoot(p: SimPlayer, aim: Vector2, power: float, finesse: bool = false) -> 
 	ball.vz = clampf((h + 0.5 * SimBall.G * t_flight * t_flight) / t_flight, 0.0, 14.0)
 	ball.spin = rng.gauss() * 1.2
 	if finesse:
-		ball.spin = curl * (2.2 + 0.8 * p.shot)
+		ball.spin = curl * (2.2 + 0.8 * p.shot) * (1.15 if p.has_trait(SimPlayer.Trait.COLOCADO) else 1.0)
 	stats_shots[p.team] += 1
 	_release_ball(p)
 	_emit("kick", {"power": power, "kind": "shot", "team": p.team})
@@ -742,6 +754,10 @@ func _standing_tackle(p: SimPlayer) -> void:
 		_foul(p, o)
 		return
 	var chance := 0.42 + 0.4 * p.defense - 0.32 * o.control + (0.0 if from_behind else 0.12)
+	if p.has_trait(SimPlayer.Trait.MURALHA):
+		chance += 0.1
+	if o.has_trait(SimPlayer.Trait.DRIBLADOR):
+		chance -= 0.06
 	if o.shielding:
 		chance -= 0.12 + 0.12 * o.control
 	if o.skill == SimPlayer.Skill.ROULETTE:
@@ -1144,7 +1160,7 @@ func _move_player(p: SimPlayer) -> void:
 		turn_rate *= 0.4
 	p.facing = _rotate_toward(p.facing, face_target.normalized(), turn_rate * DT).normalized()
 	if p.sprinting:
-		p.stamina = maxf(0.0, p.stamina - 0.055 * DT)
+		p.stamina = maxf(0.0, p.stamina - 0.055 * DT * (0.65 if p.has_trait(SimPlayer.Trait.RESISTENCIA) else 1.0))
 	else:
 		p.stamina = minf(1.0, p.stamina + 0.03 * DT)
 	p.run_phase += p.vel.length() * DT * 2.3
@@ -1232,7 +1248,7 @@ func _possession() -> void:
 		if d > reach:
 			continue
 		if ball.z > max_z:
-			if ball.z < 2.4 and not keeper_zone:
+			if ball.z < (2.7 if p.has_trait(SimPlayer.Trait.CABECEADOR) else 2.4) and not keeper_zone:
 				_header(p)
 				return
 			continue
@@ -1257,7 +1273,7 @@ func _take(p: SimPlayer) -> void:
 	var keeper_zone := p.is_keeper and in_own_box(p)
 	var limit := 9.0 + 12.0 * p.control
 	if keeper_zone:
-		var catch_p := clampf(1.35 - rel / 30.0 + p.defense * 0.15, 0.12, 0.97)
+		var catch_p := clampf(1.35 - rel / 30.0 + p.defense * 0.15 + (0.12 if p.has_trait(SimPlayer.Trait.GOLEIRO_SEGURO) else 0.0), 0.12, 0.97)
 		if rel > 8.0 and not rng.chance(catch_p):
 			# espalmada
 			ball.vel = Vector2(-ball.vel.x * 0.35, ball.vel.y * 0.3 + rng.gauss() * 5.0)
@@ -1357,7 +1373,7 @@ func _start_skill(p: SimPlayer, rs: Vector2) -> void:
 				var to := o.pos - p.pos
 				var dist := to.length()
 				if dist < 3.4 and to.dot(fwd) > 0.0:
-					var chance := 0.3 + 0.45 * p.control - 0.3 * o.defense
+					var chance := 0.3 + 0.45 * p.control - 0.3 * o.defense + (0.15 if p.has_trait(SimPlayer.Trait.DRIBLADOR) else 0.0)
 					if rng.chance(chance):
 						o.off_balance = 0.65
 						o.vel += perp * p.skill_side * 2.2

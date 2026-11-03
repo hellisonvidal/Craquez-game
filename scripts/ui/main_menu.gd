@@ -13,8 +13,14 @@ var team_a := 0
 var team_b := 1
 var p1_dev := 0
 var p2_dev := 0
-var minutes_opts := [2.0, 3.0, 5.0, 8.0]
-var minutes_i := 1
+var minutes_opts := [3.0, 5.0, 10.0, 20.0, 45.0]
+var minutes_i := 0
+const WEATHERS := [["sol", "Ensolarado"], ["nublado", "Nublado"], ["chuva", "Chuva"], ["tempestade", "Tempestade"], ["neve", "Neve"], ["aleatorio", "Aleatório"]]
+const TIMES := [["dia", "Dia"], ["tarde", "Entardecer"], ["noite", "Noite"]]
+var weather_i := 0
+var tod_i := 2
+var dyn_weather := true
+var _roster_overlay: Control
 var skill_opts := [["Fácil", 0.3], ["Normal", 0.6], ["Difícil", 0.9]]
 var skill_i := 1
 var page: int = Page.TITLE
@@ -148,6 +154,7 @@ func _process(delta: float) -> void:
 
 func show_page(p: int) -> void:
 	page = p
+	_roster_overlay = null
 	_labels.clear()
 	_first_focus = null
 	for c in _content.get_children():
@@ -355,6 +362,10 @@ func _page_setup() -> void:
 		_cycler(inner, "p2", "Jogador 2")
 		_cycler(inner, "skill", "Dificuldade CPU")
 	_cycler(inner, "minutes", "Tempo de jogo")
+	if GameModes.ALL[mode_i] != GameModes.FUTSAL or online:
+		_cycler(inner, "weather", "Clima")
+		_cycler(inner, "tod", "Horário")
+		_cycler(inner, "dyn", "Clima dinâmico")
 	_small(inner, _controls_help(), Color("#64748b"), 17)
 	_nav_row(vb, show_page.bind(Page.MODES), "Escolher times  ▶", show_page.bind(Page.TEAMS))
 
@@ -386,17 +397,35 @@ func _page_teams() -> void:
 		panel.add_child(inner)
 		var head := _small(inner, "CASA" if side == 0 else "VISITANTE", Color("#facc15") if side == 0 else Color("#38bdf8"), 26)
 		head.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-		_cycler(inner, "league_a" if side == 0 else "league_b", "")
+		var lrow := _cycler(inner, "league_a" if side == 0 else "league_b", "")
+		var licon := Crest.new()
+		licon.custom_minimum_size = Vector2(60, 60)
+		lrow.add_child(licon)
+		lrow.move_child(licon, 0)
 		_cycler(inner, "team_a" if side == 0 else "team_b", "")
 		(_labels["team_a" if side == 0 else "team_b"] as Button).add_theme_font_size_override("font_size", 30)
+		var badges := HBoxContainer.new()
+		badges.alignment = BoxContainer.ALIGNMENT_CENTER
+		badges.add_theme_constant_override("separation", 24)
+		inner.add_child(badges)
+		var crest := Crest.new()
+		crest.custom_minimum_size = Vector2(120, 120)
+		badges.add_child(crest)
 		var kit := KitBadge.new()
-		kit.custom_minimum_size = Vector2(0, 120)
-		inner.add_child(kit)
+		kit.custom_minimum_size = Vector2(150, 120)
+		badges.add_child(kit)
+		var info := _small(inner, "", Color("#94a3b8"), 18)
+		var roster_btn := Button.new()
+		roster_btn.text = "Ver elenco e habilidades"
+		roster_btn.custom_minimum_size = Vector2(0, 50)
+		roster_btn.add_theme_font_size_override("font_size", 20)
+		roster_btn.pressed.connect(_show_roster.bind(side))
+		inner.add_child(roster_btn)
 		var faces := HBoxContainer.new()
 		faces.alignment = BoxContainer.ALIGNMENT_CENTER
 		faces.add_theme_constant_override("separation", 10)
 		inner.add_child(faces)
-		_side_widgets[side] = {"kit": kit, "faces": faces}
+		_side_widgets[side] = {"kit": kit, "faces": faces, "crest": crest, "licon": licon, "info": info}
 		if side == 0:
 			var vs := Label.new()
 			vs.text = "VS"
@@ -474,6 +503,9 @@ func _unhandled_input(event: InputEvent) -> void:
 		return
 	if event.is_action_pressed("ui_cancel"):
 		get_viewport().set_input_as_handled()
+		if _roster_overlay != null:
+			_close_roster()
+			return
 		match page:
 			Page.MODES:
 				show_page(Page.TITLE)
@@ -555,6 +587,12 @@ func _cycle(key: String, d: int) -> void:
 		"minutes":
 			minutes_i = posmod(minutes_i + d, minutes_opts.size())
 			Settings.half_minutes = minutes_opts[minutes_i]
+		"weather":
+			weather_i = posmod(weather_i + d, WEATHERS.size())
+		"tod":
+			tod_i = posmod(tod_i + d, TIMES.size())
+		"dyn":
+			dyn_weather = not dyn_weather
 		"skill":
 			skill_i = posmod(skill_i + d, skill_opts.size())
 			Settings.cpu_skill = skill_opts[skill_i][1]
@@ -621,6 +659,9 @@ func _refresh() -> void:
 	_set_label("p1", InputRouter.device_label(_devices[p1_dev]))
 	_set_label("p2", InputRouter.device_label(p2))
 	_set_label("minutes", "%d min cada tempo" % int(minutes_opts[minutes_i]))
+	_set_label("weather", WEATHERS[weather_i][1])
+	_set_label("tod", TIMES[tod_i][1])
+	_set_label("dyn", "Sim — o tempo pode mudar durante o jogo" if dyn_weather else "Não")
 	_set_label("skill", skill_opts[skill_i][0])
 	var q: String = Settings.QUALITY_NAMES[Settings.quality]
 	if Settings.quality == Settings.Quality.AUTO:
@@ -634,6 +675,12 @@ func _refresh() -> void:
 			if w.is_empty():
 				continue
 			var t := ta if side == 0 else tb
+			(w["crest"] as Crest).setup_team(t)
+			var li := Teams.league_of(team_a if side == 0 else team_b)
+			var lg_d: Dictionary = Teams.leagues()[li] if not Teams.leagues().is_empty() else {}
+			(w["licon"] as Crest).setup_league(String(lg_d.get("name", "")), String(lg_d.get("id", "")).to_upper(), li * 7919 + 13)
+			var st: Dictionary = t.get("stadium", {})
+			(w["info"] as Label).text = "%s · %s lugares" % [st.get("name", "Estádio"), _thousands(int(st.get("cap", 0)))] if not st.is_empty() else ""
 			var kit: KitBadge = w["kit"]
 			kit.c1 = t["c1"]
 			kit.c2 = t["c2"]
@@ -674,7 +721,152 @@ func _on_play() -> void:
 		"mode": GameModes.ALL[mode_i], "team_a": team_a, "team_b": team_b,
 		"devices": [p1, p2], "seed": int(Time.get_unix_time_from_system()) & 0xFFFFFF,
 		"half_minutes": minutes_opts[minutes_i],
+		"weather": _weather_pick(), "tod": TIMES[tod_i][0], "dynamic_weather": dyn_weather,
 	})
+
+
+## "Aleatório" sorteia um clima (é sorteado aqui, no menu, para valer igual nos dois lados do online).
+func _weather_pick() -> String:
+	var w: String = WEATHERS[weather_i][0]
+	if w == "aleatorio":
+		var opts := ["sol", "sol", "nublado", "chuva", "tempestade", "neve"]
+		w = opts[randi() % opts.size()]
+	return w
+
+
+func _thousands(n: int) -> String:
+	var s := str(n)
+	var out := ""
+	while s.length() > 3:
+		out = "." + s.substr(s.length() - 3) + out
+		s = s.substr(0, s.length() - 3)
+	return s + out
+
+
+# ------------------------------------------------------------------ elenco (atributos e habilidades)
+
+const ATTR_NAMES := ["VEL", "ACE", "FIN", "PAS", "DRI", "DEF"]
+
+
+func _show_roster(side: int) -> void:
+	if _roster_overlay != null:
+		_roster_overlay.queue_free()
+	var t := Teams.get_team(team_a if side == 0 else team_b)
+	var dim := ColorRect.new()
+	dim.color = Color(0, 0, 0, 0.7)
+	dim.set_anchors_preset(Control.PRESET_FULL_RECT)
+	_content.add_child(dim)
+	_roster_overlay = dim
+	var panel := PanelContainer.new()
+	panel.set_anchors_preset(Control.PRESET_FULL_RECT)
+	panel.offset_left = 60
+	panel.offset_right = -60
+	panel.offset_top = 40
+	panel.offset_bottom = -40
+	dim.add_child(panel)
+	var vb := VBoxContainer.new()
+	vb.add_theme_constant_override("separation", 8)
+	panel.add_child(vb)
+	var head := HBoxContainer.new()
+	head.add_theme_constant_override("separation", 16)
+	vb.add_child(head)
+	var crest := Crest.new()
+	crest.custom_minimum_size = Vector2(70, 70)
+	crest.setup_team(t)
+	head.add_child(crest)
+	var title := Label.new()
+	title.text = "%s — elenco" % t["name"]
+	title.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	title.add_theme_font_size_override("font_size", 34)
+	title.add_theme_color_override("font_color", Color("#facc15"))
+	head.add_child(title)
+	var close := Button.new()
+	close.text = "Fechar"
+	close.custom_minimum_size = Vector2(160, 56)
+	close.pressed.connect(_close_roster)
+	head.add_child(close)
+	var legend := _small(vb, "VEL velocidade · ACE aceleração · FIN finalização · PAS passe · DRI drible · DEF defesa", Color("#64748b"), 16)
+	legend.horizontal_alignment = HORIZONTAL_ALIGNMENT_LEFT
+	var scroll := ScrollContainer.new()
+	scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	vb.add_child(scroll)
+	var list := VBoxContainer.new()
+	list.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	list.add_theme_constant_override("separation", 6)
+	scroll.add_child(list)
+	for e: Dictionary in t.get("roster", []):
+		list.add_child(_player_row(e))
+	close.call_deferred("grab_focus")
+
+
+func _close_roster() -> void:
+	if _roster_overlay != null:
+		_roster_overlay.queue_free()
+		_roster_overlay = null
+
+
+func _player_row(e: Dictionary) -> Control:
+	var row := HBoxContainer.new()
+	row.add_theme_constant_override("separation", 12)
+	var face := TextureRect.new()
+	face.custom_minimum_size = Vector2(56, 56)
+	face.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	face.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+	face.texture = FaceLibrary.texture(int(e.get("fid", 0)), 128)
+	row.add_child(face)
+	var ovr := Label.new()
+	ovr.text = str(int(e.get("ovr", 70)))
+	ovr.custom_minimum_size = Vector2(56, 0)
+	ovr.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	ovr.add_theme_font_size_override("font_size", 30)
+	var o := int(e.get("ovr", 70))
+	ovr.add_theme_color_override("font_color", Color("#4ade80") if o >= 82 else (Color("#facc15") if o >= 72 else Color("#e2e8f0")))
+	row.add_child(ovr)
+	var name_l := Label.new()
+	name_l.text = "%d  %s\n%s · %s" % [int(e.get("num", 0)), e.get("n", ""), e.get("pos", ""), e.get("nat", "")]
+	name_l.custom_minimum_size = Vector2(300, 0)
+	name_l.add_theme_font_size_override("font_size", 19)
+	row.add_child(name_l)
+	var bars := AttrBars.new()
+	bars.values = e.get("a", [])
+	bars.custom_minimum_size = Vector2(420, 52)
+	row.add_child(bars)
+	var traits := HFlowContainer.new()
+	traits.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	traits.add_theme_constant_override("h_separation", 6)
+	for tn in e.get("t", []):
+		var chip := Label.new()
+		chip.text = " %s " % tn
+		chip.add_theme_font_size_override("font_size", 16)
+		chip.add_theme_color_override("font_color", Color("#0f172a"))
+		var sb := StyleBoxFlat.new()
+		sb.bg_color = Color("#facc15")
+		sb.set_corner_radius_all(8)
+		sb.content_margin_left = 6
+		sb.content_margin_right = 6
+		chip.add_theme_stylebox_override("normal", sb)
+		traits.add_child(chip)
+	row.add_child(traits)
+	return row
+
+
+## Barras dos 6 atributos (0-99).
+class AttrBars:
+	extends Control
+	var values: Array = []
+
+	func _draw() -> void:
+		var f := ThemeDB.fallback_font
+		var n := 6
+		var w := size.x / n
+		for i in n:
+			var v := float(values[i]) if i < values.size() else 0.0
+			var x := i * w
+			draw_string(f, Vector2(x, 16), "%s %d" % [MainMenu.ATTR_NAMES[i], roundi(v * 99.0)], HORIZONTAL_ALIGNMENT_LEFT, w - 6, 15, Color("#cbd5e1"))
+			draw_rect(Rect2(Vector2(x, 26), Vector2(w - 10, 10)), Color(1, 1, 1, 0.1))
+			var col := Color("#ef4444").lerp(Color("#4ade80"), clampf((v - 0.45) / 0.45, 0.0, 1.0))
+			draw_rect(Rect2(Vector2(x, 26), Vector2((w - 10) * clampf(v, 0.0, 1.0), 10)), col)
 
 
 # ------------------------------------------------------------------ online
@@ -758,6 +950,7 @@ func _net_cfg() -> Dictionary:
 	return {
 		"mode": GameModes.ALL[mode_i], "team_a": team_a, "team_b": team_b,
 		"seed": int(Time.get_unix_time_from_system()) & 0xFFFFFF, "half_minutes": minutes_opts[minutes_i],
+		"weather": _weather_pick(), "tod": TIMES[tod_i][0], "dynamic_weather": dyn_weather,
 	}
 
 
@@ -782,6 +975,7 @@ func _client_got_config(c: Dictionary) -> void:
 	var cfg := {
 		"mode": String(c["mode"]), "team_a": int(c["team_a"]), "team_b": int(c["team_b"]),
 		"seed": int(c["seed"]), "half_minutes": float(c["half_minutes"]),
+		"weather": String(c.get("weather", "sol")), "tod": String(c.get("tod", "noite")), "dynamic_weather": bool(c.get("dynamic_weather", false)),
 		"devices": ["remote", _devices[p1_dev]], "session": _session,
 	}
 	_session = null

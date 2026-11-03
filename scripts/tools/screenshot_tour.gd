@@ -31,6 +31,10 @@ func run(dir: String, main_node: Node) -> void:
 	main._current.show_page(MainMenu.Page.TEAMS)
 	await _wait(1.0)
 	await _shot("01_menu")
+	main._current._show_roster(0)
+	await _wait(0.8)
+	await _shot("01c_elenco")
+	main._current._close_roster()
 	main._current._pick_mode(GameModes.FUTSAL, false)
 	main._current.show_page(MainMenu.Page.TEAMS)
 	await _wait(1.0)
@@ -64,6 +68,13 @@ func run(dir: String, main_node: Node) -> void:
 	Settings.apply()
 	await _match(GameModes.FIELD, _t("esp", 15), _t("esp", 3), ["cpu", "cpu"], 11, [[18.0, "10_qualidade_baixa"]])
 
+	# clima, horário e porte de estádio
+	Settings.quality = Settings.Quality.ULTRA
+	Settings.apply()
+	await _match(GameModes.FIELD, _t("ned", 1), _t("ned", 2), ["cpu", "cpu"], 31, [[14.0, "12_chuva_dia"]], {"weather": "chuva", "tod": "dia"})
+	await _match(GameModes.FIELD, _t("rus", 0), _t("rus", 3), ["cpu", "cpu"], 32, [[14.0, "13_neve_entardecer"]], {"weather": "neve", "tod": "tarde"})
+	await _match(GameModes.FIELD, _t("uru", 15), _t("uru", 14), ["cpu", "cpu"], 33, [[12.0, "14_tempestade_estadio_modesto"]], {"weather": "tempestade", "tod": "noite"})
+	await _match(GameModes.FIELD, _t("sau", 0), _t("sau", 1), ["cpu", "cpu"], 34, [[12.0, "15_saudita_dia"]], {"weather": "sol", "tod": "dia"})
 	# caça um gol para mostrar o banner com a face do artilheiro
 	Settings.quality = Settings.Quality.ULTRA
 	Settings.apply()
@@ -79,9 +90,11 @@ func _t(id: String, k: int) -> int:
 	return k
 
 
-func _match(mode: String, a: int, b: int, devices: Array, seed_value: int, shots: Array) -> void:
-	main._start_match({"mode": mode, "team_a": a, "team_b": b, "devices": devices,
-		"seed": seed_value, "half_minutes": 3.0})
+func _match(mode: String, a: int, b: int, devices: Array, seed_value: int, shots: Array, extra: Dictionary = {}) -> void:
+	var cfg := {"mode": mode, "team_a": a, "team_b": b, "devices": devices,
+		"seed": seed_value, "half_minutes": 3.0, "weather": "sol", "tod": "noite"}
+	cfg.merge(extra, true)
+	main._start_match(cfg)
 	var t := 0.0
 	for s in shots:
 		await _wait(float(s[0]) - t)

@@ -30,6 +30,14 @@ func start(cfg: Dictionary) -> void:
 	sim = MatchSim.new()
 	var seed_value: int = cfg.get("seed", 1234)
 	sim.setup(cfg["mode"], ta, tb, seed_value, float(cfg.get("half_minutes", 3.0)) * 60.0)
+	# clima inicial muda o gramado (vale igual nos dois lados do online: vem da configuração)
+	var weather: String = cfg.get("weather", "sol")
+	if cfg["mode"] != GameModes.FUTSAL:
+		match weather:
+			"chuva", "tempestade":
+				sim.mode["roll_decel"] = float(sim.mode["roll_decel"]) * 0.8
+			"neve":
+				sim.mode["roll_decel"] = float(sim.mode["roll_decel"]) * 1.35
 	replay.seed_value = seed_value
 	replay.mode_id = cfg["mode"]
 	var devices: Array = cfg["devices"]
@@ -46,6 +54,11 @@ func start(cfg: Dictionary) -> void:
 	if (ta["c1"] as Color).is_equal_approx(tb["c1"]) or _similar(ta["c1"], tb["c1"]):
 		colors[1] = [tb["c2"], tb["c1"]]
 	view = MatchView3D.new()
+	view.weather = weather if cfg["mode"] != GameModes.FUTSAL else "sol"
+	view.tod = String(cfg.get("tod", "noite"))
+	view.dynamic_weather = bool(cfg.get("dynamic_weather", false)) and cfg["mode"] != GameModes.FUTSAL
+	view.home_team = ta
+	view.visual_seed = seed_value
 	add_child(view)
 	view.human_team = [brains[0] == null, brains[1] == null]
 	view.setup(sim, colors)
@@ -55,6 +68,18 @@ func start(cfg: Dictionary) -> void:
 	hud = Hud.new()
 	add_child(hud)
 	hud.setup(sim, [String(ta["short"]), String(tb["short"])], colors)
+	view.weather_changed.connect(func(t: String): hud.show_toast(t, 3.0))
+	var st: Dictionary = ta.get("stadium", {})
+	var where := String(st.get("name", "")) if cfg["mode"] == GameModes.FIELD else ""
+	var tod_name: String = {"dia": "Dia", "tarde": "Entardecer", "noite": "Noite"}.get(String(cfg.get("tod", "noite")), "")
+	var parts: PackedStringArray = []
+	if where != "":
+		parts.append(where)
+	if cfg["mode"] != GameModes.FUTSAL:
+		parts.append(tod_name)
+		parts.append(view.weather_fx.label())
+	if not parts.is_empty():
+		hud.show_toast(" · ".join(parts), 4.0)
 	hud.resume_requested.connect(func(): _set_paused(false))
 	hud.quit_requested.connect(_quit)
 	hud.rematch_requested.connect(_rematch)
@@ -150,6 +175,7 @@ func _on_event(e: Dictionary) -> void:
 	match e["type"]:
 		"goal":
 			view.shake(10.0)
+			view.on_goal(int(e["team"]))
 			for t in 2:
 				InputRouter.rumble(devs[t], 0.6, 0.9 if t == int(e["team"]) else 0.2, 0.5)
 		"kick":

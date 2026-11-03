@@ -127,6 +127,100 @@ LEAGUES = [
         ("Matador Cordobés", "MAT", "#1e3a8a", "#f8fafc", 0.74), ("Matador de Victoria", "VIC", "#1e3a8a", "#dc2626", 0.69),
         ("Tatengue", "TAT", "#f8fafc", "#dc2626", 0.69), ("Fortín de Liniers", "FTN", "#f8fafc", "#1d4ed8", 0.74),
     ]},
+    {"id": "uru", "name": "Liga Uruguaia", "country": "UY", "foreign": 0.08, "teams": [
+        ("Carbonero Aurinegro", "CAR", "#facc15", "#111827", 0.78), ("Tricolor Bolso", "BOL", "#f8fafc", "#1e3a8a", 0.78),
+        ("Violeta del Parque", "VIO", "#7c3aed", "#f8fafc", 0.70), ("Franja Danubiana", "DAN", "#f8fafc", "#111827", 0.68),
+        ("Negriazul de Belvedere", "LVP", "#111827", "#1d4ed8", 0.71), ("Bohemio de Montevideo", "BOH", "#f8fafc", "#111827", 0.67),
+        ("Darsenero", "DAR", "#dc2626", "#f8fafc", 0.66), ("Cervecero", "CER", "#15803d", "#f8fafc", 0.66),
+        ("Sastre", "SAS", "#dc2626", "#15803d", 0.67), ("Villero", "VLL", "#7dd3fc", "#f8fafc", 0.65),
+        ("Arachán", "ARA", "#1d4ed8", "#facc15", 0.66), ("Pedrense", "PED", "#f8fafc", "#dc2626", 0.65),
+        ("Gaucho del Pantanoso", "GAU", "#facc15", "#dc2626", 0.64), ("Rojo Fernandino", "FER", "#dc2626", "#15803d", 0.65),
+        ("Pionero", "PIO", "#dc2626", "#1e3a8a", 0.64), ("Palermitano", "PAL", "#dc2626", "#1d4ed8", 0.63),
+    ]},
+    {"id": "per", "name": "Liga Peruana", "country": "PE", "foreign": 0.12, "teams": [
+        ("Crema Limeño", "CRE", "#fef3c7", "#111827", 0.74), ("Blanquiazul Íntimo", "INT", "#1e3a8a", "#f8fafc", 0.73),
+        ("Celeste Rimense", "CEL", "#38bdf8", "#f8fafc", 0.73), ("Dominó Arequipeño", "DOM", "#dc2626", "#111827", 0.70),
+        ("Papá Cusqueño", "PAP", "#dc2626", "#f8fafc", 0.68), ("Dorado Imperial", "DOR", "#facc15", "#111827", 0.68),
+        ("Rojo Matador", "HUA", "#dc2626", "#f8fafc", 0.67), ("Tarmeño", "ADT", "#1d4ed8", "#f8fafc", 0.64),
+        ("Albo Piurano", "GRA", "#f8fafc", "#111827", 0.65), ("Vendaval Sullanense", "SUL", "#f8fafc", "#1e3a8a", 0.64),
+        ("Comerciante Cutervino", "CUT", "#1d4ed8", "#facc15", 0.64), ("Celeste Cusqueño", "GAR", "#7dd3fc", "#f8fafc", 0.65),
+        ("Chongoyapano", "JP2", "#facc15", "#1d4ed8", 0.63), ("Andahuaylino", "CHK", "#15803d", "#facc15", 0.64),
+        ("Rosado Chalaco", "SBA", "#f9a8d4", "#111827", 0.65), ("Gavilán Cajamarquino", "UTC", "#1e3a8a", "#facc15", 0.65),
+        ("Moqueguano", "MOQ", "#facc15", "#111827", 0.62), ("Cajamarquino", "CAJ", "#f8fafc", "#dc2626", 0.62),
+    ]},
+    {"id": "chi", "name": "Liga Chilena", "country": "CL", "foreign": 0.12, "teams": [
+        ("Pirata Coquimbano", "COQ", "#facc15", "#111827", 0.72), ("Cruzado", "CRU", "#f8fafc", "#1d4ed8", 0.73),
+        ("Capo de Rancagua", "OHI", "#38bdf8", "#f8fafc", 0.69), ("Romántico Viajero", "ROM", "#1e3a8a", "#f8fafc", 0.73),
+        ("Itálico", "ITA", "#15803d", "#f8fafc", 0.68), ("Árabe Tricolor", "ARB", "#15803d", "#dc2626", 0.69),
+        ("Minero de El Salvador", "MIN", "#f97316", "#f8fafc", 0.66), ("Cacique Albo", "CAC", "#f8fafc", "#111827", 0.75),
+        ("Acerero", "ACE", "#1d4ed8", "#111827", 0.68), ("Diablo Rojo de Chillán", "CHL", "#dc2626", "#f8fafc", 0.66),
+        ("Limachino", "LIM", "#dc2626", "#facc15", 0.63), ("Cementero", "CEM", "#dc2626", "#f8fafc", 0.66),
+        ("Papayero", "PAY", "#dc2626", "#1e3a8a", 0.64), ("Ruletero Viñamarino", "RUL", "#1e3a8a", "#facc15", 0.66),
+        ("Campanil", "CAM", "#facc15", "#1d4ed8", 0.64), ("Lila Penquista", "LIL", "#a855f7", "#f8fafc", 0.63),
+    ]},
+    {"id": "ecu", "name": "Liga Equatoriana", "country": "EC", "foreign": 0.12, "teams": [
+        ("Albo Quiteño", "LDU", "#f8fafc", "#1e3a8a", 0.77), ("Rayado del Valle", "IDV", "#111827", "#1d4ed8", 0.78),
+        ("Ídolo del Astillero", "IDO", "#facc15", "#111827", 0.74), ("Bombillo Eléctrico", "BOM", "#1d4ed8", "#f8fafc", 0.71),
+        ("Oriental Quiteño", "AUC", "#facc15", "#dc2626", 0.69), ("Camarata", "CAT", "#38bdf8", "#f8fafc", 0.69),
+        ("Morlaco", "MOR", "#dc2626", "#f8fafc", 0.67), ("Bananero", "BAN", "#15803d", "#f8fafc", 0.67),
+        ("Celeste Ambateño", "MAC", "#7dd3fc", "#f8fafc", 0.66), ("Ponchito", "PON", "#dc2626", "#facc15", 0.65),
+        ("Lojano Libre", "LIB", "#dc2626", "#f8fafc", 0.65), ("Atunero", "ATU", "#1d4ed8", "#f8fafc", 0.64),
+        ("Cetáceo Riobambeño", "DAQ", "#facc15", "#1d4ed8", 0.64), ("Rodillo Rojo", "TEC", "#dc2626", "#f8fafc", 0.64),
+        ("Ciudadano", "CIU", "#38bdf8", "#1e3a8a", 0.64), ("León del Norte", "LEO", "#facc15", "#111827", 0.63),
+    ]},
+    {"id": "sau", "name": "Liga Saudita", "country": "SA", "foreign": 0.45, "teams": [
+        ("Riyadh Azul", "HIL", "#1d4ed8", "#f8fafc", 0.84), ("Riyadh Amarelo", "NAS", "#facc15", "#1d4ed8", 0.83),
+        ("Jeddah Tigres", "ITT", "#facc15", "#111827", 0.82), ("Jeddah Real", "AHL", "#15803d", "#f8fafc", 0.81),
+        ("Khobar Real", "QAD", "#dc2626", "#facc15", 0.78), ("Dammam Comandos", "ETT", "#15803d", "#dc2626", 0.74),
+        ("Buraidah Fênix", "TAA", "#facc15", "#111827", 0.74), ("Riyadh Juventude", "SHB", "#f8fafc", "#111827", 0.74),
+        ("Hofuf Conquistador", "FAT", "#1e3a8a", "#f8fafc", 0.71), ("Saihat Golfo", "KHA", "#facc15", "#15803d", 0.70),
+        ("Majmaah Laranja", "FAY", "#f97316", "#1e3a8a", 0.70), ("Rass Eterno", "KHO", "#dc2626", "#facc15", 0.68),
+        ("Khamis Montanha", "DAM", "#facc15", "#dc2626", 0.69), ("Rass Firme", "HAZ", "#dc2626", "#f8fafc", 0.67),
+        ("Tabuk Futuro", "NEO", "#111827", "#facc15", 0.69), ("Abha Serrano", "ABH", "#15803d", "#f8fafc", 0.66),
+        ("Harmah Real", "FAI", "#facc15", "#1e3a8a", 0.66), ("Diriyah Histórico", "DIR", "#a16207", "#f8fafc", 0.65),
+    ]},
+    {"id": "ned", "name": "Liga Holandesa", "country": "NL", "foreign": 0.4, "teams": [
+        ("Amsterdam Godenzonen", "AMS", "#f8fafc", "#dc2626", 0.80), ("Eindhoven Boeren", "EIN", "#dc2626", "#f8fafc", 0.82),
+        ("Rotterdam Stadionclub", "ROT", "#dc2626", "#111827", 0.81), ("Alkmaar Kaaskoppen", "ALK", "#dc2626", "#f8fafc", 0.77),
+        ("Enschede Tukkers", "ENS", "#dc2626", "#f8fafc", 0.76), ("Utrecht Domstedelingen", "UTR", "#dc2626", "#f8fafc", 0.74),
+        ("Deventer Eagles", "DEV", "#facc15", "#dc2626", 0.72), ("Friese Pompeblêden", "FRI", "#1d4ed8", "#f8fafc", 0.71),
+        ("Nijmegen Groenrood", "NIJ", "#dc2626", "#15803d", 0.73), ("Rotterdam Kasteel", "SPA", "#dc2626", "#111827", 0.70),
+        ("Sittard Fortuna", "SIT", "#facc15", "#15803d", 0.70), ("Groningen Trots", "GRO", "#15803d", "#f8fafc", 0.70),
+        ("Zwolle Blauwvingers", "ZWO", "#1d4ed8", "#f8fafc", 0.69), ("Kralingen Rood-Zwart", "EXC", "#dc2626", "#111827", 0.68),
+        ("Almelo Heraclieden", "ALM", "#111827", "#f8fafc", 0.68), ("Den Haag Ooievaars", "HAA", "#facc15", "#15803d", 0.68),
+        ("Leeuwarden Geel-Blauw", "LWD", "#facc15", "#1d4ed8", 0.67), ("Tilburg Tricolores", "TIL", "#dc2626", "#1d4ed8", 0.67),
+    ]},
+    {"id": "por", "name": "Liga Portuguesa", "country": "PT", "foreign": 0.45, "teams": [
+        ("Lisboa Águias", "SLB", "#dc2626", "#f8fafc", 0.84), ("Porto Dragões", "FCP", "#1d4ed8", "#f8fafc", 0.84),
+        ("Lisboa Leões", "SCP", "#15803d", "#f8fafc", 0.84), ("Braga Arsenalistas", "SCB", "#dc2626", "#f8fafc", 0.78),
+        ("Guimarães Conquistadores", "VSC", "#f8fafc", "#111827", 0.73), ("Famalicão Fama", "FAM", "#1e3a8a", "#f8fafc", 0.72),
+        ("Barcelos Galos", "GIL", "#dc2626", "#1e3a8a", 0.71), ("Estoril Canarinhos", "EST", "#facc15", "#1e3a8a", 0.70),
+        ("Lisboa Gansos", "CPA", "#111827", "#f8fafc", 0.69), ("Moreira Cónegos", "MOR", "#15803d", "#f8fafc", 0.69),
+        ("Vila do Conde Rioavistas", "RAV", "#15803d", "#f8fafc", 0.69), ("Arouca Arouquenses", "ARO", "#facc15", "#1e3a8a", 0.69),
+        ("Açores Arquipélago", "SCL", "#dc2626", "#f8fafc", 0.70), ("Madeira Alvinegros", "NAC", "#111827", "#f8fafc", 0.68),
+        ("Amadora Tricolor", "EAM", "#dc2626", "#15803d", 0.67), ("Alverca Ribatejanos", "ALV", "#dc2626", "#1d4ed8", 0.66),
+        ("Madeira Verde-Rubros", "MRT", "#15803d", "#dc2626", 0.68), ("Viseu Viriatos", "VIS", "#111827", "#f8fafc", 0.66),
+    ]},
+    {"id": "rus", "name": "Liga Russa", "country": "RU", "foreign": 0.3, "teams": [
+        ("São Petersburgo Azul", "ZEN", "#38bdf8", "#f8fafc", 0.82), ("Krasnodar Touros", "KRA", "#15803d", "#111827", 0.80),
+        ("Moscou Vermelho-Branco", "SPM", "#dc2626", "#f8fafc", 0.78), ("Moscou Exército", "CSK", "#dc2626", "#1e3a8a", 0.78),
+        ("Moscou Ferroviários", "LOK", "#dc2626", "#15803d", 0.77), ("Moscou Azul-Branco", "DMO", "#1d4ed8", "#f8fafc", 0.76),
+        ("Kazan Rubi", "RUB", "#7f1d1d", "#15803d", 0.71), ("Rostov Amarelo-Azul", "ROS", "#facc15", "#1e3a8a", 0.71),
+        ("Grozny Verde", "AKH", "#15803d", "#f8fafc", 0.69), ("Samara Asas", "KRY", "#1e3a8a", "#f8fafc", 0.70),
+        ("Kaliningrado Báltico", "BAL", "#1d4ed8", "#f8fafc", 0.71), ("Níjni Novgorod", "NNO", "#1e3a8a", "#facc15", 0.67),
+        ("Togliatti Akron", "AKR", "#dc2626", "#111827", 0.67), ("Makhachkala Dínamo", "DMK", "#1d4ed8", "#f8fafc", 0.68),
+        ("Moscou Pátria", "ROD", "#1e3a8a", "#dc2626", 0.66), ("Voronej Tocha", "FAK", "#1e3a8a", "#facc15", 0.66),
+    ]},
+    {"id": "ukr", "name": "Liga Ucraniana", "country": "UA", "foreign": 0.25, "teams": [
+        ("Donetsk Mineiros", "SHA", "#f97316", "#111827", 0.80), ("Kiev Azul-Branco", "DKY", "#f8fafc", "#1d4ed8", 0.79),
+        ("Jitomir Lobos", "POL", "#facc15", "#15803d", 0.74), ("Kryvyi Rih Mineiros", "KRV", "#dc2626", "#f8fafc", 0.72),
+        ("Luhansk Estrela", "ZOR", "#111827", "#f8fafc", 0.71), ("Cherkasy Cerejas", "LNZ", "#f8fafc", "#dc2626", 0.71),
+        ("Lviv Leões Verdes", "KAR", "#15803d", "#f8fafc", 0.71), ("Kiev Obolon", "OBO", "#1d4ed8", "#f8fafc", 0.66),
+        ("Kovalivka Espiga", "KOL", "#facc15", "#15803d", 0.67), ("Rivne Urze", "VER", "#15803d", "#f8fafc", 0.67),
+        ("Kharkiv Metalurgistas", "MET", "#facc15", "#1d4ed8", 0.70), ("Kudrivka Vermelho", "KUD", "#dc2626", "#111827", 0.65),
+        ("Kamianets Epicentro", "EPI", "#f97316", "#f8fafc", 0.66), ("Kiev Margem Esquerda", "LBK", "#111827", "#facc15", 0.65),
+        ("Chernivtsi Bucovina", "BUK", "#facc15", "#111827", 0.65), ("Odessa Mar Negro", "CHO", "#1d4ed8", "#111827", 0.66),
+    ]},
 ]
 
 # ---------------------------------------------------------------- nomes por nacionalidade
@@ -196,6 +290,18 @@ NAMES = {
            ["Tanaka", "Suzuki", "Takahashi", "Watanabe", "Ito", "Yamamoto", "Nakamura", "Kobayashi", "Saito", "Matsumoto"], []),
     "KR": (["Ji-ho", "Min-seo", "Do-yun", "Seo-jun", "Ha-joon", "Jun-woo", "Hyun-woo", "Ye-jun"],
            ["Kim", "Lee", "Park", "Choi", "Jung", "Kang", "Cho", "Yoon"], []),
+    "PE": (["Renato", "José", "Carlos", "Diego", "Alexander", "Luis", "Martín", "Edison", "Kevin", "Bryan", "Jesús", "Aldair"],
+           ["Quispe", "Flores", "Huamán", "Chávez", "Ramos", "Mendoza", "Vargas", "Rojas", "Ccori", "Paucar", "Ticona", "Yupanqui"], []),
+    "CL": (["Matías", "Benjamín", "Vicente", "Joaquín", "Felipe", "Ignacio", "Cristóbal", "Diego", "Sebastián", "Bastián"],
+           ["Muñoz", "Rojas", "Díaz", "Soto", "Contreras", "Silva", "Sepúlveda", "Morales", "Fuentes", "Valenzuela"], []),
+    "EC": (["Carlos", "Jorge", "Bryan", "Andrés", "Jordy", "Anthony", "Dixon", "Segundo", "Romario", "Fidel"],
+           ["Caicedo", "Estupiñán", "Mina", "Arboleda", "Preciado", "Corozo", "Angulo", "Valencia", "Quiñónez", "Plata"], []),
+    "SA": (["Abdullah", "Mohammed", "Faisal", "Salem", "Fahad", "Nasser", "Khalid", "Saud", "Turki", "Yasser", "Hattan", "Ziyad"],
+           ["Al-Qahtani", "Al-Harbi", "Al-Otaibi", "Al-Shehri", "Al-Dosari", "Al-Ghamdi", "Al-Zahrani", "Al-Mutairi", "Al-Subaie", "Al-Malki"], []),
+    "RU": (["Aleksandr", "Dmitri", "Ivan", "Maksim", "Artyom", "Nikita", "Kirill", "Sergei", "Andrei", "Pavel", "Yegor", "Danil"],
+           ["Ivanov", "Smirnov", "Kuznetsov", "Popov", "Sokolov", "Lebedev", "Kozlov", "Novikov", "Morozov", "Volkov", "Orlov", "Belov"], []),
+    "UA": (["Oleksandr", "Mykola", "Andriy", "Bohdan", "Taras", "Vitaliy", "Yaroslav", "Denys", "Serhiy", "Oleh", "Artem", "Roman"],
+           ["Kovalenko", "Bondarenko", "Tkachenko", "Shevchuk", "Melnyk", "Kravchenko", "Boyko", "Moroz", "Lysenko", "Savchenko", "Marchenko", "Rudenko"], []),
     "CA": (["Liam", "Noah", "Owen", "Ethan", "Nathan", "Logan", "Cole", "Mathieu"],
            ["Tremblay", "Gagnon", "Roy", "Côté", "Bouchard", "MacDonald", "Campbell", "Stewart"], []),
 }
@@ -209,7 +315,15 @@ FOREIGN_POOL = {
     "US": ["AR", "BR", "CO", "MX", "UY", "CA", "ES", "EN", "GH", "JP", "KR", "FR"],
     "BR": ["AR", "UY", "CO", "PT"],
     "AR": ["UY", "CO", "BR"],
-    "PT": ["BR", "ES", "AR", "CI", "SN"],
+    "PT": ["BR", "ES", "AR", "CI", "SN", "UY", "CO", "NG"],
+    "UY": ["AR", "BR", "CO"],
+    "PE": ["AR", "UY", "CO", "BR"],
+    "CL": ["AR", "UY", "CO", "BR"],
+    "EC": ["CO", "AR", "UY", "BR"],
+    "SA": ["BR", "PT", "FR", "ES", "NG", "SN", "MA", "AR", "CO", "NL", "EN"],
+    "NL": ["BR", "MA", "DE", "EN", "NG", "GH", "PT", "JP", "SN", "UY"],
+    "RU": ["BR", "CO", "UY", "AR", "NG", "SN", "PT"],
+    "UA": ["BR", "CO", "NG", "GH", "PT"],
 }
 
 # aparência: pesos por tom de pele (8 tons de face_gen.SKIN_TONES, claro → escuro)
@@ -221,6 +335,8 @@ SKIN_W = {
     "NG": [0, 0, 0, 1, 6, 20, 38, 35], "SN": [0, 0, 0, 1, 5, 18, 36, 40], "CI": [0, 0, 0, 1, 6, 22, 38, 33],
     "GH": [0, 0, 0, 1, 6, 22, 38, 33], "MA": [4, 16, 32, 28, 14, 4, 1, 1], "CO": [8, 18, 26, 22, 12, 7, 4, 3],
     "MX": [6, 16, 30, 28, 12, 5, 2, 1], "JP": [20, 50, 26, 4, 0, 0, 0, 0], "KR": [22, 50, 24, 4, 0, 0, 0, 0],
+    "PE": [4, 12, 26, 30, 18, 6, 3, 1], "CL": [10, 24, 30, 22, 10, 3, 1, 0], "EC": [4, 10, 18, 22, 16, 12, 10, 8],
+    "SA": [2, 8, 26, 32, 20, 8, 3, 1], "RU": [42, 34, 12, 4, 3, 2, 2, 1], "UA": [44, 34, 12, 4, 2, 2, 1, 1],
 }
 
 # ---------------------------------------------------------------- futsal pelo mundo
@@ -310,6 +426,8 @@ FAMOUS = {
     "Callum Wilson", "Ben White", "Harry Wilson", "Moussa Sissoko", "Benjamin Mendy", "Miles Robinson", "Sean Johnson",
     "Gonzalo Martínez", "Lucas Hernández", "Ángel Correa", "Federico Fernández", "Lucas Paquetá", "Danilo Pereira",
     "Rodrigo Moreno", "Pablo Marín", "Jorge Molina", "Sergio Gómez", "James Ward", "Alan Ruiz", "Lucas Torres",
+    "Salem Al-Dosari", "Carlos Gruezo", "Bryan Angulo", "Jordy Caicedo", "Anthony Valencia", "Romario Caicedo",
+    "Luis Ramos", "Alexander Callens", "Matías Fernández", "Felipe Mora", "Diego Valdés", "Aleksandr Kokorin",
 }
 
 
@@ -338,6 +456,44 @@ def attrs(r: random.Random, rating: float, pos: str) -> list[float]:
     if pos == "MF":
         return [g(0.0), g(0.0), g(0.0), g(0.06), g(0.05), g(-0.02)]
     return [g(0.05), g(0.05), g(0.08), g(-0.02), g(0.04), g(-0.12)]
+
+
+# habilidades especiais (afetam a simulação; ver SimPlayer.Trait)
+TRAITS = {
+    "GK": ["Goleiro Seguro", "Reflexo", "Líder"],
+    "DF": ["Muralha", "Carrinho", "Cabeceador", "Líder", "Resistência", "Velocista"],
+    "MF": ["Maestro", "Resistência", "Longa Distância", "Chute Colocado", "Driblador", "Líder"],
+    "FW": ["Finalizador", "Velocista", "Driblador", "Cabeceador", "Chute Colocado", "Longa Distância"],
+}
+
+
+def traits_for(r: random.Random, pos: str, a: list[float], star: float) -> list[str]:
+    n = 1 + (1 if r.random() < 0.35 + star * 4 else 0) + (1 if star > 0 and r.random() < 0.3 else 0)
+    pool = list(TRAITS[pos])
+    # quem tem o atributo alto puxa a habilidade correspondente
+    if a[0] > 0.8 and "Velocista" in pool:
+        pool += ["Velocista"] * 2
+    if a[2] > 0.8 and "Finalizador" in pool:
+        pool += ["Finalizador"] * 2
+    if a[3] > 0.8 and "Maestro" in pool:
+        pool += ["Maestro"] * 2
+    if a[4] > 0.8 and "Driblador" in pool:
+        pool += ["Driblador"] * 2
+    out: list[str] = []
+    while len(out) < n and pool:
+        t = r.choice(pool)
+        pool = [x for x in pool if x != t]
+        out.append(t)
+    return out
+
+
+def overall(pos: str, a: list[float]) -> int:
+    w = {"GK": [0.05, 0.05, 0.0, 0.15, 0.15, 0.6], "DF": [0.15, 0.1, 0.05, 0.15, 0.1, 0.45],
+         "MF": [0.12, 0.1, 0.15, 0.3, 0.25, 0.08], "FW": [0.2, 0.15, 0.35, 0.1, 0.18, 0.02]}[pos]
+    return int(round(30 + 63 * sum(x * y for x, y in zip(a, w))))
+
+
+STADIUM_WORDS = ["Arena", "Estádio", "Estádio", "Parque", "Arena", "Coliseu"]
 
 
 def nearest_face(lib: list, f: list[int]) -> int:
@@ -370,10 +526,17 @@ def main() -> None:
                 f = face_for(r, nat)
                 num = nums[pos].pop(0) if nums[pos] else 30 + pi
                 star = 0.05 if (pi in (8, 9, 14, 15) if sport == "football" else pi in (5, 6, 10)) else 0.0
+                a = attrs(r, rating + star, pos)
                 roster.append({"n": player_name(r, nat, used), "num": num, "pos": pos, "nat": nat,
-                               "f": f, "fid": nearest_face(lib, f), "a": attrs(r, rating + star, pos)})
+                               "f": f, "fid": nearest_face(lib, f), "a": a, "ovr": overall(pos, a),
+                               "t": traits_for(r, pos, a, star)})
                 total += 1
-            lg["teams"].append({"name": name, "short": short, "c1": c1, "c2": c2, "rating": rating, "roster": roster})
+            city = name.split()[0]
+            tier = 3 if rating >= 0.8 else (2 if rating >= 0.72 else 1)
+            stadium = {"name": f"{r.choice(STADIUM_WORDS)} {city}" if sport == "football" else f"Ginásio {city}",
+                       "tier": tier, "cap": int(r.uniform(*{3: (55, 82), 2: (28, 50), 1: (8, 24)}[tier])) * 1000}
+            lg["teams"].append({"name": name, "short": short, "c1": c1, "c2": c2, "rating": rating,
+                                "stadium": stadium, "roster": roster})
         out["leagues"].append(lg)
     p = ROOT / "data" / "leagues.json"
     p.parent.mkdir(exist_ok=True)

@@ -34,6 +34,28 @@ var _cam_cfg: Dictionary = {}
 ## >= 0: câmera de perto seguindo esse atleta (replays / screenshots)
 var closeup_id: int = -1
 
+signal weather_changed(text: String)
+
+# configuração da partida (definida antes de setup)
+var weather: String = "sol"
+var tod: String = "noite"          # dia, tarde, noite
+var dynamic_weather: bool = false
+var home_team: Dictionary = {}
+var visual_seed: int = 1
+
+var weather_fx: WeatherFX
+var _env: Environment
+var _sky_mat: ProceduralSkyMaterial
+var _pitch_mat: ShaderMaterial
+var _ball_mat: ShaderMaterial
+var _celebrate: float = 0.0
+var _wave: float = -1.0
+var _wave_cd: float = 25.0
+var _flares: Array = []             # [{node, t}]
+var _confetti: Array[CPUParticles3D] = []
+var _goal_end: float = 1.0          # lado (x) da torcida que comemora
+var _stadium_tier: int = 3
+
 const CAMS := {
 	"field": {"height": 21.0, "back": 22.0, "fov": 29.0, "clamp": 22.0, "look_z": 0.45},
 	"futsal": {"height": 10.5, "back": 10.5, "fov": 36.0, "clamp": 7.0, "look_z": 0.4},
@@ -46,6 +68,7 @@ func setup(s: MatchSim, colors: Array) -> void:
 	team_colors = colors
 	var mid: String = sim.mode["id"]
 	_cam_cfg = CAMS.get(mid, CAMS["field"])
+	_stadium_tier = int(home_team.get("stadium", {}).get("tier", 3))
 	_build_environment()
 	_build_ground()
 	_build_goal(-1.0)
@@ -71,6 +94,22 @@ func setup(s: MatchSim, colors: Array) -> void:
 	cam.far = 600.0
 	add_child(cam)
 	cam.make_current()
+	weather_fx = WeatherFX.new()
+	add_child(weather_fx)
+	weather_fx.env = _env
+	weather_fx.sky_mat = _sky_mat
+	if _sky_mat != null:
+		weather_fx.sky_top = _sky_mat.sky_top_color
+		weather_fx.sky_horizon = _sky_mat.sky_horizon_color
+	weather_fx.pitch_mat = _pitch_mat
+	weather_fx.ball_mat = _ball_mat
+	weather_fx.crowd_mats = _crowd_mats
+	weather_fx.crowd_light = 0.82 if _night else 1.0
+	weather_fx.cam = cam
+	var indoor := String(sim.mode["surface"]) == "wood"
+	weather_fx.setup("sol" if indoor else weather, dynamic_weather and not indoor, _night, visual_seed, self)
+	weather_fx.changed.connect(func(t: String): weather_changed.emit(t))
+	_build_confetti()
 	_cam_x = sim.ball.pos.x
 	_look = Vector3(sim.ball.pos.x, 0, 0)
 	_update_camera(1.0)
@@ -137,7 +176,7 @@ func _build_environment() -> void:
 		env.background_mode = Environment.BG_SKY
 		var sky := Sky.new()
 		var sm := ProceduralSkyMaterial.new()
-		if surface == "grass":
+		if surface == "grass" and tod == "noite":
 			# jogo noturno
 			_night = true
 			sm.sky_top_color = Color("#050a1a")
@@ -147,8 +186,14 @@ func _build_environment() -> void:
 			for sx: float in [-1.0, 1.0]:
 				for sz: float in [-1.0, 1.0]:
 					_lights2d.append(Vector2(sx * (hl + 14.0), sz * (hw + 18.0)))
+		elif tod == "dia":
+			sm.sky_top_color = Color("#2f6fd6")
+			sm.sky_horizon_color = Color("#bcd8f2")
+			sm.ground_bottom_color = Color("#1f2937")
+			sm.ground_horizon_color = Color("#94a3b8")
+			_sun_dir = Vector2(0.35, -0.3)
 		else:
-			# fim de tarde na quadra de rua
+			# fim de tarde: céu alaranjado e sombras longas
 			sm.sky_top_color = Color("#3b2a6b")
 			sm.sky_horizon_color = Color("#fb923c")
 			sm.ground_bottom_color = Color("#1f2937")
@@ -156,7 +201,9 @@ func _build_environment() -> void:
 			_sun_dir = Vector2(0.55, -0.35)
 		sky.sky_material = sm
 		env.sky = sky
+		_sky_mat = sm
 	env.tonemap_mode = Environment.TONE_MAPPER_LINEAR
+	_env = env
 	var we := WorldEnvironment.new()
 	we.environment = env
 	add_child(we)
@@ -195,6 +242,7 @@ func _build_ground() -> void:
 	mat.set_shader_parameter("line_w", 0.12 if mid == GameModes.FIELD else 0.08)
 	mat.set_shader_parameter("stripes", 1.0 if Settings.detail["stripes"] else 0.0)
 	mat.set_shader_parameter("night", 1.0 if _night else 0.0)
+	_pitch_mat = mat
 	_mesh(pm, mat, Vector3.ZERO)
 
 
@@ -263,6 +311,9 @@ func _crowd_mat(cols: Vector2, bias: float = 0.5) -> ShaderMaterial:
 	m.set_shader_parameter("seats", cols)
 	m.set_shader_parameter("bias", bias)
 	m.set_shader_parameter("light", 0.82 if _night else 1.0)
+	m.set_shader_parameter("tifo", 0.85 if bias > 0.85 else 0.0)
+	if home_team.has("c1"):
+		m.set_shader_parameter("seat_color", (home_team["c1"] as Color).darkened(0.72))
 	m.set_shader_parameter("team_a", team_colors[0][0])
 	m.set_shader_parameter("team_b", team_colors[1][0])
 	_crowd_mats.append(m)
@@ -322,36 +373,68 @@ func _build_stadium() -> void:
 			l.double_sided = false
 			l.position = Vector3(-hl + 4.0 + i * (hl * 2.0 - 8.0) / 8.0, 0.48, -(hw + 4.0) + 0.14)
 			add_child(l)
-	# arquibancadas: lado de lá misto, cada fundo com uma torcida, degrau do lado da câmera
+	# arquibancadas conforme o porte do estádio do time da casa
+	# (3 = arena com dois anéis e cobertura total, 2 = clássico, 1 = modesto)
 	var base_y := 1.4
+	var tier := _stadium_tier
 	_box(Vector3(hl * 2.0 + 30.0, base_y, 1.0), Color("#111827"), Vector3(0, base_y * 0.5, -(hw + 7.5)), false)
-	_stand(Vector3(0, base_y, -(hw + 8.0)), hl * 2.0 + 30.0, 22.0, 15.0, 0.0, 1.6, 0.5)
-	_stand(Vector3(0, base_y + 16.5, -(hw + 31.0)), hl * 2.0 + 30.0, 12.0, 9.0, 0.0, 1.6, 0.5)
-	_stand(Vector3(-(hl + 9.0), base_y, 0), hw * 2.0 + 16.0, 16.0, 11.0, PI / 2, 1.6, 0.92)
-	_stand(Vector3(hl + 9.0, base_y, 0), hw * 2.0 + 16.0, 16.0, 11.0, -PI / 2, 1.6, 0.08)
-	_stand(Vector3(0, 0.6, hw + 8.0), hl * 2.0 + 30.0, 6.0, 3.0, PI, 1.6, 0.5)
-	# anel entre os dois níveis + coberturas com faixa de luz
-	_box(Vector3(hl * 2.0 + 30.0, 1.4, 1.0), Color("#1e293b"), Vector3(0, base_y + 15.6, -(hw + 30.6)), false)
-	_box(Vector3(hl * 2.0 + 30.0, 0.35, 0.3), Color("#fde68a"), Vector3(0, base_y + 15.0, -(hw + 30.2)), false)
 	var roof := Color("#94a3b8") if _night else Color("#cbd5e1")
-	_box(Vector3(hl * 2.0 + 38.0, 0.8, 18.0), roof, Vector3(0, 33.0, -(hw + 34.0)), true)
-	_box(Vector3(hl * 2.0 + 38.0, 0.25, 0.4), Color("#fef9c3"), Vector3(0, 32.5, -(hw + 25.2)), false)
-	for sgn: float in [-1.0, 1.0]:
-		_box(Vector3(14.0, 0.8, hw * 2.0 + 30.0), roof, Vector3(sgn * (hl + 22.0), 18.0, 0), true)
+	if tier >= 3:
+		_stand(Vector3(0, base_y, -(hw + 8.0)), hl * 2.0 + 30.0, 22.0, 15.0, 0.0, 1.6, 0.5)
+		_stand(Vector3(0, base_y + 16.5, -(hw + 31.0)), hl * 2.0 + 30.0, 12.0, 9.0, 0.0, 1.6, 0.5)
+		_stand(Vector3(-(hl + 9.0), base_y, 0), hw * 2.0 + 16.0, 16.0, 11.0, PI / 2, 1.6, 0.92)
+		_stand(Vector3(hl + 9.0, base_y, 0), hw * 2.0 + 16.0, 16.0, 11.0, -PI / 2, 1.6, 0.08)
+		_stand(Vector3(0, 0.6, hw + 8.0), hl * 2.0 + 30.0, 6.0, 3.0, PI, 1.6, 0.5)
+		_box(Vector3(hl * 2.0 + 30.0, 1.4, 1.0), Color("#1e293b"), Vector3(0, base_y + 15.6, -(hw + 30.6)), false)
+		_box(Vector3(hl * 2.0 + 30.0, 0.35, 0.3), Color("#fde68a"), Vector3(0, base_y + 15.0, -(hw + 30.2)), false)
+		_box(Vector3(hl * 2.0 + 38.0, 0.8, 18.0), roof, Vector3(0, 33.0, -(hw + 34.0)), true)
+		_box(Vector3(hl * 2.0 + 38.0, 0.25, 0.4), Color("#fef9c3"), Vector3(0, 32.5, -(hw + 25.2)), false)
+		for sgn: float in [-1.0, 1.0]:
+			_box(Vector3(14.0, 0.8, hw * 2.0 + 30.0), roof, Vector3(sgn * (hl + 22.0), 18.0, 0), true)
+		# telão no fundo
+		_box(Vector3(12.0, 6.5, 0.6), Color("#0b1220"), Vector3(hl + 18.0, 16.0, -hw * 0.6), true)
+	elif tier == 2:
+		_stand(Vector3(0, base_y, -(hw + 8.0)), hl * 2.0 + 24.0, 18.0, 11.0, 0.0, 1.6, 0.5)
+		_stand(Vector3(-(hl + 9.0), base_y, 0), hw * 2.0 + 10.0, 12.0, 7.0, PI / 2, 1.6, 0.92)
+		_stand(Vector3(hl + 9.0, base_y, 0), hw * 2.0 + 10.0, 12.0, 7.0, -PI / 2, 1.6, 0.08)
+		_stand(Vector3(0, 0.6, hw + 8.0), hl * 2.0 + 24.0, 5.0, 2.5, PI, 1.6, 0.5)
+		_box(Vector3(hl * 1.4, 0.7, 12.0), roof, Vector3(0, 21.0, -(hw + 20.0)), true)
+	else:
+		# estádio modesto: arquibancada só no lado de lá e atrás de um gol; resto é muro e árvores
+		_stand(Vector3(0, base_y, -(hw + 8.0)), hl * 1.6, 9.0, 5.0, 0.0, 1.6, 0.5)
+		_stand(Vector3(-(hl + 9.0), base_y, 0), hw * 1.4, 6.0, 3.5, PI / 2, 1.6, 0.9)
+		_box(Vector3(hl * 0.6, 0.5, 6.0), roof, Vector3(0, 9.5, -(hw + 13.0)), true)
+		var rng := RandomNumberGenerator.new()
+		rng.seed = visual_seed
+		for i in 22:
+			var side := -1.0 if i % 2 == 0 else 1.0
+			var tp := Vector3(rng.randf_range(-hl - 20.0, hl + 20.0) if i < 14 else (hl + 12.0) * 1.0, 0, -(hw + 22.0 + rng.randf_range(0, 8)) if i < 14 else rng.randf_range(-hw, hw))
+			if i >= 14 and side < 0.0:
+				continue
+			var trunk := CylinderMesh.new()
+			trunk.top_radius = 0.25
+			trunk.bottom_radius = 0.35
+			trunk.height = 4.0
+			_mesh(trunk, Toon.mat(Color("#5b3a1e"), true), tp + Vector3(0, 2.0, 0))
+			var crown := SphereMesh.new()
+			crown.radius = rng.randf_range(2.2, 3.4)
+			crown.height = crown.radius * 2.0
+			_mesh(crown, Toon.mat(Color("#166534").lerp(Color("#15803d"), rng.randf()), true, 0.1), tp + Vector3(0, 5.5, 0))
 	# refletores: torres + painel aceso + brilho
+	var mast_h := 38.0 if tier >= 3 else (30.0 if tier == 2 else 22.0)
 	for sx: float in [-1.0, 1.0]:
 		for sz: float in [-1.0, 1.0]:
 			var p := Vector3(sx * (hl + 14.0), 0, sz * (hw + 18.0))
 			var mast := CylinderMesh.new()
 			mast.top_radius = 0.35
 			mast.bottom_radius = 0.6
-			mast.height = 38.0
-			_mesh(mast, Toon.mat(Color("#64748b"), true), p + Vector3(0, 19.0, 0))
-			var panel := _box(Vector3(7.0, 4.0, 0.6), Color("#fffbeb"), p + Vector3(0, 39.0, 0), false)
+			mast.height = mast_h
+			_mesh(mast, Toon.mat(Color("#64748b"), true), p + Vector3(0, mast_h * 0.5, 0))
+			var panel := _box(Vector3(7.0, 4.0, 0.6), Color("#fffbeb"), p + Vector3(0, mast_h + 1.0, 0), false)
 			panel.look_at(Vector3(0, 0, 0), Vector3.UP)
 			if _night:
-				_glow(p + Vector3(0, 39.0, 0), 26.0, Color(1.0, 0.95, 0.8), 2.6)
-				_glow(p + Vector3(0, 39.0, 0), 9.0, Color(1.0, 1.0, 0.95), 1.4)
+				_glow(p + Vector3(0, mast_h + 1.0, 0), 26.0, Color(1.0, 0.95, 0.8), 2.6)
+				_glow(p + Vector3(0, mast_h + 1.0, 0), 9.0, Color(1.0, 1.0, 0.95), 1.4)
 	# bandeirinhas de escanteio
 	var pole := CylinderMesh.new()
 	pole.top_radius = 0.022
@@ -637,6 +720,95 @@ func _update_officials(delta: float) -> void:
 		_place_shadows(o["shadows"], fp.pos, (o["rig"] as PlayerRig).rotation.y, false)
 
 
+## Confete nas arquibancadas atrás de cada gol (dispara no gol).
+func _build_confetti() -> void:
+	if String(sim.mode["surface"]) != "grass" or not Settings.detail["crowd"]:
+		return
+	for side: float in [-1.0, 1.0]:
+		var p := CPUParticles3D.new()
+		var q := QuadMesh.new()
+		q.size = Vector2(0.35, 0.22)
+		var m := StandardMaterial3D.new()
+		m.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+		m.vertex_color_use_as_albedo = true
+		m.cull_mode = BaseMaterial3D.CULL_DISABLED
+		q.material = m
+		p.mesh = q
+		p.amount = 400
+		p.lifetime = 4.0
+		p.one_shot = true
+		p.explosiveness = 0.85
+		p.emitting = false
+		p.emission_shape = CPUParticles3D.EMISSION_SHAPE_BOX
+		p.emission_box_extents = Vector3(3, 2, sim.half_w)
+		p.position = Vector3(side * (sim.half_len + 16.0), 12.0, 0)
+		p.direction = Vector3(-side * 0.5, 1, 0)
+		p.spread = 50.0
+		p.initial_velocity_min = 6.0
+		p.initial_velocity_max = 12.0
+		p.gravity = Vector3(0, -3.5, 0)
+		p.angular_velocity_min = -360.0
+		p.angular_velocity_max = 360.0
+		var g := Gradient.new()
+		p.color_initial_ramp = g
+		add_child(p)
+		_confetti.append(p)
+
+
+## Gol: torcida comemora, confete nas cores do time e sinalizadores (à noite).
+func on_goal(team: int) -> void:
+	_celebrate = 1.0
+	_wave = -1.0
+	var attack_dir := sim.team_dir(team)
+	_goal_end = attack_dir
+	if _confetti.size() == 2:
+		var p: CPUParticles3D = _confetti[0 if attack_dir < 0.0 else 1]
+		var g := Gradient.new()
+		g.set_color(0, team_colors[team][0])
+		g.set_color(1, team_colors[team][1] if (team_colors[team][1] as Color).get_luminance() < 0.9 else Color("#facc15"))
+		g.add_point(0.5, Color.WHITE)
+		p.color_initial_ramp = g
+		p.restart()
+		p.emitting = true
+	if (_night or tod == "tarde") and String(sim.mode["surface"]) == "grass" and Settings.detail["crowd"]:
+		for i in 6:
+			var pos := Vector3(attack_dir * (sim.half_len + 12.0 + randf() * 8.0), 4.0 + randf() * 6.0, randf_range(-sim.half_w, sim.half_w))
+			var q := QuadMesh.new()
+			q.size = Vector2(5, 5)
+			var m := ShaderMaterial.new()
+			m.shader = preload("res://shaders/glow.gdshader")
+			m.set_shader_parameter("color", Color(1.0, 0.25, 0.1))
+			var mi := _mesh(q, m, pos)
+			_flares.append({"node": mi, "t": 7.0 + randf() * 3.0, "mat": m})
+
+
+func _update_crowd(delta: float) -> void:
+	_celebrate = maxf(0.0, _celebrate - delta * 0.11)
+	# "ola" de vez em quando, com o jogo parado ou morno
+	_wave_cd -= delta
+	if _wave < 0.0 and _wave_cd <= 0.0 and _excitement < 0.4 and _celebrate <= 0.05:
+		_wave = 0.0
+		_wave_cd = randf_range(35.0, 70.0)
+	if _wave >= 0.0:
+		_wave += delta * 0.16
+		if _wave > 1.1:
+			_wave = -1.0
+	for m in _crowd_mats:
+		m.set_shader_parameter("celebrate", _celebrate)
+		m.set_shader_parameter("wave", _wave)
+	var keep: Array = []
+	for f in _flares:
+		f["t"] = float(f["t"]) - delta
+		var mat: ShaderMaterial = f["mat"]
+		var fl := 0.75 + 0.25 * sin(Time.get_ticks_msec() * 0.03 + float(f["t"]) * 7.0)
+		mat.set_shader_parameter("color", Color(1.0, 0.25 + 0.15 * fl, 0.08) * clampf(float(f["t"]), 0.0, 1.0) * fl)
+		if float(f["t"]) <= 0.0:
+			(f["node"] as Node).queue_free()
+		else:
+			keep.append(f)
+	_flares = keep
+
+
 func _build_ball() -> void:
 	ball_node = Node3D.new()
 	add_child(ball_node)
@@ -647,6 +819,7 @@ func _build_ball() -> void:
 	sm.rings = 12
 	var mat := ShaderMaterial.new()
 	mat.shader = preload("res://shaders/ball.gdshader")
+	_ball_mat = mat
 	if Settings.detail.get("outline", true):
 		mat.next_pass = Toon.outline_mat()
 	ball_mesh = MeshInstance3D.new()
@@ -696,6 +869,9 @@ func _process(delta: float) -> void:
 	_excitement = lerpf(_excitement, target, minf(1.0, delta * 2.0))
 	for m in _crowd_mats:
 		m.set_shader_parameter("excitement", _excitement)
+	_update_crowd(delta)
+	if weather_fx != null:
+		weather_fx.update(delta)
 	_update_camera(delta)
 	_overlay.queue_redraw()
 

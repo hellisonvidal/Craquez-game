@@ -15,6 +15,8 @@ uniform float goal_half = 3.66;
 uniform float line_w = 0.12;
 uniform float stripes = 1.0;
 uniform float night = 0.0;
+uniform float wet = 0.0;
+uniform float snow = 0.0;
 
 varying vec2 wp;
 
@@ -87,6 +89,16 @@ void fragment() {
 		c = vec3(0.36, 0.36, 0.39) * (0.8 + 0.35 * n);
 		c *= 0.92 + 0.12 * step(0.85, noise(p * 6.0));
 		if (!inside) c = vec3(0.24, 0.24, 0.27) * (0.85 + 0.3 * n);
+	}
+	// chuva: grama mais escura e com reflexos; neve: manto branco irregular
+	if (wet > 0.0) {
+		c *= 1.0 - 0.22 * wet;
+		float sheen = smoothstep(0.62, 0.95, noise(p * 0.6 + vec2(TIME * 0.05, 0.0))) * wet;
+		c += vec3(0.08, 0.1, 0.12) * sheen;
+	}
+	if (snow > 0.0) {
+		float cover = smoothstep(0.25, 0.75, noise(p * 0.9) * 0.7 + snow * 0.6);
+		c = mix(c, vec3(0.93, 0.95, 0.98), cover * snow);
 	}
 	float d = lines(p);
 	float aa = fwidth(d) * 0.8 + 0.002;

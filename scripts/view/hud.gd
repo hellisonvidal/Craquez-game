@@ -195,6 +195,13 @@ func on_event(e: Dictionary) -> void:
 				_toast.visible = true
 
 
+## Aviso compacto logo abaixo do placar.
+func show_toast(text: String, t: float = 2.5) -> void:
+	_toast_lbl.text = text
+	_toast_t = t
+	_toast.visible = true
+
+
 func show_message(title: String, sub: String, t: float) -> void:
 	_banner_lbl.text = title
 	_banner_sub.text = sub

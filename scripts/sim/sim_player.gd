@@ -4,6 +4,16 @@ extends RefCounted
 
 const RADIUS := 0.38
 
+# habilidades especiais (bits), vindas de data/leagues.json
+enum Trait { VELOCISTA = 1, DRIBLADOR = 2, FINALIZADOR = 4, COLOCADO = 8, CABECEADOR = 16, MAESTRO = 32,
+	MURALHA = 64, CARRINHO = 128, GOLEIRO_SEGURO = 256, REFLEXO = 512, LONGA_DISTANCIA = 1024, RESISTENCIA = 2048, LIDER = 4096 }
+const TRAIT_NAMES := {
+	"Velocista": Trait.VELOCISTA, "Driblador": Trait.DRIBLADOR, "Finalizador": Trait.FINALIZADOR,
+	"Chute Colocado": Trait.COLOCADO, "Cabeceador": Trait.CABECEADOR, "Maestro": Trait.MAESTRO,
+	"Muralha": Trait.MURALHA, "Carrinho": Trait.CARRINHO, "Goleiro Seguro": Trait.GOLEIRO_SEGURO,
+	"Reflexo": Trait.REFLEXO, "Longa Distância": Trait.LONGA_DISTANCIA, "Resistência": Trait.RESISTENCIA, "Líder": Trait.LIDER,
+}
+
 # dribles (analógico direito)
 enum Skill { NONE, KNOCK, DRAG, ROLL, STEPOVER, ROULETTE }
 const SKILL_TIME := [0.0, 0.25, 0.5, 0.42, 0.55, 0.62]
@@ -15,6 +25,7 @@ var is_keeper: bool = false
 var number: int = 1
 var name: String = ""
 var face_id: int = 0
+var traits: int = 0
 var face: Array = []              # [pele, cor do cabelo, estilo, barba, olhos, porte] (data/leagues.json)
 var base: Vector2 = Vector2.ZERO # posição na formação (normalizada)
 
@@ -64,6 +75,10 @@ var off_balance: float = 0.0      # defensor enganado pela finta
 var face_ball: bool = false      # IA sem a bola: desloca olhando para o lance (recua/anda de lado)
 var shielding: bool = false     # LT/L2: protege a bola (com) ou contém (sem)
 var touch_t: float = 0.0          # domínio (só visual)
+
+
+func has_trait(t: int) -> bool:
+	return (traits & t) != 0
 
 
 func top_speed() -> float:
