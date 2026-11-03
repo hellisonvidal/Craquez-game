@@ -28,7 +28,8 @@ func _ready() -> void:
 	_font = ThemeDB.fallback_font
 	# dentro de CanvasLayer as âncoras não dão tamanho: acompanha a tela
 	_fit()
-	get_viewport().size_changed.connect(_fit)
+	if not get_viewport().size_changed.is_connected(_fit):
+		get_viewport().size_changed.connect(_fit)
 
 
 func _fit() -> void:
@@ -36,7 +37,8 @@ func _fit() -> void:
 	size = get_viewport_rect().size
 	queue_redraw()
 	# o primeiro desenho acontece com tamanho 0: redesenha quando a tela ganha tamanho/gira
-	resized.connect(queue_redraw)
+	if not resized.is_connected(queue_redraw):
+		resized.connect(queue_redraw)
 
 
 func _btn_center(b: Dictionary) -> Vector2:

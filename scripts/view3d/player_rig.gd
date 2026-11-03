@@ -71,7 +71,7 @@ func build(p: SimPlayer, kit: Dictionary) -> void:
 		BodyMesh.S.HEAD: _face_mat(kit),
 	}
 	for sidx in mats:
-		if sidx < body.mesh.get_surface_count():
+		if sidx < 10:
 			body.set_surface_override_material(sidx, mats[sidx])
 	# número nas costas, preso ao osso do peito
 	var att := BoneAttachment3D.new()
