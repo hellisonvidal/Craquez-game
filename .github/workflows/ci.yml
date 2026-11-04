@@ -115,14 +115,18 @@ jobs:
       - name: Screenshots
         if: matrix.targetPlatform == 'StandaloneLinux64'
         run: |
-          sudo apt-get update -qq && sudo apt-get install -y -qq xvfb libgl1-mesa-dri mesa-utils > /dev/null
+          sudo apt-get update -qq && sudo apt-get install -y -qq xvfb libgl1-mesa-dri mesa-utils mesa-vulkan-drivers libvulkan1 > /dev/null
           cd build/StandaloneLinux64
           sudo chown -R "$USER" . && chmod +x Craquez
           mkdir -p "$GITHUB_WORKSPACE/shots"
-          vblank_mode=0 timeout 1500 xvfb-run -a -s "-screen 0 1280x720x24" ./Craquez -force-glcore -screen-fullscreen 0 -screen-width 1280 -screen-height 720 \
-            -logFile "$GITHUB_WORKSPACE/shots/player.log" --shots="$GITHUB_WORKSPACE/shots" || echo "jogo saiu com código $?"
+          # 1ª tentativa: Vulkan por software (lavapipe); se não sair nenhuma imagem, tenta OpenGL
+          for api in vulkan glcore; do
+            timeout 1200 xvfb-run -a -s "-screen 0 1280x720x24" ./Craquez -force-$api -screen-fullscreen 0 -screen-width 1280 -screen-height 720 \
+              -logFile "$GITHUB_WORKSPACE/shots/player-$api.log" --shots="$GITHUB_WORKSPACE/shots" || echo "jogo ($api) saiu com código $?"
+            ls "$GITHUB_WORKSPACE"/shots/*.png > /dev/null 2>&1 && break
+          done
           ls -la "$GITHUB_WORKSPACE/shots"
-          grep -E "Exception|Error|\[shots\]" "$GITHUB_WORKSPACE/shots/player.log" | head -80 || true
+          grep -E "Exception|Error|\[shots\]" "$GITHUB_WORKSPACE"/shots/player-*.log | head -80 || true
       - uses: actions/upload-artifact@v4
         if: matrix.targetPlatform == 'StandaloneLinux64'
         with:
