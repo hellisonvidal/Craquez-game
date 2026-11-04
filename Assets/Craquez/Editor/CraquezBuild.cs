@@ -23,6 +23,19 @@ namespace Craquez.EditorTools
         [InitializeOnLoadMethod]
         static void OnLoad()
         {
+            // Linux (só usado nas screenshots do CI): Vulkan + OpenGL, para rodar com lavapipe
+            try
+            {
+                var want = new[] { UnityEngine.Rendering.GraphicsDeviceType.Vulkan, UnityEngine.Rendering.GraphicsDeviceType.OpenGLCore };
+                var cur = PlayerSettings.GetGraphicsAPIs(BuildTarget.StandaloneLinux64);
+                if (PlayerSettings.GetUseDefaultGraphicsAPIs(BuildTarget.StandaloneLinux64) || cur.Length == 0 || cur[0] != want[0])
+                {
+                    PlayerSettings.SetUseDefaultGraphicsAPIs(BuildTarget.StandaloneLinux64, false);
+                    PlayerSettings.SetGraphicsAPIs(BuildTarget.StandaloneLinux64, want);
+                    Debug.Log("Craquez: APIs gráficas do Linux = Vulkan, OpenGLCore");
+                }
+            }
+            catch (Exception e) { Debug.LogWarning("Craquez: APIs do Linux: " + e.Message); }
             EditorApplication.delayCall += () =>
             {
                 try { if (!File.Exists(MatDir + "/Lit.mat")) PrepareAssets(); }
