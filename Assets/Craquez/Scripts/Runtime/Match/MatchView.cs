@@ -47,7 +47,7 @@ namespace Craquez
             parent.SetParent(transform, false);
             foreach (var p in s.players)
             {
-                var rig = AthleteFactory.Create(p, kits[p.team], gk[p.team], parent, q, c.boots);
+                var rig = AthleteFactory.Create(p, kits[p.team], gk[p.team], parent, q, (p.team == 0 ? c.tacticsA : c.tacticsB).boots);
                 var av = rig.gameObject.AddComponent<AthleteView>();
                 av.Setup(p, rig, this);
                 athletes.Add(av);

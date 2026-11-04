@@ -393,30 +393,31 @@ namespace Craquez
             _back = ShowModes;
             Title(root, (_cfg.mode == GameModes.Street ? "RUA" : (_cfg.national ? "SELEÇÕES" : "CLUBES")) + "  •  " + GameModes.DisplayName(_cfg.mode).ToUpperInvariant(), "Ajuste a partida e escolha os times");
             var list = UiKit.Rect(root, "lista").Place(0, 0, 0.55f, 1, 90, 150, 0, 260);
-            UiKit.VList(list, 12, 0, false);
+            UiKit.VList(list, 8, 0, false);
             int sideIdx = _cfg.sideB == Side.Player2 ? 1 : _cfg.sideA == Side.Cpu ? 2 : 0;
             var first = UiKit.Cycler(list, "Jogadores", SideOpts, sideIdx, i =>
             {
                 _cfg.sideA = i == 2 ? Side.Cpu : Side.Player1;
                 _cfg.sideB = i == 1 ? Side.Player2 : Side.Cpu;
             });
-            UiKit.Size(first, 72, 72);
-            UiKit.Size(UiKit.Cycler(list, "Dificuldade", DiffOpts, Mathf.Max(0, System.Array.IndexOf(DiffVals, _cfg.difficulty)), i => _cfg.difficulty = DiffVals[i]), 72, 72);
+            UiKit.Size(first, 60, 60);
+            UiKit.Size(UiKit.Cycler(list, "Dificuldade", DiffOpts, Mathf.Max(0, System.Array.IndexOf(DiffVals, _cfg.difficulty)), i => _cfg.difficulty = DiffVals[i]), 60, 60);
             var mins = new List<string>();
             foreach (var m in MinuteOpts) mins.Add(m + " minutos");
-            UiKit.Size(UiKit.Cycler(list, "Duração", mins, Mathf.Max(0, System.Array.IndexOf(MinuteOpts, _cfg.minutes)), i => _cfg.minutes = MinuteOpts[i]), 72, 72);
+            UiKit.Size(UiKit.Cycler(list, "Duração", mins, Mathf.Max(0, System.Array.IndexOf(MinuteOpts, _cfg.minutes)), i => _cfg.minutes = MinuteOpts[i]), 60, 60);
             if (_cfg.mode != GameModes.Futsal)
             {
-                UiKit.Size(UiKit.Cycler(list, "Clima", WeatherOpts, Mathf.Max(0, System.Array.IndexOf(WeatherIds, _cfg.weather)), i => _cfg.weather = WeatherIds[i]), 72, 72);
-                UiKit.Size(UiKit.Cycler(list, "Clima dinâmico", new[] { "Ligado", "Desligado" }, _cfg.dynamicWeather ? 0 : 1, i => _cfg.dynamicWeather = i == 0), 72, 72);
+                UiKit.Size(UiKit.Cycler(list, "Clima", WeatherOpts, Mathf.Max(0, System.Array.IndexOf(WeatherIds, _cfg.weather)), i => _cfg.weather = WeatherIds[i]), 60, 60);
+                UiKit.Size(UiKit.Cycler(list, "Clima dinâmico", new[] { "Ligado", "Desligado" }, _cfg.dynamicWeather ? 0 : 1, i => _cfg.dynamicWeather = i == 0), 60, 60);
             }
-            UiKit.Size(UiKit.Cycler(list, "Horário", TodOpts, Mathf.Max(0, System.Array.IndexOf(TodIds, _cfg.timeOfDay)), i => _cfg.timeOfDay = TodIds[i]), 72, 72);
+            UiKit.Size(UiKit.Cycler(list, "Horário", TodOpts, Mathf.Max(0, System.Array.IndexOf(TodIds, _cfg.timeOfDay)), i => _cfg.timeOfDay = TodIds[i]), 60, 60);
             if (_cfg.mode != GameModes.Field)
             {
                 var names = _cfg.mode == GameModes.Futsal ? VenueBuilder.FutsalNames : VenueBuilder.StreetNames;
-                UiKit.Size(UiKit.Cycler(list, "Local", names, _cfg.venue, i => _cfg.venue = i), 72, 72);
+                UiKit.Size(UiKit.Cycler(list, "Local", names, _cfg.venue, i => _cfg.venue = i), 60, 60);
             }
-            UiKit.Size(UiKit.Cycler(list, "Cerimônia de abertura", new[] { "Mostrar", "Pular" }, _cfg.ceremony ? 0 : 1, i => _cfg.ceremony = i == 0), 72, 72);
+            UiKit.Size(UiKit.Cycler(list, "Câmera", BroadcastCamera.Modes, Settings.Camera, i => Settings.Camera = i), 60, 60);
+            UiKit.Size(UiKit.Cycler(list, "Cerimônia de abertura", new[] { "Mostrar", "Pular" }, _cfg.ceremony ? 0 : 1, i => _cfg.ceremony = i == 0), 60, 60);
             // bola (30) e chuteiras (16) com pré-visualização
             var card = UiKit.Panel(root).rectTransform.Place(0.58f, 0, 1, 1, 0, 200, 90, 300);
             UiKit.Label(card, "BOLA", 30, Theme.Head, Theme.Accent, TextAnchor.MiddleLeft).rectTransform.Place(0, 1, 1, 1, 30, -70, 30, 20);
@@ -434,31 +435,7 @@ namespace Craquez
             var ballC = UiKit.Cycler(card, "Bola", ballNames, _cfg.ball, i => { _cfg.ball = i; RefreshBall(); });
             ballC.GetComponent<RectTransform>().Place(0, 1, 1, 1, 24, -390, 24, 318);
             RefreshBall();
-            UiKit.Label(card, "CHUTEIRAS", 30, Theme.Head, Theme.Accent, TextAnchor.MiddleLeft).rectTransform.Place(0, 1, 1, 1, 30, -460, 30, 410);
-            var bootRow = UiKit.Rect(card, "chuteira").Place(0, 1, 1, 1, 30, -560, 30, 470);
-            var bootNames = new List<string> { "Cada atleta com a sua" };
-            foreach (var d in BootPainter.Designs) bootNames.Add(d.name);
-            void RefreshBoots()
-            {
-                UiKit.Clear(bootRow);
-                var list2 = new List<int>();
-                if (_cfg.boots < 0) { for (int i = 0; i < 6; i++) list2.Add((i * 5 + 1) % BootPainter.Designs.Length); }
-                else list2.Add(_cfg.boots);
-                float x = 0;
-                foreach (int bi in list2)
-                {
-                    var d = BootPainter.Designs[bi];
-                    foreach (var col in new[] { d.baseC, d.accent, d.sole })
-                    {
-                        UiKit.Image(bootRow, col, Theme.RoundSmall, "cor").rectTransform.At(0, 0.5f, list2.Count > 1 ? 22 : 70, 70, x, 0);
-                        x += list2.Count > 1 ? 24 : 78;
-                    }
-                    x += list2.Count > 1 ? 14 : 0;
-                }
-            }
-            var bootC = UiKit.Cycler(card, "Chuteiras", bootNames, _cfg.boots + 1, i => { _cfg.boots = i - 1; RefreshBoots(); });
-            bootC.GetComponent<RectTransform>().Place(0, 1, 1, 1, 24, -660, 24, 588);
-            RefreshBoots();
+
             var go = UiKit.Button(root, "ESCOLHER TIMES  ›", ShowTeams, 40, new Color(0.0f, 0.55f, 0.38f));
             go.GetComponent<RectTransform>().At(1, 0, 520, 100, -90, 90);
             var help = UiKit.Label(root, InputRouter.Help(InputRouter.DefaultP1()), 22, Theme.Body, Theme.TextDim);
@@ -485,12 +462,18 @@ namespace Craquez
                 crest.rectTransform.At(0, 1, 170, 170, 30, -70);
                 crest.preserveAspect = true;
                 var lgIcon = UiKit.Image(col, Color.white, null, "liga");
-                lgIcon.rectTransform.At(1, 1, 90, 90, -30, -20);
-                var name = UiKit.Label(col, "", 50, Theme.HeadItalic, Theme.Text);
-                name.rectTransform.Place(0, 1, 1, 1, 220, -150, 30, 70);
-                var info = UiKit.Label(col, "", 24, Theme.Body, Theme.TextDim);
-                info.rectTransform.Place(0, 1, 1, 1, 220, -240, 30, 150);
-                var kitRow = UiKit.Rect(col, "uniforme").Place(0, 1, 1, 1, 30, -300, 30, 250);
+                lgIcon.rectTransform.At(0, 1, 56, 56, 210, -14);
+                var name = UiKit.Label(col, "", 46, Theme.HeadItalic, Theme.Text);
+                name.rectTransform.Place(0, 1, 1, 1, 220, -150, 250, 70);
+                var info = UiKit.Label(col, "", 22, Theme.Body, Theme.TextDim);
+                info.rectTransform.Place(0, 1, 1, 1, 220, -250, 250, 150);
+                var kitRow = UiKit.Rect(col, "uniforme").Place(0, 1, 1, 1, 30, -300, 250, 250);
+                // prévia 3D: o uniforme vestido num atleta
+                var pv = UiKit.Image(col, new Color(0, 0, 0, 0.35f), Theme.Round, "prévia").rectTransform.At(1, 1, 210, 300, -20, -16);
+                pv.gameObject.AddComponent<RectMask2D>();
+                var pvImg = UiKit.Rect(pv, "img").Place(0, 0, 1, 1).gameObject.AddComponent<RawImage>();
+                pvImg.raycastTarget = false;
+                var preview = KitPreview.Create(pvImg);
                 var list = UiKit.Rect(col, "lista").Place(0, 0, 1, 1, 24, 130, 24, 320);
                 UiKit.VList(list, 10, 0, false);
                 int Team() => s == 0 ? _cfg.teamA : _cfg.teamB;
@@ -509,6 +492,9 @@ namespace Craquez
                     UiKit.Clear(kitRow);
                     int kIdx = s == 0 ? _cfg.kitA : (_cfg.kitB < 0 ? 0 : _cfg.kitB);
                     var k = t.kits[Mathf.Clamp(kIdx, 0, t.kits.Count - 1)];
+                    if (s == 1 && _cfg.kitB < 0) k = Teams.PickKits(Teams.Get(_cfg.teamA), t, _cfg.kitA, -1)[1];
+                    var tacs = s == 0 ? _cfg.tacticsA : _cfg.tacticsB;
+                    preview.Show(t, k, tacs.boots);
                     float x = 0;
                     foreach (var c in new[] { k.c1, k.c2, k.shorts, k.socks })
                     {
@@ -587,6 +573,23 @@ namespace Craquez
             UiKit.Size(fc, 70, 70);
             UiKit.Size(UiKit.Cycler(left, "Mentalidade", new[] { "Defensiva", "Equilibrada", "Ofensiva" }, tac.mentality, i => tac.mentality = i), 70, 70);
             UiKit.Size(UiKit.Cycler(left, "Pressão", new[] { "Baixa", "Média", "Alta" }, tac.press, i => tac.press = i), 70, 70);
+            var bootNames = new List<string> { "Cada atleta com a sua" };
+            foreach (var d in BootPainter.Designs) bootNames.Add(d.name);
+            var bootRow = UiKit.Rect(root, "amostra chuteira").Place(0, 1, 0.36f, 1, 380, -300, 0, 260);
+            void RefreshBoots()
+            {
+                UiKit.Clear(bootRow);
+                if (tac.boots < 0) return;
+                var d = BootPainter.Designs[tac.boots];
+                float x = 0;
+                foreach (var c in new[] { d.baseC, d.accent, d.sole })
+                {
+                    UiKit.Image(bootRow, c, Theme.RoundSmall, "cor").rectTransform.At(0, 0.5f, 34, 34, x, 0);
+                    x += 40;
+                }
+            }
+            UiKit.Size(UiKit.Cycler(left, "Chuteiras", bootNames, tac.boots + 1, i => { tac.boots = i - 1; RefreshBoots(); }), 70, 70);
+            RefreshBoots();
             // campinho com a formação
             var pitch = UiKit.Image(left, new Color(0.1f, 0.4f, 0.2f, 0.9f), Theme.Round, "campinho");
             UiKit.Size(pitch, 420, 420);
@@ -665,6 +668,7 @@ namespace Craquez
             UiKit.Size(UiKit.Cycler(list, "Volume", vols, Mathf.RoundToInt(Settings.Volume * 10), i => Settings.Volume = i / 10f), 72, 72);
             UiKit.Size(UiKit.Cycler(list, "Vibração", new[] { "Ligada", "Desligada" }, Settings.Vibration ? 0 : 1, i => Settings.Vibration = i == 0), 72, 72);
             UiKit.Size(UiKit.Cycler(list, "Câmera", BroadcastCamera.Modes, Settings.Camera, i => Settings.Camera = i), 72, 72);
+            UiKit.Size(UiKit.Cycler(list, "Zoom da câmera", BroadcastCamera.Zooms, Settings.CameraZoom + 2, i => Settings.CameraZoom = i - 2), 72, 72);
             var status = UiKit.Label(root, "", 24, Theme.Body, Theme.TextDim);
             status.rectTransform.Place(0.58f, 0.2f, 1, 0.8f, 0, 0, 90, 0);
             void St() => status.text = "OPTION FILE\n\nUse nomes, uniformes, estádios e escudos reais por sua conta.\n" +

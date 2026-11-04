@@ -1270,7 +1270,9 @@ namespace Craquez.Sim
                 ball.vel = o.vel;
                 return;
             }
-            if (o.stun > 0f || o.slide > 0f || o.position.Dist(ball.pos) > 1.7f)
+            float spd = o.vel.magnitude;
+            float lose = spd > 5f ? 2.4f : 1.7f;
+            if (o.stun > 0f || o.slide > 0f || o.position.Dist(ball.pos) > lose)
             {
                 ball.owner = -1;
                 return;
@@ -1280,7 +1282,29 @@ namespace Craquez.Sim
                 SkillBall(o);
                 return;
             }
-            float spd = o.vel.magnitude;
+            // condução em toques: em velocidade a bola é empurrada à frente e o atleta corre atrás dela
+            if (spd > 3.2f && !o.shielding && o.windup <= 0f && ball.z < 0.35f)
+            {
+                var fwd = o.facing;
+                var perp = new Vector2(-fwd.y, fwd.x);
+                var rel = ball.pos - o.position;
+                float along = Vector2.Dot(rel, fwd), side = Vector2.Dot(rel, perp);
+                if (along < 0.38f + spd * 0.02f)
+                {
+                    // toque: a bola sai na frente; distância ideal maior no pique e para quem tem menos controle
+                    float lead = o.sprinting ? Mathf.Lerp(1.35f, 0.75f, o.control) : Mathf.Lerp(0.75f, 0.45f, o.control);
+                    float decel = mode.rollDecel + mode.groundDrag * spd * spd;
+                    float extra = Mathf.Sqrt(2f * decel * lead);
+                    ball.vel = fwd * (spd + extra) - perp * side * 4f;
+                    ball.z = 0f;
+                    ball.vz = 0f;
+                    ball.spin = 0f;
+                    ball.slideT = 0f;
+                    o.touchT = 0.18f;
+                }
+                else ball.vel -= perp * side * 5f * DT;   // entre os toques a bola rola solta (leve correção de rumo)
+                return;
+            }
             float ahead = 0.42f + spd * 0.07f + (o.sprinting ? 0.45f : 0f);
             if (o.shielding) ahead = 0.34f + spd * 0.03f;
             if (o.windup > 0f) ahead = 0.4f;

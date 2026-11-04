@@ -49,6 +49,7 @@ namespace Craquez
             view.sides = new[] { c.sideA, c.sideB };
             view.Build(sim, c, cam);
             view.weather.onChange = msg => hud?.Toast(msg);
+            view.bcam.followTeam = c.sideA == Side.Cpu && c.sideB != Side.Cpu ? 1 : 0;
             hud = new GameObject("HUD").AddComponent<Hud>();
             hud.transform.SetParent(transform, false);
             hud.Build(sim, c, view.kits);
@@ -307,13 +308,14 @@ namespace Craquez
             var dim = UiKit.Image(root, new Color(0, 0, 0, 0.6f), null, "pausa");
             dim.rectTransform.Place(0, 0, 1, 1);
             _pauseMenu = dim.gameObject;
-            var panel = UiKit.Panel(dim.transform).rectTransform.At(0.5f, 0.5f, 760, 820);
+            var panel = UiKit.Panel(dim.transform).rectTransform.At(0.5f, 0.5f, 760, 900);
             UiKit.Label(panel, "PAUSA", 64, Theme.HeadItalic, Theme.Accent, TextAnchor.MiddleCenter).rectTransform.Place(0, 1, 1, 1, 0, -110, 0, 20);
             var list = UiKit.Rect(panel, "lista").Place(0, 0, 1, 1, 60, 240, 60, 130);
             UiKit.VList(list, 14, 0, false);
             var first = UiKit.Button(list, "Continuar", Resume);
             UiKit.Size(first, 70, 70);
             UiKit.Size(UiKit.Cycler(list, "Câmera", BroadcastCamera.Modes, view.bcam.mode, i => { view.bcam.mode = i; Settings.Camera = i; }), 70, 70);
+            UiKit.Size(UiKit.Cycler(list, "Zoom", BroadcastCamera.Zooms, view.bcam.zoom + 2, i => { view.bcam.zoom = i - 2; Settings.CameraZoom = i - 2; }), 70, 70);
             UiKit.Size(UiKit.Button(list, "Reiniciar partida", () => { Resume(); onRestart?.Invoke(cfg); }), 70, 70);
             UiKit.Size(UiKit.Button(list, "Sair para o menu", () => { Resume(); onExit?.Invoke(); }), 70, 70);
             var dev = _cpu[0] == null ? _dev[0] : _dev[1];

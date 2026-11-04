@@ -56,6 +56,7 @@ namespace Craquez.Sim
         public int mentality = 1;   // 0 defensiva, 1 equilibrada, 2 ofensiva
         public int press = 1;       // 0 baixa, 1 média, 2 alta
         public int[] lineup = new int[0];
+        public int boots = -1;      // modelo de chuteira do time (-1 = cada atleta com a sua)
     }
 
     /// <summary>
