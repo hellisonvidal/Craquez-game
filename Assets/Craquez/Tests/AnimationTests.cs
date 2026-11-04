@@ -65,6 +65,7 @@ namespace Craquez.Tests
                 for (int f = 0; f < 90; f++)
                 {
                     anim.Tick(1f / 60f, 5f, 5f, 0f, false);
+                    r.PinHips(0f);
                     var d = B(r, "calf_l").position - thigh.position;
                     float a = Vector3.SignedAngle(Vector3.down, d, g.transform.right);
                     minA = Mathf.Min(minA, a);
@@ -77,6 +78,7 @@ namespace Craquez.Tests
                 Debug.Log($"[anim-diag] coxa: SampleAnimation varia {sampled:F1}°; pelo grafo a coxa oscila {maxA - minA:F1}° ({minA:F0}..{maxA:F0}); quadril sai do lugar até {drift:F2} m");
                 Assert.Greater(hit, binds.Length / 2, "curvas do clipe não encontram os ossos do modelo");
                 Assert.Greater(maxA - minA, 20f, "a corrida não move as pernas");
+                Assert.Less(drift, 0.05f, "quadril não ficou preso na horizontal");
             }
             finally { Object.DestroyImmediate(g); }
         }

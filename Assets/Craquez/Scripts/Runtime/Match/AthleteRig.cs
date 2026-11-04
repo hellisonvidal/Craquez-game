@@ -16,6 +16,8 @@ namespace Craquez
         public Quaternion modelFix = Quaternion.identity;
         /// <summary>Rotações locais de repouso do pescoço e da cabeça.</summary>
         public Quaternion headRest = Quaternion.identity, neckRest = Quaternion.identity;
+        /// <summary>Posição de repouso do quadril no referencial do atleta (para "correr no lugar").</summary>
+        public Vector3 pelvisRest;
         Transform _number, _numberFront;
 
         public void Init(Transform m)
@@ -52,6 +54,7 @@ namespace Craquez
                     m.localRotation = modelFix * m.localRotation;
                 }
             }
+            if (pelvis != null) pelvisRest = transform.InverseTransformPoint(pelvis.position);
             // pés no chão
             if (footL != null)
             {
@@ -60,6 +63,20 @@ namespace Craquez
                     if (t != null) minY = Mathf.Min(minY, t.position.y);
                 if (minY < 0.3f && minY > -0.3f) m.localPosition += Vector3.up * (0.035f - (minY - transform.position.y));
             }
+        }
+
+        /// <summary>
+        /// Os clipes de captura trazem parte do deslocamento no quadril (a corrida anda ~1 m
+        /// e volta a cada ciclo: pés "patinando"). Prende o quadril na horizontal; a
+        /// simulação é quem desloca o atleta. keep = fração do movimento do clipe mantida.
+        /// </summary>
+        public void PinHips(float keep)
+        {
+            if (pelvis == null) return;
+            var lp = transform.InverseTransformPoint(pelvis.position);
+            lp.x = Mathf.Lerp(pelvisRest.x, lp.x, keep);
+            lp.z = Mathf.Lerp(pelvisRest.z, lp.z, keep);
+            pelvis.position = transform.TransformPoint(lp);
         }
 
         /// <summary>Número nas costas (e pequeno no peito), acompanhando o tronco.</summary>

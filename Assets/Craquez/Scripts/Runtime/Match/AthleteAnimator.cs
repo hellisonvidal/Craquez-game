@@ -99,11 +99,12 @@ namespace Craquez
             _contact = new float[Loco.Length];
             _groundSpeed = new float[Loco.Length];
             var go = animator.gameObject;
-            Transform fl = null, fr = null;
+            Transform fl = null, fr = null, pel = null;
             foreach (var t in go.GetComponentsInChildren<Transform>(true))
             {
                 if (t.name == "foot_l") fl = t;
                 else if (t.name == "foot_r") fr = t;
+                else if (t.name == "pelvis") pel = t;
             }
             if (fl == null || fr == null) return;
             for (int i = 0; i < Loco.Length; i++)
@@ -122,6 +123,8 @@ namespace Craquez
                     float t = len * k / N;
                     ci.clip.SampleAnimation(go, t);
                     var o = rigRoot != null ? rigRoot.transform.position : go.transform.position;
+                    // quadril preso na horizontal, como no jogo (PinHips): mede a passada "no lugar"
+                    if (pel != null) { var ph = pel.position; o.x = ph.x; o.z = ph.z; }
                     lp[k] = fl.position - o;
                     rp[k] = fr.position - o;
                     // apoio do pé esquerdo: pé esquerdo mais baixo e mais à frente que o direito

@@ -286,7 +286,12 @@ namespace Craquez
 
         void LateUpdate()
         {
-            if (p != null && rig != null) BodyLayer();
+            if (p != null && rig != null)
+            {
+                // ações (cortes, fintas, giro) mantêm um pouco do balanço do quadril; locomoção, nada
+                rig.PinHips(anim != null ? anim.ActionWeight * 0.25f : 0f);
+                BodyLayer();
+            }
             GroundFeet();
             if (p == null || rig == null || rig.head == null) return;
             HeadAndNeck();
