@@ -122,7 +122,12 @@ namespace Craquez.Sim
             if (text != null)
             {
                 var root = MiniJson.Parse(text);
-                foreach (var lo in MiniJson.L(root, "leagues") ?? new List<object>())
+                // ligas e times em ordem alfabética (ignora acentos e maiúsculas)
+                var cmp = System.Globalization.CultureInfo.InvariantCulture.CompareInfo;
+                int Cmp(string x, string y) => cmp.Compare(x ?? "", y ?? "", System.Globalization.CompareOptions.IgnoreCase | System.Globalization.CompareOptions.IgnoreNonSpace);
+                var los = new List<object>(MiniJson.L(root, "leagues") ?? new List<object>());
+                los.Sort((x, y) => Cmp(MiniJson.S(x, "name"), MiniJson.S(y, "name")));
+                foreach (var lo in los)
                 {
                     var lg = new League
                     {
@@ -130,9 +135,11 @@ namespace Craquez.Sim
                         sport = MiniJson.S(lo, "sport", "football"), country = MiniJson.S(lo, "country"),
                         first = _flat.Count,
                     };
-                    foreach (var to in MiniJson.L(lo, "teams") ?? new List<object>())
+                    var ts = new List<TeamData>();
+                    foreach (var to in MiniJson.L(lo, "teams") ?? new List<object>()) ts.Add(ParseTeam(to));
+                    ts.Sort((x, y) => Cmp(x.name, y.name));
+                    foreach (var t in ts)
                     {
-                        var t = ParseTeam(to);
                         t.index = _flat.Count;
                         t.league = lg.name;
                         t.leagueId = lg.id;

@@ -31,6 +31,7 @@ namespace Craquez
         MatchController _match, _attract;
         System.Action _back;
         readonly MatchConfig _cfg = new MatchConfig();
+        System.Action _refreshVenue;
         Text _pressText;
 
         void Start()
@@ -244,7 +245,7 @@ namespace Craquez
         {
             _cfg.mode = mode;
             _cfg.national = national;
-            _cfg.venue = Random.Range(0, 8);
+            _cfg.venue = Random.Range(0, mode == GameModes.Futsal ? VenueBuilder.FutsalNames.Length : 8);
             FixTeamsForMode();
             ShowSetup();
         }
@@ -413,21 +414,38 @@ namespace Craquez
             if (_cfg.mode != GameModes.Field)
             {
                 var names = _cfg.mode == GameModes.Futsal ? VenueBuilder.FutsalNames : VenueBuilder.StreetNames;
-                UiKit.Size(UiKit.Cycler(list, "Local", names, _cfg.venue, i => _cfg.venue = i), 68, 68);
+                UiKit.Size(UiKit.Cycler(list, "Local", names, _cfg.venue, i => { _cfg.venue = i; _refreshVenue?.Invoke(); }), 68, 68);
             }
             UiKit.Size(UiKit.Cycler(list, "Câmera", BroadcastCamera.Modes, Settings.Camera, i => Settings.Camera = i), 68, 68);
             UiKit.Size(UiKit.Cycler(list, "Cerimônia de abertura", new[] { "Mostrar", "Pular" }, _cfg.ceremony ? 0 : 1, i => _cfg.ceremony = i == 0), 68, 68);
-            // bola (30) e chuteiras (16) com pré-visualização
-            var card = UiKit.Panel(root).rectTransform.Place(0.58f, 0, 1, 1, 0, 200, 90, 300);
-            UiKit.Label(card, "BOLA", 30, Theme.Head, Theme.Accent, TextAnchor.MiddleLeft).rectTransform.Place(0, 1, 1, 1, 30, -70, 30, 20);
-            var holder = UiKit.Image(card, Color.white, Theme.Circle, "bola").rectTransform.At(0, 1, 210, 210, 30, -80);
+            // local da partida (imagem grande) e bola (pequena, parada)
+            var card = UiKit.Panel(root).rectTransform.Place(0.57f, 0, 1, 1, 0, 200, 70, 250);
+            UiKit.Label(card, "LOCAL", 28, Theme.Head, Theme.Accent, TextAnchor.MiddleLeft).rectTransform.Place(0, 1, 1, 1, 26, -56, 26, 14);
+            var vHolder = UiKit.Image(card, Color.white, Theme.Round, "local").rectTransform.Place(0, 1, 1, 1, 22, -400, 22, 62);
+            vHolder.gameObject.AddComponent<RectMask2D>();
+            var venueImg = UiKit.Rect(vHolder, "img").Place(0, 0, 1, 1).gameObject.AddComponent<RawImage>();
+            var venueName = UiKit.Label(vHolder, "", 34, Theme.HeadItalic, Color.white, TextAnchor.LowerLeft);
+            venueName.rectTransform.Place(0, 0, 1, 0.4f, 18, 10, 18, 0);
+            UiKit.Shadow(venueName, 3, 0.9f);
+            Texture2D venueTex = null;
+            _refreshVenue = () =>
+            {
+                if (venueTex != null) Destroy(venueTex);
+                var home = Teams.Get(_cfg.teamA);
+                venueTex = MenuArt.Venue(_cfg.mode, _cfg.venue, home != null ? home.c1 : Theme.Accent);
+                venueImg.texture = venueTex;
+                venueName.text = _cfg.mode == GameModes.Futsal ? VenueBuilder.FutsalNames[_cfg.venue % VenueBuilder.FutsalNames.Length]
+                    : _cfg.mode == GameModes.Street ? VenueBuilder.StreetNames[_cfg.venue % VenueBuilder.StreetNames.Length]
+                    : (home != null && !string.IsNullOrEmpty(home.stadium.name) ? home.stadium.name : "Estádio do mandante");
+            };
+            _refreshVenue();
+            var holder = UiKit.Image(card, Color.white, Theme.Circle, "bola").rectTransform.At(0, 0, 112, 112, 26, 110);
             holder.gameObject.AddComponent<Mask>().showMaskGraphic = false;
             var ballImg = UiKit.Rect(holder, "tex").Place(0, 0, 1, 1).gameObject.AddComponent<RawImage>();
-            ballImg.uvRect = new Rect(0, 0, 0.5f, 1f);
-            ballImg.gameObject.AddComponent<SpinUv>().img = ballImg;
+            ballImg.uvRect = new Rect(0.25f, 0, 0.5f, 1f);   // frente da bola, parada
             var shine = UiKit.Image(holder, new Color(1, 1, 1, 0.25f), Theme.Soft, "brilho").rectTransform.Place(0.05f, 0.45f, 0.6f, 0.98f);
-            var ballName = UiKit.Label(card, "", 34, Theme.HeadItalic, Theme.Text);
-            ballName.rectTransform.Place(0, 1, 1, 1, 260, -190, 20, 110);
+            var ballName = UiKit.Label(card, "", 30, Theme.HeadItalic, Theme.Text);
+            ballName.rectTransform.Place(0, 0, 1, 0, 156, 170, 20, -222);
             void RefreshBall() { ballImg.texture = BallCatalog.Texture(_cfg.ball, 256); ballName.text = BallCatalog.All[_cfg.ball].name; }
             // só as bolas da modalidade (futsal tem bolas próprias, menores)
             var ballIdx = BallCatalog.ForMode(_cfg.mode);
@@ -435,7 +453,7 @@ namespace Craquez
             var ballNames = new List<string>();
             for (int i = 0; i < ballIdx.Count; i++) ballNames.Add((i + 1) + ". " + BallCatalog.All[ballIdx[i]].name);
             var ballC = UiKit.Cycler(card, _cfg.mode == GameModes.Futsal ? "Bola de futsal" : "Bola", ballNames, ballIdx.IndexOf(_cfg.ball), i => { _cfg.ball = ballIdx[i]; RefreshBall(); });
-            ballC.GetComponent<RectTransform>().Place(0, 1, 1, 1, 24, -390, 24, 318);
+            ballC.GetComponent<RectTransform>().Place(0, 0, 1, 0, 150, 26, 22, -94);
             RefreshBall();
 
             var go = UiKit.Button(root, "ESCOLHER TIMES  ›", ShowTeams, 40, new Color(0.0f, 0.55f, 0.38f));

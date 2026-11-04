@@ -18,6 +18,15 @@ namespace Craquez
         public Quaternion headRest = Quaternion.identity, neckRest = Quaternion.identity;
         /// <summary>Posição de repouso do quadril no referencial do atleta (para "correr no lugar").</summary>
         public Vector3 pelvisRest;
+        /// <summary>Inclinação do pé (tornozelo -> ponta) em repouso, em graus (negativo = ponta para baixo).</summary>
+        public float footPitchRest;
+
+        public static float FootPitch(Transform foot, Transform ball)
+        {
+            if (foot == null || ball == null) return 0f;
+            var d = ball.position - foot.position;
+            return Mathf.Atan2(d.y, new Vector2(d.x, d.z).magnitude) * Mathf.Rad2Deg;
+        }
         Transform _number, _numberFront;
 
         public void Init(Transform m)
@@ -55,6 +64,7 @@ namespace Craquez
                 }
             }
             if (pelvis != null) pelvisRest = transform.InverseTransformPoint(pelvis.position);
+            footPitchRest = FootPitch(footL, B("ball_l"));
             // pés no chão
             if (footL != null)
             {

@@ -150,6 +150,36 @@ namespace Craquez.Tests
             finally { Object.DestroyImmediate(g); }
         }
 
+        /// <summary>Braços não abrem/erguem demais e o pé não fica pendurado depois das correções.</summary>
+        [Test]
+        public void BracosEPesNaturais()
+        {
+            var (g, r) = Make("Q");
+            var anim = new AthleteAnimator(r.animator, "Q", 5);
+            var pose = new PoseEdits();
+            float maxAbdBefore = 0f, maxAbdAfter = 0f, minPitchBefore = 999f, minPitchAfter = 999f;
+            try
+            {
+                foreach (var (spd, guard) in new[] { (5f, false), (1.2f, true), (0f, false), (7.5f, false) })
+                    for (int f = 0; f < 120; f++)
+                    {
+                        pose.Restore();
+                        anim.Tick(1f / 60f, spd, guard ? 0f : spd, guard ? spd : 0f, guard);
+                        r.PinHips(0f);
+                        for (int sd = -1; sd <= 1; sd += 2) maxAbdBefore = Mathf.Max(maxAbdBefore, PoseFix.Abduction(r, g.transform, sd, out _));
+                        foreach (var (ft, tb) in new[] { (r.footL, B(r, "ball_l")), (r.footR, B(r, "ball_r")) }) minPitchBefore = Mathf.Min(minPitchBefore, AthleteRig.FootPitch(ft, tb) - r.footPitchRest);
+                        PoseFix.Arms(r, g.transform, pose, 1f);
+                        PoseFix.Feet(r, g.transform, pose, 0f);
+                        for (int sd = -1; sd <= 1; sd += 2) maxAbdAfter = Mathf.Max(maxAbdAfter, PoseFix.Abduction(r, g.transform, sd, out _));
+                        foreach (var (ft, tb) in new[] { (r.footL, B(r, "ball_l")), (r.footR, B(r, "ball_r")) }) minPitchAfter = Mathf.Min(minPitchAfter, AthleteRig.FootPitch(ft, tb) - r.footPitchRest);
+                    }
+                Debug.Log($"[pose] abertura máx. do braço: {maxAbdBefore:F0}° -> {maxAbdAfter:F0}°; ponta do pé (rel. repouso) mín.: {minPitchBefore:F0}° -> {minPitchAfter:F0}°");
+                Assert.Less(maxAbdAfter, 26f, "braços ainda abertos");
+                Assert.Greater(minPitchAfter, -38f, "pé ainda pendurado");
+            }
+            finally { anim.Destroy(); Object.DestroyImmediate(g); }
+        }
+
         [Test]
         public void CorrecoesNaoAcumulamEPoseNatural()
         {

@@ -32,6 +32,78 @@ namespace Craquez
         }
     }
 
+    /// <summary>Correções de pose por cima da captura (testáveis sem a partida).</summary>
+    public static class PoseFix
+    {
+        /// <summary>
+        /// Pés firmes: a captura deixa o pé "pendurado" (ponta caída). No chão, o pé fica
+        /// plano; no ar, a ponta não cai mais que ~30° do natural (chutes podem esticar mais).
+        /// </summary>
+        public static void Feet(AthleteRig rig, Transform root, PoseEdits pose, float act)
+        {
+            float rest = rig.footPitchRest;
+            float ground = root.position.y;
+            for (int side = 0; side < 2; side++)
+            {
+                var foot = side == 0 ? rig.footL : rig.footR;
+                rig.bones.TryGetValue(side == 0 ? "ball_l" : "ball_r", out var toe);
+                if (foot == null || toe == null) continue;
+                float pitch = AthleteRig.FootPitch(foot, toe);
+                float h = Mathf.Min(foot.position.y, toe.position.y + 0.05f) - ground;
+                float stance = 1f - Mathf.Clamp01((h - 0.1f) / 0.12f);   // 1 = apoiado
+                float lo = rest - Mathf.Lerp(30f, 55f, act), hi = rest + 25f;
+                float target = Mathf.Lerp(Mathf.Clamp(pitch, lo, hi), rest + 2f, stance * (1f - act * 0.7f));
+                float delta = target - pitch;
+                if (Mathf.Abs(delta) < 0.5f) continue;
+                var fwd = toe.position - foot.position;
+                var axis = Vector3.Cross(fwd, Vector3.up);
+                if (axis.sqrMagnitude < 1e-6f) continue;
+                pose.Rotate(foot, Quaternion.AngleAxis(delta, axis.normalized));   // + levanta a ponta
+            }
+        }
+
+        /// <summary>Abertura lateral do braço (graus) no referencial do atleta.</summary>
+        public static float Abduction(AthleteRig rig, Transform root, int side, out float elev)
+        {
+            elev = 0f;
+            string sfx = side < 0 ? "_l" : "_r";
+            rig.bones.TryGetValue("upperarm" + sfx, out var up);
+            rig.bones.TryGetValue("lowerarm" + sfx, out var lo);
+            if (up == null || lo == null) return 0f;
+            var arm = (lo.position - up.position).normalized;
+            float s = Mathf.Sign(Vector3.Dot(up.position - (rig.spine != null ? rig.spine.position : root.position), root.right));
+            elev = Vector3.Angle(arm, -root.up);
+            return Mathf.Atan2(Vector3.Dot(arm, root.right) * s, Vector3.Dot(arm, -root.up)) * Mathf.Rad2Deg;
+        }
+
+        /// <summary>
+        /// Braços naturais: a captura (retargeted) abre e ergue os braços demais. Limita a
+        /// abertura lateral (~16°) e a elevação (~50°), preservando o balanço da corrida.
+        /// </summary>
+        public static void Arms(AthleteRig rig, Transform root, PoseEdits pose, float w)
+        {
+            var right = root.right;
+            var down = -root.up;
+            for (int side = -1; side <= 1; side += 2)
+            {
+                string sfx = side < 0 ? "_l" : "_r";
+                rig.bones.TryGetValue("upperarm" + sfx, out var up);
+                rig.bones.TryGetValue("lowerarm" + sfx, out var lo);
+                if (up == null || lo == null) continue;
+                float s = Mathf.Sign(Vector3.Dot(up.position - (rig.spine != null ? rig.spine.position : root.position), right));
+                float abd = Abduction(rig, root, side, out _);
+                if (abd > 16f) pose.Rotate(up, Quaternion.AngleAxis(-(abd - 16f) * w * s, root.forward));   // (+ em torno da frente ergueria o braço direito)
+                var arm = (lo.position - up.position).normalized;
+                float elev = Vector3.Angle(arm, down);
+                if (elev > 50f)
+                {
+                    var axis = Vector3.Cross(arm, down);
+                    if (axis.sqrMagnitude > 1e-6f) pose.Rotate(up, Quaternion.AngleAxis((elev - 50f) * w, axis.normalized));
+                }
+            }
+        }
+    }
+
     /// <summary>
     /// Mistura as animações de captura de movimento (CMU, transferidas para o
     /// esqueleto dos atletas) pelo Playables API:

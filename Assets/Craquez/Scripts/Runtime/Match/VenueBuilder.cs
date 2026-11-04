@@ -24,7 +24,7 @@ namespace Craquez
         public static readonly string[] FutsalNames =
         {
             "Ginásio Municipal", "Arena Coberta", "Quadra do Clube", "Ginásio Universitário",
-            "Arena Neon", "Quadra da Escola", "Ginásio Olímpico", "Quadra Society Indoor",
+            "Arena Neon", "Quadra da Escola", "Ginásio Olímpico", "Quadra Society Indoor", "Ginásio Antigo (tacos)",
         };
         public static readonly string[] StreetNames =
         {
@@ -94,21 +94,7 @@ namespace Craquez
             float ox = mx + 22f, oz = mz + 22f;
             ring.Quad(new Vector3(-ox, -0.01f, -oz), new Vector3(-ox, -0.01f, oz), new Vector3(ox, -0.01f, oz), new Vector3(ox, -0.01f, -oz), new Vector2(0, 0), new Vector2(ox / 4f, oz / 4f));
             ring.Object("Entorno", Gfx.LitN(new Color(0.62f, 0.7f, 0.56f), grass, Gfx.GrassNormal, 0.1f, 0.6f), v.root, false);
-            // desgaste natural: pequenas áreas, marca do pênalti e círculo central
-            var wear = Gfx.Transparent(Color.white, Gfx.Wear(256, (int)(seed % 991)));
-            var wk = new MeshKit();
-            void Patch(Vector3 c, float sx, float sz)
-            {
-                wk.Quad(c + new Vector3(-sx, 0.004f, -sz), c + new Vector3(-sx, 0.004f, sz), c + new Vector3(sx, 0.004f, sz), c + new Vector3(sx, 0.004f, -sz), Vector2.zero, Vector2.one);
-            }
-            foreach (float s in new[] { -1f, 1f })
-            {
-                Patch(new Vector3(s * (hl - 3f), 0, 0), 3.2f, 5.5f);    // pequena área (goleiro)
-                Patch(new Vector3(s * (hl - 11f), 0, 0), 1.6f, 1.6f);   // marca do pênalti
-            }
-            Patch(Vector3.zero, 2.4f, 2.4f);
-            var wg = wk.Object("Desgaste", wear, v.root, false);
-            wg.GetComponent<MeshRenderer>().shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
+            // (desgaste do gramado removido: aparecia como retângulos brancos no campo)
         }
 
         static void Lines(Venue v, MatchSim sim, float hl, float hw)
@@ -329,13 +315,15 @@ namespace Craquez
             var k = new MeshKit();
             foreach (float s in new[] { -1f, 1f })
             {
-                var c = new Vector3(s * 9f, 1.1f, -(hw + 3.2f));
-                k.Box(c + new Vector3(0, 1.0f, -0.6f), new Vector3(7f, 0.1f, 1.8f));
-                k.Box(c + new Vector3(0, 0.0f, -1.5f), new Vector3(7f, 2.2f, 0.1f));
-                k.Box(c + new Vector3(-3.5f, 0, -0.6f), new Vector3(0.1f, 2.2f, 1.8f));
-                k.Box(c + new Vector3(3.5f, 0, -0.6f), new Vector3(0.1f, 2.2f, 1.8f));
+                // bancos do lado oposto à câmera (não tapam a lateral de perto), cobertura opaca
+                var c = new Vector3(s * 9f, 1.1f, hw + 3.2f);
+                k.Box(c + new Vector3(0, 1.0f, 0.6f), new Vector3(7f, 0.1f, 1.8f));
+                k.Box(c + new Vector3(0, 0.0f, 1.5f), new Vector3(7f, 2.2f, 0.1f));
+                k.Box(c + new Vector3(-3.5f, 0, 0.6f), new Vector3(0.1f, 2.2f, 1.8f));
+                k.Box(c + new Vector3(3.5f, 0, 0.6f), new Vector3(0.1f, 2.2f, 1.8f));
+                k.Box(c + new Vector3(0, -0.75f, 1.0f), new Vector3(6.6f, 0.45f, 0.6f));   // assento
             }
-            k.Object("Bancos", Gfx.Transparent(new Color(0.75f, 0.85f, 0.95f, 0.35f)), v.root, false);
+            k.Object("Bancos", Gfx.Lit(new Color(0.14f, 0.18f, 0.28f), null, 0.4f), v.root, false);
         }
 
         static void CornerFlags(Venue v, float hl, float hw, Color c)
@@ -356,11 +344,23 @@ namespace Craquez
         // ------------------------------------------------------------------ futsal
         public static Venue Futsal(MatchSim sim, TeamData home, TeamData away, Kit homeKit, Kit awayKit, int variant, bool night, int quality, Transform parent)
         {
-            variant = Mathf.Abs(variant) % 8;
+            variant = Mathf.Abs(variant) % FutsalNames.Length;
             var v = new Venue { root = new GameObject("Quadra").transform, name = FutsalNames[variant] };
             v.root.SetParent(parent, false);
             float hl = sim.halfLen, hw = sim.halfW;
             // (quadra, entorno, madeira?) — paletas de ginásios reais
+            var pp = FutsalPalette(variant);
+            Texture2D courtTex = pp.kind == 0 ? Gfx.Wood(1024, Color.white, variant) : pp.kind == 2 ? Gfx.Grass(512, Color.white, variant) : pp.kind == 3 ? Gfx.Parquet(1024, variant) : Gfx.SportFloor(256, variant);
+            bool woodish = pp.kind == 0 || pp.kind == 3;
+            var courtMat = Gfx.LitN(pp.court * (woodish ? 1.05f : 1f), courtTex, woodish ? Gfx.WoodNormal : pp.kind == 2 ? Gfx.GrassNormal : Gfx.AsphaltNormal, woodish ? 0.65f : pp.kind == 1 ? 0.6f : 0.1f, pp.kind == 1 ? 0.08f : 0.45f);
+            var surMat = Gfx.Lit(pp.surround, pp.kind == 2 ? courtTex : Gfx.SportFloor(256, variant + 9), pp.kind == 2 ? 0.1f : 0.5f);
+            BuildFutsalHall(v, sim, home, away, homeKit, awayKit, pp, courtMat, surMat, variant, night, quality);
+            return v;
+        }
+
+        /// <summary>Cores da quadra e do entorno; kind: 0 madeira, 1 sintético, 2 grama, 3 tacos (ginásio antigo).</summary>
+        public static (Color court, Color surround, int kind) FutsalPalette(int variant)
+        {
             (Color court, Color surround, int kind)[] pal =
             {
                 (new Color(0.86f, 0.66f, 0.42f), new Color(0.12f, 0.32f, 0.62f), 0),   // madeira clara + azul
@@ -371,11 +371,14 @@ namespace Craquez
                 (new Color(0.25f, 0.52f, 0.36f), new Color(0.55f, 0.5f, 0.45f), 1),    // quadra de escola
                 (new Color(0.9f, 0.72f, 0.48f), new Color(0.88f, 0.42f, 0.12f), 0),    // olímpico: madeira + laranja
                 (new Color(0.3f, 0.6f, 0.25f), new Color(0.2f, 0.35f, 0.18f), 2),      // society (grama sintética)
+                (new Color(1f, 0.95f, 0.9f), new Color(0.18f, 0.36f, 0.28f), 3),       // ginásio antigo: tacos + verde-escuro
             };
-            var pp = pal[variant];
-            Texture2D courtTex = pp.kind == 0 ? Gfx.Wood(1024, Color.white, variant) : pp.kind == 2 ? Gfx.Grass(512, Color.white, variant) : Gfx.SportFloor(256, variant);
-            var courtMat = Gfx.LitN(pp.court * (pp.kind == 0 ? 1.05f : 1f), courtTex, pp.kind == 0 ? Gfx.WoodNormal : pp.kind == 2 ? Gfx.GrassNormal : Gfx.AsphaltNormal, pp.kind == 0 ? 0.7f : pp.kind == 1 ? 0.6f : 0.1f, pp.kind == 1 ? 0.08f : 0.45f);
-            var surMat = Gfx.Lit(pp.surround, pp.kind == 2 ? courtTex : Gfx.SportFloor(256, variant + 9), pp.kind == 2 ? 0.1f : 0.5f);
+            return pal[Mathf.Abs(variant) % pal.Length];
+        }
+
+        static void BuildFutsalHall(Venue v, MatchSim sim, TeamData home, TeamData away, Kit homeKit, Kit awayKit, (Color court, Color surround, int kind) pp, Material courtMat, Material surMat, int variant, bool night, int quality)
+        {
+            float hl = sim.halfLen, hw = sim.halfW;
             v.pitchMat = courtMat;
             v.pitchMat2 = surMat;
             var k = new MeshKit();
@@ -489,7 +492,6 @@ namespace Craquez
                 }
             v.tunnel = new Vector3(0, 0, -(hw + 2.5f));
             v.standDist = 3f;
-            return v;
         }
 
         /// <summary>Painéis da parede alta do ginásio com faixa de janelas.</summary>

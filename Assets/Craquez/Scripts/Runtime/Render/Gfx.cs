@@ -264,6 +264,37 @@ namespace Craquez
             return t;
         }
 
+        /// <summary>Tacos de madeira em espinha de peixe (ginásio antigo): cada taco com tom e veio próprios, verniz gasto.</summary>
+        public static Texture2D Parquet(int size, int seed)
+        {
+            var t = Tex(size, size);
+            var px = new Color32[size * size];
+            const int N = 8;          // tacos por lado da textura (comprimento)
+            for (int y = 0; y < size; y++)
+                for (int x = 0; x < size; x++)
+                {
+                    float u = x / (float)size * N, v = y / (float)size * N;
+                    // espinha de peixe: faixas diagonais alternando a direção do taco
+                    float a = u + v, b = u - v;
+                    int band = Mathf.FloorToInt(b * 2f);
+                    bool even = (band & 1) == 0;
+                    float along = even ? a : -a + 100f;
+                    int ti = Mathf.FloorToInt(along * 2f);
+                    float fu = along * 2f - ti, fv = b * 2f - band;
+                    float tone = 0.78f + Hash(ti + band * 131, band, seed) * 0.3f;
+                    float grain = Fbm(fu * 2f + ti, fv * 14f, 16, seed + ti, 3);
+                    float edge = (fu < 0.03f || fu > 0.97f || fv < 0.04f || fv > 0.96f) ? 0.62f : 1f;
+                    var wood = Color.Lerp(new Color(0.62f, 0.38f, 0.2f), new Color(0.86f, 0.62f, 0.36f), tone - 0.6f);
+                    float wearN = Fbm(x / (float)size * 3f, y / (float)size * 3f, 3, seed + 5, 3);
+                    var c = wood * (0.86f + grain * 0.2f) * edge * (0.9f + wearN * 0.15f);
+                    c.a = 1;
+                    px[y * size + x] = c;
+                }
+            t.SetPixels32(px);
+            t.Apply(true);
+            return t;
+        }
+
         /// <summary>Piso esportivo sintético (poliuretano): liso, só manchas suaves de uso.</summary>
         public static Texture2D SportFloor(int size, int seed)
         {

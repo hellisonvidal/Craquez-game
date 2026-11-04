@@ -233,6 +233,7 @@ namespace Craquez
                 _pose.Rotate(rig.spine, Quaternion.AngleAxis(_accLean * 0.45f, ax));
             }
             ArmsDown();
+            FeetFirm();
             if (_touchAnim > 0f)
             {
                 _touchAnim = Mathf.Max(0f, _touchAnim - dt / 0.24f);
@@ -246,38 +247,16 @@ namespace Craquez
             }
         }
 
-        /// <summary>
-        /// Braços naturais: a captura (retargeted) abre e ergue os braços demais. Limita a
-        /// abertura lateral (~20°) e a elevação (~55°), preservando o balanço da corrida.
-        /// </summary>
+        void FeetFirm()
+        {
+            if (p.slide > 0f || (p.isKeeper && p.dive > 0f)) return;
+            PoseFix.Feet(rig, transform, _pose, anim != null ? anim.ActionWeight : 0f);
+        }
+
         void ArmsDown()
         {
             if (_celebrate > 0f || (p.isKeeper && (p.dive > 0f || p.hold > 0f))) return;
-            float w = 1f - (anim != null ? anim.ActionWeight * 0.5f : 0f);
-            var right = transform.right;
-            var down = -transform.up;
-            for (int side = -1; side <= 1; side += 2)
-            {
-                string sfx = side < 0 ? "_l" : "_r";
-                rig.bones.TryGetValue("upperarm" + sfx, out var up);
-                rig.bones.TryGetValue("lowerarm" + sfx, out var lo);
-                if (up == null || lo == null) continue;
-                var arm = (lo.position - up.position).normalized;
-                // abertura lateral: ângulo no plano frontal (direita/baixo)
-                float s = Mathf.Sign(Vector3.Dot(up.position - (rig.spine != null ? rig.spine.position : transform.position), right));
-                float lat = Vector3.Dot(arm, right) * s;          // + = para fora
-                float abd = Mathf.Atan2(lat, Vector3.Dot(arm, down)) * Mathf.Rad2Deg;
-                if (abd > 20f)
-                    _pose.Rotate(up, Quaternion.AngleAxis(-(abd - 20f) * 0.85f * w * s, transform.forward));   // (+ em torno da frente levaria o braço direito para cima)
-                // elevação geral (braço acima da linha do ombro)
-                arm = (lo.position - up.position).normalized;
-                float elev = Vector3.Angle(arm, down);
-                if (elev > 55f)
-                {
-                    var axis = Vector3.Cross(arm, down);
-                    if (axis.sqrMagnitude > 1e-6f) _pose.Rotate(up, Quaternion.AngleAxis((elev - 55f) * 0.8f * w, axis.normalized));
-                }
-            }
+            PoseFix.Arms(rig, transform, _pose, 1f - (anim != null ? anim.ActionWeight * 0.5f : 0f));
         }
 
         float _ground;

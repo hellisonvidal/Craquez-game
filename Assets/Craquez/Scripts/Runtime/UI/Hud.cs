@@ -107,6 +107,11 @@ namespace Craquez.UI
             _goalSub = UiKit.Label(_goalBox, "", 44, Theme.Head, Theme.Text, TextAnchor.MiddleCenter);
             _goalSub.rectTransform.Place(0, 0.12f, 1, 0.38f);
             _goalCg.alpha = 0;
+            // pausa sempre visível (toque, mouse; controle/teclado usam Start/Esc)
+            var pause = UiKit.Button(root, "II", () => onPause?.Invoke(), 34, new Color(0.02f, 0.03f, 0.07f, 0.85f));
+            pause.GetComponent<RectTransform>().At(1, 1, 96, 72, -30, -30);
+            var pnav = pause.navigation; pnav.mode = Navigation.Mode.None; pause.navigation = pnav;
+            _pauseBtn = pause.gameObject;
             _overlay = UiKit.Rect(root, "overlay").Place(0, 0, 1, 1);
             _cut = UiKit.Image(root, Color.black, null, "corte");
             _cut.rectTransform.Place(0, 0, 1, 1);
@@ -141,6 +146,9 @@ namespace Craquez.UI
         }
 
         public RectTransform Overlay => _overlay;
+        public System.Action onPause;
+        GameObject _pauseBtn;
+        public void ShowPauseButton(bool on) { if (_pauseBtn != null) _pauseBtn.SetActive(on); }
 
         Image _cut;
         float _cutT;

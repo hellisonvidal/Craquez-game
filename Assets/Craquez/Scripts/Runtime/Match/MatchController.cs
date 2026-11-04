@@ -62,6 +62,7 @@ namespace Craquez
             hud.Build(sim, c, view.kits);
             hud.SetWeather(view.venue.name + "  •  " + view.weather.Label);
             view.onCut = () => { if (!attract) hud.Cut(); };
+            hud.onPause = () => { if (_phase == Phase.Playing || _phase == Phase.Goal) Pause(); };
             var sides = new[] { c.sideA, c.sideB };
             var p1 = InputRouter.DefaultP1();
             for (int t = 0; t < 2; t++)
@@ -348,6 +349,9 @@ namespace Craquez
         {
             _phase = Phase.Paused;
             Time.timeScale = 0f;
+            // os controles de toque ficam numa camada acima do HUD: escondidos, os botões do menu respondem
+            if (_touch) _touch.gameObject.SetActive(false);
+            hud.ShowPauseButton(false);
             PausePage(0);
         }
 
@@ -423,12 +427,16 @@ namespace Craquez
             if (_pauseMenu != null) Destroy(_pauseMenu);
             Time.timeScale = 1f;
             _phase = Phase.Playing;
+            if (_touch) _touch.gameObject.SetActive(true);
+            hud.ShowPauseButton(true);
             for (int t = 0; t < 2; t++) _prevPause[t] = InputFrame.Pause;
         }
 
         void ShowEnd()
         {
             _phase = Phase.Ended;
+            if (_touch) _touch.gameObject.SetActive(false);
+            hud.ShowPauseButton(false);
             var ta = Teams.Get(cfg.teamA);
             var tb = Teams.Get(cfg.teamB);
             var root = hud.Overlay;
