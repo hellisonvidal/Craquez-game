@@ -86,7 +86,10 @@ namespace Craquez.EditorTools
                 bool pos = b.propertyName.StartsWith("m_LocalPosition");
                 bool scale = b.propertyName.StartsWith("m_LocalScale");
                 bool pelvis = b.path.EndsWith("/pelvis") || b.path == "pelvis";
-                if (scale || (pos && !pelvis)) AnimationUtility.SetEditorCurve(clip, b, null);
+                // nó do esqueleto ("Armature") e osso raiz: guardam a conversão de eixos do Blender
+                // (Z para cima); se a animação mexer neles, o atleta "deita". Só os ossos animam.
+                bool armatureNode = b.path == "" || b.path == "Armature" || b.path.EndsWith("/Root") || b.path == "Armature/Root";
+                if (armatureNode || scale || (pos && !pelvis)) AnimationUtility.SetEditorCurve(clip, b, null);
             }
         }
 

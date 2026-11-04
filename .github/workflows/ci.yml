@@ -80,6 +80,8 @@ jobs:
             targetPlatform: Android
           - name: Windows
             targetPlatform: StandaloneWindows64
+          - name: Linux (screenshots)
+            targetPlatform: StandaloneLinux64
     steps:
       - uses: jlumbroso/free-disk-space@v1.3.1
         with:
@@ -104,7 +106,26 @@ jobs:
           versioning: None
           androidExportType: androidPackage
       - uses: actions/upload-artifact@v4
+        if: matrix.targetPlatform != 'StandaloneLinux64'
         with:
           name: Craquez-${{ matrix.name }}
           path: build/${{ matrix.targetPlatform }}
+          retention-days: 14
+      # roda o jogo (renderização por software) e tira screenshots de todas as telas e modos
+      - name: Screenshots
+        if: matrix.targetPlatform == 'StandaloneLinux64'
+        run: |
+          sudo apt-get update -qq && sudo apt-get install -y -qq xvfb libgl1-mesa-dri mesa-utils > /dev/null
+          cd build/StandaloneLinux64
+          sudo chown -R "$USER" . && chmod +x Craquez
+          mkdir -p "$GITHUB_WORKSPACE/shots"
+          timeout 600 xvfb-run -a -s "-screen 0 1600x900x24" ./Craquez -force-glcore -screen-fullscreen 0 -screen-width 1600 -screen-height 900 \
+            -logFile "$GITHUB_WORKSPACE/shots/player.log" --shots="$GITHUB_WORKSPACE/shots" || echo "jogo saiu com código $?"
+          ls -la "$GITHUB_WORKSPACE/shots"
+          grep -E "Exception|Error|\[shots\]" "$GITHUB_WORKSPACE/shots/player.log" | head -80 || true
+      - uses: actions/upload-artifact@v4
+        if: matrix.targetPlatform == 'StandaloneLinux64'
+        with:
+          name: Craquez-screenshots
+          path: shots
           retention-days: 14

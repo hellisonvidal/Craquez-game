@@ -13,6 +13,7 @@ namespace Craquez
         Vector3 _prev, _cur;
         float _yaw, _lean, _pitch, _hop, _hopT, _celebrate, _fall, _diveSide, _slideT;
         Vector2 _lastVel;
+        bool _diag;
         Transform _marker;
 
         public static Vector3 W(Vector2 v, float y = 0f) => new Vector3(v.x, y, v.y);
@@ -147,6 +148,11 @@ namespace Craquez
             var lv = Quaternion.Euler(0, -_yaw, 0) * v3;
             bool guard = p.shielding && !p.isKeeper && view.sim.ball.owner >= 0 && view.sim.players[view.sim.ball.owner].team != p.team;
             anim?.Tick(dt, p.vel.magnitude, lv.z, lv.x, guard);
+            if (!_diag && rig.head != null && p.id == 3)
+            {
+                _diag = true;
+                Debug.Log($"[diag] atleta {p.name}: cabeça a {rig.head.position.y - transform.position.y:F2} m do chão (raiz), pés {rig.footL?.position.y - transform.position.y:F2} m; rotação do modelo {rig.model.localEulerAngles}");
+            }
             if (_celebrate > 0f) _celebrate -= dt;
         }
 

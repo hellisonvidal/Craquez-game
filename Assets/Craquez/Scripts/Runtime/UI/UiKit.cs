@@ -88,8 +88,20 @@ namespace Craquez.UI
             var s = go.GetComponent<CanvasScaler>();
             s.uiScaleMode = CanvasScaler.ScaleMode.ScaleWithScreenSize;
             s.referenceResolution = new Vector2(1920, 1080);
-            s.matchWidthOrHeight = 0.5f;
+            // telas mais largas que 16:9 (celulares 19,5:9 / 20:9): escala pela altura e usa a largura extra
+            s.matchWidthOrHeight = Screen.height > 0 && Screen.width / (float)Screen.height >= 1.77f ? 1f : 0f;   // tablets 4:3/16:10: pela largura
             return c;
+        }
+
+        /// <summary>Área útil do canvas respeitando entalhes/câmera frontal e cantos (Screen.safeArea).</summary>
+        public static RectTransform SafeRoot(Canvas c)
+        {
+            var rt = Rect(c.transform, "area segura");
+            rt.anchorMin = Vector2.zero;
+            rt.anchorMax = Vector2.one;
+            rt.offsetMin = rt.offsetMax = Vector2.zero;
+            rt.gameObject.AddComponent<SafeArea>();
+            return rt;
         }
 
         public static RectTransform Rect(Transform parent, string name = "rect")
@@ -240,6 +252,24 @@ namespace Craquez.UI
         public static void Clear(Transform t)
         {
             for (int i = t.childCount - 1; i >= 0; i--) UnityEngine.Object.Destroy(t.GetChild(i).gameObject);
+        }
+    }
+
+    /// <summary>Ajusta o retângulo à área segura da tela (Android com entalhe, cantos arredondados).</summary>
+    public class SafeArea : MonoBehaviour
+    {
+        Rect _last;
+        Vector2Int _res;
+        void Update()
+        {
+            var sa = Screen.safeArea;
+            if (sa == _last && _res.x == Screen.width && _res.y == Screen.height) return;
+            _last = sa;
+            _res = new Vector2Int(Screen.width, Screen.height);
+            if (Screen.width <= 0 || Screen.height <= 0) return;
+            var rt = (RectTransform)transform;
+            rt.anchorMin = new Vector2(sa.xMin / Screen.width, sa.yMin / Screen.height);
+            rt.anchorMax = new Vector2(sa.xMax / Screen.width, sa.yMax / Screen.height);
         }
     }
 

@@ -334,7 +334,7 @@ namespace Craquez
             var fence = new MeshKit();
             float fh = 6.5f, fx = hl + 3f, fz = hw + 3f;
             fence.Quad(new Vector3(-fx, 0, fz), new Vector3(-fx, fh, fz), new Vector3(fx, fh, fz), new Vector3(fx, 0, fz), new Vector2(0, 0), new Vector2(fx / 1.5f, fh / 1.5f));
-            fence.Quad(new Vector3(fx, 0, -fz), new Vector3(fx, fh, -fz), new Vector3(-fx, fh, -fz), new Vector3(-fx, 0, -fz), new Vector2(0, 0), new Vector2(fx / 1.5f, fh / 1.5f));
+            // (sem tela do lado da câmera: não atrapalha a visão)
             fence.Quad(new Vector3(fx, 0, fz), new Vector3(fx, fh, fz), new Vector3(fx, fh, -fz), new Vector3(fx, 0, -fz), new Vector2(0, 0), new Vector2(fz / 1.5f, fh / 1.5f));
             fence.Quad(new Vector3(-fx, 0, -fz), new Vector3(-fx, fh, -fz), new Vector3(-fx, fh, fz), new Vector3(-fx, 0, fz), new Vector2(0, 0), new Vector2(fz / 1.5f, fh / 1.5f));
             fence.Object("Tela de proteção", netMat, v.root, false);

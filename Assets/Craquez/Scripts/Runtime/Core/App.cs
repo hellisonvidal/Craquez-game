@@ -55,9 +55,10 @@ namespace Craquez
                 es.transform.SetParent(transform, false);
             }
             _menu = UiKit.Canvas("Menus", 30, transform);
-            _root = (RectTransform)_menu.transform;
+            _root = UiKit.SafeRoot(_menu);
             _cfg.seed = (uint)System.DateTime.Now.Ticks;
             ShowIntro();
+            if (ShotTour.Requested()) gameObject.AddComponent<ShotTour>().Run(this);
         }
 
         /// <summary>Sempre em tela cheia: janela sem bordas na resolução nativa (PC) e modo imersivo (Android).</summary>
@@ -110,8 +111,14 @@ namespace Craquez
             // barra superior: marca + controle detectado
             var top = UiKit.Image(_root, new Color(0.01f, 0.02f, 0.05f, 0.7f), null, "topo").rectTransform.Place(0, 1, 1, 1, 0, -64, 0, 0);
             var line = UiKit.Image(top, Theme.Accent, null, "linha").rectTransform.Place(0, 0, 1, 0, 0, 0, 0, -3);
+            var back = UiKit.Button(top, "‹  Voltar", () => _back?.Invoke(), 28, new Color(0.12f, 0.16f, 0.26f));
+            back.GetComponent<RectTransform>().Place(0, 0, 0, 1, 16, 8, 0, 8).sizeDelta = new Vector2(190, -16);
+            back.GetComponent<RectTransform>().anchoredPosition = new Vector2(16 + 95, 0);
+            var nav = back.navigation;
+            nav.mode = Navigation.Mode.None;   // não rouba o foco do controle; Esc/B/voltar do Android também funcionam
+            back.navigation = nav;
             var brand = UiKit.Label(top, "CRAQUEZ", 38, Theme.HeadItalic, Color.white);
-            brand.rectTransform.Place(0, 0, 0.4f, 1, 40, 0, 0, 0);
+            brand.rectTransform.Place(0, 0, 0.4f, 1, 230, 0, 0, 0);
             var dev = UiKit.Label(top, "" + InputRouter.DeviceName(InputRouter.DefaultP1()) + "   •   feito com IA  •  gratuito", 22, Theme.BodyBold, Theme.TextDim, TextAnchor.MiddleRight);
             dev.rectTransform.Place(0.4f, 0, 1, 1, 0, 0, 40, 0);
             // barra de dicas
@@ -684,6 +691,33 @@ namespace Craquez
             _match.onRestart = c => { EndMatch(); StartMatch(); };
             _match.Begin(_cfg, cam);
         }
+
+        // ------------------------------------------------------------ roteiro de screenshots (CI)
+        public void Tour_Modes() => ShowModes();
+        public void Tour_Setup(string mode, bool national)
+        {
+            _cfg.mode = mode;
+            _cfg.national = national;
+            FixTeamsForMode();
+            ShowSetup();
+        }
+        public void Tour_Teams() => ShowTeams();
+        public void Tour_Tactics() => ShowTactics(0);
+        public MatchController Tour_Match(string mode, bool national, string tod, string weather)
+        {
+            _cfg.mode = mode;
+            _cfg.national = national;
+            FixTeamsForMode();
+            _cfg.timeOfDay = tod;
+            _cfg.weather = weather;
+            _cfg.ceremony = false;
+            _cfg.minutes = 10;
+            _cfg.sideA = Side.Cpu;
+            _cfg.sideB = Side.Cpu;
+            StartMatch();
+            return _match;
+        }
+        public void Tour_EndMatch() { EndMatch(); ShowModes(); }
 
         void EndMatch()
         {

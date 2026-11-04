@@ -17,7 +17,7 @@ namespace Craquez
         {
             var c = UiKit.Canvas("Toque", 20, parent);
             var tc = c.gameObject.AddComponent<TouchControls>();
-            tc.Build((RectTransform)c.transform);
+            tc.Build(UiKit.SafeRoot(c));
             TouchState.active = true;
             return tc;
         }

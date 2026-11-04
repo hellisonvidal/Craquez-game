@@ -26,6 +26,8 @@ namespace Craquez
             animator = m.GetComponent<Animator>() ?? m.gameObject.AddComponent<Animator>();
             animator.applyRootMotion = false;
             animator.cullingMode = AnimatorCullingMode.CullUpdateTransforms;
+            if (head != null)
+                Debug.Log($"[diag] modelo {m.name}: cabeça em repouso a {head.position.y - transform.position.y:F2} m; filhos {m.childCount}; Armature rot {(B("Armature") != null ? B("Armature").localEulerAngles.ToString() : "-")}");
             // descobre para onde o modelo olha (pé -> ponta do pé) e corrige para +Z
             var ballL = B("ball_l");
             if (footL != null && ballL != null)
