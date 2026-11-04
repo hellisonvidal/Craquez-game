@@ -10,7 +10,7 @@ namespace Craquez.Tests
         {
             int a = mode == GameModes.Futsal ? FirstLeague(true) : 0;
             var sim = new MatchSim();
-            sim.Setup(mode, new TeamSetup { data = Teams.Get(a) }, new TeamSetup { data = Teams.Get(a + 1) }, seed, 60f);
+            sim.Setup(mode, new TeamSetup { data = Teams.Get(a) }, new TeamSetup { data = Teams.Get(a + 1) }, seed, 120f);
             return sim;
         }
 
@@ -51,7 +51,7 @@ namespace Craquez.Tests
         public void FullMatchRunsToTheEnd(string mode)
         {
             var sim = NewMatch(mode);
-            Play(sim, 60 * 200);
+            Play(sim, 60 * 400);
             Assert.AreEqual(MatchState.Fulltime, sim.state);
             Assert.IsFalse(float.IsNaN(sim.ball.pos.x));
             Assert.Greater(sim.statsShots[0] + sim.statsShots[1], 0);

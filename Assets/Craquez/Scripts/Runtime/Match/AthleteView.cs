@@ -29,7 +29,11 @@ namespace Craquez
             transform.position = _cur;
         }
 
-        void OnDestroy() => anim?.Destroy();
+        void OnDestroy()
+        {
+            anim?.Destroy();
+            if (_shadow != null) Destroy(_shadow.gameObject);
+        }
 
         static float Yaw(Vector2 f) => Mathf.Atan2(f.x, f.y) * Mathf.Rad2Deg;
 
@@ -156,8 +160,48 @@ namespace Craquez
             if (_celebrate > 0f) _celebrate -= dt;
         }
 
+        float _ground;
+        Transform _shadow;
+        static Material _shadowMat;
+
+        /// <summary>Pés sempre no chão: depois da animação, alinha o pé mais baixo ao piso.</summary>
+        void GroundFeet()
+        {
+            if (rig == null || rig.model == null) return;
+            Transform bl = null, br = null;
+            rig.bones.TryGetValue("ball_l", out bl);
+            rig.bones.TryGetValue("ball_r", out br);
+            float lowest = float.MaxValue;
+            foreach (var t in new[] { bl, br }) if (t != null) lowest = Mathf.Min(lowest, t.position.y - 0.035f);
+            foreach (var t in new[] { rig.footL, rig.footR }) if (t != null) lowest = Mathf.Min(lowest, t.position.y - 0.085f);
+            if (lowest == float.MaxValue) return;
+            float lift = transform.position.y;   // pulos/mergulhos intencionais
+            float err = lowest - lift;
+            // suaviza para não tremer, mas corrige rápido
+            _ground = Mathf.Lerp(_ground, err, 1f - Mathf.Exp(-Time.deltaTime * 18f));
+            if (p.slide <= 0f && !(p.isKeeper && p.dive > 0f) && p.stun < 0.5f)
+                rig.model.position -= Vector3.up * _ground;
+            // sombra de contato
+            if (_shadow == null)
+            {
+                var go = GameObject.CreatePrimitive(PrimitiveType.Quad);
+                Destroy(go.GetComponent<Collider>());
+                go.name = "sombra";
+                _shadowMat ??= Gfx.UnlitTransparent(new Color(0, 0, 0, 0.5f), Gfx.Radial(64, Color.white, new Color(1, 1, 1, 0), 1.6f));
+                go.GetComponent<MeshRenderer>().sharedMaterial = _shadowMat;
+                go.GetComponent<MeshRenderer>().shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
+                _shadow = go.transform;
+                _shadow.SetParent(transform.parent, false);
+            }
+            var c = rig.pelvis != null ? rig.pelvis.position : transform.position;
+            _shadow.position = new Vector3(c.x, 0.012f, c.z);
+            _shadow.rotation = Quaternion.Euler(90, transform.eulerAngles.y, 0);
+            _shadow.localScale = new Vector3(0.9f, 1.15f, 1f);
+        }
+
         void LateUpdate()
         {
+            GroundFeet();
             if (p == null || rig == null || rig.head == null) return;
             // cabeça acompanha a bola (limitado)
             var ballW = W(view.sim.ball.pos, view.sim.ball.z + 0.11f);

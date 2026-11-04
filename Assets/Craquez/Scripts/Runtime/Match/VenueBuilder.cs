@@ -55,10 +55,10 @@ namespace Craquez
         static void Pitch(Venue v, float hl, float hw, uint seed, int quality)
         {
             int ts = quality >= 2 ? 512 : 256;
-            var grass = Gfx.Grass(ts, new Color(0.23f, 0.5f, 0.16f), (int)(seed % 997));
+            var grass = Gfx.Grass(ts, new Color(0.26f, 0.5f, 0.15f), (int)(seed % 997));
             // faixas de corte: duas tonalidades alternadas
             v.pitchMat = Gfx.LitN(new Color(1.0f, 1.0f, 1.0f), grass, Gfx.GrassNormal, 0.16f, 0.8f);
-            v.pitchMat2 = Gfx.LitN(new Color(0.86f, 0.92f, 0.84f), grass, Gfx.GrassNormal, 0.16f, 0.8f);
+            v.pitchMat2 = Gfx.LitN(new Color(0.78f, 0.86f, 0.74f), grass, Gfx.GrassNormal, 0.16f, 0.8f);   // faixas de corte bem visíveis
             Gfx.Tiling(v.pitchMat, new Vector2(1, 1));
             Gfx.Tiling(v.pitchMat2, new Vector2(1, 1));
             var a = new MeshKit();
@@ -81,7 +81,7 @@ namespace Craquez
             var ring = new MeshKit();
             float ox = mx + 22f, oz = mz + 22f;
             ring.Quad(new Vector3(-ox, -0.01f, -oz), new Vector3(-ox, -0.01f, oz), new Vector3(ox, -0.01f, oz), new Vector3(ox, -0.01f, -oz), new Vector2(0, 0), new Vector2(ox / 4f, oz / 4f));
-            ring.Object("Entorno", Gfx.Lit(new Color(0.32f, 0.33f, 0.36f), Gfx.Asphalt(256, new Color(0.6f, 0.6f, 0.62f), 4, 0.1f), 0.1f), v.root, false);
+            ring.Object("Entorno", Gfx.LitN(new Color(0.55f, 0.66f, 0.5f), grass, Gfx.GrassNormal, 0.1f, 0.6f), v.root, false);
         }
 
         static void Lines(Venue v, MatchSim sim, float hl, float hw)
@@ -192,9 +192,15 @@ namespace Craquez
             var mat = Gfx.Lit(Color.white, crowd, 0.05f);
             v.crowdMats.Add(mat);
             var concrete = Gfx.Lit(new Color(0.55f, 0.56f, 0.6f), Gfx.Asphalt(256, Color.white, 11, 0.05f), 0.15f);
+            // torcedores em pé: silhuetas recortadas sobre cada fileira (dá volume à arquibancada)
+            var people = Gfx.CrowdPeople(quality >= 2 ? 2048 : 1024, 64, homeKit.c1, homeKit.c2, awayKit.c1, (int)(home.name.GetHashCode() & 0xFFFF) + 1);
+            var peopleMat = Gfx.Cutout(Color.white, people, 0.5f, 0.05f);
+            v.crowdMats.Add(peopleMat);
             v.standDist = gapZ;
             for (int side = 0; side < 4; side++)
             {
+                // lado 0 é o da câmera de TV: lá só há a pista e os bancos (a arquibancada tapava o campo)
+                if (side == 0) continue;
                 bool longSide = side < 2;
                 float len = longSide ? (hl + gapX) * 2f : (hw + gapZ) * 2f;
                 float dist = longSide ? hw + gapZ : hl + gapX;
@@ -218,6 +224,16 @@ namespace Craquez
                 float topY = 1.1f + rows * rise, far = dist + rows * step;
                 back.Quad(new Vector3(-len / 2, 0, -dist + 0.2f), new Vector3(len / 2, 0, -dist + 0.2f), new Vector3(len / 2, 1.1f, -dist + 0.2f), new Vector3(-len / 2, 1.1f, -dist + 0.2f));
                 back.Quad(new Vector3(len / 2, 0, -far), new Vector3(len / 2, topY + 2.5f, -far), new Vector3(-len / 2, topY + 2.5f, -far), new Vector3(-len / 2, 0, -far));
+                var ppl = new MeshKit();
+                for (int r = 0; r < rows; r += quality >= 1 ? 1 : 2)
+                {
+                    float y1 = 1.1f + (r + 1) * rise, d = dist + r * step + step * 0.55f;
+                    float off = (r * 0.37f) % 1f;
+                    ppl.Quad(new Vector3(-len / 2, y1, -d), new Vector3(len / 2, y1, -d), new Vector3(len / 2, y1 + 0.85f, -d), new Vector3(-len / 2, y1 + 0.85f, -d),
+                        new Vector2(off, 0f), new Vector2(off + len / 14f, 1f));
+                }
+                var gp = ppl.Object("Torcedores " + side, peopleMat, v.root, false);
+                gp.transform.localRotation = Quaternion.Euler(0, side == 0 ? 0 : side == 1 ? 180 : side == 2 ? 90 : -90, 0);
                 var go = k.Object("Torcida " + side, mat, v.root, quality >= 2);
                 var gb = back.Object("Estrutura " + side, concrete, v.root, quality >= 1);
                 float yaw = side == 0 ? 0 : side == 1 ? 180 : side == 2 ? 90 : -90;
@@ -235,10 +251,10 @@ namespace Craquez
                 }
             }
             // cantos: blocos de concreto preenchendo
-            for (int c = 0; c < 4; c++)
+            for (int c = 0; c < 2; c++)   // só os cantos do fundo (os da frente tapariam a câmera)
             {
                 var k = new MeshKit();
-                float sx = c % 2 == 0 ? 1 : -1, sz = c < 2 ? 1 : -1;
+                float sx = c % 2 == 0 ? 1 : -1, sz = 1;
                 float cx = (hl + gapX + rows * step * 0.5f) * sx, cz = (hw + gapZ + rows * step * 0.5f) * sz;
                 k.Box(new Vector3(cx, (1.1f + rows * rise) * 0.5f, cz), new Vector3(rows * step, 1.1f + rows * rise, rows * step), 4f);
                 k.Object("Canto " + c, concrete, v.root, quality >= 1);

@@ -65,7 +65,7 @@ namespace Craquez.Sim
     /// </summary>
     public static class Teams
     {
-        public static readonly string[] PatternNames = { "liso", "listras", "aros", "faixa", "metades", "riscas", "faixa_peito" };
+        public static readonly string[] PatternNames = { "liso", "listras", "aros", "faixa", "metades", "riscas", "faixa_peito", "faixa_vertical" };
         public static readonly string[] KitNames = { "Principal", "Reserva", "Terceiro" };
 
         static bool _loaded;

@@ -1323,10 +1323,10 @@ namespace Craquez.Sim
                 var perp = new Vector2(-fwd.y, fwd.x);
                 var rel = ball.pos - o.position;
                 float along = Vector2.Dot(rel, fwd), side = Vector2.Dot(rel, perp);
-                if (along < 0.38f + spd * 0.02f)
+                if (along < 0.3f + spd * 0.012f)
                 {
-                    // toque: a bola sai na frente; distância ideal maior no pique e para quem tem menos controle
-                    float lead = o.sprinting ? Mathf.Lerp(1.35f, 0.75f, o.control) : Mathf.Lerp(0.75f, 0.45f, o.control);
+                    // toque: a bola sai um pouco à frente (mais no pique e para quem tem menos controle)
+                    float lead = o.sprinting ? Mathf.Lerp(0.9f, 0.5f, o.control) : Mathf.Lerp(0.42f, 0.25f, o.control);
                     float decel = mode.rollDecel + mode.groundDrag * spd * spd;
                     float extra = Mathf.Sqrt(2f * decel * lead);
                     ball.vel = fwd * (spd + extra) - perp * side * 4f;

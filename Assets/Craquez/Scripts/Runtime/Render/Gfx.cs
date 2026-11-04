@@ -293,6 +293,46 @@ namespace Craquez
             return t;
         }
 
+        /// <summary>Silhuetas de torcedores (cabeça, ombros, braços, cachecóis e bandeiras) com alfa, repetível.</summary>
+        public static Texture2D CrowdPeople(int w, int h, Color home, Color home2, Color away, int seed)
+        {
+            var t = Tex(w, h, true);
+            var px = new Color32[w * h];
+            int pw = 14;
+            int n = w / pw;
+            for (int i = 0; i < n; i++)
+            {
+                float r = Hash(i, 1, seed);
+                if (r > 0.94f) continue;   // lugar vazio
+                bool awaySide = i > n * 0.82f;
+                Color shirt = awaySide ? away : (r < 0.55f ? home : r < 0.8f ? home2 : Color.HSVToRGB(Hash(i, 5, seed), 0.35f, 0.75f));
+                Color skin = Color.Lerp(new Color(0.36f, 0.22f, 0.15f), new Color(0.95f, 0.78f, 0.65f), Hash(i, 2, seed));
+                Color hair = Color.Lerp(new Color(0.05f, 0.04f, 0.03f), new Color(0.45f, 0.32f, 0.2f), Hash(i, 3, seed) * 0.7f);
+                int cx = i * pw + pw / 2 + (int)((Hash(i, 4, seed) - 0.5f) * 4);
+                float hgt = 0.82f + Hash(i, 6, seed) * 0.18f;
+                bool armsUp = Hash(i, 7, seed) > 0.72f;
+                bool flag = Hash(i, 8, seed) > 0.95f;
+                for (int y = 0; y < h; y++)
+                    for (int x = Mathf.Max(0, cx - pw); x < Mathf.Min(w, cx + pw); x++)
+                    {
+                        float u = (x - cx) / (float)pw, v = y / (float)h / hgt;   // v: 0 base .. 1 topo da cabeça
+                        Color c = new Color(0, 0, 0, 0);
+                        if (v < 0.62f && Mathf.Abs(u) < 0.42f - (v > 0.5f ? (v - 0.5f) * 1.5f : 0f)) c = shirt * (0.8f + v * 0.3f);
+                        if (v > 0.6f && v < 0.7f && Mathf.Abs(u) < 0.12f) c = skin * 0.9f;                                     // pescoço
+                        if (new Vector2(u * 1.3f, (v - 0.8f) * 1.0f).magnitude < 0.2f) c = v > 0.86f ? hair : skin;          // cabeça
+                        if (armsUp && v > 0.45f && v < 1.05f && Mathf.Abs(Mathf.Abs(u) - 0.42f + (v - 0.45f) * 0.25f) < 0.08f) c = v > 0.95f ? skin : shirt * 0.9f;
+                        if (v > 0.52f && v < 0.58f && Mathf.Abs(u) < 0.4f && Hash(i, 9, seed) > 0.6f) c = home2;           // cachecol
+                        if (flag && u > 0.2f && v > 0.7f && v < 1.15f && u < 1.4f) c = Mathf.Repeat(v * 6f, 1f) < 0.5f ? home : home2;
+                        c.a = c.a > 0f ? 1f : 0f;
+                        if (c.a > 0f) px[Mathf.Min(h - 1, y) * w + x] = c;
+                    }
+            }
+            t.SetPixels32(px);
+            t.filterMode = FilterMode.Bilinear;
+            t.Apply(true);
+            return t;
+        }
+
         /// <summary>Rede de gol (losangos), com alfa.</summary>
         public static Texture2D Net(int size, float cell = 12f, float thick = 1.4f)
         {

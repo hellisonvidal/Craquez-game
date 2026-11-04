@@ -255,17 +255,86 @@ namespace Craquez
                     break;
                 case "foul":
                     Sfx.Whistle();
+                    if (e.team == 1) Sfx.Boo();   // torcida da casa vaia falta do visitante
                     foreach (var a in athletes) if (a.p.team != e.team && a.p.stun > 0.8f) a.OnVictimFoul();
                     break;
                 case "goal":
                     Sfx.Net();
                     Sfx.Cheer();
+                    GoalParty(e.team);
                     _crowdHype = 1.6f;
                     bcam.Shake(0.6f);
                     foreach (var n in venue.nets)
                         n.Hit(new Vector3(sim.ball.pos.x, sim.ball.z + 0.3f, sim.ball.pos.y), sim.ball.Speed + 10f);
                     break;
             }
+        }
+
+        /// <summary>Festa do gol: papel picado nas cores do time e sinalizadores com fumaça atrás do gol.</summary>
+        void GoalParty(int team)
+        {
+            if (venue == null) return;
+            var k = kits[Mathf.Clamp(team, 0, 1)];
+            float gx = sim.halfLen * Mathf.Sign(sim.ball.pos.x == 0 ? 1 : sim.ball.pos.x);
+            bool field = sim.mode.id == GameModes.Field;
+            var center = new Vector3(gx + Mathf.Sign(gx) * (field ? 18f : 5f), field ? 14f : 8f, 0f);
+            Burst(center, new Vector3(field ? 10f : 4f, 2f, field ? 50f : 18f), new[] { k.c1, k.c2, Color.white }, 700, false);
+            Burst(new Vector3(0, field ? 16f : 8f, sim.halfW + (field ? 20f : 8f)), new Vector3(field ? 80f : 30f, 2f, 8f), new[] { k.c1, k.c2 }, 500, false);
+            if (field)
+                for (int i = 0; i < 6; i++)
+                    Burst(center + new Vector3(0, -6f, (i - 2.5f) * 8f), new Vector3(0.5f, 0.2f, 0.5f), new[] { new Color(1f, 0.45f, 0.1f), new Color(1f, 0.25f, 0.05f) }, 120, true);
+        }
+
+        void Burst(Vector3 pos, Vector3 box, Color[] cols, int count, bool flare)
+        {
+            var go = new GameObject(flare ? "Sinalizador" : "Papel picado");
+            go.transform.SetParent(transform, false);
+            go.transform.position = pos;
+            var ps = go.AddComponent<ParticleSystem>();
+            ps.Stop(true, ParticleSystemStopBehavior.StopEmittingAndClear);
+            var main = ps.main;
+            main.duration = flare ? 5f : 2f;
+            main.loop = false;
+            main.startLifetime = flare ? 2.5f : 6f;
+            main.startSpeed = flare ? 2.5f : 3f;
+            main.startSize = flare ? 0.9f : 0.18f;
+            main.startRotation = new ParticleSystem.MinMaxCurve(0f, 6.28f);
+            main.gravityModifier = flare ? -0.05f : 0.12f;
+            main.maxParticles = count * 2;
+            main.simulationSpace = ParticleSystemSimulationSpace.World;
+            var grad = new Gradient();
+            var ck = new GradientColorKey[cols.Length];
+            for (int i = 0; i < cols.Length; i++) ck[i] = new GradientColorKey(cols[i], cols.Length == 1 ? 0f : i / (float)(cols.Length - 1));
+            grad.SetKeys(ck, new[] { new GradientAlphaKey(1f, 0f), new GradientAlphaKey(1f, 1f) });
+            main.startColor = new ParticleSystem.MinMaxGradient(grad) { mode = ParticleSystemGradientMode.RandomColor };
+            var em = ps.emission;
+            em.rateOverTime = count / main.duration;
+            var sh = ps.shape;
+            sh.shapeType = ParticleSystemShapeType.Box;
+            sh.scale = box;
+            var noise = ps.noise;
+            noise.enabled = true;
+            noise.strength = flare ? 0.6f : 1.2f;
+            noise.frequency = 0.4f;
+            var rot = ps.rotationOverLifetime;
+            rot.enabled = !flare;
+            rot.z = new ParticleSystem.MinMaxCurve(-4f, 4f);
+            if (flare)
+            {
+                var col = ps.colorOverLifetime;
+                col.enabled = true;
+                var g2 = new Gradient();
+                g2.SetKeys(new[] { new GradientColorKey(new Color(1f, 0.6f, 0.2f), 0f), new GradientColorKey(new Color(0.55f, 0.55f, 0.6f), 0.35f) },
+                    new[] { new GradientAlphaKey(1f, 0f), new GradientAlphaKey(0.5f, 0.4f), new GradientAlphaKey(0f, 1f) });
+                col.color = g2;
+                var size = ps.sizeOverLifetime;
+                size.enabled = true;
+                size.size = new ParticleSystem.MinMaxCurve(1f, AnimationCurve.Linear(0, 0.5f, 1, 3.5f));
+            }
+            var r = go.GetComponent<ParticleSystemRenderer>();
+            r.sharedMaterial = flare ? Gfx.Particles(Color.white, Gfx.Radial(64, Color.white, new Color(1, 1, 1, 0), 1.2f)) : Gfx.Particles(Color.white, Gfx.Solid(Color.white));
+            ps.Play();
+            Destroy(go, 12f);
         }
 
         void Update()
@@ -302,6 +371,7 @@ namespace Craquez
                 if (m.HasProperty("_BaseMap")) m.SetTextureOffset("_BaseMap", new Vector2(0, bounce));
             }
             Sfx.Crowd((sim.mode.id == GameModes.Field ? 0.5f : 0.28f) + _crowdHype * 0.3f, sim.mode.id == GameModes.Field ? 0.22f + danger * 0.1f : 0f);
+            Sfx.Drums(sim.mode.id == GameModes.Street ? 0f : 0.12f + _crowdHype * 0.25f);
             foreach (var m in venue.ledMats)
             {
                 var o = new Vector2(Time.time * 0.015f, 0);
@@ -323,6 +393,8 @@ namespace Craquez
             m.position = new Vector3(av.transform.position.x, 0, av.transform.position.z);
             m.rotation = Quaternion.Euler(0, Mathf.Atan2(p.facing.x, p.facing.y) * Mathf.Rad2Deg, 0);
         }
+
+        void OnDestroy() => Sfx.Drums(0f);
 
         public AthleteView ViewOf(int id) => id >= 0 && id < athletes.Count ? athletes[id] : null;
     }

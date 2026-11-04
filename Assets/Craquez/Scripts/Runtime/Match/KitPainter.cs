@@ -109,12 +109,16 @@ namespace Craquez
                 c = k.c1;
                 switch (k.pattern)
                 {
-                    case 1: if (Mathf.Repeat(x / 0.11f + 0.25f, 1f) < 0.5f) c = k.c2; break;          // listras
-                    case 2: if (Mathf.Repeat(h / 0.12f, 1f) < 0.5f) c = k.c2; break;                  // aros
-                    case 3: if (Mathf.Abs(x * 0.9f - (h - 0.3f)) < 0.07f) c = k.c2; break;           // faixa diagonal
-                    case 4: if (x > 0f) c = k.c2; break;                                             // metades
-                    case 5: if (Mathf.Repeat(x / 0.05f, 1f) < 0.16f) c = k.c2; break;                 // riscas finas
-                    case 6: if (h > 0.15f && h < 0.24f && Mathf.Abs(x) < 0.25f) c = k.c2; break;      // faixa no peito
+                    case 1: if (Mathf.Repeat(x / 0.17f + 0.25f, 1f) < 0.5f) c = k.c2; break;                  // listras (~8,5 cm)
+                    case 2: if (Mathf.Repeat(h / 0.15f, 1f) < 0.5f) c = k.c2; break;                         // aros
+                    case 3: if (Mathf.Abs(x * 0.95f - (h - 0.28f)) < 0.085f) c = k.c2; break;                // faixa diagonal (ombro -> quadril)
+                    case 4: if (x > 0f) c = k.c2; break;                                                     // metades
+                    case 5: if (Mathf.Repeat(x / 0.07f, 1f) < 0.14f) c = k.c2; break;                         // riscas finas
+                    case 6: if (h > 0.14f && h < 0.25f && Mathf.Abs(x) < 0.3f) c = k.c2; break;               // faixa no peito
+                    case 7:                                                                                  // faixa vertical central
+                        if (Mathf.Abs(x) < 0.075f) c = k.c2;
+                        else if (Mathf.Abs(x) < 0.09f) c = Color.white;
+                        break;
                 }
                 // ombros e laterais com painel de contraste discreto
                 if (Mathf.Abs(x) > 0.17f && Mathf.Abs(x) < 0.21f && h > 0.05f) c = Color.Lerp(c, Contrast(k.c1, k.c2), 0.55f);

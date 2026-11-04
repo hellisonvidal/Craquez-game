@@ -27,6 +27,7 @@ namespace Craquez
         public Camera cam;
         Canvas _menu;
         RectTransform _root;
+        Image _bg;
         MatchController _match, _attract;
         System.Action _back;
         readonly MatchConfig _cfg = new MatchConfig();
@@ -56,6 +57,10 @@ namespace Craquez
                 es.transform.SetParent(transform, false);
             }
             _menu = UiKit.Canvas("Menus", 30, transform);
+            // fundo de borda a borda (inclusive sob o entalhe da câmera); conteúdo na área segura
+            _bg = UiKit.Image(_menu.transform, new Color(0, 0, 0, 0), null, "fundo da tela");
+            _bg.rectTransform.Place(0, 0, 1, 1);
+            _bg.raycastTarget = false;
             _root = UiKit.SafeRoot(_menu);
             _cfg.seed = (uint)System.DateTime.Now.Ticks;
             ShowIntro();
@@ -103,7 +108,8 @@ namespace Craquez
         {
             UiKit.Clear(_root);
             _pressText = null;
-            var bg = UiKit.Image(_root, dark ? new Color(0.01f, 0.02f, 0.05f, 0.55f) : new Color(0, 0, 0, 0), null, "fundo");
+            _bg.color = dark ? new Color(0.01f, 0.02f, 0.05f, 0.55f) : new Color(0, 0, 0, 0);
+            var bg = UiKit.Image(_root, new Color(0, 0, 0, 0), null, "fundo");
             bg.rectTransform.Place(0, 0, 1, 1);
             // degradê lateral (legibilidade sobre o jogo ao fundo)
             var grad = UiKit.Image(_root, new Color(0.01f, 0.02f, 0.05f, 0.8f), Theme.Soft, "brilho");
@@ -158,8 +164,9 @@ namespace Craquez
         void ShowIntro()
         {
             UiKit.Clear(_root);
-            var bg = UiKit.Image(_root, Color.black, null, "preto");
+            var bg = UiKit.Image(_root, new Color(0, 0, 0, 0), null, "preto");
             bg.rectTransform.Place(0, 0, 1, 1);
+            _bg.color = Color.black;
             _introPage = 0;
             _introT = 0;
             BuildIntroPage();
@@ -289,14 +296,8 @@ namespace Craquez
         }
 
         // ------------------------------------------------------------ modos
-        static readonly (string title, string sub, string desc, string mode, bool national, MenuArt.Kind art)[] ModeDefs =
-        {
-            ("CLUBES", "Campo  •  11 x 11", "22 ligas e 400 clubes da temporada 2026/27. Estádios em 3 portes, clima e cerimônia de abertura.", GameModes.Field, false, MenuArt.Kind.FieldClubs),
-            ("SELEÇÕES", "Campo  •  11 x 11", "40 seleções ordenadas pelo ranking mundial do Craquez. Jogue com as cores do seu país.", GameModes.Field, true, MenuArt.Kind.FieldNations),
-            ("FUTSAL", "Clubes  •  5 x 5", "Ligas de futsal do Brasil, Espanha, Portugal, Itália e Argentina em 8 quadras com tela.", GameModes.Futsal, false, MenuArt.Kind.FutsalClubs),
-            ("FUTSAL SELEÇÕES", "5 x 5", "As 20 melhores seleções de futsal do mundo. Bola no chão, toque rápido.", GameModes.Futsal, true, MenuArt.Kind.FutsalNations),
-            ("RUA", "3 x 3", "8 ruas diferentes: prédios, morro, praia, terraço, gaiola, telhado, viaduto e praça. A bola bate na parede.", GameModes.Street, false, MenuArt.Kind.Street),
-        };
+        // modalidades (primeira tela) e, dentro de futebol/futsal, clubes x seleções
+        struct Card { public string title, sub, desc; public MenuArt.Kind art; public System.Action go; }
         static readonly Dictionary<MenuArt.Kind, Texture2D> _tileArt = new Dictionary<MenuArt.Kind, Texture2D>();
 
         void ShowModes()
@@ -304,15 +305,50 @@ namespace Craquez
             if (_attract == null) StartAttract();
             var root = Page();
             _back = ShowTitle;
-            Title(root, "JOGAR", "Escolha o modo de jogo");
-            var row = UiKit.Rect(root, "cartoes").Place(0, 0, 1, 1, 90, 230, 90, 300);
-            var hl = UiKit.HList(row, 28);
+            Title(root, "JOGAR", "Escolha a modalidade");
+            Cards(root, new[]
+            {
+                new Card { title = "FUTEBOL", sub = "Campo  •  11 x 11", desc = "Clubes de 22 ligas ou seleções do ranking mundial. Estádios, clima e cerimônia de abertura.", art = MenuArt.Kind.FieldClubs, go = () => ShowSub(GameModes.Field) },
+                new Card { title = "FUTSAL", sub = "Quadra  •  5 x 5", desc = "Clubes das ligas de futsal ou as 20 melhores seleções, em 8 ginásios diferentes.", art = MenuArt.Kind.FutsalClubs, go = () => ShowSub(GameModes.Futsal) },
+                new Card { title = "RUA", sub = "3 x 3", desc = "8 ruas: prédios, morro, praia, terraço, gaiola, telhado, viaduto e praça. A bola bate na parede.", art = MenuArt.Kind.Street, go = () => Choose(GameModes.Street, false) },
+            });
+            var opt = UiKit.Button(root, "Opções", ShowOptions, 32);
+            opt.GetComponent<RectTransform>().At(1, 1, 260, 70, -90, -110);
+        }
+
+        void ShowSub(string mode)
+        {
+            var root = Page();
+            _back = ShowModes;
+            bool futsal = mode == GameModes.Futsal;
+            Title(root, futsal ? "FUTSAL" : "FUTEBOL", "Clubes ou seleções?");
+            Cards(root, new[]
+            {
+                new Card { title = "CLUBES", sub = futsal ? "5 ligas de futsal" : "22 ligas  •  400 clubes", desc = futsal ? "Ligas de futsal do Brasil, Espanha, Portugal, Itália e Argentina." : "Série A e B do Brasil, Premier League, La Liga, Itália, França, Argentina, MLS e muito mais.", art = futsal ? MenuArt.Kind.FutsalClubs : MenuArt.Kind.FieldClubs, go = () => Choose(mode, false) },
+                new Card { title = "SELEÇÕES", sub = futsal ? "20 seleções" : "40 seleções", desc = futsal ? "O ranking das seleções de futsal: Brasil, Argentina, Espanha, Portugal, Irã..." : "Ordenadas pelo ranking do Craquez, inspirado no da FIFA.", art = futsal ? MenuArt.Kind.FutsalNations : MenuArt.Kind.FieldNations, go = () => Choose(mode, true) },
+            });
+        }
+
+        void Choose(string mode, bool national)
+        {
+            _cfg.mode = mode;
+            _cfg.national = national;
+            _cfg.venue = Random.Range(0, 8);
+            FixTeamsForMode();
+            ShowSetup();
+        }
+
+        void Cards(RectTransform root, Card[] defs)
+        {
+            float w = defs.Length >= 3 ? 1f : 0.62f;
+            var row = UiKit.Rect(root, "cartoes").Place((1f - w) / 2f, 0, (1f + w) / 2f, 1, 90, 230, 90, 300);
+            var hl = UiKit.HList(row, 34);
             hl.childForceExpandHeight = true;
             var desc = UiKit.Label(root, "", 30, Theme.Body, Theme.Text);
             desc.rectTransform.Place(0, 0, 0.75f, 0, 94, 110, 0, -200);
             UiKit.Shadow(desc, 2, 0.8f);
             Button first = null;
-            foreach (var m in ModeDefs)
+            foreach (var m in defs)
             {
                 var mm = m;
                 var card = UiKit.Image(row, Color.white, Theme.Round, "modo " + mm.title);
@@ -333,26 +369,16 @@ namespace Craquez
                 var ri = UiKit.Rect(art, "img").Place(0, 0, 1, 1).gameObject.AddComponent<RawImage>();
                 ri.texture = tex;
                 ri.raycastTarget = false;
-                var title = UiKit.Label(card.transform, mm.title, 44, Theme.HeadItalic, Color.white, TextAnchor.MiddleCenter);
+                var title = UiKit.Label(card.transform, mm.title, 52, Theme.HeadItalic, Color.white, TextAnchor.MiddleCenter);
                 title.rectTransform.Place(0, 0.12f, 1, 0.3f, 6, 0, 6, 0);
-                var sub = UiKit.Label(card.transform, mm.sub, 24, Theme.BodyBold, Theme.Accent, TextAnchor.MiddleCenter);
+                var sub = UiKit.Label(card.transform, mm.sub, 26, Theme.BodyBold, Theme.Accent, TextAnchor.MiddleCenter);
                 sub.rectTransform.Place(0, 0.02f, 1, 0.14f);
                 var fx = card.gameObject.AddComponent<TileFx>();
                 fx.glow = glow;
                 fx.onSelected = () => desc.text = mm.desc;
-                b.onClick.AddListener(() =>
-                {
-                    Sfx.Ui();
-                    _cfg.mode = mm.mode;
-                    _cfg.national = mm.national;
-                    _cfg.venue = Random.Range(0, 8);
-                    FixTeamsForMode();
-                    ShowSetup();
-                });
+                b.onClick.AddListener(() => { Sfx.Ui(); mm.go(); });
                 if (first == null) first = b;
             }
-            var opt = UiKit.Button(root, "Opções", ShowOptions, 32);
-            opt.GetComponent<RectTransform>().At(1, 1, 260, 70, -90, -110);
             UiKit.Select(first);
         }
 
@@ -391,7 +417,7 @@ namespace Craquez
         void ShowSetup()
         {
             var root = Page();
-            _back = ShowModes;
+            _back = _cfg.mode == GameModes.Street ? (System.Action)ShowModes : () => ShowSub(_cfg.mode);
             Title(root, (_cfg.mode == GameModes.Street ? "RUA" : (_cfg.national ? "SELEÇÕES" : "CLUBES")) + "  •  " + GameModes.DisplayName(_cfg.mode).ToUpperInvariant(), "Ajuste a partida e escolha os times");
             var list = UiKit.Rect(root, "lista").Place(0, 0, 0.55f, 1, 90, 150, 0, 260);
             UiKit.VList(list, 8, 0, false);
@@ -402,16 +428,16 @@ namespace Craquez
                 _cfg.sideB = i == 1 ? Side.Player2 : Side.Cpu;
             });
             UiKit.Size(first, 60, 60);
-            UiKit.Size(UiKit.Cycler(list, "Dificuldade", DiffOpts, Mathf.Max(0, System.Array.IndexOf(DiffVals, _cfg.difficulty)), i => _cfg.difficulty = DiffVals[i]), 60, 60);
-            var mins = new List<string>();
-            foreach (var m in MinuteOpts) mins.Add(m + " minutos");
-            UiKit.Size(UiKit.Cycler(list, "Duração", mins, Mathf.Max(0, System.Array.IndexOf(MinuteOpts, _cfg.minutes)), i => _cfg.minutes = MinuteOpts[i]), 60, 60);
             if (_cfg.mode != GameModes.Futsal)
             {
                 UiKit.Size(UiKit.Cycler(list, "Clima", WeatherOpts, Mathf.Max(0, System.Array.IndexOf(WeatherIds, _cfg.weather)), i => _cfg.weather = WeatherIds[i]), 60, 60);
                 UiKit.Size(UiKit.Cycler(list, "Clima dinâmico", new[] { "Ligado", "Desligado" }, _cfg.dynamicWeather ? 0 : 1, i => _cfg.dynamicWeather = i == 0), 60, 60);
             }
             UiKit.Size(UiKit.Cycler(list, "Horário", TodOpts, Mathf.Max(0, System.Array.IndexOf(TodIds, _cfg.timeOfDay)), i => _cfg.timeOfDay = TodIds[i]), 60, 60);
+            UiKit.Size(UiKit.Cycler(list, "Dificuldade", DiffOpts, Mathf.Max(0, System.Array.IndexOf(DiffVals, _cfg.difficulty)), i => _cfg.difficulty = DiffVals[i]), 60, 60);
+            var mins = new List<string>();
+            foreach (var m in MinuteOpts) mins.Add(m + " minutos");
+            UiKit.Size(UiKit.Cycler(list, "Duração", mins, Mathf.Max(0, System.Array.IndexOf(MinuteOpts, _cfg.minutes)), i => _cfg.minutes = MinuteOpts[i]), 60, 60);
             if (_cfg.mode != GameModes.Field)
             {
                 var names = _cfg.mode == GameModes.Futsal ? VenueBuilder.FutsalNames : VenueBuilder.StreetNames;
@@ -686,6 +712,7 @@ namespace Craquez
         {
             StopAttract();
             UiKit.Clear(_root);
+            _bg.color = new Color(0, 0, 0, 0);
             _back = null;
             if (_cfg.tacticsA.lineup == null) _cfg.tacticsA = new Tactics();
             _cfg.seed = (uint)System.DateTime.Now.Ticks | 1u;
