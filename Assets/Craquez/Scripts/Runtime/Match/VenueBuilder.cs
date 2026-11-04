@@ -317,72 +317,159 @@ namespace Craquez
             var v = new Venue { root = new GameObject("Quadra").transform, name = FutsalNames[variant] };
             v.root.SetParent(parent, false);
             float hl = sim.halfLen, hw = sim.halfW;
-            Color[] floors = { new Color(0.78f, 0.55f, 0.32f), new Color(0.15f, 0.35f, 0.65f), new Color(0.72f, 0.5f, 0.3f), new Color(0.2f, 0.45f, 0.3f),
-                               new Color(0.12f, 0.12f, 0.2f), new Color(0.6f, 0.25f, 0.2f), new Color(0.8f, 0.6f, 0.35f), new Color(0.18f, 0.5f, 0.2f) };
-            bool wood = variant == 0 || variant == 2 || variant == 6;
-            var floorTex = wood ? Gfx.Wood(512, Color.white, variant) : variant == 7 ? Gfx.Grass(256, Color.white, variant) : Gfx.Asphalt(256, Color.white, variant, 0f);
-            var floor = Gfx.Lit(floors[variant] * (wood ? 1.15f : 1f), floorTex, wood ? 0.55f : 0.35f);
-            v.pitchMat = floor;
+            // (quadra, entorno, madeira?) — paletas de ginásios reais
+            (Color court, Color surround, int kind)[] pal =
+            {
+                (new Color(0.86f, 0.66f, 0.42f), new Color(0.12f, 0.32f, 0.62f), 0),   // madeira clara + azul
+                (new Color(0.16f, 0.38f, 0.7f), new Color(0.08f, 0.18f, 0.4f), 1),     // sintético azul
+                (new Color(0.62f, 0.4f, 0.22f), new Color(0.6f, 0.12f, 0.12f), 0),     // madeira escura + vermelho
+                (new Color(0.2f, 0.5f, 0.32f), new Color(0.35f, 0.36f, 0.4f), 1),      // sintético verde + cinza
+                (new Color(0.1f, 0.14f, 0.3f), new Color(0.03f, 0.04f, 0.08f), 1),     // arena neon
+                (new Color(0.25f, 0.52f, 0.36f), new Color(0.55f, 0.5f, 0.45f), 1),    // quadra de escola
+                (new Color(0.9f, 0.72f, 0.48f), new Color(0.88f, 0.42f, 0.12f), 0),    // olímpico: madeira + laranja
+                (new Color(0.3f, 0.6f, 0.25f), new Color(0.2f, 0.35f, 0.18f), 2),      // society (grama sintética)
+            };
+            var pp = pal[variant];
+            Texture2D courtTex = pp.kind == 0 ? Gfx.Wood(1024, Color.white, variant) : pp.kind == 2 ? Gfx.Grass(512, Color.white, variant) : Gfx.Asphalt(256, Color.white, variant, 0f);
+            var courtMat = Gfx.Lit(pp.court * (pp.kind == 0 ? 1.05f : 1f), courtTex, pp.kind == 0 ? 0.62f : pp.kind == 1 ? 0.45f : 0.1f);
+            var surMat = Gfx.Lit(pp.surround, pp.kind == 2 ? courtTex : Gfx.Asphalt(256, Color.white, variant + 9, 0f), pp.kind == 2 ? 0.1f : 0.4f);
+            v.pitchMat = courtMat;
+            v.pitchMat2 = surMat;
             var k = new MeshKit();
-            float mx = hl + 4f, mz = hw + 4f;
-            k.Quad(new Vector3(-mx, 0, -mz), new Vector3(-mx, 0, mz), new Vector3(mx, 0, mz), new Vector3(mx, 0, -mz), new Vector2(0, 0), new Vector2(mx / 3f, mz / 3f));
-            k.Object("Piso", floor, v.root, false);
+            k.Quad(new Vector3(-hl, 0.002f, -hw), new Vector3(-hl, 0.002f, hw), new Vector3(hl, 0.002f, hw), new Vector3(hl, 0.002f, -hw), new Vector2(0, 0), new Vector2(hl / 4f, hw / 4f));
+            k.Object("Quadra", courtMat, v.root, false);
+            var sur = new MeshKit();
+            float mx = hl + 6f, mz = hw + 6f;
+            sur.Quad(new Vector3(-mx, 0, -mz), new Vector3(-mx, 0, mz), new Vector3(mx, 0, mz), new Vector3(mx, 0, -mz), new Vector2(0, 0), new Vector2(mx / 3f, mz / 3f));
+            sur.Object("Entorno", surMat, v.root, false);
             Lines(v, sim, hl, hw);
             Goals(v, sim, hl, true);
-            // tela de proteção em volta (alambrado) e arquibancada baixa
-            var netMat = Gfx.Cutout(new Color(0.85f, 0.85f, 0.85f), Gfx.Net(128, 10f, 1f), 0.4f);
-            var fence = new MeshKit();
-            float fh = 6.5f, fx = hl + 3f, fz = hw + 3f;
-            fence.Quad(new Vector3(-fx, 0, fz), new Vector3(-fx, fh, fz), new Vector3(fx, fh, fz), new Vector3(fx, 0, fz), new Vector2(0, 0), new Vector2(fx / 1.5f, fh / 1.5f));
-            // (sem tela do lado da câmera: não atrapalha a visão)
-            fence.Quad(new Vector3(fx, 0, fz), new Vector3(fx, fh, fz), new Vector3(fx, fh, -fz), new Vector3(fx, 0, -fz), new Vector2(0, 0), new Vector2(fz / 1.5f, fh / 1.5f));
-            fence.Quad(new Vector3(-fx, 0, -fz), new Vector3(-fx, fh, -fz), new Vector3(-fx, fh, fz), new Vector3(-fx, 0, fz), new Vector2(0, 0), new Vector2(fz / 1.5f, fh / 1.5f));
-            fence.Object("Tela de proteção", netMat, v.root, false);
-            // ginásio: paredes, teto e arquibancada
-            var wallMat = Gfx.Lit(Color.Lerp(floors[(variant + 3) % 8], Color.white, 0.55f), Gfx.Asphalt(256, Color.white, variant + 20, 0f), 0.2f);
-            var hall = new MeshKit();
-            float W = hl + 16f, D = hw + 16f, H = 16f;
-            // (ordem invertida: as faces olham para dentro do ginásio)
-            hall.Quad(new Vector3(-W, 0, D), new Vector3(-W, H, D), new Vector3(W, H, D), new Vector3(W, 0, D));
-            hall.Quad(new Vector3(W, 0, -D), new Vector3(W, H, -D), new Vector3(-W, H, -D), new Vector3(-W, 0, -D));
-            hall.Quad(new Vector3(W, 0, D), new Vector3(W, H, D), new Vector3(W, H, -D), new Vector3(W, 0, -D));
-            hall.Quad(new Vector3(-W, 0, -D), new Vector3(-W, H, -D), new Vector3(-W, H, D), new Vector3(-W, 0, D));
-            hall.Quad(new Vector3(-W, H, -D), new Vector3(W, H, -D), new Vector3(W, H, D), new Vector3(-W, H, D));
-            hall.Object("Ginásio", wallMat, v.root, false);
-            var crowd = Gfx.CrowdTex(1024, 256, homeKit.c1, homeKit.c2, awayKit.c1, variant * 31, 0.8f);
+            // placas de publicidade na beira da quadra (três lados; o da câmera fica livre)
+            string[] txt = { "CRAQUEZ", home.shortName, "FUTSAL", "GOL", away.shortName, "JOGO LIMPO" };
+            Color[] cols = { new Color(0.0f, 0.75f, 0.5f), home.c1, new Color(0.1f, 0.2f, 0.6f), new Color(0.9f, 0.6f, 0.1f), away.c1, new Color(0.75f, 0.1f, 0.2f) };
+            var led = Gfx.Emissive(Color.white, new Color(0.8f, 0.8f, 0.8f), Gfx.Led(txt, cols, 2048, 64));
+            v.ledMats.Add(led);
+            var bd = new MeshKit();
+            float bx = hl + 2.2f, bz = hw + 2.2f, bh = 0.8f;
+            bd.Quad(new Vector3(-bx, 0, bz), new Vector3(-bx, bh, bz), new Vector3(bx, bh, bz), new Vector3(bx, 0, bz), new Vector2(0, 0), new Vector2(bx / 6f, 1));
+            bd.Quad(new Vector3(bx, 0, bz), new Vector3(bx, bh, bz), new Vector3(bx, bh, -bz), new Vector3(bx, 0, -bz), new Vector2(0, 0), new Vector2(bz / 6f, 1));
+            bd.Quad(new Vector3(-bx, 0, -bz), new Vector3(-bx, bh, -bz), new Vector3(-bx, bh, bz), new Vector3(-bx, 0, bz), new Vector2(0, 0), new Vector2(bz / 6f, 1));
+            bd.Object("Placas", led, v.root, false);
+            // ginásio
+            float W = hl + 18f, D = hw + 17f, H = 17f;
+            var wallLow = Gfx.Lit(Color.Lerp(pp.surround, Color.white, 0.25f), Gfx.Asphalt(256, Color.white, variant + 20, 0f), 0.25f);
+            var wallHigh = Gfx.Lit(new Color(0.82f, 0.83f, 0.86f), HallPanels(variant), 0.2f);
+            var low = new MeshKit();
+            var high = new MeshKit();
+            float wl = 3.2f;
+            void Wall(Vector3 a0, Vector3 a1)
+            {
+                float len = (a1 - a0).magnitude;
+                low.Quad(a0, a0 + Vector3.up * wl, a1 + Vector3.up * wl, a1, new Vector2(0, 0), new Vector2(len / 4f, 1));
+                high.Quad(a0 + Vector3.up * wl, a0 + Vector3.up * H, a1 + Vector3.up * H, a1 + Vector3.up * wl, new Vector2(0, 0), new Vector2(len / 8f, 1));
+            }
+            Wall(new Vector3(-W, 0, D), new Vector3(W, 0, D));
+            Wall(new Vector3(W, 0, -D), new Vector3(-W, 0, -D));
+            Wall(new Vector3(W, 0, D), new Vector3(W, 0, -D));
+            Wall(new Vector3(-W, 0, -D), new Vector3(-W, 0, D));
+            low.Object("Parede", wallLow, v.root, false);
+            high.Object("Parede alta", wallHigh, v.root, false);
+            var roof = new MeshKit();
+            roof.Quad(new Vector3(-W, H, -D), new Vector3(W, H, -D), new Vector3(W, H, D), new Vector3(-W, H, D), new Vector2(0, 0), new Vector2(W / 3f, D / 3f));
+            roof.Object("Teto", Gfx.Lit(new Color(0.22f, 0.24f, 0.28f), Gfx.Asphalt(128, Color.white, 3, 0f), 0.2f), v.root, false);
+            // tesouras metálicas do telhado
+            var steel = new MeshKit();
+            for (float x = -W + 4f; x <= W - 4f; x += 7f)
+            {
+                steel.Cylinder(new Vector3(x, H - 0.3f, -D), new Vector3(x, H - 0.3f, D), 0.18f, 6);
+                steel.Cylinder(new Vector3(x, H - 2.6f, -D * 0.8f), new Vector3(x, H - 2.6f, D * 0.8f), 0.12f, 6);
+                for (float z = -D * 0.8f; z < D * 0.8f; z += 4f)
+                    steel.Cylinder(new Vector3(x, H - 2.6f, z), new Vector3(x, H - 0.3f, z + 2f), 0.07f, 5);
+            }
+            steel.Object("Estrutura metálica", Gfx.Lit(new Color(0.45f, 0.47f, 0.5f), null, 0.5f, 0.7f), v.root, false);
+            // arquibancadas laterais (lado da câmera mais baixa)
+            var crowd = Gfx.CrowdTex(1024, 256, homeKit.c1, homeKit.c2, awayKit.c1, variant * 31, 0.85f);
             var cm = Gfx.Lit(Color.white, crowd, 0.05f);
             v.crowdMats.Add(cm);
-            var st = new MeshKit();
-            for (int r = 0; r < 9; r++)
+            var concrete = Gfx.Lit(new Color(0.6f, 0.61f, 0.64f), Gfx.Asphalt(256, Color.white, 13, 0.05f), 0.15f);
+            var rail = new MeshKit();
+            foreach (float sz in new[] { 1f, -1f })
             {
-                float y0 = 0.6f + r * 0.45f, y1 = y0 + 0.45f, d0 = fz + 2.5f + r * 0.8f, d1 = d0 + 0.8f;
-                st.Quad(new Vector3(-fx, y0, -d0), new Vector3(fx, y0, -d0), new Vector3(fx, y1, -d0), new Vector3(-fx, y1, -d0), new Vector2(0, r / 9f), new Vector2(fx / 12f, (r + 1) / 9f));
-                st.Quad(new Vector3(-fx, y1, -d0), new Vector3(fx, y1, -d0), new Vector3(fx, y1, -d1), new Vector3(-fx, y1, -d1), new Vector2(0, r / 9f), new Vector2(fx / 12f, r / 9f + 0.002f));
+                var st = new MeshKit();
+                var stc = new MeshKit();
+                int rows = sz > 0 ? 11 : 4;
+                float start = hw + 4.2f, sx = hl + 3f;
+                for (int r = 0; r < rows; r++)
+                {
+                    float y0 = 1.0f + r * 0.45f, y1 = y0 + 0.45f, d0 = start + r * 0.85f, d1 = d0 + 0.85f;
+                    var A = new Vector3(-sx, y0, d0 * sz); var B = new Vector3(sx, y0, d0 * sz);
+                    var C = new Vector3(sx, y1, d0 * sz); var Dd = new Vector3(-sx, y1, d0 * sz);
+                    if (sz > 0) st.Quad(B, A, Dd, C, new Vector2(0, r / (float)rows), new Vector2(sx / 12f, (r + 1) / (float)rows));
+                    else st.Quad(A, B, C, Dd, new Vector2(0, r / (float)rows), new Vector2(sx / 12f, (r + 1) / (float)rows));
+                    var E = new Vector3(-sx, y1, d1 * sz); var F = new Vector3(sx, y1, d1 * sz);
+                    if (sz > 0) stc.Quad(Dd, E, F, C); else stc.Quad(C, F, E, Dd);   // piso dos degraus voltado para cima
+                }
+                st.Object("Torcida", cm, v.root, false);
+                stc.Object("Degraus", concrete, v.root, false);
+                // base e guarda-corpo
+                var front = new MeshKit();
+                front.Box(new Vector3(0, 0.5f, (start - 0.1f) * sz), new Vector3(sx * 2f, 1f, 0.2f), 2f);
+                front.Object("Mureta", wallLow, v.root, false);
+                rail.Cylinder(new Vector3(-sx, 2.0f, (start - 0.1f) * sz), new Vector3(sx, 2.0f, (start - 0.1f) * sz), 0.03f, 6);
+                for (float x = -sx; x <= sx; x += 2.5f) rail.Cylinder(new Vector3(x, 1f, (start - 0.1f) * sz), new Vector3(x, 2.0f, (start - 0.1f) * sz), 0.025f, 5);
             }
-            st.Object("Torcida", cm, v.root, false);
-            var st2 = Object.Instantiate(v.root.Find("Torcida").gameObject, v.root);
-            st2.transform.localRotation = Quaternion.Euler(0, 180, 0);
-            // luminárias do teto
-            var lamp = Gfx.Emissive(Color.white, variant == 4 ? new Color(0.4f, 2.5f, 3.5f) : new Color(4, 4, 3.8f));
+            rail.Object("Guarda-corpo", Gfx.Lit(new Color(0.75f, 0.77f, 0.8f), null, 0.6f, 0.8f), v.root, false);
+            // placar suspenso no centro
+            var sb = new MeshKit();
+            sb.Box(new Vector3(0, H - 4.5f, 0), new Vector3(4.2f, 2.2f, 4.2f), 1f);
+            sb.Object("Placar", Gfx.Emissive(new Color(0.05f, 0.05f, 0.08f), new Color(0.2f, 0.9f, 0.6f) * 0.6f, Gfx.Led(new[] { home.shortName + " X " + away.shortName }, new[] { new Color(0.02f, 0.03f, 0.06f) }, 512, 64)), v.root, false);
+            // luminárias e luzes
+            var lamp = Gfx.Emissive(Color.white, variant == 4 ? new Color(0.4f, 2.5f, 3.5f) : new Color(5, 5, 4.6f));
             var lk = new MeshKit();
             for (int i = -2; i <= 2; i++)
                 for (int j = -1; j <= 1; j++)
-                    lk.Box(new Vector3(i * hl * 0.45f, H - 0.4f, j * hw * 0.6f), new Vector3(3f, 0.2f, 1.2f));
+                    lk.Box(new Vector3(i * hl * 0.45f, H - 2.9f, j * hw * 0.7f), new Vector3(1.6f, 0.25f, 1.6f));
             lk.Object("Luminárias", lamp, v.root, false);
-            for (int j = -1; j <= 1; j += 2)
-            {
-                var lgo = new GameObject("Luz teto");
-                lgo.transform.SetParent(v.root, false);
-                lgo.transform.position = new Vector3(0, H - 1f, j * hw * 0.5f);
-                var l = lgo.AddComponent<Light>();
-                l.type = LightType.Point;
-                l.range = 45f;
-                l.intensity = 1.6f;
-                v.floodlights.Add(l);
-            }
+            for (int i = -1; i <= 1; i += 2)
+                for (int j = -1; j <= 1; j += 2)
+                {
+                    var lgo = new GameObject("Luz teto");
+                    lgo.transform.SetParent(v.root, false);
+                    lgo.transform.position = new Vector3(i * hl * 0.5f, H - 3.2f, j * hw * 0.5f);
+                    var l = lgo.AddComponent<Light>();
+                    l.type = LightType.Point;
+                    l.range = 40f;
+                    l.intensity = 1.3f;
+                    l.color = variant == 4 ? new Color(0.75f, 0.9f, 1f) : new Color(1f, 0.97f, 0.92f);
+                    v.floodlights.Add(l);
+                }
             v.tunnel = new Vector3(0, 0, -(hw + 2.5f));
             v.standDist = 3f;
             return v;
+        }
+
+        /// <summary>Painéis da parede alta do ginásio com faixa de janelas.</summary>
+        static Texture2D HallPanels(int seed)
+        {
+            int s = 256;
+            var t = Gfx.Tex(s, s);
+            var px = new Color32[s * s];
+            for (int y = 0; y < s; y++)
+                for (int x = 0; x < s; x++)
+                {
+                    float u = x / (float)s, vv = y / (float)s;
+                    bool seam = (x % 64) < 2;
+                    bool window = vv > 0.62f && vv < 0.86f && (x % 64) > 8 && (x % 64) < 56;
+                    float n = Gfx.Fbm(u * 4, vv * 4, 4, seed, 3);
+                    Color c = window ? new Color(0.55f, 0.68f, 0.82f) * (0.9f + vv * 0.2f) : Color.white * (0.86f + n * 0.12f);
+                    if (seam) c *= 0.7f;
+                    if (vv < 0.05f) c = new Color(0.3f, 0.3f, 0.32f);
+                    c.a = 1;
+                    px[y * s + x] = c;
+                }
+            t.SetPixels32(px);
+            t.Apply(true);
+            return t;
         }
 
         // ------------------------------------------------------------------ rua

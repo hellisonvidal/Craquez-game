@@ -38,7 +38,7 @@ namespace Craquez
         void Start()
         {
             Application.runInBackground = false;
-            GoFullscreen();
+            if (!ShotTour.Requested()) GoFullscreen();   // (o servidor gráfico virtual do CI não suporta trocar de modo)
             Screen.sleepTimeout = SleepTimeout.NeverSleep;
             Sfx.Init();
             UrpSetup.Quality(Settings.Quality);
@@ -76,7 +76,7 @@ namespace Craquez
         void OnApplicationFocus(bool focus)
         {
             // Android: ao voltar de outro app as barras do sistema reaparecem
-            if (focus && !Screen.fullScreen) GoFullscreen();
+            if (focus && !Screen.fullScreen && ShotTour.Dir == null) GoFullscreen();
         }
 
         void Update()
