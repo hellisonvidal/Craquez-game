@@ -24,6 +24,59 @@ namespace Craquez.Tests
 
         static Transform B(AthleteRig r, string n) => r.bones.TryGetValue(n, out var t) ? t : null;
 
+        static string PathOf(Transform t, Transform root)
+        {
+            var s = t.name;
+            for (var p = t.parent; p != null && p != root; p = p.parent) s = p.name + "/" + s;
+            return s;
+        }
+
+        /// <summary>A animação precisa mexer de fato nos ossos (caminhos do clipe = hierarquia do modelo).</summary>
+        [Test]
+        public void ClipesMexemNosOssos()
+        {
+            var (g, r) = Make("D");
+            try
+            {
+                Assert.IsTrue(AthleteAnimator.Clips.TryGetValue("Run", out var ci), "clipe Run ausente");
+                var model = r.model;
+                var paths = new System.Collections.Generic.HashSet<string>();
+                foreach (var t in model.GetComponentsInChildren<Transform>(true)) if (t != model) paths.Add(PathOf(t, model));
+                var binds = UnityEditor.AnimationUtility.GetCurveBindings(ci.clip);
+                int hit = 0;
+                var sample = new System.Text.StringBuilder();
+                foreach (var b in binds)
+                {
+                    if (paths.Contains(b.path)) hit++;
+                    else if (sample.Length < 600) sample.Append(b.path).Append(" | ");
+                }
+                var thigh = B(r, "thigh_l");
+                Debug.Log($"[anim-diag] clipe Run: {binds.Length} curvas, {hit} com caminho existente no modelo; modelo: '{PathOf(thigh, model)}'; sem par: {sample}");
+                // amostragem direta do clipe
+                ci.clip.SampleAnimation(model.gameObject, 0f);
+                var q0 = thigh.localRotation;
+                ci.clip.SampleAnimation(model.gameObject, ci.clip.length * 0.5f);
+                float sampled = Quaternion.Angle(q0, thigh.localRotation);
+                // pelo grafo (como no jogo)
+                var anim = new AthleteAnimator(r.animator, "D", 3);
+                float minA = 999f, maxA = -999f;
+                var fwd = g.transform.forward;
+                for (int f = 0; f < 90; f++)
+                {
+                    anim.Tick(1f / 60f, 5f, 5f, 0f, false);
+                    var d = B(r, "calf_l").position - thigh.position;
+                    float a = Vector3.SignedAngle(Vector3.down, d, g.transform.right);
+                    minA = Mathf.Min(minA, a);
+                    maxA = Mathf.Max(maxA, a);
+                }
+                anim.Destroy();
+                Debug.Log($"[anim-diag] coxa: SampleAnimation varia {sampled:F1}°; pelo grafo a coxa oscila {maxA - minA:F1}° ({minA:F0}..{maxA:F0})");
+                Assert.Greater(hit, binds.Length / 2, "curvas do clipe não encontram os ossos do modelo");
+                Assert.Greater(maxA - minA, 20f, "a corrida não move as pernas");
+            }
+            finally { Object.DestroyImmediate(g); }
+        }
+
         [Test]
         public void CorrecoesNaoAcumulamEPoseNatural()
         {
