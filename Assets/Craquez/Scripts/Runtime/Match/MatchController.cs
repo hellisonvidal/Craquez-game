@@ -33,6 +33,7 @@ namespace Craquez
         readonly GoalShow _show = new GoalShow();
         int _showTeam = -1, _showScorer = -1;
         GameObject _pauseMenu, _endMenu, _lineup;
+        MatchTracker _tracker;
         Camera _cam;
 
         public void Begin(MatchConfig c, Camera cam)
@@ -63,6 +64,11 @@ namespace Craquez
             hud.SetWeather(view.venue.name + "  •  " + view.weather.Label);
             view.onCut = () => { if (!attract) hud.Cut(); };
             hud.onPause = () => { if (_phase == Phase.Playing || _phase == Phase.Goal) Pause(); };
+            if (!attract)
+            {
+                _tracker = new MatchTracker(c);
+                _tracker.onUnlock = d => hud.Toast("CONQUISTA: " + d.name.ToUpperInvariant(), 3.2f);
+            }
             var sides = new[] { c.sideA, c.sideB };
             var p1 = InputRouter.DefaultP1();
             for (int t = 0; t < 2; t++)
@@ -303,6 +309,7 @@ namespace Craquez
         {
             foreach (var e in sim.events)
             {
+                _tracker?.OnEvent(e, sim);
                 switch (e.type)
                 {
                     case "goal":
@@ -455,6 +462,16 @@ namespace Craquez
             UiKit.Button(row, "Menu principal", () => onExit?.Invoke());
             UiKit.Select(again);
             Sfx.Crowd(0.3f, 0f);
+            // conquistas desta partida
+            var got = _tracker != null ? _tracker.Finish(sim, view.weather.kind) : null;
+            _tracker = null;
+            if (got != null && got.Count > 0)
+            {
+                var names = new List<string>();
+                foreach (var d in got) names.Add(d.name);
+                UiKit.Label(panel, "Conquistas: " + string.Join("  •  ", names), 26, Theme.BodyBold, Theme.Accent2, TextAnchor.MiddleCenter)
+                    .rectTransform.Place(0, 1, 1, 1, 30, -330, 30, 270);
+            }
         }
 
         void OnDestroy()

@@ -63,8 +63,8 @@ namespace Craquez
             _root = UiKit.SafeRoot(_menu);
             _cfg.seed = (uint)System.DateTime.Now.Ticks;
             // abre sempre na tela inicial (partida CPU x CPU ao fundo): "pressione qualquer botão" -> modos
-            StartAttract();
-            ShowTitle();
+            // (depois do "Made with Unity"): aviso de IA -> degradê com a logo -> "toque para iniciar"
+            ShowIntro();
             if (ShotTour.Requested()) gameObject.AddComponent<ShotTour>().Run(this);
         }
 
@@ -88,10 +88,20 @@ namespace Craquez
 
         void Update()
         {
+            if (_introT >= 0f) { UpdateIntro(); return; }
             if (_pressText != null)
             {
-                _pressText.color = new Color(1, 1, 1, 0.45f + 0.55f * Mathf.Abs(Mathf.Sin(Time.time * 2.2f)));
-                if (InputRouter.AnyPressedThisFrame()) { _pressText = null; Sfx.Ui(); ShowModes(); return; }
+                float since = Time.unscaledTime - _titleShownAt;
+                _pressText.color = new Color(1, 1, 1, Mathf.Clamp01((since - 1.8f) / 0.4f) * (0.45f + 0.55f * Mathf.Abs(Mathf.Sin(Time.unscaledTime * 2.2f))));
+                if (InputRouter.AnyPressedThisFrame() && Time.unscaledTime - _titleShownAt > 1.2f)
+                {
+                    _pressText = null;
+                    var tfx = _root.GetComponent<TitleFx>();
+                    if (tfx != null) Destroy(tfx);
+                    Sfx.Ui();
+                    ShowModes();
+                    return;
+                }
             }
             if (_match == null && _back != null && InputRouter.BackPressedThisFrame()) { Sfx.Ui(); _back(); }
             // mantém algo selecionado para navegar com controle/teclado
@@ -184,48 +194,187 @@ namespace Craquez
             _attract = null;
         }
 
-        // ------------------------------------------------------------ título
+        // ------------------------------------------------------------ abertura: feito com IA
+        float _introT = -1f;
+        CanvasGroup _introCg;
+
+        void ShowIntro()
+        {
+            UiKit.Clear(_root);
+            _pressText = null;
+            _back = null;
+            _bg.color = Color.black;
+            var page = UiKit.Rect(_root, "aviso IA").Place(0, 0, 1, 1);
+            _introCg = page.gameObject.AddComponent<CanvasGroup>();
+            _introCg.alpha = 0f;
+            var a = UiKit.Label(page, "Este jogo foi feito 100% com inteligência artificial", 50, Theme.Head, Color.white, TextAnchor.MiddleCenter);
+            a.rectTransform.At(0.5f, 0.56f, 1700, 90);
+            var b = UiKit.Label(page, "Código, atletas, estádios, sons e telas: tudo gerado por IA (Claude).\nPor isso o Craquez é e sempre será gratuito.", 32, Theme.Body, Theme.TextDim, TextAnchor.MiddleCenter);
+            b.rectTransform.At(0.5f, 0.42f, 1700, 120);
+            _introT = 0f;
+        }
+
+        void UpdateIntro()
+        {
+            _introT += Time.unscaledDeltaTime;
+            const float dur = 3.6f;
+            if (_introCg != null) _introCg.alpha = Mathf.Clamp01(_introT / 0.6f) * Mathf.Clamp01((dur - _introT) / 0.6f);
+            if (_introT >= dur || (_introT > 0.4f && InputRouter.AnyPressedThisFrame()))
+            {
+                _introT = -1f;
+                ShowTitle();
+            }
+        }
+
+        // ------------------------------------------------------------ título: degradê + logo
+        static Texture2D _titleGrad;
+        static Texture2D TitleGradient()
+        {
+            if (_titleGrad != null) return _titleGrad;
+            const int w = 256, h = 144;
+            _titleGrad = new Texture2D(w, h, TextureFormat.RGBA32, false) { wrapMode = TextureWrapMode.Clamp };
+            var px = new Color32[w * h];
+            var c0 = new Color(0.01f, 0.03f, 0.08f); var c1 = new Color(0.02f, 0.18f, 0.26f); var c2 = new Color(0f, 0.55f, 0.4f);
+            for (int y = 0; y < h; y++)
+                for (int x = 0; x < w; x++)
+                {
+                    float t = Mathf.Clamp01((x / (float)w) * 0.55f + (y / (float)h) * 0.45f);
+                    var c = t < 0.6f ? Color.Lerp(c0, c1, t / 0.6f) : Color.Lerp(c1, c2, (t - 0.6f) / 0.4f);
+                    c.a = 1f;
+                    px[y * w + x] = c;
+                }
+            _titleGrad.SetPixels32(px);
+            _titleGrad.Apply();
+            return _titleGrad;
+        }
+
         void ShowTitle()
         {
-            var root = Page(false);
+            UiKit.Clear(_root);
             _back = null;
-            var shade = UiKit.Image(root, new Color(0.0f, 0.02f, 0.06f, 0.45f), null, "sombra");
-            shade.rectTransform.Place(0, 0, 1, 1);
-            var glow = UiKit.Image(root, new Color(0f, 0.9f, 0.62f, 0.18f), Theme.Soft, "brilho").rectTransform.At(0.5f, 0.6f, 1600, 700);
-            var shadow = UiKit.Label(root, "CRAQUEZ", 260, Theme.HeadItalic, new Color(0, 0, 0, 0.5f), TextAnchor.MiddleCenter);
-            shadow.rectTransform.At(0.5f, 0.6f, 1600, 300, 10, -10);
-            var logo = UiKit.Label(root, "CRAQUEZ", 260, Theme.HeadItalic, Color.white, TextAnchor.MiddleCenter);
-            logo.rectTransform.At(0.5f, 0.6f, 1600, 300);
-            var grad = logo.gameObject.AddComponent<Outline>();
-            grad.effectColor = Theme.Accent;
-            grad.effectDistance = new Vector2(3, -3);
-            var sub = UiKit.Label(root, "FUTEBOL  •  FUTSAL  •  RUA", 40, Theme.Head, Theme.Accent2, TextAnchor.MiddleCenter);
-            sub.rectTransform.At(0.5f, 0.46f, 1400, 60);
-            _pressText = UiKit.Label(root, Application.isMobilePlatform ? "TOQUE NA TELA PARA COMEÇAR" : "PRESSIONE QUALQUER BOTÃO", 48, Theme.BodyBold, Color.white, TextAnchor.MiddleCenter);
-            _pressText.rectTransform.At(0.5f, 0.2f, 1400, 72);
-            var ver = UiKit.Label(root, "v" + Application.version + "  •  desenvolvido com Claude  •  feito 100% com IA  •  gratuito", 22, Theme.Body, Theme.TextDim, TextAnchor.LowerRight);
+            _bg.color = Color.black;
+            var grad = UiKit.Rect(_root, "degradê").Place(0, 0, 1, 1).gameObject.AddComponent<RawImage>();
+            grad.texture = TitleGradient();
+            var glow = UiKit.Image(_root, new Color(0f, 0.9f, 0.62f, 0.22f), Theme.Soft, "brilho").rectTransform.At(0.5f, 0.6f, 1500, 900);
+            var logoBox = UiKit.Rect(_root, "logo").At(0.5f, 0.6f, 1600, 520);
+            var icon = UiKit.Rect(logoBox, "ícone").At(0.5f, 0.62f, 360, 360).gameObject.AddComponent<RawImage>();
+            icon.texture = Resources.Load<Texture2D>("UI/craquez_logo");
+            if (icon.texture == null) icon.enabled = false;
+            var shadow = UiKit.Label(logoBox, "CRAQUEZ", 200, Theme.HeadItalic, new Color(0, 0, 0, 0.5f), TextAnchor.MiddleCenter);
+            shadow.rectTransform.At(0.5f, 0.12f, 1600, 230, 8, -8);
+            var logo = UiKit.Label(logoBox, "CRAQUEZ", 200, Theme.HeadItalic, Color.white, TextAnchor.MiddleCenter);
+            logo.rectTransform.At(0.5f, 0.12f, 1600, 230);
+            var outl = logo.gameObject.AddComponent<Outline>();
+            outl.effectColor = Theme.Accent;
+            outl.effectDistance = new Vector2(3, -3);
+            var sub = UiKit.Label(_root, "FUTEBOL  •  FUTSAL  •  RUA", 36, Theme.Head, Theme.Accent2, TextAnchor.MiddleCenter);
+            sub.rectTransform.At(0.5f, 0.3f, 1400, 56);
+            _pressText = UiKit.Label(_root, Application.isMobilePlatform ? "TOQUE NA TELA PARA INICIAR" : "APERTE QUALQUER BOTÃO PARA INICIAR", 46, Theme.BodyBold, Color.white, TextAnchor.MiddleCenter);
+            _pressText.rectTransform.At(0.5f, 0.16f, 1500, 72);
+            var ver = UiKit.Label(_root, "v" + Application.version + "  •  feito 100% com IA  •  gratuito", 22, Theme.Body, Theme.TextDim, TextAnchor.LowerRight);
             ver.rectTransform.Place(0, 0, 1, 0, 0, 24, 30, -50);
+            var fx = _root.gameObject.AddComponent<TitleFx>();
+            fx.Setup(grad, glow.GetComponent<Image>(), logoBox, sub, _pressText);
+            _titleShownAt = Time.unscaledTime;
         }
+
+        float _titleShownAt;
 
         // ------------------------------------------------------------ modos
         // modalidades (primeira tela) e, dentro de futebol/futsal, clubes x seleções
         struct Card { public string title, sub, desc; public MenuArt.Kind art; public System.Action go; }
         static readonly Dictionary<MenuArt.Kind, Texture2D> _tileArt = new Dictionary<MenuArt.Kind, Texture2D>();
 
+        /// <summary>
+        /// Tela de modos minimalista: à esquerda, uma linha por modalidade (ícone pequeno +
+        /// atalhos Clubes/Seleções); à direita, as conquistas com o progresso.
+        /// </summary>
         void ShowModes()
         {
             if (_attract == null) StartAttract();
             var root = Page();
             _back = ShowTitle;
-            Title(root, "JOGAR", "Escolha a modalidade");
-            Cards(root, new[]
+            Title(root, "JOGAR", null);
+            var left = UiKit.Rect(root, "modos").Place(0, 0, 0.5f, 1, 90, 120, 20, 230);
+            UiKit.VList(left, 16, 0, false);
+            Button first = null;
+            void Row(string title, string sub, MenuArt.Kind art, (string label, System.Action go)[] actions)
             {
-                new Card { title = "FUTEBOL", sub = "Campo  •  11 x 11", desc = "Clubes de 22 ligas ou seleções do ranking mundial. Estádios, clima e cerimônia de abertura.", art = MenuArt.Kind.FieldClubs, go = () => ShowSub(GameModes.Field) },
-                new Card { title = "FUTSAL", sub = "Quadra  •  5 x 5", desc = "Clubes das ligas de futsal ou as 20 melhores seleções, em 8 ginásios diferentes.", art = MenuArt.Kind.FutsalClubs, go = () => ShowSub(GameModes.Futsal) },
-                new Card { title = "RUA", sub = "3 x 3", desc = "8 ruas: prédios, morro, praia, terraço, gaiola, telhado, viaduto e praça. A bola bate na parede.", art = MenuArt.Kind.Street, go = () => Choose(GameModes.Street, false) },
+                var row = UiKit.Image(left, new Color(0.06f, 0.09f, 0.16f, 0.88f), Theme.Round, "modo " + title);
+                UiKit.Size(row, 132, 132);
+                if (!_tileArt.TryGetValue(art, out var tex) || tex == null) _tileArt[art] = tex = MenuArt.Tile(art, 128, 128);
+                var ic = UiKit.Image(row.transform, Color.white, Theme.Round, "ícone").rectTransform.At(0, 0.5f, 100, 100, 16, 0);
+                ic.gameObject.AddComponent<Mask>().showMaskGraphic = false;
+                var ri = UiKit.Rect(ic, "img").Place(0, 0, 1, 1).gameObject.AddComponent<RawImage>();
+                ri.texture = tex;
+                ri.raycastTarget = false;
+                UiKit.Label(row.transform, title, 46, Theme.HeadItalic, Color.white).rectTransform.Place(0, 0.45f, 1, 1, 134, 0, 0, 6);
+                UiKit.Label(row.transform, sub, 22, Theme.BodyBold, Theme.TextDim).rectTransform.Place(0, 0, 1, 0.5f, 136, 14, 0, 0);
+                float x = -16f;
+                for (int i = actions.Length - 1; i >= 0; i--)
+                {
+                    var (label, go) = actions[i];
+                    var b = UiKit.Button(row.transform, label, go, 28, new Color(0.0f, 0.5f, 0.35f));
+                    b.GetComponent<RectTransform>().At(1, 0.5f, 172, 70, x, 0);
+                    x -= 184f;
+                    if (i == 0 && first == null) first = b;   // CLUBES do futebol
+                }
+            }
+            Row("FUTEBOL", "Campo  •  11 x 11  •  22 ligas e 40 seleções", MenuArt.Kind.FieldClubs,
+                new (string, System.Action)[] { ("CLUBES", () => Choose(GameModes.Field, false)), ("SELEÇÕES", () => Choose(GameModes.Field, true)) });
+            Row("FUTSAL", "Quadra  •  5 x 5  •  9 ginásios", MenuArt.Kind.FutsalClubs,
+                new (string, System.Action)[] { ("CLUBES", () => Choose(GameModes.Futsal, false)), ("SELEÇÕES", () => Choose(GameModes.Futsal, true)) });
+            Row("RUA", "3 x 3  •  8 ruas  •  a bola bate na parede", MenuArt.Kind.Street,
+                new (string, System.Action)[] { ("JOGAR", () => Choose(GameModes.Street, false)) });
+            var opt = UiKit.Button(left, "OPÇÕES", ShowOptions, 30);
+            UiKit.Size(opt, 76, 76);
+            AchievementsPanel(UiKit.Rect(root, "conquistas").Place(0.52f, 0, 1, 1, 10, 120, 90, 230));
+            UiKit.Select(first);
+        }
+
+        /// <summary>Lista rolável das conquistas (as em andamento primeiro).</summary>
+        void AchievementsPanel(RectTransform area)
+        {
+            var panel = UiKit.Panel(area).rectTransform.Place(0, 0, 1, 1);
+            int done = Achievements.DoneCount, total = Achievements.All.Length;
+            UiKit.Label(panel, "CONQUISTAS", 34, Theme.HeadItalic, Theme.Accent, TextAnchor.MiddleLeft).rectTransform.Place(0, 1, 1, 1, 26, -62, 26, 12);
+            UiKit.Label(panel, done + " / " + total, 30, Theme.Head, Color.white, TextAnchor.MiddleRight).rectTransform.Place(0, 1, 1, 1, 26, -62, 26, 12);
+            var barBg = UiKit.Image(panel, new Color(1, 1, 1, 0.1f), Theme.RoundSmall, "barra").rectTransform.Place(0, 1, 1, 1, 26, -84, 26, 70);
+            var bar = UiKit.Image(barBg, Theme.Accent, Theme.RoundSmall, "progresso").rectTransform;
+            bar.Place(0, 0, Mathf.Max(0.02f, done / (float)total), 1);
+            // lista rolável
+            var view = UiKit.Rect(panel, "lista").Place(0, 0, 1, 1, 14, 14, 14, 100);
+            view.gameObject.AddComponent<RectMask2D>();
+            var hit = view.gameObject.AddComponent<Image>();
+            hit.color = new Color(0, 0, 0, 0);
+            var content = UiKit.Rect(view, "itens");
+            content.anchorMin = new Vector2(0, 1); content.anchorMax = new Vector2(1, 1); content.pivot = new Vector2(0.5f, 1);
+            content.anchoredPosition = Vector2.zero; content.sizeDelta = Vector2.zero;
+            var vl = UiKit.VList(content, 8, 6, false);
+            vl.childForceExpandHeight = false;
+            content.gameObject.AddComponent<ContentSizeFitter>().verticalFit = ContentSizeFitter.FitMode.PreferredSize;
+            var sr = view.gameObject.AddComponent<ScrollRect>();
+            sr.content = content; sr.horizontal = false; sr.movementType = ScrollRect.MovementType.Clamped; sr.scrollSensitivity = 40f;
+            var list = new List<Achievements.Def>(Achievements.All);
+            list.Sort((x, y) =>
+            {
+                bool dx = Achievements.Done(x), dy = Achievements.Done(y);
+                if (dx != dy) return dx ? 1 : -1;
+                float px = Achievements.Progress(x) / (float)x.target, py = Achievements.Progress(y) / (float)y.target;
+                return x.tier != y.tier ? x.tier.CompareTo(y.tier) : py.CompareTo(px);
             });
-            var opt = UiKit.Button(root, "Opções", ShowOptions, 32);
-            opt.GetComponent<RectTransform>().At(1, 1, 260, 70, -90, -110);
+            foreach (var d in list)
+            {
+                bool ok = Achievements.Done(d);
+                var item = UiKit.Image(content, ok ? new Color(0.1f, 0.2f, 0.16f, 0.9f) : new Color(0.1f, 0.13f, 0.2f, 0.85f), Theme.RoundSmall, "conquista");
+                UiKit.Size(item, 84, 84);
+                var tc = Achievements.TierColor(d.tier);
+                UiKit.Image(item.transform, ok ? tc : new Color(tc.r, tc.g, tc.b, 0.35f), Theme.Circle, "medalha").rectTransform.At(0, 0.5f, 52, 52, 16, 0);
+                UiKit.Label(item.transform, d.name, 28, Theme.Head, ok ? Color.white : Theme.Text).rectTransform.Place(0, 0.45f, 1, 1, 84, 0, 120, 4);
+                UiKit.Label(item.transform, d.desc, 20, Theme.Body, Theme.TextDim).rectTransform.Place(0, 0, 1, 0.5f, 84, 6, 120, 0);
+                UiKit.Label(item.transform, ok ? "✓" : Achievements.Progress(d) + "/" + d.target, ok ? 34 : 24, Theme.Head, ok ? Theme.Accent : Theme.TextDim, TextAnchor.MiddleRight)
+                    .rectTransform.Place(0, 0, 1, 1, 0, 0, 18, 0);
+            }
         }
 
         void ShowSub(string mode)
@@ -390,7 +539,7 @@ namespace Craquez
         void ShowSetup()
         {
             var root = Page();
-            _back = _cfg.mode == GameModes.Street ? (System.Action)ShowModes : () => ShowSub(_cfg.mode);
+            _back = ShowModes;
             Title(root, (_cfg.mode == GameModes.Street ? "RUA" : (_cfg.national ? "SELEÇÕES" : "CLUBES")) + "  •  " + GameModes.DisplayName(_cfg.mode).ToUpperInvariant(), "Ajuste a partida e escolha os times");
             var list = UiKit.Rect(root, "lista").Place(0, 0, 0.55f, 1, 90, 150, 0, 250);
             UiKit.VList(list, 8, 0, false);

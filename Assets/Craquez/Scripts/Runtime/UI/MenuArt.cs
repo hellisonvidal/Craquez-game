@@ -260,6 +260,39 @@ namespace Craquez.UI
         }
     }
 
+    /// <summary>Abertura do título: o degradê clareia, a logo cresce e o "toque para iniciar" pulsa.</summary>
+    public class TitleFx : MonoBehaviour
+    {
+        RawImage _grad;
+        Image _glow;
+        RectTransform _logo;
+        Graphic _sub, _press;
+        float _t;
+
+        public void Setup(RawImage grad, Image glow, RectTransform logo, Graphic sub, Graphic press)
+        {
+            _grad = grad; _glow = glow; _logo = logo; _sub = sub; _press = press;
+            Update();
+        }
+
+        void Update()
+        {
+            _t += Time.unscaledDeltaTime;
+            float g = Mathf.Clamp01(_t / 1.2f);
+            if (_grad) _grad.color = new Color(g, g, g, 1f);
+            if (_glow) _glow.color = new Color(0f, 0.9f, 0.62f, 0.22f * g * (0.8f + 0.2f * Mathf.Sin(_t * 1.5f)));
+            float l = Mathf.Clamp01((_t - 0.7f) / 0.8f);
+            float e = 1f - Mathf.Pow(1f - l, 3f);
+            if (_logo)
+            {
+                _logo.localScale = Vector3.one * Mathf.Lerp(0.75f, 1f, e);
+                foreach (var gr in _logo.GetComponentsInChildren<Graphic>()) { var c = gr.color; c.a = gr is Text t && t.color.r < 0.1f ? 0.5f * e : e; gr.color = c; }
+            }
+            if (_sub) { var c = _sub.color; c.a = Mathf.Clamp01((_t - 1.3f) / 0.6f); _sub.color = c; }
+            if (_press && _t < 1.8f) { var c = _press.color; c.a = 0f; _press.color = c; }
+        }
+    }
+
     /// <summary>Cartão do carrossel: esquerda/direita trocam de opção; arrastar para o lado também.</summary>
     public class CarouselButton : Button, IBeginDragHandler, IDragHandler, IEndDragHandler
     {
