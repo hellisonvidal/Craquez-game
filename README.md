@@ -12,6 +12,12 @@ PvP local, contra CPU e **PvP online** (por IP). Suporte a controles **Xbox / Pl
 |---|---|
 | **Visual** | 3D com sombreamento "desenhado" e contorno; atletas com esqueleto e músculos, rosto desenhado; estádio noturno com refletores, árbitro e assistentes |
 | **Ligas 2026/27** | Série A Itália, Premier League, La Liga, Ligue 1, Série A e B do Brasil, MLS e Liga Argentina — 178 clubes com a composição real da temporada e as cores reais (nomes alterados, sem licença) + 5 ligas de futsal (Brasil, Espanha, Portugal, Itália, Argentina). Edite em `data/leagues.json` |
+| **Uniformes** | 3 por time (principal, reserva, terceiro) em padrões originais; escolha automática evita cores parecidas |
+| **Táticas** | Formação, mentalidade, pressão e escolha de titulares — tudo afeta a IA e a escalação |
+| **Locais** | Estádios em 3 portes, 8 quadras de futsal fechadas com tela e 8 cenários de rua |
+| **Clima** | Sol, nublado, chuva, tempestade, neve; dia, entardecer, noite; clima dinâmico |
+| **Cerimônia** | Sobrevoo do estádio, entrada dos times e da arbitragem, apresentação das escalações |
+| **Option file** | Personalize nomes, uniformes, elencos e escudos (PNG) no seu aparelho — veja [docs/OPTION_FILE.md](docs/OPTION_FILE.md) |
 | **Jogabilidade** | Dribles no analógico direito, proteção/contenção (LT/L2), chute colocado (RB/R1), armação do chute, domínio orientado |
 | **Física** | Bola 2.5D com gravidade, arrasto do ar, efeito Magnus (curva), quique por superfície (grama/madeira/asfalto), atrito de rolagem, traves e travessão |
 | **Movimento** | Aceleração/frenagem, inércia em mudanças de direção, giro mais lento em velocidade, fôlego (stamina), condução de bola com toques |
