@@ -86,12 +86,18 @@ namespace Craquez.Sim
                 if (_holdBtn == 0 && _cooldown == 0)
                 {
                     float shootRange = sim.halfLen * Mathf.Lerp(0.32f, 0.45f, skill);
-                    if (toGoal.magnitude < shootRange && Mathf.Abs(p.position.y) < sim.halfW * 0.6f)
+                    if (toGoal.magnitude < shootRange && Mathf.Abs(p.position.y) < sim.halfW * 0.7f)
                     {
                         f.move = new Vector2(dir, Noise(sim, 1) > 0.5f ? 0.6f : -0.6f);
                         Press(ref f, InputFrame.Shoot, (int)Mathf.Lerp(18f, 40f, toGoal.magnitude / shootRange));
                         _finesse = Noise(sim, 13) < 0.25f + skill * 0.2f;
                         if (_finesse) f.buttons |= InputFrame.Finesse;
+                    }
+                    else if (oppD > 2.2f && Noise(sim, 14) < 0.012f + skill * 0.012f && sim.HasForwardOption(p))
+                    {
+                        // jogada para frente: passe ou enfiada para quem está livre mais adiante
+                        f.move = new Vector2(dir, (Noise(sim, 15) - 0.5f) * 0.8f).Norm();
+                        Press(ref f, Noise(sim, 16) > 0.45f ? InputFrame.Pass : InputFrame.Through, 10 + (int)(Noise(sim, 17) * 12f));
                     }
                     else if (oppD < 2.2f && Noise(sim, 2) < 0.06f + skill * 0.08f)
                     {
