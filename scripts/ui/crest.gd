@@ -9,9 +9,11 @@ var short_name: String = ""
 var seed_value: int = 0
 var is_league: bool = false
 var league_name: String = ""
+var tex: Texture2D               # escudo do usuário (option file), se houver
 
 
-func setup_team(t: Dictionary) -> void:
+func setup_team(t: Dictionary, user_tex: Texture2D = null) -> void:
+	tex = user_tex
 	c1 = t.get("c1", Color.WHITE)
 	c2 = t.get("c2", Color.BLACK)
 	short_name = String(t.get("short", ""))
@@ -33,6 +35,8 @@ func _draw() -> void:
 	var o := (size - Vector2(s, s)) * 0.5
 	if is_league:
 		_draw_league(o, s)
+	elif tex != null:
+		draw_texture_rect(tex, Rect2(o, Vector2(s, s)), false)
 	else:
 		_draw_crest(o, s)
 

@@ -20,6 +20,8 @@ const TIMES := [["dia", "Dia"], ["tarde", "Entardecer"], ["noite", "Noite"]]
 var weather_i := 0
 var tod_i := 2
 var dyn_weather := true
+var kit_a := 0     # 0 principal, 1 reserva, 2 terceiro
+var kit_b := -1    # -1 automático (evita cores parecidas)
 var _roster_overlay: Control
 var skill_opts := [["Fácil", 0.3], ["Normal", 0.6], ["Difícil", 0.9]]
 var skill_i := 1
@@ -366,7 +368,7 @@ func _page_setup() -> void:
 		_cycler(inner, "weather", "Clima")
 		_cycler(inner, "tod", "Horário")
 		_cycler(inner, "dyn", "Clima dinâmico")
-	_small(inner, _controls_help(), Color("#64748b"), 17)
+	_labels["_help"] = _small(inner, "", Color("#94a3b8"), 17)
 	_nav_row(vb, show_page.bind(Page.MODES), "Escolher times  ▶", show_page.bind(Page.TEAMS))
 
 
@@ -404,6 +406,8 @@ func _page_teams() -> void:
 		lrow.move_child(licon, 0)
 		_cycler(inner, "team_a" if side == 0 else "team_b", "")
 		(_labels["team_a" if side == 0 else "team_b"] as Button).add_theme_font_size_override("font_size", 30)
+		_cycler(inner, "kit_a" if side == 0 else "kit_b", "")
+		(_labels["kit_a" if side == 0 else "kit_b"] as Button).add_theme_font_size_override("font_size", 20)
 		var badges := HBoxContainer.new()
 		badges.alignment = BoxContainer.ALIGNMENT_CENTER
 		badges.add_theme_constant_override("separation", 24)
@@ -451,6 +455,24 @@ func _page_options() -> void:
 	_cycler(inner, "quality", "Gráficos")
 	_cycler(inner, "sound", "Som")
 	_cycler(inner, "vibration", "Vibração")
+	var of_lbl := _small(inner, "", Color("#94a3b8"), 18)
+	of_lbl.text = ("Option file ativo: %d times personalizados\n%s" % [Teams.override_count, Teams.option_dir]) if Teams.override_count > 0 \
+		else "Option file: nenhum. Exporte o modelo, edite e salve como option_file.json\n(Windows: pasta option_file ao lado do Craquez.exe)"
+	_labels["_of"] = of_lbl
+	var hb := HBoxContainer.new()
+	hb.add_theme_constant_override("separation", 12)
+	inner.add_child(hb)
+	var exp := Button.new()
+	exp.text = "Exportar modelo do option file"
+	exp.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	exp.custom_minimum_size = Vector2(0, 56)
+	exp.pressed.connect(_export_option)
+	hb.add_child(exp)
+	var rel := Button.new()
+	rel.text = "Recarregar"
+	rel.custom_minimum_size = Vector2(200, 56)
+	rel.pressed.connect(_reload_option)
+	hb.add_child(rel)
 	var back := Button.new()
 	back.text = "◀  Voltar"
 	back.custom_minimum_size = Vector2(0, 66)
@@ -463,6 +485,8 @@ class KitBadge:
 	extends Control
 	var c1 := Color.WHITE
 	var c2 := Color.BLACK
+	var shorts := Color.BLACK
+	var pattern := 0
 	var rating := 0.7
 	var short_name := ""
 
@@ -477,9 +501,36 @@ class KitBadge:
 			top + Vector2(w * 0.76, w * 0.3), top + Vector2(w * 0.76, h * 0.68), top + Vector2(w * 0.24, h * 0.68),
 			top + Vector2(w * 0.24, w * 0.3), top + Vector2(w * 0.14, w * 0.36), top + Vector2(0, w * 0.22)])
 		draw_colored_polygon(shirt, c1)
+		# padrão do uniforme recortado pela camisa
+		var bands: Array = []
+		var x0 := top.x
+		match pattern:
+			1:
+				for i in 7:
+					if i % 2 == 1:
+						bands.append(Rect2(Vector2(x0 + w * i / 7.0, top.y), Vector2(w / 7.0, h)))
+			2:
+				for i in 6:
+					if i % 2 == 1:
+						bands.append(Rect2(Vector2(x0, top.y + h * 0.68 * i / 6.0), Vector2(w, h * 0.68 / 6.0)))
+			4:
+				bands.append(Rect2(Vector2(x0 + w * 0.5, top.y), Vector2(w * 0.26, h)))
+			5:
+				for i in 12:
+					bands.append(Rect2(Vector2(x0 + w * i / 12.0, top.y), Vector2(w * 0.012, h)))
+			6:
+				bands.append(Rect2(Vector2(x0, top.y + h * 0.28), Vector2(w, h * 0.1)))
+		for b: Rect2 in bands:
+			var poly := PackedVector2Array([b.position, b.position + Vector2(b.size.x, 0), b.end, b.position + Vector2(0, b.size.y)])
+			for part in Geometry2D.intersect_polygons(shirt, poly):
+				draw_colored_polygon(part, c2)
+		if pattern == 3:
+			var sash := PackedVector2Array([top + Vector2(w * 0.2, 0), top + Vector2(w * 0.38, 0), top + Vector2(w * 0.8, h * 0.68), top + Vector2(w * 0.62, h * 0.68)])
+			for part in Geometry2D.intersect_polygons(shirt, sash):
+				draw_colored_polygon(part, c2)
 		shirt.append(shirt[0])
 		draw_polyline(shirt, Color(0, 0, 0, 0.8), 3)
-		draw_rect(Rect2(top + Vector2(w * 0.26, h * 0.7), Vector2(w * 0.48, h * 0.24)), c2)
+		draw_rect(Rect2(top + Vector2(w * 0.26, h * 0.7), Vector2(w * 0.48, h * 0.24)), shorts)
 		draw_rect(Rect2(top + Vector2(w * 0.26, h * 0.7), Vector2(w * 0.48, h * 0.24)), Color(0, 0, 0, 0.8), false, 3)
 		var f := ThemeDB.fallback_font
 		draw_string(f, top + Vector2(0, h * 0.5), short_name, HORIZONTAL_ALIGNMENT_CENTER, w, int(h * 0.2), c2 if c2.get_luminance() != c1.get_luminance() else Color.BLACK)
@@ -523,10 +574,8 @@ func _on_joy_changed(_id: int, _connected: bool) -> void:
 
 func _refresh_devices() -> void:
 	_devices = InputRouter.available_devices()
-	p1_dev = clampi(p1_dev, 0, _devices.size() - 1)
-	# celular: o padrão é o controle de toque (se houver controle conectado, ele vem primeiro)
-	if OS.has_feature("mobile") and Input.get_connected_joypads().is_empty() and "touch" in _devices:
-		p1_dev = _devices.find("touch")
+	# padrão conforme a plataforma: controle conectado > toque (celular) > teclado
+	p1_dev = ControlsHelp.default_device(_devices)
 	if p2_dev == 0 and _devices.size() > 1 and not OS.has_feature("mobile"):
 		p2_dev = 2   # índice 0 = CPU, 1.. = dispositivos
 
@@ -593,6 +642,10 @@ func _cycle(key: String, d: int) -> void:
 			tod_i = posmod(tod_i + d, TIMES.size())
 		"dyn":
 			dyn_weather = not dyn_weather
+		"kit_a":
+			kit_a = posmod(kit_a + d, 3)
+		"kit_b":
+			kit_b = posmod(kit_b + 1 + d, 4) - 1
 		"skill":
 			skill_i = posmod(skill_i + d, skill_opts.size())
 			Settings.cpu_skill = skill_opts[skill_i][1]
@@ -657,10 +710,14 @@ func _refresh() -> void:
 	_set_label("team_a", String(ta["name"]))
 	_set_label("team_b", String(tb["name"]))
 	_set_label("p1", InputRouter.device_label(_devices[p1_dev]))
+	if _labels.has("_help"):
+		(_labels["_help"] as Label).text = ControlsHelp.text(_devices[p1_dev])
 	_set_label("p2", InputRouter.device_label(p2))
 	_set_label("minutes", "%d min cada tempo" % int(minutes_opts[minutes_i]))
 	_set_label("weather", WEATHERS[weather_i][1])
 	_set_label("tod", TIMES[tod_i][1])
+	_set_label("kit_a", "Uniforme: " + Teams.KIT_NAMES[kit_a])
+	_set_label("kit_b", "Uniforme: " + ("Automático" if kit_b < 0 else Teams.KIT_NAMES[kit_b]))
 	_set_label("dyn", "Sim — o tempo pode mudar durante o jogo" if dyn_weather else "Não")
 	_set_label("skill", skill_opts[skill_i][0])
 	var q: String = Settings.QUALITY_NAMES[Settings.quality]
@@ -675,15 +732,19 @@ func _refresh() -> void:
 			if w.is_empty():
 				continue
 			var t := ta if side == 0 else tb
-			(w["crest"] as Crest).setup_team(t)
+			(w["crest"] as Crest).setup_team(t, Teams.crest_texture(team_a if side == 0 else team_b))
 			var li := Teams.league_of(team_a if side == 0 else team_b)
 			var lg_d: Dictionary = Teams.leagues()[li] if not Teams.leagues().is_empty() else {}
 			(w["licon"] as Crest).setup_league(String(lg_d.get("name", "")), String(lg_d.get("id", "")).to_upper(), li * 7919 + 13)
 			var st: Dictionary = t.get("stadium", {})
 			(w["info"] as Label).text = "%s · %s lugares" % [st.get("name", "Estádio"), _thousands(int(st.get("cap", 0)))] if not st.is_empty() else ""
 			var kit: KitBadge = w["kit"]
-			kit.c1 = t["c1"]
-			kit.c2 = t["c2"]
+			var chosen: Array = Teams.pick_kits(ta, tb, kit_a, kit_b)
+			var kd: Dictionary = chosen[side]
+			kit.c1 = kd["c1"]
+			kit.c2 = kd["c2"]
+			kit.shorts = kd["shorts"]
+			kit.pattern = int(kd["pattern"])
 			kit.rating = float(t.get("rating", 0.7))
 			kit.short_name = String(t.get("short", ""))
 			kit.queue_redraw()
@@ -722,6 +783,7 @@ func _on_play() -> void:
 		"devices": [p1, p2], "seed": int(Time.get_unix_time_from_system()) & 0xFFFFFF,
 		"half_minutes": minutes_opts[minutes_i],
 		"weather": _weather_pick(), "tod": TIMES[tod_i][0], "dynamic_weather": dyn_weather,
+		"kit_a": kit_a, "kit_b": kit_b,
 	})
 
 
@@ -772,7 +834,7 @@ func _show_roster(side: int) -> void:
 	vb.add_child(head)
 	var crest := Crest.new()
 	crest.custom_minimum_size = Vector2(70, 70)
-	crest.setup_team(t)
+	crest.setup_team(t, Teams.crest_texture(team_a if side == 0 else team_b))
 	head.add_child(crest)
 	var title := Label.new()
 	title.text = "%s — elenco" % t["name"]
@@ -898,6 +960,16 @@ func _build_online(parent: VBoxContainer) -> void:
 	join.pressed.connect(_on_join)
 	hb.add_child(join)
 	_net_status = _small(parent, "Quem cria a sala escolhe o modo e os times.", Color("#94a3b8"), 20)
+
+
+func _export_option() -> void:
+	var path := Teams.export_option_template()
+	(_labels["_of"] as Label).text = "Modelo salvo em:\n%s\nEdite e salve como option_file.json na mesma pasta." % path
+
+
+func _reload_option() -> void:
+	Teams.reload()
+	show_page(Page.OPTIONS)
 
 
 func _online_back() -> void:

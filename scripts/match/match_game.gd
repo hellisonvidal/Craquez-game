@@ -49,15 +49,16 @@ func start(cfg: Dictionary) -> void:
 		lockstep = Lockstep.new(session, sim, session.local_team(), 3)
 		lockstep.desync.connect(func(t): hud.show_message("Dessincronia", "tick %d — a partida pode divergir" % t, 3.0))
 		session.peer_disconnected.connect(_on_peer_lost)
-	var colors := [[ta["c1"], ta["c2"]], [tb["c1"], tb["c2"]]]
+	var kits := Teams.pick_kits(ta, tb, int(cfg.get("kit_a", 0)), int(cfg.get("kit_b", -1)))
+	var colors := [[kits[0]["c1"], kits[0]["c2"]], [kits[1]["c1"], kits[1]["c2"]]]
 	# uniformes parecidos? o visitante usa as cores invertidas
-	if (ta["c1"] as Color).is_equal_approx(tb["c1"]) or _similar(ta["c1"], tb["c1"]):
-		colors[1] = [tb["c2"], tb["c1"]]
+
 	view = MatchView3D.new()
 	view.weather = weather if cfg["mode"] != GameModes.FUTSAL else "sol"
 	view.tod = String(cfg.get("tod", "noite"))
 	view.dynamic_weather = bool(cfg.get("dynamic_weather", false)) and cfg["mode"] != GameModes.FUTSAL
 	view.home_team = ta
+	view.kits = kits
 	view.visual_seed = seed_value
 	add_child(view)
 	view.human_team = [brains[0] == null, brains[1] == null]
@@ -68,6 +69,10 @@ func start(cfg: Dictionary) -> void:
 	hud = Hud.new()
 	add_child(hud)
 	hud.setup(sim, [String(ta["short"]), String(tb["short"])], colors)
+	for d in devices:
+		if d != "cpu" and d != "remote":
+			hud.set_controls_help(ControlsHelp.text(String(d)))
+			break
 	view.weather_changed.connect(func(t: String): hud.show_toast(t, 3.0))
 	var st: Dictionary = ta.get("stadium", {})
 	var where := String(st.get("name", "")) if cfg["mode"] == GameModes.FIELD else ""

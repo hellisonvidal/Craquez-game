@@ -66,7 +66,7 @@ func build(p: SimPlayer, kit: Dictionary) -> void:
 	skel.add_child(body)
 	body.skeleton = NodePath("..")
 	var skin: Color = kit["skin"]
-	var shirt_m := Toon.mat(kit["shirt"])
+	var shirt_m: Material = _kit_mat(kit) if not kit.get("long_sleeves", false) else Toon.mat(kit["shirt"])
 	var arm_m: Material = shirt_m if kit.get("long_sleeves", false) else Toon.mat(skin)
 	var mats := {
 		BodyMesh.S.SHIRT: shirt_m,
@@ -103,6 +103,26 @@ func build(p: SimPlayer, kit: Dictionary) -> void:
 
 
 static var _face_cache: Dictionary = {}
+static var _kit_cache: Dictionary = {}
+
+
+## Camisa com padrão do uniforme (listras, aros, faixa...), gola e punhos.
+static func _kit_mat(kit: Dictionary) -> ShaderMaterial:
+	var c1: Color = kit["shirt"]
+	var c2: Color = kit.get("trim", kit.get("shorts", Color.WHITE))
+	var pat := int(kit.get("pattern", 0))
+	var key := "%s|%s|%d|%s" % [c1.to_html(), c2.to_html(), pat, Settings.detail.get("outline", true)]
+	if _kit_cache.has(key):
+		return _kit_cache[key]
+	var m := ShaderMaterial.new()
+	m.shader = preload("res://shaders/kit.gdshader")
+	m.set_shader_parameter("c1", c1)
+	m.set_shader_parameter("c2", c2)
+	m.set_shader_parameter("pattern", pat)
+	if Settings.detail.get("outline", true):
+		m.next_pass = Toon.outline_mat()
+	_kit_cache[key] = m
+	return m
 
 
 static func _face_mat(kit: Dictionary) -> ShaderMaterial:

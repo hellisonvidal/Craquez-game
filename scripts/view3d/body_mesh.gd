@@ -102,7 +102,7 @@ static func _loft(st: SurfaceTool, base: int, cx: float, rings: Array, weight_fn
 		for i in N:
 			var a := TAU * i / N
 			var p := Vector3(cx + ox + cos(a) * float(r[1]), y, float(r[3]) + sin(a) * float(r[2]))
-			_vtx(st, p, w)
+			_vtx(st, p, w, Vector2(p.x, p.y))   # UV = posição de repouso (padrões do uniforme)
 			count += 1
 	for k in rings.size() - 1:
 		for i in N:

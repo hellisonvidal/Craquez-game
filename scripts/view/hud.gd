@@ -195,6 +195,18 @@ func on_event(e: Dictionary) -> void:
 				_toast.visible = true
 
 
+## Ajuda de controles mostrada na pausa (conforme o dispositivo do jogador).
+func set_controls_help(text: String) -> void:
+	var l := Label.new()
+	l.text = text
+	l.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	l.custom_minimum_size = Vector2(380, 0)
+	l.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	l.add_theme_font_size_override("font_size", 16)
+	l.modulate = Color("#94a3b8")
+	_pause.get_child(0).add_child(l)
+
+
 ## Aviso compacto logo abaixo do placar.
 func show_toast(text: String, t: float = 2.5) -> void:
 	_toast_lbl.text = text

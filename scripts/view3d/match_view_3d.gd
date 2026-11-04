@@ -41,6 +41,7 @@ var weather: String = "sol"
 var tod: String = "noite"          # dia, tarde, noite
 var dynamic_weather: bool = false
 var home_team: Dictionary = {}
+var kits: Array = []               # uniforme escolhido de cada time (Teams.pick_kits)
 var visual_seed: int = 1
 
 var weather_fx: WeatherFX
@@ -605,8 +606,16 @@ func _kit_for(p: SimPlayer) -> Dictionary:
 	var cols: Array = team_colors[p.team] if p.team >= 0 else [Color("#111827"), Color("#111827")]
 	var shirt: Color = cols[0]
 	var second: Color = cols[1]
+	var shorts := second
+	var socks := shirt
+	var pattern := 0
+	if p.team >= 0 and p.team < kits.size():
+		var k: Dictionary = kits[p.team]
+		shorts = k["shorts"]
+		socks = k["socks"]
+		pattern = int(k["pattern"])
 	return {
-		"shirt": shirt, "shorts": second, "socks": shirt,
+		"shirt": shirt, "shorts": shorts, "socks": socks, "trim": second, "pattern": pattern,
 		"skin": Color(String(m.get("skin_hex", "#c98e62"))),
 		"hair": Color(String(m.get("hair_hex", "#1a1210"))),
 		"hair_style": String(m.get("hair_style", "short")),
@@ -626,6 +635,8 @@ func _build_players() -> void:
 			kit["shorts"] = Color("#111827")
 			kit["socks"] = kit["shirt"]
 			kit["gloves"] = Color("#f8fafc")
+			kit["pattern"] = 0
+			kit["trim"] = Color("#111827")
 			kit["long_sleeves"] = true
 			kit["number_color"] = Color("#111827")
 		var rig := PlayerRig.new()

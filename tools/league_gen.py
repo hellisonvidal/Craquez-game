@@ -493,6 +493,36 @@ def overall(pos: str, a: list[float]) -> int:
     return int(round(30 + 63 * sum(x * y for x, y in zip(a, w))))
 
 
+# ---------------------------------------------------------------- uniformes (3 por time)
+PATTERNS = ["liso", "listras", "aros", "faixa", "metades", "riscas", "faixa_peito"]
+THIRD_COLORS = ["#111827", "#0f766e", "#6d28d9", "#ca8a04", "#84cc16", "#0369a1", "#9f1239", "#f97316", "#e5e7eb", "#1e293b"]
+
+
+def _lum(hexc: str) -> float:
+    h = hexc.lstrip("#")
+    r, g, b = (int(h[i:i + 2], 16) / 255 for i in (0, 2, 4))
+    return 0.299 * r + 0.587 * g + 0.114 * b
+
+
+def kits_for(r: random.Random, c1: str, c2: str) -> list[dict]:
+    """Principal nas cores do clube; reserva clara (ou escura se o principal for claro);
+    terceiro numa cor alternativa. Padrões genéricos (sem cópia de modelos oficiais)."""
+    home_pat = r.choices(PATTERNS, weights=[40, 18, 6, 7, 6, 12, 11])[0]
+    shorts_home = c2 if _lum(c2) < 0.85 or r.random() < 0.5 else c1
+    home = {"c1": c1, "c2": c2, "shorts": shorts_home, "socks": c1, "pattern": home_pat}
+    if _lum(c1) < 0.7:
+        away = {"c1": "#f8fafc", "c2": c1, "shorts": "#f8fafc" if r.random() < 0.6 else c1, "socks": "#f8fafc",
+                "pattern": r.choices(PATTERNS, weights=[45, 8, 6, 14, 4, 10, 13])[0]}
+    else:
+        dark = c2 if _lum(c2) < 0.5 else "#1e293b"
+        away = {"c1": dark, "c2": c1 if _lum(c1) > 0.5 else "#f8fafc", "shorts": dark, "socks": dark,
+                "pattern": r.choices(PATTERNS, weights=[45, 8, 6, 14, 4, 10, 13])[0]}
+    third_c = r.choice([c for c in THIRD_COLORS if abs(_lum(c) - _lum(c1)) > 0.15 and c != away["c1"]])
+    third = {"c1": third_c, "c2": c1 if abs(_lum(c1) - _lum(third_c)) > 0.2 else "#f8fafc", "shorts": third_c,
+             "socks": third_c, "pattern": r.choices(PATTERNS, weights=[35, 10, 10, 15, 8, 10, 12])[0]}
+    return [home, away, third]
+
+
 STADIUM_WORDS = ["Arena", "Estádio", "Estádio", "Parque", "Arena", "Coliseu"]
 
 
@@ -535,7 +565,8 @@ def main() -> None:
             tier = 3 if rating >= 0.8 else (2 if rating >= 0.72 else 1)
             stadium = {"name": f"{r.choice(STADIUM_WORDS)} {city}" if sport == "football" else f"Ginásio {city}",
                        "tier": tier, "cap": int(r.uniform(*{3: (55, 82), 2: (28, 50), 1: (8, 24)}[tier])) * 1000}
-            lg["teams"].append({"name": name, "short": short, "c1": c1, "c2": c2, "rating": rating,
+            kits = kits_for(r, c1, c2)
+            lg["teams"].append({"name": name, "short": short, "c1": c1, "c2": c2, "rating": rating, "kits": kits,
                                 "stadium": stadium, "roster": roster})
         out["leagues"].append(lg)
     p = ROOT / "data" / "leagues.json"
