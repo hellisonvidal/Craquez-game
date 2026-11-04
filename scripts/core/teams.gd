@@ -73,25 +73,35 @@ const KIT_NAMES := ["Principal", "Reserva", "Terceiro"]
 static func _parse_kits(t: Dictionary) -> Array:
 	var out: Array = []
 	for k: Dictionary in t.get("kits", []):
+		if k.get("c1") is Color:
+			out.append(k)
+			continue
 		out.append({
-			"c1": Color(String(k.get("c1", "#ffffff"))), "c2": Color(String(k.get("c2", "#000000"))),
-			"shorts": Color(String(k.get("shorts", k.get("c2", "#000000")))), "socks": Color(String(k.get("socks", k.get("c1", "#ffffff")))),
+			"c1": _col(k.get("c1", "#ffffff")), "c2": _col(k.get("c2", "#000000")),
+			"shorts": _col(k.get("shorts", k.get("c2", "#000000"))), "socks": _col(k.get("socks", k.get("c1", "#ffffff"))),
 			"pattern": int(PATTERN_IDS.get(String(k.get("pattern", "liso")), 0)),
 		})
 	if out.is_empty():
-		var c1 := Color(String(t.get("c1", "#ffffff")))
-		var c2 := Color(String(t.get("c2", "#000000")))
+		var c1 := _col(t.get("c1", "#ffffff"))
+		var c2 := _col(t.get("c2", "#000000"))
 		out.append({"c1": c1, "c2": c2, "shorts": c2, "socks": c1, "pattern": 0})
 		out.append({"c1": c2, "c2": c1, "shorts": c2, "socks": c2, "pattern": 0})
 		out.append({"c1": Color("#111827"), "c2": c1, "shorts": Color("#111827"), "socks": Color("#111827"), "pattern": 0})
 	return out
 
 
+## Aceita Color ou texto "#rrggbb".
+static func _col(v: Variant) -> Color:
+	if v is Color:
+		return v
+	return Color(str(v))
+
+
 ## Uniformes da partida: casa usa o pedido (padrão principal); visitante usa o pedido
 ## ou, no automático (-1), o primeiro que não se confunda com o da casa.
 static func pick_kits(ta: Dictionary, tb: Dictionary, ka: int = 0, kb: int = -1) -> Array:
-	var kits_a: Array = ta.get("kits", _parse_kits(ta))
-	var kits_b: Array = tb.get("kits", _parse_kits(tb))
+	var kits_a: Array = ta["kits"] if ta.has("kits") else _parse_kits(ta)
+	var kits_b: Array = tb["kits"] if tb.has("kits") else _parse_kits(tb)
 	var a: Dictionary = kits_a[clampi(ka, 0, kits_a.size() - 1)]
 	if kb >= 0:
 		return [a, kits_b[clampi(kb, 0, kits_b.size() - 1)]]
