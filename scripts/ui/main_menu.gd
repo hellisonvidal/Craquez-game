@@ -1054,6 +1054,7 @@ func _show_roster(side: int) -> void:
 			sl.horizontal_alignment = HORIZONTAL_ALIGNMENT_LEFT
 		var role := GameModes.role_for(form[slot], slot, has_gk) if slot >= 0 and slot < form.size() else ""
 		list.add_child(_player_row(roster[ri], ri, role))
+	_refresh()
 	close.call_deferred("grab_focus")
 
 

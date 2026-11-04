@@ -1140,7 +1140,7 @@ func start_prematch() -> void:
 		sp.number = p.number
 		sp.face_id = p.face_id
 		sp.is_keeper = p.is_keeper
-		sp.pos = Vector2(0, -(hw + 2.5))
+		sp.pos = Vector2(0, -minf(hw + 2.5, 11.0))
 		sp.facing = Vector2(0, 1)
 		var idx: int = counts[p.team]
 		counts[p.team] += 1
@@ -1150,7 +1150,7 @@ func start_prematch() -> void:
 	var oi := 0
 	for o in _officials:
 		var sp: SimPlayer = o["p"]
-		sp.pos = Vector2(0, -(hw + 2.5))
+		sp.pos = Vector2(0, -minf(hw + 2.5, 11.0))
 		_pm_actors.append({"rig": o["rig"], "sp": sp, "slot": Vector2([0.0, -0.55, 0.55][oi % 3], 3.0), "delay": 3.4 + oi * 0.1, "shadows": o["shadows"], "official": true})
 		oi += 1
 
@@ -1174,7 +1174,7 @@ func _update_prematch(delta: float) -> void:
 		if e >= float(a["delay"]):
 			var to := slot - sp.pos
 			var d := to.length()
-			var want := to / d * minf(2.3, d * 2.0) if d > 0.05 else Vector2.ZERO
+			var want := to / d * minf(3.4, d * 2.0) if d > 0.05 else Vector2.ZERO
 			sp.vel = sp.vel.move_toward(want, 6.0 * delta)
 			sp.pos += sp.vel * delta
 			if sp.vel.length() > 0.3:
