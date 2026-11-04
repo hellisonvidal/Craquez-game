@@ -188,6 +188,8 @@ namespace Craquez
                 _locoSpeed[i] = Mathf.Max(0.01f, ms > 0.6f && ms < 11f ? ms : ci.speed);
                 _graph.Connect(_locoP[i], 0, _loco, i);
             }
+            // o pique tem de ser mais rápido que a corrida (a medida do clipe de pique é curta)
+            _locoSpeed[ISprint] = Mathf.Max(_locoSpeed[ISprint], _locoSpeed[IRun] * 1.4f);
             _graph.Connect(_loco, 0, _top, 0);
             _top.SetInputWeight(0, 1f);
             output.SetSourcePlayable(_top);

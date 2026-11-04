@@ -45,6 +45,7 @@ namespace Craquez
             var gk = new[] { KeeperKit(kits[0], kits[1], 0), KeeperKit(kits[1], kits[0], 1) };
             var parent = new GameObject("Atletas").transform;
             parent.SetParent(transform, false);
+            AthleteFactory.IndoorShoes = c.mode == GameModes.Futsal;
             foreach (var p in s.players)
             {
                 var rig = AthleteFactory.Create(p, kits[p.team], gk[p.team], parent, q, (p.team == 0 ? c.tacticsA : c.tacticsB).boots);
@@ -163,7 +164,7 @@ namespace Craquez
             go.name = "Bola";
             Destroy(go.GetComponent<Collider>());
             go.transform.SetParent(transform, false);
-            go.transform.localScale = Vector3.one * 0.22f;
+            go.transform.localScale = Vector3.one * sim.ball.radius * 2f;
             go.GetComponent<MeshRenderer>().sharedMaterial = Gfx.Character(Color.white, BallCatalog.Texture(cfg.ball, q >= 2 ? 1024 : 512), 0.6f);
             _ball = go.transform;
             var sh = GameObject.CreatePrimitive(PrimitiveType.Quad);

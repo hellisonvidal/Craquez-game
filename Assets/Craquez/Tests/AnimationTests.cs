@@ -61,7 +61,7 @@ namespace Craquez.Tests
                 var anim = new AthleteAnimator(r.animator, "D", 3);
                 float minA = 999f, maxA = -999f, drift = 0f;
                 var pelvis = B(r, "pelvis");
-                var p0 = pelvis.position;
+                var p0 = g.transform.TransformPoint(r.pelvisRest);
                 for (int f = 0; f < 90; f++)
                 {
                     anim.Tick(1f / 60f, 5f, 5f, 0f, false);

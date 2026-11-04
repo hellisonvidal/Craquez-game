@@ -261,7 +261,7 @@ namespace Craquez
             // vizinhos (esquerda/direita), menores e escurecidos
             RawImage Side(float ax, string name)
             {
-                var holder = UiKit.Image(area, new Color(0.12f, 0.16f, 0.26f, 0.85f), Theme.Round, name).rectTransform.At(ax, 0.5f, 380, 440, ax < 0.5f ? 140 : -140, 0);
+                var holder = UiKit.Image(area, new Color(0.12f, 0.16f, 0.26f, 0.85f), Theme.Round, name).rectTransform.At(ax, 0.5f, 270, 320, ax < 0.5f ? 170 : -170, 0);
                 var ri = UiKit.Rect(holder, "img").Place(0, 0, 1, 1, 8, 8, 8, 8).gameObject.AddComponent<RawImage>();
                 ri.color = new Color(0.55f, 0.6f, 0.7f, 0.8f);
                 ri.raycastTarget = false;
@@ -271,7 +271,7 @@ namespace Craquez
             var nextImg = defs.Length > 1 ? Side(1f, "seguinte") : null;
             // cartão central
             var card = UiKit.Image(area, Color.white, Theme.Round, "modo");
-            card.rectTransform.At(0.5f, 0.5f, 820, 600, 0, 10);
+            card.rectTransform.At(0.5f, 0.5f, 600, 440, 0, 10);
             var b = card.gameObject.AddComponent<CarouselButton>();
             b.targetGraphic = card;
             var cb = ColorBlock.defaultColorBlock;
@@ -287,15 +287,15 @@ namespace Craquez
             art.gameObject.AddComponent<RectMask2D>();
             var ri2 = UiKit.Rect(art, "img").Place(0, 0, 1, 1).gameObject.AddComponent<RawImage>();
             ri2.raycastTarget = false;
-            var title = UiKit.Label(card.transform, "", 72, Theme.HeadItalic, Color.white, TextAnchor.MiddleCenter);
+            var title = UiKit.Label(card.transform, "", 56, Theme.HeadItalic, Color.white, TextAnchor.MiddleCenter);
             title.rectTransform.Place(0, 0.1f, 1, 0.27f, 6, 0, 6, 0);
             UiKit.Shadow(title, 3);
-            var sub = UiKit.Label(card.transform, "", 32, Theme.BodyBold, Theme.Accent, TextAnchor.MiddleCenter);
+            var sub = UiKit.Label(card.transform, "", 26, Theme.BodyBold, Theme.Accent, TextAnchor.MiddleCenter);
             sub.rectTransform.Place(0, 0.01f, 1, 0.12f);
             var fx = card.gameObject.AddComponent<TileFx>();
             fx.glow = glow;
             // descrição e indicador de página
-            var desc = UiKit.Label(root, "", 32, Theme.Body, Theme.Text, TextAnchor.MiddleCenter);
+            var desc = UiKit.Label(root, "", 28, Theme.Body, Theme.Text, TextAnchor.MiddleCenter);
             desc.rectTransform.Place(0.12f, 0, 0.88f, 0, 0, 120, 0, -240);
             UiKit.Shadow(desc, 2, 0.8f);
             var dots = UiKit.Rect(root, "pontos").Place(0.5f, 0, 0.5f, 0, -200, 80, -200, -120);
@@ -336,8 +336,8 @@ namespace Craquez
             // setas grandes
             Button Arrow(float px, string txt, int d)
             {
-                var a = UiKit.Button(area, txt, () => { Step(d); UiKit.Select(b); }, 96, new Color(0.0f, 0.55f, 0.38f));
-                a.GetComponent<RectTransform>().At(0.5f, 0.5f, 132, 132, px, 10);
+                var a = UiKit.Button(area, txt, () => { Step(d); UiKit.Select(b); }, 80, new Color(0.0f, 0.55f, 0.38f));
+                a.GetComponent<RectTransform>().At(0.5f, 0.5f, 110, 110, px, 10);
                 var img = a.GetComponent<Image>();
                 img.sprite = Theme.Circle;
                 var nav = a.navigation;
@@ -347,8 +347,8 @@ namespace Craquez
             }
             if (defs.Length > 1)
             {
-                Arrow(-490f, "‹", -1);
-                Arrow(490f, "›", 1);
+                Arrow(-380f, "‹", -1);
+                Arrow(380f, "›", 1);
             }
             Show();
             UiKit.Select(b);
@@ -429,9 +429,12 @@ namespace Craquez
             var ballName = UiKit.Label(card, "", 34, Theme.HeadItalic, Theme.Text);
             ballName.rectTransform.Place(0, 1, 1, 1, 260, -190, 20, 110);
             void RefreshBall() { ballImg.texture = BallCatalog.Texture(_cfg.ball, 256); ballName.text = BallCatalog.All[_cfg.ball].name; }
+            // só as bolas da modalidade (futsal tem bolas próprias, menores)
+            var ballIdx = BallCatalog.ForMode(_cfg.mode);
+            if (!ballIdx.Contains(_cfg.ball)) _cfg.ball = ballIdx[0];
             var ballNames = new List<string>();
-            for (int i = 0; i < BallCatalog.All.Length; i++) ballNames.Add((i + 1) + ". " + BallCatalog.All[i].name);
-            var ballC = UiKit.Cycler(card, "Bola", ballNames, _cfg.ball, i => { _cfg.ball = i; RefreshBall(); });
+            for (int i = 0; i < ballIdx.Count; i++) ballNames.Add((i + 1) + ". " + BallCatalog.All[ballIdx[i]].name);
+            var ballC = UiKit.Cycler(card, _cfg.mode == GameModes.Futsal ? "Bola de futsal" : "Bola", ballNames, ballIdx.IndexOf(_cfg.ball), i => { _cfg.ball = ballIdx[i]; RefreshBall(); });
             ballC.GetComponent<RectTransform>().Place(0, 1, 1, 1, 24, -390, 24, 318);
             RefreshBall();
 
@@ -467,7 +470,7 @@ namespace Craquez
                 var info = UiKit.Label(col, "", 22, Theme.Body, Theme.TextDim);
                 info.rectTransform.Place(0, 1, 1, 1, 220, -250, 250, 150);
                 var kitRow = UiKit.Rect(col, "uniforme").Place(0, 1, 1, 1, 30, -300, 250, 250);
-                // prévia 3D: o uniforme vestido num atleta
+                // prévia do uniforme estendido (camisa, calção, meiões e chuteiras)
                 var pv = UiKit.Image(col, new Color(0, 0, 0, 0.35f), Theme.Round, "prévia").rectTransform.At(1, 1, 210, 300, -20, -16);
                 pv.gameObject.AddComponent<RectMask2D>();
                 var pvImg = UiKit.Rect(pv, "img").Place(0, 0, 1, 1).gameObject.AddComponent<RawImage>();
@@ -687,6 +690,8 @@ namespace Craquez
             _bg.color = new Color(0, 0, 0, 0);
             _back = null;
             if (_cfg.tacticsA.lineup == null) _cfg.tacticsA = new Tactics();
+            var balls = BallCatalog.ForMode(_cfg.mode);
+            if (!balls.Contains(_cfg.ball)) _cfg.ball = balls[0];
             _cfg.seed = (uint)System.DateTime.Now.Ticks | 1u;
             var go = new GameObject("Partida");
             go.transform.SetParent(transform, false);

@@ -90,6 +90,7 @@ namespace Craquez.Sim
         {
             mode = GameModes.Get(modeId);
             mode.rollDecel *= rollScale;
+            ball.radius = modeId == GameModes.Futsal ? 0.098f : 0.11f;   // futsal: bola tamanho 4
             halfLen = mode.length * 0.5f;
             halfW = mode.width * 0.5f;
             goalHalf = mode.goalWidth * 0.5f;
@@ -143,6 +144,35 @@ namespace Craquez.Sim
             }
             kickoffTeam = 0;
             ResetForKickoff(0);
+        }
+
+        /// <summary>Clima mudou no meio do jogo: bola mais rápida na chuva, mais lenta na neve.</summary>
+        public void SetRollScale(float s)
+        {
+            rollScale = s;
+            mode.rollDecel = GameModes.Get(mode.id).rollDecel * s;
+        }
+
+        /// <summary>Troca formação, mentalidade e pressão no meio do jogo (menu de pausa).</summary>
+        public void ApplyTactics(int t, Tactics tac)
+        {
+            if (tac == null) return;
+            teams[t].tactics = tac;
+            teamMentality[t] = Mathf.Clamp(tac.mentality, 0, 2);
+            teamPress[t] = Mathf.Clamp(tac.press, 0, 2);
+            var forms = GameModes.Formations(mode.id);
+            if (!forms.TryGetValue(tac.formation ?? "", out var f)) return;
+            int i = 0;
+            foreach (var p in players)
+            {
+                if (p.team != t) continue;
+                if (i < f.Length)
+                {
+                    p.basePos = f[i];
+                    if (!p.isKeeper) p.pos = GameModes.RoleFor(p.basePos, i, mode.keeper);
+                }
+                i++;
+            }
         }
 
         static void ApplyRoster(SimPlayer p, RosterEntry e)

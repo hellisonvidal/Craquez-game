@@ -36,7 +36,7 @@ namespace Craquez
             baseAmbient = RenderSettings.ambientLight;
             baseFog = RenderSettings.fogColor;
             _rng = new System.Random((int)seed * 31 + 7);
-            _next = 50f + (float)_rng.NextDouble() * 50f;
+            _next = 25f + (float)_rng.NextDouble() * 20f;   // primeira virada logo no começo
             _rain = Particles(cam, true);
             _snow = Particles(cam, false);
             Target(out _cloud, out _rainK, out _snowK, out _storm);
@@ -102,7 +102,7 @@ namespace Craquez
                 _next -= dt;
                 if (_next <= 0f)
                 {
-                    _next = 45f + (float)_rng.NextDouble() * 65f;
+                    _next = 35f + (float)_rng.NextDouble() * 35f;
                     string[] opts = _snowMode ? (kind == "neve" ? new[] { "nublado" } : new[] { "neve" })
                         : kind == "sol" ? new[] { "nublado" } : kind == "nublado" ? new[] { "sol", "chuva", "chuva" }
                         : kind == "chuva" ? new[] { "nublado", "tempestade", "nublado" } : new[] { "chuva" };
@@ -115,7 +115,7 @@ namespace Craquez
                 }
             }
             Target(out var tc, out var tr, out var ts, out var tst);
-            float k = dt <= 0f ? 1f : Mathf.Min(1f, dt * 0.12f);
+            float k = dt <= 0f ? 1f : Mathf.Min(1f, dt * 0.35f);   // transição de ~5 s
             _cloud = Mathf.Lerp(_cloud, tc, k);
             _rainK = Mathf.Lerp(_rainK, tr, k);
             _snowK = Mathf.Lerp(_snowK, ts, k);

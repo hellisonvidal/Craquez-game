@@ -4,7 +4,7 @@ using UnityEngine;
 
 namespace Craquez
 {
-    /// <summary>30 bolas originais (sem marcas): gomos, cores e desenhos variados, geradas por código.</summary>
+    /// <summary>Bolas originais (sem marcas) de campo e de futsal: gomos, cores e desenhos variados, geradas por código.</summary>
     public static class BallCatalog
     {
         public class Ball
@@ -13,7 +13,20 @@ namespace Craquez
             public int style;           // desenho
             public Color a, b, c;       // fundo, cor principal, detalhe
             public float scale = 1f;
+            public bool futsal;         // bola de futsal (tamanho 4, menor e de quique baixo)
         }
+
+        /// <summary>Índices das bolas da modalidade (futsal tem as suas; campo e rua usam as de campo).</summary>
+        public static List<int> ForMode(string mode)
+        {
+            bool f = mode == GameModes.Futsal;
+            var l = new List<int>();
+            for (int i = 0; i < All.Length; i++) if (All[i].futsal == f) l.Add(i);
+            return l;
+        }
+
+        /// <summary>Raio real (m): campo tamanho 5 = 11 cm; futsal tamanho 4 = 9,8 cm.</summary>
+        public static float Radius(string mode) => mode == GameModes.Futsal ? 0.098f : 0.11f;
 
         static Color H(string s) => Teams.Col(s);
 
@@ -35,7 +48,7 @@ namespace Craquez
             new Ball { name = "Ondas do Mar", style = 10, a = H("#e0f2fe"), b = H("#0369a1"), c = H("#0ea5e9") },
             new Ball { name = "Rua Grafite", style = 11, a = H("#e5e7eb"), b = H("#111827"), c = H("#f43f5e") },
             new Ball { name = "Ouro", style = 0, a = H("#fef3c7"), b = H("#b45309"), c = H("#f59e0b") },
-            new Ball { name = "Futsal Max", style = 4, a = H("#fde047"), b = H("#1d4ed8"), c = H("#ffffff") },
+            new Ball { name = "Futsal Max", style = 4, a = H("#fde047"), b = H("#1d4ed8"), c = H("#ffffff"), futsal = true },
             new Ball { name = "Copa Verde", style = 12, a = H("#ffffff"), b = H("#15803d"), c = H("#fbbf24") },
             new Ball { name = "Tricolor", style = 13, a = H("#ffffff"), b = H("#1d4ed8"), c = H("#dc2626") },
             new Ball { name = "Retrô Couro", style = 14, a = H("#a16207"), b = H("#713f12"), c = H("#fde68a") },
@@ -49,6 +62,14 @@ namespace Craquez
             new Ball { name = "Noturna Neon", style = 11, a = H("#111827"), b = H("#84cc16"), c = H("#f0abfc") },
             new Ball { name = "Bandeirinha", style = 13, a = H("#ffffff"), b = H("#16a34a"), c = H("#facc15") },
             new Ball { name = "Lenda", style = 7, a = H("#0b0b0b"), b = H("#f8fafc"), c = H("#d4a017") },
+            // futsal (tamanho 4)
+            new Ball { name = "Salão Clássica", style = 1, a = H("#facc15"), b = H("#111827"), c = H("#111827"), futsal = true },
+            new Ball { name = "Quadra Pro", style = 0, a = H("#ffffff"), b = H("#dc2626"), c = H("#1d4ed8"), futsal = true },
+            new Ball { name = "Ginásio Neon", style = 6, a = H("#f0fdf4"), b = H("#16a34a"), c = H("#f97316"), futsal = true },
+            new Ball { name = "Salão Azul", style = 3, a = H("#eff6ff"), b = H("#1e40af"), c = H("#facc15"), futsal = true },
+            new Ball { name = "Taco de Madeira", style = 12, a = H("#fff7ed"), b = H("#c2410c"), c = H("#0f172a"), futsal = true },
+            new Ball { name = "Pivô", style = 9, a = H("#ffffff"), b = H("#7c3aed"), c = H("#facc15"), futsal = true },
+            new Ball { name = "Ala Rápida", style = 10, a = H("#fef08a"), b = H("#0f766e"), c = H("#ef4444"), futsal = true },
         };
 
         static readonly Dictionary<int, Texture2D> _cache = new Dictionary<int, Texture2D>();

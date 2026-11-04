@@ -12,6 +12,8 @@ namespace Craquez
     public static class AthleteFactory
     {
         public static readonly string[] Bases = { "afro", "latino", "europeu", "asiatico" };
+        /// <summary>Futsal: tênis de quadra no lugar das chuteiras (vale para os atletas criados em seguida).</summary>
+        public static bool IndoorShoes;
         static readonly Dictionary<string, GameObject> _models = new Dictionary<string, GameObject>();
         static readonly Dictionary<string, Texture2D> _tex = new Dictionary<string, Texture2D>();
         static readonly Dictionary<string, Material> _mats = new Dictionary<string, Material>();
@@ -159,7 +161,8 @@ namespace Craquez
                     case "Boots":
                     {
                         int d = look.boots;
-                        smr.sharedMaterial = Shared("boots:" + d, () => Gfx.Character(Color.white, BootPainter.Paint(d), 0.62f));
+                        bool indoor = IndoorShoes;
+                        smr.sharedMaterial = Shared("boots:" + d + (indoor ? "f" : ""), () => Gfx.Character(Color.white, BootPainter.Paint(d, indoor), indoor ? 0.35f : 0.62f));
                         break;
                     }
                     default:

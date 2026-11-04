@@ -286,6 +286,8 @@ namespace Craquez.UI
     public class Cycler : Selectable, ISubmitHandler, IPointerClickHandler
     {
         public Text caption, value;
+        readonly List<Image> _chips = new List<Image>();
+        readonly List<Text> _glyphs = new List<Text>();
         IList<string> _options;
         Action<int> _onChange;
         public int Index { get; private set; }
@@ -318,6 +320,15 @@ namespace Craquez.UI
             var l = UiKit.Label(chip.transform, glyph, 46, Theme.Head, Theme.Accent, TextAnchor.MiddleCenter);
             l.rectTransform.Place(0, 0, 1, 1, 0, 4, 0, 0);
             l.raycastTarget = false;
+            _chips.Add(chip);
+            _glyphs.Add(l);
+        }
+
+        /// <summary>Selecionado, o fundo fica verde: as setas viram botões escuros com seta branca.</summary>
+        void ArrowLook(bool selected)
+        {
+            foreach (var c in _chips) c.color = selected ? new Color(0.02f, 0.05f, 0.1f, 0.9f) : new Color(0f, 0.9f, 0.62f, 0.22f);
+            foreach (var g in _glyphs) g.color = selected ? Color.white : Theme.Accent;
         }
 
         public void SetOptions(IList<string> options, int index)
@@ -363,6 +374,7 @@ namespace Craquez.UI
             base.OnSelect(e);
             if (caption) caption.color = new Color(0.02f, 0.05f, 0.1f);
             if (value) value.color = new Color(0.02f, 0.05f, 0.1f);
+            ArrowLook(true);
             Sfx.Move();
         }
 
@@ -371,6 +383,7 @@ namespace Craquez.UI
             base.OnDeselect(e);
             if (caption) caption.color = Theme.TextDim;
             if (value) value.color = Theme.Text;
+            ArrowLook(false);
         }
     }
 }
