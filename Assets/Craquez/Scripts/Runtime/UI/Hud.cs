@@ -108,6 +108,10 @@ namespace Craquez.UI
             _goalSub.rectTransform.Place(0, 0.12f, 1, 0.38f);
             _goalCg.alpha = 0;
             _overlay = UiKit.Rect(root, "overlay").Place(0, 0, 1, 1);
+            _cut = UiKit.Image(root, Color.black, null, "corte");
+            _cut.rectTransform.Place(0, 0, 1, 1);
+            _cut.raycastTarget = false;
+            _cut.color = new Color(0, 0, 0, 0);
         }
 
         void Chip(RectTransform sb, Kit k, float x)
@@ -137,6 +141,12 @@ namespace Craquez.UI
         }
 
         public RectTransform Overlay => _overlay;
+
+        Image _cut;
+        float _cutT;
+
+        /// <summary>Corte de cena (reinícios): tela escura que clareia em ~0,5 s.</summary>
+        public void Cut() => _cutT = 0.55f;
 
         public static string ClockText(MatchSim sim)
         {
@@ -171,6 +181,11 @@ namespace Craquez.UI
             _goalT -= Time.unscaledDeltaTime;
             _goalCg.alpha = Mathf.Clamp01(_goalT * 2f) * Mathf.Clamp01((3.2f - _goalT) * 4f);
             _goalBox.localScale = Vector3.one * (1f + Mathf.Clamp01(_goalT - 2.7f) * 0.6f);
+            if (_cutT > 0f || _cut.color.a > 0f)
+            {
+                _cutT -= Time.unscaledDeltaTime;
+                _cut.color = new Color(0, 0, 0, Mathf.Clamp01(_cutT / 0.4f));
+            }
         }
 
         public void SetWeather(string s) => _weather.text = s;

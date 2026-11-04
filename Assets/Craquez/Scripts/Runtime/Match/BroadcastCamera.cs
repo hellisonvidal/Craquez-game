@@ -40,9 +40,72 @@ namespace Craquez
 
         public void Shake(float amount) => _shake = Mathf.Max(_shake, amount);
 
+        // ---------------------------------------------------------------- paredes na frente
+        readonly System.Collections.Generic.List<Renderer> _occ = new System.Collections.Generic.List<Renderer>();
+        readonly System.Collections.Generic.List<UnityEngine.Rendering.ShadowCastingMode> _occMode = new System.Collections.Generic.List<UnityEngine.Rendering.ShadowCastingMode>();
+        readonly System.Collections.Generic.List<bool> _occHidden = new System.Collections.Generic.List<bool>();
+
+        /// <summary>
+        /// Estruturas grandes do estádio/ginásio (paredes, arquibancadas, cobertura) que podem
+        /// ficar entre a câmera e o jogo: somem enquanto taparem a visão (a sombra continua).
+        /// </summary>
+        public void SetOccluders(Transform venueRoot)
+        {
+            _occ.Clear(); _occMode.Clear(); _occHidden.Clear();
+            if (venueRoot == null) return;
+            foreach (var r in venueRoot.GetComponentsInChildren<Renderer>(true))
+            {
+                if (r is ParticleSystemRenderer) continue;
+                var b = r.bounds;
+                bool floor = b.size.y < 0.6f && b.max.y < 0.8f;
+                if (floor || Mathf.Max(b.size.x, b.size.y, b.size.z) < 3f) continue;
+                // gols, redes e o que fica dentro do campo nunca somem
+                if (sim != null && Mathf.Abs(b.center.x) < sim.halfLen + 3.5f && Mathf.Abs(b.center.z) < sim.halfW + 1.5f && b.max.y < 6f) continue;
+                _occ.Add(r);
+                _occMode.Add(r.shadowCastingMode);
+                _occHidden.Add(false);
+            }
+        }
+
+        void UpdateOccluders(Vector3 focus)
+        {
+            if (_occ.Count == 0) return;
+            var c = cam.transform.position;
+            float hw = sim.halfW;
+            // alvos: o foco, um pouco antes/depois dele e a linha lateral mais próxima
+            var targets = new[]
+            {
+                focus + Vector3.up * 0.8f, focus + new Vector3(7f, 0.8f, 0f), focus + new Vector3(-7f, 0.8f, 0f),
+                new Vector3(focus.x, 0.5f, Mathf.Sign(c.z) * hw * 0.95f),
+            };
+            for (int i = 0; i < _occ.Count; i++)
+            {
+                var r = _occ[i];
+                if (r == null) continue;
+                var b = r.bounds;
+                bool block = false;
+                foreach (var t in targets)
+                {
+                    var d = t - c;
+                    float len = d.magnitude;
+                    if (len < 0.01f) continue;
+                    if (b.Contains(c) || (b.IntersectRay(new Ray(c, d / len), out float hit) && hit < len - 0.5f)) { block = true; break; }
+                }
+                if (block == _occHidden[i]) continue;
+                _occHidden[i] = block;
+                r.shadowCastingMode = block ? UnityEngine.Rendering.ShadowCastingMode.ShadowsOnly : _occMode[i];
+            }
+        }
+
         void LateUpdate()
         {
             if (sim == null || cam == null) return;
+            Move();
+            UpdateOccluders(cinematic ? cineLook : _focus);
+        }
+
+        void Move()
+        {
             float dt = Time.deltaTime;
             if (cinematic)
             {
@@ -100,7 +163,7 @@ namespace Craquez
                 case 1: height = field ? 11f : 7f; back = field ? 28f : 15f; fov = 34f; break;
                 case 2: height = field ? 42f : 20f; back = field ? 36f : 18f; fov = 38f; break;
                 case 5: height = field ? 3.2f : 2.4f; back = field ? 14f : 6f; fov = 44f; break;
-                default: height = field ? 17f : 9f; back = field ? 40f : 20f; fov = 31f; break;
+                default: height = field ? 18f : 10f; back = field ? 38f : 16f; fov = field ? 31f : 38f; break;
             }
             height *= zk;
             back *= zk;

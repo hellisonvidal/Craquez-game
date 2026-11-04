@@ -57,8 +57,10 @@ namespace Craquez
             BuildBall(q);
             _marker0 = Marker(new Color(0.1f, 0.85f, 1f));
             _marker1 = Marker(new Color(1f, 0.55f, 0.1f));
-            bcam = cam.gameObject.GetComponent<BroadcastCamera>() ?? cam.gameObject.AddComponent<BroadcastCamera>();
+            bcam = cam.gameObject.GetComponent<BroadcastCamera>();
+            if (bcam == null) bcam = cam.gameObject.AddComponent<BroadcastCamera>();
             bcam.Setup(cam, s, Settings.Camera);
+            bcam.SetOccluders(venue.root);
             bcam.SnapToBall();
             weather = gameObject.AddComponent<WeatherFx>();
             string wk = c.weather == "aleatorio" ? WeatherFx.Kinds[(int)(c.seed % 5)] : c.weather;
@@ -236,6 +238,12 @@ namespace Craquez
             bcam.SnapToBall();
         }
 
+        /// <summary>Bola desenhada (o goleiro a põe nas mãos ao segurá-la).</summary>
+        public Transform BallVisual => _ball;
+
+        /// <summary>Corte de cena nos reinícios (o HUD escurece a tela).</summary>
+        public System.Action onCut;
+
         void OnEvent(SimEvent e)
         {
             if (e.id >= 0 && e.id < athletes.Count) athletes[e.id].OnEvent(e);
@@ -253,6 +261,12 @@ namespace Craquez
                     if (e.kind == "fulltime") Sfx.WhistleEnd();
                     else if (e.kind == "halftime" || e.kind == "penalty") Sfx.WhistleLong();
                     else if (e.kind != "throwin" && e.kind != "goalkick" && e.kind != "corner") Sfx.Whistle();
+                    if (e.kind == "goalkick" || e.kind == "corner")
+                    {
+                        // corte: a tela escurece, todos aparecem já posicionados para o reinício
+                        SnapAll();
+                        onCut?.Invoke();
+                    }
                     break;
                 case "foul":
                     Sfx.Whistle();

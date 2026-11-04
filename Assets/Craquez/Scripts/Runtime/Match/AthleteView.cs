@@ -296,6 +296,38 @@ namespace Craquez
             if (p == null || rig == null || rig.head == null) return;
             HeadAndNeck();
             Arms();
+            KeeperHold();
+        }
+
+        float _holdW;
+
+        /// <summary>Goleiro com a bola: braços fecham à frente do peito e a bola fica encaixada nas mãos.</summary>
+        void KeeperHold()
+        {
+            var sim = view.sim;
+            bool holding = p.isKeeper && p.hold > 0f && sim.ball.owner == p.id;
+            _holdW = Mathf.MoveTowards(_holdW, holding ? 1f : 0f, Time.deltaTime / 0.12f);
+            if (_holdW <= 0.001f || rig.spine == null) return;
+            var fwd = transform.forward;
+            var target = rig.spine.position + fwd * 0.3f - Vector3.up * 0.08f;
+            Vector3 handL = target, handR = target;
+            for (int side = -1; side <= 1; side += 2)
+            {
+                string sfx = side < 0 ? "_l" : "_r";
+                rig.bones.TryGetValue("upperarm" + sfx, out var up);
+                rig.bones.TryGetValue("lowerarm" + sfx, out var lo);
+                rig.bones.TryGetValue("hand" + sfx, out var hd);
+                if (up == null || lo == null || hd == null) continue;
+                float s = Mathf.Sign(Vector3.Dot(up.position - rig.spine.position, transform.right));
+                // mão de cada lado da bola; cotovelo para baixo e para fora
+                var handT = target + transform.right * s * 0.11f;
+                var elbowT = Vector3.Lerp(up.position, handT, 0.5f) - Vector3.up * 0.12f + transform.right * s * 0.1f;
+                _pose.Rotate(up, Quaternion.Slerp(Quaternion.identity, Quaternion.FromToRotation(lo.position - up.position, elbowT - up.position), _holdW));
+                _pose.Rotate(lo, Quaternion.Slerp(Quaternion.identity, Quaternion.FromToRotation(hd.position - lo.position, handT - lo.position), _holdW));
+                if (s < 0) handL = hd.position; else handR = hd.position;
+            }
+            if (holding && view.BallVisual != null)
+                view.BallVisual.position = Vector3.Lerp(view.BallVisual.position, (handL + handR) * 0.5f + fwd * 0.06f, _holdW);
         }
 
         float _armsUp;

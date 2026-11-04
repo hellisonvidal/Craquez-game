@@ -73,7 +73,7 @@ namespace Craquez
         public static int DefaultQuality()
         {
             if (Application.isMobilePlatform)
-                return SystemInfo.systemMemorySize >= 7000 && SystemInfo.graphicsMemorySize >= 2000 ? 1 : 0;
+                return SystemInfo.systemMemorySize >= 3800 ? 1 : 0;
             return SystemInfo.graphicsMemorySize >= 3000 ? 2 : 1;
         }
 

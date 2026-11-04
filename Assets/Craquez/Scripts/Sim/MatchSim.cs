@@ -335,6 +335,19 @@ namespace Craquez.Sim
             ball.lastTouchTeam = t;
             if (taker.isKeeper) taker.hold = 1.6f;
             else ctrl[t].player = taker.id;
+            // tiro de meta e escanteio: corte de cena, todos já nas posições do reinício
+            bool cut = kind == "goalkick" || kind == "corner";
+            if (cut)
+                foreach (var p in players)
+                {
+                    if (p == taker) continue;
+                    if (p.isKeeper) { p.position = new Vector2(-TeamDir(p.team) * (halfLen - 1f), 0f); }
+                    else p.position = FormationTarget(p, p.team == t);
+                    p.position.x = Mathf.Clamp(p.position.x, -halfLen + 0.5f, halfLen - 0.5f);
+                    p.position.y = Mathf.Clamp(p.position.y, -halfW + 0.5f, halfW - 0.5f);
+                    p.vel = Vector2.zero;
+                    p.facing = (ball.pos - p.position).Norm();
+                }
             foreach (var p in players)
             {
                 if (p.team != t)
@@ -351,7 +364,7 @@ namespace Craquez.Sim
             offsideTeam = -1;
             noOffsideKick = kind == "throwin" || kind == "corner" || kind == "goalkick";
             state = MatchState.Restart;
-            stateTimer = 0.7f;
+            stateTimer = cut ? 1.1f : 0.7f;
             Emit("whistle", t, -1, kind);
         }
 

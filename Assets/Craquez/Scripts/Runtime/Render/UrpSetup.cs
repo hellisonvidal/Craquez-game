@@ -26,7 +26,7 @@ namespace Craquez
             if (GraphicsSettings.currentRenderPipeline is UniversalRenderPipelineAsset urp)
             {
                 urp.shadowDistance = q >= 2 ? 120f : q == 1 ? 80f : 50f;
-                urp.renderScale = Application.isMobilePlatform ? (q >= 2 ? 1f : q == 1 ? 0.85f : 0.72f) : 1f;
+                urp.renderScale = Application.isMobilePlatform ? (q >= 1 ? 1f : 0.8f) : 1f;   // resolução nativa da tela (só o "Leve" reduz)
                 urp.msaaSampleCount = 1;
                 urp.supportsHDR = q >= 1;
             }

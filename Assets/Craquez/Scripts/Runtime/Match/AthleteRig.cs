@@ -54,6 +54,7 @@ namespace Craquez
                     m.localRotation = modelFix * m.localRotation;
                 }
             }
+            Athletic();
             if (pelvis != null) pelvisRest = transform.InverseTransformPoint(pelvis.position);
             // pés no chão
             if (footL != null)
@@ -77,6 +78,47 @@ namespace Craquez
             lp.x = Mathf.Lerp(pelvisRest.x, lp.x, keep);
             lp.z = Mathf.Lerp(pelvisRest.z, lp.z, keep);
             pelvis.position = transform.TransformPoint(lp);
+        }
+
+        // espessura (largura/profundidade) de cada osso: cintura fina, peito e ombros mais largos,
+        // coxas, panturrilhas e braços mais cheios. O comprimento não muda.
+        static readonly (string bone, float k)[] Shape =
+        {
+            ("spine_01", 0.86f), ("spine_02", 0.93f), ("spine_03", 1.06f),
+            ("clavicle_l", 1.04f), ("clavicle_r", 1.04f), ("upperarm_l", 1.08f), ("upperarm_r", 1.08f),
+            ("lowerarm_l", 1.04f), ("lowerarm_r", 1.04f),
+            ("thigh_l", 1.06f), ("thigh_r", 1.06f), ("calf_l", 1.06f), ("calf_r", 1.06f), ("neck_01", 1.05f),
+        };
+
+        /// <summary>Corpo de atleta: escala os ossos só na espessura e compensa nos filhos.</summary>
+        void Athletic()
+        {
+            foreach (var (name, k) in Shape)
+            {
+                if (!bones.TryGetValue(name, out var b) || b.childCount == 0) continue;
+                // eixo do comprimento: o que aponta para o primeiro osso filho
+                Transform child = null;
+                foreach (Transform c in b) if (c.GetComponent<Renderer>() == null) { child = c; break; }
+                if (child == null) continue;
+                var dir = b.InverseTransformDirection(child.position - b.position).normalized;
+                int len = Mathf.Abs(dir.x) > Mathf.Abs(dir.y) ? (Mathf.Abs(dir.x) > Mathf.Abs(dir.z) ? 0 : 2) : (Mathf.Abs(dir.y) > Mathf.Abs(dir.z) ? 1 : 2);
+                var sc = Vector3.one * k;
+                sc[len] = 1f;
+                b.localScale = Vector3.Scale(b.localScale, sc);
+                // filhos: desfaz a escala do pai no referencial de cada filho
+                foreach (Transform c in b)
+                {
+                    var inv = Vector3.one;
+                    for (int i = 0; i < 3; i++)
+                    {
+                        var axisInParent = c.localRotation * (i == 0 ? Vector3.right : i == 1 ? Vector3.up : Vector3.forward);
+                        float f = Mathf.Abs(axisInParent.x) * sc.x + Mathf.Abs(axisInParent.y) * sc.y + Mathf.Abs(axisInParent.z) * sc.z;
+                        float w = Mathf.Abs(axisInParent.x) + Mathf.Abs(axisInParent.y) + Mathf.Abs(axisInParent.z);
+                        inv[i] = w / Mathf.Max(0.01f, f);
+                    }
+                    c.localScale = Vector3.Scale(c.localScale, inv);
+                }
+            }
         }
 
         /// <summary>Número nas costas (e pequeno no peito), acompanhando o tronco.</summary>

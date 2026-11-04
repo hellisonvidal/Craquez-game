@@ -61,6 +61,7 @@ namespace Craquez
             hud.transform.SetParent(transform, false);
             hud.Build(sim, c, view.kits);
             hud.SetWeather(view.venue.name + "  •  " + view.weather.Label);
+            view.onCut = () => { if (!attract) hud.Cut(); };
             var sides = new[] { c.sideA, c.sideB };
             var p1 = InputRouter.DefaultP1();
             for (int t = 0; t < 2; t++)
