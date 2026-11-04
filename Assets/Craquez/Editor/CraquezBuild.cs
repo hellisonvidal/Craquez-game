@@ -18,7 +18,9 @@ namespace Craquez.EditorTools
         const string MatDir = "Assets/Craquez/Resources/Materials";
         public int callbackOrder => -100;
 
-        public void OnPreprocessBuild(BuildReport report) => PrepareAssets();
+        // o CI (GameCI) usa o próprio script de build: as configurações do jogo (tela cheia,
+        // orientação, ícones, materiais) entram aqui, antes de qualquer build
+        public void OnPreprocessBuild(BuildReport report) => Common();
 
         [InitializeOnLoadMethod]
         static void OnLoad()
