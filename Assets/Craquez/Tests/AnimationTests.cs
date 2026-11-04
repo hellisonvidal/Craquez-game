@@ -126,6 +126,29 @@ namespace Craquez.Tests
             finally { Object.DestroyImmediate(g); }
         }
 
+        /// <summary>Corpo atlético não deforma: cabeça na altura certa, mãos e pés simétricos.</summary>
+        [Test]
+        public void CorpoProporcional()
+        {
+            var (g, r) = Make("P");
+            try
+            {
+                var root = g.transform;
+                float head = B(r, "head").position.y - root.position.y;
+                float handL = Vector3.Distance(B(r, "upperarm_l").position, B(r, "hand_l").position);
+                float handR = Vector3.Distance(B(r, "upperarm_r").position, B(r, "hand_r").position);
+                float legL = Vector3.Distance(B(r, "thigh_l").position, B(r, "foot_l").position);
+                float legR = Vector3.Distance(B(r, "thigh_r").position, B(r, "foot_r").position);
+                var s1 = B(r, "spine_01").lossyScale;
+                Debug.Log($"[corpo] cabeça {head:F2} m; braços {handL:F2}/{handR:F2}; pernas {legL:F2}/{legR:F2}; escala cintura {s1}");
+                Assert.That(head, Is.InRange(1.45f, 1.95f));
+                Assert.Less(Mathf.Abs(handL - handR), 0.02f);
+                Assert.Less(Mathf.Abs(legL - legR), 0.02f);
+                Assert.That(handL, Is.InRange(0.45f, 0.7f));
+            }
+            finally { Object.DestroyImmediate(g); }
+        }
+
         [Test]
         public void CorrecoesNaoAcumulamEPoseNatural()
         {
