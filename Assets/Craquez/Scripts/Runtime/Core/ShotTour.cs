@@ -25,10 +25,12 @@ namespace Craquez
 
         float _beat;
         int _frames;
+        volatile int _total;
 
         void Update()
         {
             _frames++;
+            _total++;
             if (Time.realtimeSinceStartup - _beat > 10f)
             {
                 Debug.Log($"[shots] batimento: {Time.realtimeSinceStartup:F0}s, {_frames} quadros desde o último ({_frames / Mathf.Max(0.01f, Time.realtimeSinceStartup - _beat):F1} fps), tela {Screen.width}x{Screen.height}");
@@ -40,6 +42,22 @@ namespace Craquez
         public void Run(App app)
         {
             Debug.Log("[shots] início do roteiro em " + Dir);
+            // tela virtual (xvfb) reporta 0 Hz: sem vsync o primeiro quadro não trava
+            QualitySettings.vSyncCount = 0;
+            Application.targetFrameRate = 30;
+            // vigia em outra thread: mostra se o thread principal travou
+            var t = new System.Threading.Thread(() =>
+            {
+                int last = -1;
+                while (true)
+                {
+                    System.Threading.Thread.Sleep(15000);
+                    int f = _total;
+                    Debug.Log($"[shots] vigia: quadro {f}" + (f == last ? " (thread principal parado!)" : ""));
+                    last = f;
+                }
+            }) { IsBackground = true };
+            t.Start();
             _app = app;
             Directory.CreateDirectory(Dir);
             StartCoroutine(Tour());
