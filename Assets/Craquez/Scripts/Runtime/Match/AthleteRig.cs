@@ -34,7 +34,8 @@ namespace Craquez
             var animHost = arm != null && arm != m ? arm.gameObject : m.gameObject;
             var old = m.GetComponent<Animator>();
             if (old != null && animHost != m.gameObject) old.enabled = false;
-            animator = animHost.GetComponent<Animator>() ?? animHost.AddComponent<Animator>();
+            animator = animHost.GetComponent<Animator>();
+            if (animator == null) animator = animHost.AddComponent<Animator>();   // (?? não vê o "nulo" da Unity)
             animator.applyRootMotion = false;
             animator.cullingMode = AnimatorCullingMode.AlwaysAnimate;   // ossos sempre atualizados (evita cabeça "solta")
             if (head != null)
