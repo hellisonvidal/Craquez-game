@@ -337,6 +337,11 @@ SKIN_W = {
     "MX": [6, 16, 30, 28, 12, 5, 2, 1], "JP": [20, 50, 26, 4, 0, 0, 0, 0], "KR": [22, 50, 24, 4, 0, 0, 0, 0],
     "PE": [4, 12, 26, 30, 18, 6, 3, 1], "CL": [10, 24, 30, 22, 10, 3, 1, 0], "EC": [4, 10, 18, 22, 16, 12, 10, 8],
     "SA": [2, 8, 26, 32, 20, 8, 3, 1], "RU": [42, 34, 12, 4, 3, 2, 2, 1], "UA": [44, 34, 12, 4, 2, 2, 1, 1],
+    "BE": [26, 22, 12, 8, 8, 8, 9, 7], "HR": [40, 36, 14, 5, 2, 1, 1, 1], "CH": [30, 26, 14, 8, 6, 6, 6, 4],
+    "DK": [44, 30, 10, 5, 4, 3, 2, 2], "PL": [46, 34, 12, 4, 2, 1, 1, 0], "TR": [10, 26, 34, 20, 7, 2, 1, 0],
+    "AU": [30, 26, 14, 10, 8, 5, 4, 3], "EG": [2, 8, 24, 32, 22, 8, 3, 1], "CM": [0, 0, 0, 1, 6, 22, 38, 33],
+    "PY": [10, 22, 30, 24, 10, 3, 1, 0], "SE": [42, 30, 10, 5, 5, 3, 3, 2], "NO": [44, 30, 10, 5, 4, 3, 2, 2],
+    "AT": [40, 32, 12, 6, 4, 2, 2, 2], "IR": [6, 20, 36, 26, 10, 2, 0, 0], "KZ": [16, 34, 32, 14, 4, 0, 0, 0],
 }
 
 # ---------------------------------------------------------------- futsal pelo mundo
@@ -536,6 +541,46 @@ def nearest_face(lib: list, f: list[int]) -> int:
     return best
 
 
+def add_nations(out: dict, lib: list) -> int:
+    """Seleções de futebol (23 convocados) e de futsal (14), ordenadas pelo ranking."""
+    import nations
+    NAMES.update(nations.EXTRA_NAMES)
+    total = 0
+    by_name = {n[0]: n for n in nations.NATIONS}
+    specs = [("sel", "Seleções", "national", nations.NATIONS,
+              POSITIONS + ["GK", "DF", "MF", "MF", "FW"]),
+             ("fsel", "Seleções de Futsal", "futsal_national",
+              [by_name[n] if n in by_name else (n,) + nations.FUTSAL_ONLY[n] for n in nations.FUTSAL_NATIONS],
+              FUTSAL_POSITIONS)]
+    for lid, lname, sport, rows, positions in specs:
+        lg = {"id": lid, "name": lname, "country": "", "sport": sport, "teams": []}
+        n = len(rows)
+        for rank, (name, short, nat, c1, c2, flag, pat) in enumerate(rows, start=1):
+            r = random.Random(f"{lid}-{name}")
+            rating = round(0.88 - (rank - 1) / max(1, n - 1) * 0.17, 3)
+            used: set = set()
+            nums: dict = {k: list(v) for k, v in NUMBERS.items()}
+            roster = []
+            for pi, pos in enumerate(positions):
+                f = face_for(r, nat)
+                num = nums[pos].pop(0) if nums[pos] else 27 + pi
+                star = 0.06 if pi in (8, 9, 14, 15, 5, 10) else 0.0
+                a = attrs(r, rating + star, pos)
+                roster.append({"n": player_name(r, nat, used), "num": num, "pos": pos, "nat": nat,
+                               "f": f, "fid": nearest_face(lib, f), "a": a, "ovr": overall(pos, a),
+                               "t": traits_for(r, pos, a, star)})
+                total += 1
+            kits = kits_for(r, c1, c2)
+            kits[0]["pattern"] = pat
+            lg["teams"].append({"name": name, "short": short, "c1": c1, "c2": c2, "rating": rating, "kits": kits,
+                                "rank": rank, "flag": flag,
+                                "stadium": {"name": ("Estádio Nacional" if sport == "national" else "Arena Nacional") + f" ({name})",
+                                            "tier": 3, "cap": int(r.uniform(45, 85) if sport == "national" else r.uniform(8, 16)) * 1000},
+                                "roster": roster})
+        out["leagues"].append(lg)
+    return total
+
+
 def main() -> None:
     lib_n = 360
     lib = face_gen.write_library(lib_n, 2026, Path("/tmp") / "craquez_faces")  # rostos 2D só servem de metadados; o Unity usa atletas 3D
@@ -569,6 +614,7 @@ def main() -> None:
             lg["teams"].append({"name": name, "short": short, "c1": c1, "c2": c2, "rating": rating, "kits": kits,
                                 "stadium": stadium, "roster": roster})
         out["leagues"].append(lg)
+    total += add_nations(out, lib)
     p = ROOT / "Assets" / "Craquez" / "Resources" / "Data" / "leagues.json"
     p.parent.mkdir(exist_ok=True)
     p.write_text(json.dumps(out, ensure_ascii=False, separators=(",", ":")), encoding="utf-8")

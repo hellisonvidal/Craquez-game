@@ -38,4 +38,5 @@ $DOTNET $E/DotNetSdkRoslyn/csc.dll -nologo -noconfig -nostdlib -target:exe -r:$N
 cp $NU $E/Managed/UnityEngine/UnityEngine.CoreModule.dll $E/Managed/UnityEngine/UnityEngine.ImageConversionModule.dll $W/
 FW=$(ls $E/NetCoreRuntime/shared/Microsoft.NETCore.App | head -1)
 echo "{\"runtimeOptions\":{\"tfm\":\"net6.0\",\"framework\":{\"name\":\"Microsoft.NETCore.App\",\"version\":\"$FW\"}}}" > $W/run.runtimeconfig.json
+[ -n "${KEEP:-}" ] && cp $W/Sim.dll $W/Runtime.dll "$KEEP"/
 cd $W && $DOTNET run.dll $ROOT/Assets/Craquez/Resources/Data/leagues.json

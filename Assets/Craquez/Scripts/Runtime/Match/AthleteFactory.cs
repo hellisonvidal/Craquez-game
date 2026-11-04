@@ -64,6 +64,7 @@ namespace Craquez
             public Color hairColor, skinTint;
             public float scale;
             public float[] face;
+            public int boots;
         }
 
         /// <summary>face = [pele 0-5, cor do cabelo, estilo, barba, olhos, porte] (leagues.json).</summary>
@@ -87,13 +88,15 @@ namespace Craquez
             {
                 baseName = b, hair = Mathf.Clamp(hair, 0, Hairs.Length - 1), hairColor = HairColors[Mathf.Clamp(hc, 0, HairColors.Length - 1)],
                 skinTint = tint, scale = Mathf.Lerp(0.95f, 1.05f, F(5, R(6) * 4f) / 4f), face = f,
+                boots = (int)((h >> 5) % (uint)BootPainter.Designs.Length),
             };
         }
 
         /// <summary>Cria o atleta (com uniforme e número). Retorna o objeto raiz.</summary>
-        public static AthleteRig Create(SimPlayer p, Kit kit, Kit keeperKit, Transform parent, int quality)
+        public static AthleteRig Create(SimPlayer p, Kit kit, Kit keeperKit, Transform parent, int quality, int boots = -1)
         {
             var look = LookFor(p);
+            if (boots >= 0) look.boots = boots;
             var model = Model(look.baseName) ?? Model("latino");
             if (model == null)
             {
@@ -115,53 +118,77 @@ namespace Craquez
 
         public static void Dress(AthleteRig rig, Look look, Kit kit, int number, int quality)
         {
-            foreach (var smr in rig.GetComponentsInChildren<SkinnedMeshRenderer>(true))
+            var smrs = rig.GetComponentsInChildren<SkinnedMeshRenderer>(true);
+            Mesh bodyMesh = null, socksMesh = null;
+            foreach (var r in smrs)
+            {
+                if (r.name == "Body") bodyMesh = r.sharedMesh;
+                if (r.name == "Socks") socksMesh = r.sharedMesh;
+            }
+            var axes = bodyMesh != null ? KitPainter.AxesFrom(bodyMesh, socksMesh) : default;
+            int tex = quality >= 2 ? 1024 : 512;
+            foreach (var smr in smrs)
             {
                 string n = smr.name;
                 smr.updateWhenOffscreen = false;
                 smr.quality = quality >= 2 ? SkinQuality.Bone4 : SkinQuality.Bone2;
                 smr.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.On;
-                if (n == "Body")
+                switch (n)
                 {
-                    var skin = Shared("skin:" + look.baseName + Teams.Hex(look.skinTint), () =>
-                        Gfx.Lit(look.skinTint, T(SkinTex[look.baseName]), 0.32f));
-                    int tex = quality >= 2 ? 1024 : 512;
-                    var kitTex = KitPainter.Paint(smr.sharedMesh, kit, tex);
-                    var kitMat = Shared("kit:" + kitTex.GetInstanceID(), () => Gfx.Lit(Color.white, kitTex, 0.28f));
-                    var boots = Shared("boots", () => Gfx.Lit(new Color(0.05f, 0.05f, 0.06f), null, 0.65f));
-                    var mats = new Material[smr.sharedMesh.subMeshCount];
-                    for (int i = 0; i < mats.Length; i++) mats[i] = i == 0 ? skin : i == 4 ? boots : kitMat;
-                    smr.sharedMaterials = mats;
-                    ApplyFace(smr, look.face);
-                    rig.body = smr;
-                }
-                else if (n.StartsWith("Hair_"))
-                {
-                    string hn = n.Substring(5);
-                    bool on = hn == Hairs[look.hair];
-                    smr.gameObject.SetActive(on);
-                    if (on)
+                    case "Body":
                     {
-                        smr.sharedMaterial = Shared("hair:" + hn + Teams.Hex(look.hairColor), () =>
-                            Gfx.Cutout(look.hairColor * 2.2f, T(hn == "afro01" ? "afro_diffuse" : hn + "_diffuse"), 0.35f, 0.25f));
-                        smr.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.On;
+                        var skin = Shared("skin:" + look.baseName + Teams.Hex(look.skinTint), () =>
+                            Gfx.Lit(look.skinTint, T(SkinTex[look.baseName]), 0.32f));
+                        var mats = new Material[Mathf.Max(1, smr.sharedMesh.subMeshCount)];
+                        for (int i = 0; i < mats.Length; i++) mats[i] = skin;
+                        smr.sharedMaterials = mats;
+                        ApplyFace(smr, look.face);
+                        rig.body = smr;
+                        break;
                     }
-                }
-                else if (n == "Eyes")
-                {
-                    smr.sharedMaterial = Shared("eyes", () => Gfx.Lit(Color.white, T("brown_eye"), 0.85f));
-                    smr.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
-                }
-                else if (n == "Eyebrows")
-                {
-                    smr.sharedMaterial = Shared("brow:" + look.baseName, () => Gfx.Cutout(look.hairColor * 1.6f, T(BrowTex[look.baseName]), 0.3f));
-                    smr.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
-                }
-                else if (n == "Eyelashes")
-                {
-                    smr.sharedMaterial = Shared("lashes", () => Gfx.Cutout(new Color(0.1f, 0.08f, 0.07f), T("eyelashes02"), 0.3f));
-                    smr.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
-                    smr.gameObject.SetActive(quality >= 1);
+                    case "Shirt":
+                    case "Shorts":
+                    case "Socks":
+                    {
+                        var part = n == "Shirt" ? KitPart.Shirt : n == "Shorts" ? KitPart.Shorts : KitPart.Socks;
+                        var kt = KitPainter.Paint(smr.sharedMesh, part, kit, axes, part == KitPart.Socks ? tex / 2 : tex);
+                        // tecido dos dois lados (vê-se o avesso pela gola e pelas mangas)
+                        smr.sharedMaterial = Shared("kit:" + kt.GetInstanceID(), () => Gfx.Cutout(Color.white, kt, 0.01f, part == KitPart.Shirt ? 0.32f : 0.25f));
+                        break;
+                    }
+                    case "Boots":
+                    {
+                        int d = look.boots;
+                        smr.sharedMaterial = Shared("boots:" + d, () => Gfx.Lit(Color.white, BootPainter.Paint(d), 0.62f));
+                        break;
+                    }
+                    default:
+                        if (n.StartsWith("Hair_"))
+                        {
+                            string hn = n.Substring(5);
+                            bool on = hn == Hairs[look.hair];
+                            smr.gameObject.SetActive(on);
+                            if (on)
+                                smr.sharedMaterial = Shared("hair:" + hn + Teams.Hex(look.hairColor), () =>
+                                    Gfx.Cutout(look.hairColor * 2.2f, T(hn == "afro01" ? "afro_diffuse" : hn + "_diffuse"), 0.35f, 0.25f));
+                        }
+                        else if (n == "Eyes")
+                        {
+                            smr.sharedMaterial = Shared("eyes", () => Gfx.Lit(Color.white, T("brown_eye"), 0.85f));
+                            smr.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
+                        }
+                        else if (n == "Eyebrows")
+                        {
+                            smr.sharedMaterial = Shared("brow:" + look.baseName, () => Gfx.Cutout(look.hairColor * 1.6f, T(BrowTex[look.baseName]), 0.3f));
+                            smr.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
+                        }
+                        else if (n == "Eyelashes")
+                        {
+                            smr.sharedMaterial = Shared("lashes", () => Gfx.Cutout(new Color(0.1f, 0.08f, 0.07f), T("eyelashes02"), 0.3f));
+                            smr.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
+                            smr.gameObject.SetActive(quality >= 1);
+                        }
+                        break;
                 }
             }
             rig.SetNumber(number, kit);

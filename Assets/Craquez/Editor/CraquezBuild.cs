@@ -127,6 +127,13 @@ namespace Craquez.EditorTools
             PlayerSettings.allowedAutorotateToLandscapeLeft = true;
             PlayerSettings.allowedAutorotateToLandscapeRight = true;
             PlayerSettings.colorSpace = ColorSpace.Linear;
+            // sempre em tela cheia
+            PlayerSettings.fullScreenMode = FullScreenMode.FullScreenWindow;
+            PlayerSettings.defaultIsNativeResolution = true;
+            PlayerSettings.resizableWindow = false;
+            PlayerSettings.allowFullscreenSwitch = false;
+            PlayerSettings.Android.startInFullscreen = true;
+            PlayerSettings.Android.renderOutsideSafeArea = true;
             string v = Environment.GetEnvironmentVariable("CRAQUEZ_VERSION");
             if (!string.IsNullOrEmpty(v)) PlayerSettings.bundleVersion = v;
             PrepareAssets();

@@ -14,20 +14,25 @@ Feito 100% com inteligência artificial, por isso é e sempre será **gratuito**
 |---|---|
 | **Atletas realistas** | Corpo humano MakeHuman (CC0) com 4 biotipos, rosto variável por jogador (10 formas), 5 cabelos, tons de pele, número na camisa |
 | **Movimentos reais** | Animações de **captura de movimento** (CMU): corrida, trote, caminhada, de costas, marcação, cortes, fintas, giro, passe, chute, voleio — misturadas pela velocidade e direção do atleta |
-| **Uniformes** | 3 por time, pintados no corpo do atleta: listras, aros, faixa, metades, riscas, gola e punhos |
+| **Uniformes vestidos** | Camisa, calção e meião são peças próprias sobre o corpo: folga, barra por fora do calção, mangas, gola, dobras do tecido. 3 uniformes por time com listras, aros, faixa, metades, riscas, gola e punhos |
+| **Chuteiras** | Modeladas (sola, travas, cano acolchoado, cadarço) com 16 desenhos originais; cada atleta usa a sua ou todos o mesmo modelo |
+| **Bolas** | 30 bolas originais (clássica, espirais, faixas, estrelas, retrô de couro, alta visibilidade para neve...) |
+| **Seleções** | 40 seleções de futebol e 20 de futsal, ordenadas pelo ranking do Craquez (inspirado no da FIFA), com bandeiras e elencos fictícios |
 | **Estádios** | 3 portes (arquibancadas, cobertura, refletores), placas de LED, bancos, bandeirinhas, árbitro, rede que estufa no gol |
 | **Locais** | 8 quadras de futsal fechadas com tela de proteção e 8 ruas (prédios, morro, praia, terraço, gaiola, telhado, viaduto, praça) |
 | **Clima e horário** | Sol, nublado, chuva, tempestade com raios, neve; dia, fim de tarde, noite; clima dinâmico que muda durante o jogo e altera a bola |
 | **Imagem** | URP com sombras, bloom, tonemapping ACES e correção de cor; 3 níveis de qualidade (automático por aparelho) |
-| **Ligas 2026/27** | 22 ligas (17 de campo + 5 de futsal), 400 clubes e 6.920 jogadores com atributos e habilidades únicas. Nomes alterados, sem licença |
+| **Ligas 2026/27** | 22 ligas (17 de campo + 5 de futsal), 400 clubes, 60 seleções e 8.120 jogadores com atributos e habilidades únicas. Nomes alterados, sem licença |
 | **Táticas** | Formação, mentalidade, pressão e escalação (troca titular ↔ reserva) |
 | **Cerimônia** | Sobrevoo do estádio, entrada dos times e apresentação das escalações |
 | **Option file** | Personalize nomes, uniformes, estádios e escudos no seu aparelho — [docs/OPTION_FILE.md](docs/OPTION_FILE.md) |
-| **Simulação** | Determinística a 60 Hz (mesma semente + mesmas entradas = mesma partida): bola com arrasto, efeito Magnus e quique por superfície; faltas, pênalti, impedimento, laterais, escanteios |
+| **Física** | Determinística a 60 Hz: bola com arrasto e "crise do arrasto" em chutes fortes, efeito Magnus, quique por superfície com fase de deslize, desvio no corpo pelo ângulo de impacto; goleiro com tempo de reação, mergulho, encaixe ou espalmada; faltas, pênalti, impedimento, laterais, escanteios |
 
-## Telas
+## Telas e modos
 
-Apresentação Claude → aviso "feito com IA, gratuito" → título (com uma partida rolando ao fundo) → modos de jogo → configuração da partida → escolha dos times (+ táticas) → jogo.
+Apresentação Claude → aviso "feito com IA, gratuito" → título (com uma partida rolando ao fundo) → **Jogar**: Clubes · Seleções · Futsal · Futsal Seleções · Rua → configuração (duração, clima, horário, bola, chuteiras...) → escolha dos times/seleções (+ táticas) → jogo.
+
+O jogo sempre abre em **tela cheia** (Windows: janela sem bordas na resolução nativa; Android: modo imersivo).
 
 ## Controles
 

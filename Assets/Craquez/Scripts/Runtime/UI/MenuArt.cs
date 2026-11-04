@@ -1,0 +1,169 @@
+using Craquez.Sim;
+using UnityEngine;
+using UnityEngine.EventSystems;
+using UnityEngine.UI;
+
+namespace Craquez.UI
+{
+    /// <summary>Artes geradas para os cartões dos modos de jogo.</summary>
+    public static class MenuArt
+    {
+        public enum Kind { FieldClubs, FieldNations, FutsalClubs, FutsalNations, Street }
+
+        public static Texture2D Tile(Kind k, int w = 384, int h = 432)
+        {
+            var t = new Texture2D(w, h, TextureFormat.RGBA32, true) { wrapMode = TextureWrapMode.Clamp };
+            var px = new Color32[w * h];
+            for (int y = 0; y < h; y++)
+                for (int x = 0; x < w; x++)
+                {
+                    float u = (x + 0.5f) / w, v = (y + 0.5f) / h;
+                    Color c = Background(k, u, v, w, h);
+                    // emblema central
+                    c = Emblem(k, c, u, v, w / (float)h);
+                    // vinheta e brilho diagonal
+                    float vig = 1f - 0.45f * Mathf.Pow(Vector2.Distance(new Vector2(u, v), new Vector2(0.5f, 0.55f)) * 1.25f, 2f);
+                    float shine = Mathf.Clamp01(1f - Mathf.Abs(u + v - 1.25f) * 6f) * 0.12f;
+                    c = c * vig + Color.white * shine;
+                    c.a = 1;
+                    px[y * w + x] = c;
+                }
+            t.SetPixels32(px);
+            t.Apply(true);
+            return t;
+        }
+
+        static Color Background(Kind k, float u, float v, int w, int h)
+        {
+            switch (k)
+            {
+                case Kind.FieldClubs:
+                case Kind.FieldNations:
+                {
+                    var g1 = k == Kind.FieldClubs ? new Color(0.13f, 0.45f, 0.2f) : new Color(0.1f, 0.3f, 0.55f);
+                    var c = Color.Lerp(g1 * 0.6f, g1, v);
+                    if (Mathf.Repeat(v * 7f + u * 0.6f, 1f) < 0.5f) c *= 0.9f;          // faixas de corte em perspectiva
+                    float lineY = 0.28f + (u - 0.5f) * 0.05f;
+                    if (Mathf.Abs(v - lineY) < 0.004f) c = Color.Lerp(c, Color.white, 0.7f);
+                    var d = new Vector2((u - 0.5f) * 1.3f, (v - lineY) * 3.2f);
+                    if (Mathf.Abs(d.magnitude - 0.3f) < 0.012f && v > lineY) c = Color.Lerp(c, Color.white, 0.6f);
+                    return c;
+                }
+                case Kind.FutsalClubs:
+                case Kind.FutsalNations:
+                {
+                    var wood = new Color(0.78f, 0.53f, 0.3f);
+                    int board = (int)(u * 9f);
+                    float grain = Gfx.VNoise(u * 4f + board, v * 60f, 64, 3);
+                    var c = wood * (0.82f + grain * 0.2f + Gfx.VNoise(board, 1, 16, 7) * 0.1f);
+                    if (Mathf.Repeat(u * 9f, 1f) < 0.03f) c *= 0.7f;
+                    if (k == Kind.FutsalNations) c = Color.Lerp(c, new Color(0.15f, 0.25f, 0.6f), 0.35f);
+                    if (Mathf.Abs(v - 0.3f) < 0.005f) c = Color.Lerp(c, new Color(0.95f, 0.2f, 0.2f), 0.8f);
+                    return c;
+                }
+                default:
+                {
+                    // muro de tijolos com grafite
+                    float bx = u * 7f + (Mathf.FloorToInt(v * 14f) % 2) * 0.5f;
+                    float by = v * 14f;
+                    bool mortar = Mathf.Repeat(bx, 1f) < 0.06f || Mathf.Repeat(by, 1f) < 0.08f;
+                    var brick = Color.Lerp(new Color(0.55f, 0.22f, 0.16f), new Color(0.7f, 0.33f, 0.22f), Gfx.VNoise(Mathf.Floor(bx), Mathf.Floor(by), 32, 4));
+                    var c = mortar ? new Color(0.6f, 0.58f, 0.55f) : brick;
+                    float spray = Gfx.Fbm(u * 3f, v * 3f, 8, 11, 3);
+                    if (spray > 0.62f) c = Color.Lerp(c, new Color(0.95f, 0.2f, 0.6f), 0.7f);
+                    else if (spray < 0.32f) c = Color.Lerp(c, new Color(0.2f, 0.85f, 0.9f), 0.6f);
+                    if (v < 0.22f) c = Color.Lerp(new Color(0.25f, 0.25f, 0.27f), c, v / 0.22f * 0.3f);
+                    return c;
+                }
+            }
+        }
+
+        static Color Emblem(Kind k, Color c, float u, float v, float aspect)
+        {
+            var p = new Vector2((u - 0.5f) * aspect, v - 0.6f);
+            float r = p.magnitude;
+            bool nations = k == Kind.FieldNations || k == Kind.FutsalNations;
+            if (nations)
+            {
+                // três bandeiras tremulando
+                for (int i = 0; i < 3; i++)
+                {
+                    var q = p - new Vector2((i - 1) * 0.27f, (i == 1 ? 0.04f : -0.02f));
+                    float wave = Mathf.Sin(q.x * 18f + i) * 0.015f;
+                    if (Mathf.Abs(q.x) < 0.11f && Mathf.Abs(q.y + wave) < 0.075f)
+                    {
+                        Color[] cols = i == 0 ? new[] { Teams.Col("#009c3b"), Teams.Col("#ffdf00") } :
+                                       i == 1 ? new[] { Teams.Col("#75aadb"), Color.white } : new[] { Teams.Col("#002395"), Color.white, Teams.Col("#ed2939") };
+                        int band = i == 2 ? Mathf.Clamp((int)((q.x + 0.11f) / 0.22f * 3f), 0, 2) : (Mathf.Abs(q.y + wave) < 0.025f ? 1 : 0);
+                        var fc = cols[Mathf.Min(band, cols.Length - 1)];
+                        return fc * (0.85f + 0.15f * Mathf.Cos(q.x * 18f + i));
+                    }
+                    if (Mathf.Abs(q.x + 0.11f) < 0.006f && q.y > -0.25f && q.y < 0.08f) return new Color(0.85f, 0.85f, 0.85f);
+                }
+                return c;
+            }
+            // bola
+            if (r < 0.15f)
+            {
+                var n = new Vector3(p.x / 0.15f, p.y / 0.15f, 0);
+                n.z = Mathf.Sqrt(Mathf.Max(0, 1 - n.x * n.x - n.y * n.y));
+                float light = Mathf.Clamp01(Vector3.Dot(n, new Vector3(-0.4f, 0.5f, 0.77f))) * 0.8f + 0.25f;
+                float ang = Mathf.Atan2(n.y, n.x);
+                bool panel = new Vector2(n.x, n.y).magnitude < 0.32f && Mathf.Cos(ang * 5f) * 0.05f + 0.3f > new Vector2(n.x, n.y).magnitude * 0.9f
+                             || (new Vector2(n.x, n.y).magnitude > 0.7f && Mathf.Repeat(ang / (Mathf.PI * 2f) * 5f, 1f) < 0.32f);
+                var bc = panel ? new Color(0.08f, 0.08f, 0.1f) : Color.white;
+                return bc * light;
+            }
+            if (r < 0.17f && p.y < 0f) return c * 0.6f;
+            var sh = new Vector2(p.x * 0.8f, (p.y + 0.18f) * 3f);
+            if (sh.magnitude < 0.14f) return c * (0.55f + sh.magnitude * 2f);
+            return c;
+        }
+    }
+
+    /// <summary>Animação de entrada da página (fade + deslize).</summary>
+    public class PageFx : MonoBehaviour
+    {
+        CanvasGroup _cg;
+        RectTransform _rt;
+        float _t;
+        void Awake()
+        {
+            _cg = gameObject.AddComponent<CanvasGroup>();
+            _rt = (RectTransform)transform;
+            _cg.alpha = 0f;
+        }
+        void Update()
+        {
+            if (_t >= 1f) return;
+            _t = Mathf.Min(1f, _t + Time.unscaledDeltaTime / 0.28f);
+            float e = 1f - Mathf.Pow(1f - _t, 3f);
+            _cg.alpha = e;
+            _rt.anchoredPosition = new Vector2((1f - e) * 60f, 0);
+        }
+    }
+
+    /// <summary>Cartão que cresce e acende a borda quando selecionado.</summary>
+    public class TileFx : MonoBehaviour, ISelectHandler, IDeselectHandler, IPointerEnterHandler
+    {
+        public Image glow;
+        public System.Action onSelected;
+        float _target = 1f;
+        public void OnSelect(BaseEventData e) { _target = 1.06f; if (glow) glow.enabled = true; onSelected?.Invoke(); Sfx.Move(); }
+        public void OnDeselect(BaseEventData e) { _target = 1f; if (glow) glow.enabled = false; }
+        public void OnPointerEnter(PointerEventData e) { GetComponent<Selectable>()?.Select(); }
+        void Update()
+        {
+            float s = Mathf.Lerp(transform.localScale.x, _target, 1f - Mathf.Exp(-Time.unscaledDeltaTime * 14f));
+            transform.localScale = new Vector3(s, s, 1f);
+            if (glow && glow.enabled) glow.color = new Color(Theme.Accent.r, Theme.Accent.g, Theme.Accent.b, 0.55f + 0.35f * Mathf.Sin(Time.unscaledTime * 5f));
+        }
+    }
+
+    /// <summary>Bola girando dentro de um círculo (pré-visualização).</summary>
+    public class SpinUv : MonoBehaviour
+    {
+        public RawImage img;
+        void Update() { if (img) { var r = img.uvRect; r.x = Mathf.Repeat(r.x + Time.unscaledDeltaTime * 0.08f, 1f); img.uvRect = r; } }
+    }
+}

@@ -19,6 +19,8 @@ namespace Craquez.Sim
         public int owner = -1;
         public int lastTouchTeam = -1, lastTouchId = -1;
         public float rollAngle;   // só visual
+        /// <summary>Tempo restante deslizando (após quique/chute rasteiro forte), antes de rolar.</summary>
+        public float slideT;
 
         public float Speed => vel.magnitude;
         public bool Airborne => z > 0.02f || vz > 0.05f;
@@ -32,7 +34,9 @@ namespace Craquez.Sim
             {
                 var v3 = new Vector3(vel.x, vel.y, vz);
                 float s3 = v3.magnitude;
-                v3 -= v3 * (m.airDrag * s3 * dt);
+                // crise do arrasto: acima de ~20 m/s o coeficiente cai (chute forte "viaja")
+                float crisis = Mathf.Lerp(1f, 0.72f, Mathf.Clamp01((s3 - 18f) / 8f));
+                v3 -= v3 * (m.airDrag * crisis * s3 * dt);
                 vel = new Vector2(v3.x, v3.y);
                 vz = v3.z;
                 if (Mathf.Abs(spin) > 0.01f && s > 0.5f)
@@ -45,9 +49,12 @@ namespace Craquez.Sim
                     z = 0f;
                     if (vz < -1.2f)
                     {
-                        vz = -vz * m.bounce;
+                        // restituição cai um pouco em impactos fortes (deformação da bola)
+                        float e = m.bounce * Mathf.Lerp(1f, 0.85f, Mathf.Clamp01((-vz - 4f) / 10f));
+                        vz = -vz * e;
                         vel *= 0.86f;
                         spin *= 0.5f;
+                        slideT = 0.18f;
                         bounced = true;
                     }
                     else vz = 0f;
@@ -60,6 +67,12 @@ namespace Craquez.Sim
                 if (s > 0f)
                 {
                     float dec = m.rollDecel + m.groundDrag * s * s;
+                    if (slideT > 0f)
+                    {
+                        // fase de deslize (atrito de escorregamento) até a bola "pegar" e rolar
+                        slideT -= dt;
+                        dec += 2.2f;
+                    }
                     float ns = Mathf.Max(0f, s - dec * dt);
                     vel *= ns / s;
                     if (Mathf.Abs(spin) > 0.01f && ns > 0.5f)
