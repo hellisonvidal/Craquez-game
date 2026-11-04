@@ -79,7 +79,7 @@ namespace Craquez
             mr.sharedMaterial = mat;
             mr.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
             var fwd = transform.forward;
-            float depth = side < 0 ? 0.13f : 0.125f;
+            float depth = side < 0 ? 0.16f : 0.15f;   // por cima da camisa (peça com folga)
             go.transform.localScale = new Vector3(size, size, 1f);
             go.transform.position = spine.position + fwd * (side * depth) + Vector3.up * up + transform.right * lateral;
             // o quad do Unity mostra a face para -Z local: aponta -Z para fora do corpo

@@ -34,6 +34,10 @@ namespace Craquez.Sim
         public List<Kit> kits = new List<Kit>();
         public Stadium stadium = new Stadium();
         public List<RosterEntry> roster = new List<RosterEntry>();
+        /// <summary>Seleções: posição no ranking e bandeira [layout, cores...].</summary>
+        public int rank;
+        public List<string> flag = new List<string>();
+        public bool IsNational => rank > 0;
         public string Key => leagueId + "/" + shortName;
     }
 
@@ -41,7 +45,8 @@ namespace Craquez.Sim
     {
         public string id = "", name = "", sport = "football", country = "";
         public int first, count;
-        public bool IsFutsal => sport == "futsal";
+        public bool IsFutsal => sport.Contains("futsal");
+        public bool IsNational => sport.Contains("national");
     }
 
     /// <summary>Táticas escolhidas para a partida.</summary>
@@ -209,8 +214,9 @@ namespace Craquez.Sim
             {
                 name = MiniJson.S(to, "name"), shortName = MiniJson.S(to, "short"),
                 c1 = Col(MiniJson.S(to, "c1", "#ffffff")), c2 = Col(MiniJson.S(to, "c2", "#000000")),
-                rating = MiniJson.F(to, "rating", 0.7f),
+                rating = MiniJson.F(to, "rating", 0.7f), rank = MiniJson.I(to, "rank"),
             };
+            foreach (var fo in MiniJson.L(to, "flag") ?? new List<object>()) t.flag.Add(fo as string);
             t.kits = ParseKits(MiniJson.L(to, "kits"), t.c1, t.c2);
             var st = MiniJson.D(to, "stadium");
             if (st != null) t.stadium = new Stadium { name = MiniJson.S(st, "name"), tier = MiniJson.I(st, "tier", 1), cap = MiniJson.I(st, "cap") };

@@ -243,7 +243,7 @@ namespace Craquez.Sim
 
         void ResetForKickoff(int t)
         {
-            ball.pos = Vector2.zero; ball.vel = Vector2.zero; ball.z = 0; ball.vz = 0; ball.spin = 0; ball.owner = -1;
+            ball.pos = Vector2.zero; ball.vel = Vector2.zero; ball.z = 0; ball.vz = 0; ball.spin = 0; ball.slideT = 0; ball.owner = -1;
             passReceiver = -1;
             penaltyTeam = -1;
             offsideIds.Clear();
@@ -279,7 +279,7 @@ namespace Craquez.Sim
         {
             spot.x = Mathf.Clamp(spot.x, -halfLen, halfLen);
             spot.y = Mathf.Clamp(spot.y, -halfW, halfW);
-            ball.pos = spot; ball.vel = Vector2.zero; ball.z = 0; ball.vz = 0; ball.spin = 0;
+            ball.pos = spot; ball.vel = Vector2.zero; ball.z = 0; ball.vz = 0; ball.spin = 0; ball.slideT = 0;
             passReceiver = -1;
             SimPlayer taker = null;
             if (kind == "goalkick" && mode.keeper)
@@ -677,6 +677,7 @@ namespace Craquez.Sim
                 ball.vel = dirv * v0;
                 ball.vz = v0 > 22f ? 0.6f : 0f;
                 ball.spin = 0f;
+                ball.slideT = v0 > 14f ? 0.1f : 0f;
             }
             if (p.hold > 0f || ball.z > 0.5f) ball.z = Mathf.Max(ball.z, 0.3f);
             ReleaseBall(p);
@@ -828,7 +829,7 @@ namespace Craquez.Sim
             float dir = TeamDir(t);
             float gx = halfLen * dir;
             var spot = new Vector2(gx - dir * mode.penaltyDist, 0f);
-            ball.pos = spot; ball.vel = Vector2.zero; ball.z = 0; ball.vz = 0; ball.spin = 0;
+            ball.pos = spot; ball.vel = Vector2.zero; ball.z = 0; ball.vz = 0; ball.spin = 0; ball.slideT = 0;
             ball.owner = taker.id;
             ball.lastTouchTeam = t;
             passReceiver = -1;
@@ -1165,7 +1166,7 @@ namespace Craquez.Sim
             if (p.hold > 0f) maxS *= 0.4f;
             var targetV = intent * maxS;
             float spd = p.vel.magnitude;
-            float acc = Mathf.Lerp(5f, 8.5f, p.accel) * (p.burst > 0f ? 1.6f : 1f) * (p.offBalance > 0f ? 0.4f : 1f);
+            float acc = Mathf.Lerp(5f, 8.5f, p.accel) * (p.burst > 0f ? 1.6f : 1f) * (p.offBalance > 0f ? 0.4f : 1f) * (0.82f + 0.18f * p.stamina);
             float rate = acc;
             if (targetV.magnitude < spd - 0.2f || Vector2.Dot(targetV, p.vel) < 0f) rate = 12f;
             if (spd > 3f && targetV.magnitude > 0.1f)
@@ -1285,7 +1286,7 @@ namespace Craquez.Sim
                 float maxZ = 0.9f;
                 if (keeperZone)
                 {
-                    reach = 1f + (p.dive > 0f ? 1.3f : 0f);
+                    reach = 1f + (p.dive > 0f ? Mathf.Lerp(0.9f, 1.6f, p.dive / 0.6f) * (0.85f + 0.3f * p.defense) : 0f) + (p.Has(Trait.Reflexo) ? 0.15f : 0f);
                     maxZ = 2.6f;
                 }
                 float d = p.position.Dist(ball.pos);
@@ -1341,7 +1342,14 @@ namespace Craquez.Sim
             }
             if (rel > limit)
             {
-                ball.vel = ball.vel * 0.4f + p.facing * 1.5f;
+                // bola rápida demais: bate no corpo e desvia conforme o ângulo (domínio falho)
+                var nrm = (ball.pos - p.position).Norm();
+                if (nrm == Vector2.zero) nrm = p.facing;
+                var vrel = ball.vel - p.vel;
+                float vn = Vector2.Dot(vrel, nrm);
+                var refl = vn < 0f ? vrel - nrm * vn * 1.35f : vrel;
+                ball.vel = p.vel + refl * 0.45f + p.facing * 0.8f;
+                ball.slideT = 0.12f;
                 ball.vz = Mathf.Abs(ball.vz) * 0.3f;
                 ball.lastTouchTeam = p.team;
                 ball.lastTouchId = p.id;

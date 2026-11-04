@@ -47,7 +47,7 @@ namespace Craquez
             parent.SetParent(transform, false);
             foreach (var p in s.players)
             {
-                var rig = AthleteFactory.Create(p, kits[p.team], gk[p.team], parent, q);
+                var rig = AthleteFactory.Create(p, kits[p.team], gk[p.team], parent, q, c.boots);
                 var av = rig.gameObject.AddComponent<AthleteView>();
                 av.Setup(p, rig, this);
                 athletes.Add(av);
@@ -164,7 +164,7 @@ namespace Craquez
             Destroy(go.GetComponent<Collider>());
             go.transform.SetParent(transform, false);
             go.transform.localScale = Vector3.one * 0.22f;
-            go.GetComponent<MeshRenderer>().sharedMaterial = Gfx.Lit(Color.white, BallTex(), 0.55f);
+            go.GetComponent<MeshRenderer>().sharedMaterial = Gfx.Lit(Color.white, BallCatalog.Texture(cfg.ball, q >= 2 ? 1024 : 512), 0.6f);
             _ball = go.transform;
             var sh = GameObject.CreatePrimitive(PrimitiveType.Quad);
             sh.name = "Sombra da bola";
@@ -174,29 +174,6 @@ namespace Craquez
             sh.GetComponent<MeshRenderer>().sharedMaterial = Gfx.UnlitTransparent(new Color(0, 0, 0, 0.45f), Gfx.Radial(64, Color.white, new Color(1, 1, 1, 0), 1.5f));
             sh.GetComponent<MeshRenderer>().shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
             _ballShadow = sh.transform;
-        }
-
-        /// <summary>Bola com gomos (padrão original).</summary>
-        static Texture2D BallTex()
-        {
-            int s = 256;
-            var t = Gfx.Tex(s, s / 2);
-            var px = new Color32[s * s / 2];
-            for (int y = 0; y < s / 2; y++)
-                for (int x = 0; x < s; x++)
-                {
-                    float u = x / (float)s * Mathf.PI * 2, v = y / (float)(s / 2) * Mathf.PI;
-                    var p = new Vector3(Mathf.Sin(v) * Mathf.Cos(u), Mathf.Cos(v), Mathf.Sin(v) * Mathf.Sin(u));
-                    float a = Mathf.Abs(Mathf.Sin(p.x * 5f + p.y * 3f)) * Mathf.Abs(Mathf.Sin(p.z * 5f - p.y * 2f));
-                    Color c = a > 0.62f ? new Color(0.05f, 0.35f, 0.75f) : a > 0.55f ? new Color(0.95f, 0.75f, 0.1f) : new Color(0.97f, 0.97f, 0.97f);
-                    float seam = Mathf.Abs(Mathf.Sin(p.x * 9f)) < 0.04f || Mathf.Abs(Mathf.Sin(p.z * 9f)) < 0.04f ? 0.75f : 1f;
-                    c *= seam;
-                    c.a = 1;
-                    px[y * s + x] = c;
-                }
-            t.SetPixels32(px);
-            t.Apply(true);
-            return t;
         }
 
         Transform Marker(Color c)

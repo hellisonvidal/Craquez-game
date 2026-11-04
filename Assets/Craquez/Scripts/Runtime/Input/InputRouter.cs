@@ -165,7 +165,7 @@ namespace Craquez
                 return "Setas mover  •  Num1 passe  •  Num2 chute  •  Num3 alto  •  Num5 enfiada  •  Num0 correr\nNum4 trocar  •  Num6 proteger  •  Num9 colocado  •  Home/End/Del/PgDn: dribles";
             var g = Pad(d == DeviceKind.Gamepad1 ? 0 : 1);
             if (IsPlayStation(g))
-                return "✕ passe  •  ○ chute  •  □ alto/cruzamento  •  △ enfiada  •  R2 correr\nL1 trocar  •  L2 proteger/conter  •  R1 colocado  •  R3 (analógico direito): dribles";
+                return "Cruz passe  •  Bola chute  •  Quadrado alto  •  Triângulo enfiada  •  R2 correr\nL1 trocar  •  L2 proteger/conter  •  R1 colocado  •  R3 (analógico direito): dribles";
             return "A passe  •  B chute  •  X alto/cruzamento  •  Y enfiada  •  RT correr\nLB trocar  •  LT proteger/conter  •  RB colocado  •  Analógico direito: dribles";
         }
 

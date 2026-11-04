@@ -251,57 +251,6 @@ def apply_kit(obj, rig):
     for f, r in reg.items():
         f.material_index = idx[r]
 
-    # regiões por vértice (a roupa "mais externa" vence na borda)
-    order = {"Skin": 0, "Boots": 1, "Socks": 2, "Shorts": 3, "Shirt": 4}
-    vreg = {}
-    for f, r in reg.items():
-        for v in f.verts:
-            if v not in vreg or order[r] > order[vreg[v]]:
-                vreg[v] = r
-    orig = {v: v.co.copy() for v in bm.verts}
-    # suaviza o tecido (esconde mamilos, abdome e dedos dos pés) sem mexer nas bordas
-    interior = {v for v in bm.verts if vreg.get(v) in ("Shirt", "Shorts", "Boots", "Socks")
-                and all(reg[f] == vreg[v] for f in v.link_faces)}
-    # Taubin (lambda/mu): alisa sem encolher
-    iters = {"Shirt": 12, "Shorts": 8, "Boots": 70, "Socks": 4}
-    for it in range(max(iters.values()) * 2):
-        fac = 0.5 if it % 2 == 0 else -0.53
-        new = {}
-        for v in interior:
-            if it >= iters[vreg[v]] * 2:
-                continue
-            nb = [e.other_vert(v).co for e in v.link_edges]
-            avg = sum(nb, Vector()) / len(nb)
-            new[v] = v.co + (avg - v.co) * fac
-        for v, c in new.items():
-            v.co = c
-    # sola da chuteira plana
-    sole_z = min(v.co.z for v in bm.verts)
-    for v in bm.verts:
-        if vreg.get(v) == "Boots" and v.co.z < sole_z + 0.012:
-            v.co.z = sole_z + 0.004 if v.co.z < sole_z + 0.008 else v.co.z
-    bm.normal_update()
-    for v in bm.verts:
-        r = vreg.get(v, "Skin")
-        d = INFLATE.get(r, 0.0)
-        if r == "Shorts":
-            # calção mais folgado perto da barra
-            for s_ in ("l", "r"):
-                h, t = _bone_ws(rig, f"thigh_{s_}")
-                tt = (v.co - h).dot(t - h) / (t - h).length_squared
-                if 0.0 < tt < 0.6 and (v.co.x > 0) == (h.x > 0):
-                    d += 0.012 * max(0.0, tt) / 0.5
-        if r == "Boots":
-            d += 0.0
-        if d > 0:
-            v.co += v.normal * d
-    # aplica o mesmo deslocamento às shape keys
-    sk_layers = list(bm.verts.layers.shape.values())
-    for lay in sk_layers:
-        for v in bm.verts:
-            off = v.co - orig[v]
-            if off.length_squared > 0:
-                v[lay] = v[lay] + off
     bm.to_mesh(me)
     bm.free()
     me.update()
@@ -344,6 +293,8 @@ def build(name, v):
         if m.type == "SUBSURF":
             h.modifiers.remove(m)
     apply_kit(h, rig)
+    import garments
+    garments.make_all(h, rig)
     h.name = "Body"
     h.data.name = "Body"
     rig.name = "Armature"
@@ -351,6 +302,8 @@ def build(name, v):
         if c == h:
             continue
         base = c.name.split(".")[-1].lower()
+        if c.name in ("Shirt", "Shorts", "Socks", "Boots"):
+            continue
         if base + ".mhclo" in HAIRS:
             c.name = "Hair_" + base
         elif "eyebrow" in base:

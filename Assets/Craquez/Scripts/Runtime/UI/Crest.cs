@@ -15,7 +15,7 @@ namespace Craquez.UI
             var t = Teams.Get(index);
             string key = "t:" + index + ":" + t.name + (user != null ? ":u" : "");
             if (_cache.TryGetValue(key, out var s) && s != null) return s;
-            var tex = user != null ? user : Draw(t);
+            var tex = user != null ? user : t.flag.Count >= 2 ? Flag(t.flag, 160, 112) : Draw(t);
             s = Sprite.Create(tex, new Rect(0, 0, tex.width, tex.height), new Vector2(0.5f, 0.5f));
             _cache[key] = s;
             return s;
@@ -29,6 +29,64 @@ namespace Craquez.UI
             s = Sprite.Create(tex, new Rect(0, 0, tex.width, tex.height), new Vector2(0.5f, 0.5f));
             _cache[key] = s;
             return s;
+        }
+
+        /// <summary>Bandeira estilizada (cantos arredondados, leve ondulação e brilho de tecido).</summary>
+        public static Texture2D Flag(List<string> spec, int W, int H)
+        {
+            var tex = new Texture2D(W, H, TextureFormat.RGBA32, true) { wrapMode = TextureWrapMode.Clamp };
+            var px = new Color32[W * H];
+            string lay = spec[0];
+            var cols = new List<Color>();
+            for (int i = 1; i < spec.Count; i++) cols.Add(Teams.Col(spec[i]));
+            if (cols.Count == 0) cols.Add(Color.white);
+            Color C(int i) => cols[Mathf.Clamp(i, 0, cols.Count - 1)];
+            for (int y = 0; y < H; y++)
+                for (int x = 0; x < W; x++)
+                {
+                    float u = (x + 0.5f) / W, v = 1f - (y + 0.5f) / H;   // v = 0 no topo
+                    float wave = Mathf.Sin(u * 7f + v * 2f) * 0.012f;
+                    float vv = v + wave;
+                    Color c;
+                    switch (lay)
+                    {
+                        case "h": c = C(Mathf.Clamp((int)(vv * cols.Count), 0, cols.Count - 1)); break;
+                        case "v": c = C(Mathf.Clamp((int)(u * cols.Count), 0, cols.Count - 1)); break;
+                        case "vsplit": c = u < 0.4f ? C(0) : C(1); if (new Vector2((u - 0.4f) * 1.43f, vv - 0.5f).magnitude < 0.16f) c = new Color(0.98f, 0.82f, 0.1f); break;
+                        case "nordic": c = (Mathf.Abs(vv - 0.5f) < 0.1f || Mathf.Abs(u - 0.36f) < 0.07f) ? C(1) : C(0); break;
+                        case "cross": c = (Mathf.Abs(vv - 0.5f) < 0.12f && Mathf.Abs(u - 0.5f) < 0.3f) || (Mathf.Abs(u - 0.5f) < 0.085f && Mathf.Abs(vv - 0.5f) < 0.38f) ? C(1) : C(0); break;
+                        case "disc":
+                        {
+                            c = C(0);
+                            var d = new Vector2((u - 0.5f) * 1.43f, vv - 0.5f);
+                            if (cols.Count >= 3 && Mathf.Abs(d.x) / 0.48f + Mathf.Abs(d.y) / 0.36f < 1f && spec[1] != spec[2]) c = C(1);
+                            float r = d.magnitude;
+                            if (r < 0.2f) c = cols.Count >= 3 ? C(2) : C(1);
+                            break;
+                        }
+                        case "star":
+                        {
+                            c = C(0);
+                            var d = new Vector2((u - 0.5f) * 1.43f, vv - 0.5f);
+                            float ang = Mathf.Atan2(d.y, d.x);
+                            float rad = 0.17f * (0.5f + 0.5f * Mathf.Cos(ang * 5f + Mathf.PI / 2));
+                            if (d.magnitude < rad + 0.04f) c = C(1);
+                            break;
+                        }
+                        default: c = C(0); break;
+                    }
+                    // tecido: sombreado da ondulação + borda arredondada
+                    float shade = 0.9f + 0.1f * Mathf.Cos(u * 7f + v * 2f);
+                    c = new Color(c.r * shade, c.g * shade, c.b * shade, 1f);
+                    float dx = Mathf.Max(0, Mathf.Abs(u - 0.5f) * W - (W * 0.5f - 10)), dy = Mathf.Max(0, Mathf.Abs(v - 0.5f) * H - (H * 0.5f - 10));
+                    float a = Mathf.Clamp01(10.5f - Mathf.Sqrt(dx * dx + dy * dy));
+                    if (a < 1f && a > 0.4f) c = Color.Lerp(new Color(0, 0, 0, 1), c, a);
+                    c.a = a;
+                    px[y * W + x] = c;
+                }
+            tex.SetPixels32(px);
+            tex.Apply(true);
+            return tex;
         }
 
         static bool InShape(int kind, float x, float y)

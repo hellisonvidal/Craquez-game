@@ -22,6 +22,9 @@ namespace Craquez
         public int venue;                // futsal/rua: qual quadra/rua
         public uint seed = 1;
         public bool ceremony = true;
+        public bool national;            // seleções em vez de clubes
+        public int ball;                 // BallCatalog
+        public int boots = -1;           // -1 = cada atleta com a sua; senão modelo único
 
         public float SecondsPerHalf => minutes * 60f * 0.5f;
     }

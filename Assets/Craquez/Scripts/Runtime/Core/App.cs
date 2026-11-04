@@ -10,8 +10,8 @@ namespace Craquez
 {
     /// <summary>
     /// Ponto de entrada e fluxo de telas:
-    /// apresentação Claude → aviso "feito com IA, gratuito" → título → modos →
-    /// configuração → times (+ táticas) → partida. Opções a partir do título/modos.
+    /// apresentação Claude / aviso "feito com IA, gratuito" / título / modos /
+    /// configuração / times (+ táticas) / partida. Opções a partir do título/modos.
     /// </summary>
     public class App : MonoBehaviour
     {
@@ -38,6 +38,7 @@ namespace Craquez
         void Start()
         {
             Application.runInBackground = false;
+            GoFullscreen();
             Screen.sleepTimeout = SleepTimeout.NeverSleep;
             Sfx.Init();
             UrpSetup.Quality(Settings.Quality);
@@ -57,6 +58,24 @@ namespace Craquez
             _root = (RectTransform)_menu.transform;
             _cfg.seed = (uint)System.DateTime.Now.Ticks;
             ShowIntro();
+        }
+
+        /// <summary>Sempre em tela cheia: janela sem bordas na resolução nativa (PC) e modo imersivo (Android).</summary>
+        static void GoFullscreen()
+        {
+            if (Application.isMobilePlatform)
+            {
+                Screen.fullScreen = true;
+                return;
+            }
+            var r = Screen.currentResolution;
+            Screen.SetResolution(r.width, r.height, FullScreenMode.FullScreenWindow);
+        }
+
+        void OnApplicationFocus(bool focus)
+        {
+            // Android: ao voltar de outro app as barras do sistema reaparecem
+            if (focus && !Screen.fullScreen) GoFullscreen();
         }
 
         void Update()
@@ -82,25 +101,47 @@ namespace Craquez
         {
             UiKit.Clear(_root);
             _pressText = null;
-            var bg = UiKit.Image(_root, dark ? new Color(0.01f, 0.02f, 0.05f, 0.62f) : new Color(0, 0, 0, 0), null, "fundo");
+            var bg = UiKit.Image(_root, dark ? new Color(0.01f, 0.02f, 0.05f, 0.55f) : new Color(0, 0, 0, 0), null, "fundo");
             bg.rectTransform.Place(0, 0, 1, 1);
             // degradê lateral (legibilidade sobre o jogo ao fundo)
-            var grad = UiKit.Image(_root, new Color(0.01f, 0.02f, 0.05f, 0.75f), Theme.Soft, "brilho");
+            var grad = UiKit.Image(_root, new Color(0.01f, 0.02f, 0.05f, 0.8f), Theme.Soft, "brilho");
             grad.rectTransform.Place(-0.6f, -0.6f, 0.7f, 1.6f);
-            return _root;
+            if (!dark) return _root;
+            // barra superior: marca + controle detectado
+            var top = UiKit.Image(_root, new Color(0.01f, 0.02f, 0.05f, 0.7f), null, "topo").rectTransform.Place(0, 1, 1, 1, 0, -64, 0, 0);
+            var line = UiKit.Image(top, Theme.Accent, null, "linha").rectTransform.Place(0, 0, 1, 0, 0, 0, 0, -3);
+            var brand = UiKit.Label(top, "CRAQUEZ", 38, Theme.HeadItalic, Color.white);
+            brand.rectTransform.Place(0, 0, 0.4f, 1, 40, 0, 0, 0);
+            var dev = UiKit.Label(top, "" + InputRouter.DeviceName(InputRouter.DefaultP1()) + "   •   feito com IA  •  gratuito", 22, Theme.BodyBold, Theme.TextDim, TextAnchor.MiddleRight);
+            dev.rectTransform.Place(0.4f, 0, 1, 1, 0, 0, 40, 0);
+            // barra de dicas
+            var hints = UiKit.Image(_root, new Color(0.01f, 0.02f, 0.05f, 0.7f), null, "dicas").rectTransform.Place(0, 0, 1, 0, 0, 0, 0, -56);
+            UiKit.Label(hints, HintText(), 24, Theme.BodyBold, Theme.TextDim, TextAnchor.MiddleRight).rectTransform.Place(0, 0, 1, 1, 40, 0, 40, 0);
+            var content = UiKit.Rect(_root, "conteudo").Place(0, 0, 1, 1);
+            content.gameObject.AddComponent<PageFx>();
+            return content;
+        }
+
+        static string HintText()
+        {
+            var d = InputRouter.DefaultP1();
+            if (d == DeviceKind.Touch) return "Toque para escolher   •   ‹ › nas opções para mudar";
+            if (d == DeviceKind.Keyboard1 || d == DeviceKind.Keyboard2) return "Enter  Confirmar     Esc  Voltar     ‹ ›  Mudar opção";
+            bool ps = UnityEngine.InputSystem.Gamepad.current != null && InputRouter.IsPlayStation(UnityEngine.InputSystem.Gamepad.current);
+            return ps ? "X  Confirmar     O  Voltar     ‹ ›  Mudar opção" : "A  Confirmar     B  Voltar     ‹ ›  Mudar opção";
         }
 
         Text Title(RectTransform root, string text, string sub = null)
         {
             var t = UiKit.Label(root, text, 84, Theme.HeadItalic, Theme.Text);
-            t.rectTransform.Place(0, 1, 1, 1, 90, -150, 60, 40);
+            t.rectTransform.Place(0, 1, 1, 1, 90, -190, 60, 80);
             UiKit.Shadow(t, 4);
             var bar = UiKit.Image(root, Theme.Accent, null, "barra").rectTransform;
-            bar.At(0, 1, 140, 8, 94, -156);
+            bar.At(0, 1, 140, 8, 94, -196);
             if (sub != null)
             {
                 var s = UiKit.Label(root, sub, 28, Theme.BodyBold, Theme.TextDim);
-                s.rectTransform.Place(0, 1, 1, 1, 94, -210, 60, 170);
+                s.rectTransform.Place(0, 1, 1, 1, 94, -250, 60, 210);
             }
             return t;
         }
@@ -125,8 +166,8 @@ namespace Craquez
             if (_introPage == 0)
             {
                 var glow = UiKit.Image(page, new Color(0.85f, 0.47f, 0.34f, 0.25f), Theme.Soft, "brilho").rectTransform.At(0.5f, 0.55f, 900, 900);
-                var star = UiKit.Label(page, "✳", 150, Theme.Head, new Color(0.85f, 0.47f, 0.34f), TextAnchor.MiddleCenter);
-                star.rectTransform.At(0.5f, 0.62f, 300, 220);
+                var star = UiKit.Rect(page, "emblema").At(0.5f, 0.62f, 200, 200).gameObject.AddComponent<RawImage>();
+                star.texture = Burst(256, new Color(0.85f, 0.47f, 0.34f));
                 var a = UiKit.Label(page, "desenvolvido com", 34, Theme.Body, Theme.TextDim, TextAnchor.MiddleCenter);
                 a.rectTransform.At(0.5f, 0.47f, 1200, 60);
                 var b = UiKit.Label(page, "Claude", 120, Theme.Head, Color.white, TextAnchor.MiddleCenter);
@@ -144,6 +185,32 @@ namespace Craquez
                 c.rectTransform.At(0.5f, 0.3f, 1600, 140);
                 UiKit.Shadow(c, 5);
             }
+        }
+
+        /// <summary>Emblema de raios arredondados (abertura).</summary>
+        static Texture2D Burst(int n, Color c)
+        {
+            var t = new Texture2D(n, n, TextureFormat.RGBA32, true) { wrapMode = TextureWrapMode.Clamp };
+            var px = new Color32[n * n];
+            for (int y = 0; y < n; y++)
+                for (int x = 0; x < n; x++)
+                {
+                    var p = new Vector2(x + 0.5f - n / 2f, y + 0.5f - n / 2f) / (n / 2f);
+                    float best = 9f;
+                    for (int k = 0; k < 12; k++)
+                    {
+                        float a = k / 12f * Mathf.PI * 2f + 0.13f;
+                        float len = k % 2 == 0 ? 0.92f : 0.72f;
+                        var d = new Vector2(Mathf.Cos(a), Mathf.Sin(a));
+                        float tt = Mathf.Clamp(Vector2.Dot(p, d), 0.08f, len);
+                        best = Mathf.Min(best, (p - d * tt).magnitude);
+                    }
+                    float alpha = Mathf.Clamp01((0.085f - best) * n * 0.5f + 0.5f);
+                    px[y * n + x] = new Color(c.r, c.g, c.b, alpha);
+                }
+            t.SetPixels32(px);
+            t.Apply(true);
+            return t;
         }
 
         void UpdateIntro()
@@ -214,48 +281,79 @@ namespace Craquez
         }
 
         // ------------------------------------------------------------ modos
+        static readonly (string title, string sub, string desc, string mode, bool national, MenuArt.Kind art)[] ModeDefs =
+        {
+            ("CLUBES", "Campo  •  11 x 11", "22 ligas e 400 clubes da temporada 2026/27. Estádios em 3 portes, clima e cerimônia de abertura.", GameModes.Field, false, MenuArt.Kind.FieldClubs),
+            ("SELEÇÕES", "Campo  •  11 x 11", "40 seleções ordenadas pelo ranking mundial do Craquez. Jogue com as cores do seu país.", GameModes.Field, true, MenuArt.Kind.FieldNations),
+            ("FUTSAL", "Clubes  •  5 x 5", "Ligas de futsal do Brasil, Espanha, Portugal, Itália e Argentina em 8 quadras com tela.", GameModes.Futsal, false, MenuArt.Kind.FutsalClubs),
+            ("FUTSAL SELEÇÕES", "5 x 5", "As 20 melhores seleções de futsal do mundo. Bola no chão, toque rápido.", GameModes.Futsal, true, MenuArt.Kind.FutsalNations),
+            ("RUA", "3 x 3", "8 ruas diferentes: prédios, morro, praia, terraço, gaiola, telhado, viaduto e praça. A bola bate na parede.", GameModes.Street, false, MenuArt.Kind.Street),
+        };
+        static readonly Dictionary<MenuArt.Kind, Texture2D> _tileArt = new Dictionary<MenuArt.Kind, Texture2D>();
+
         void ShowModes()
         {
             if (_attract == null) StartAttract();
             var root = Page();
             _back = ShowTitle;
-            Title(root, "MODOS DE JOGO", "Escolha onde a bola vai rolar");
-            var row = UiKit.Rect(root, "cartoes").Place(0, 0, 1, 1, 90, 200, 90, 300);
-            UiKit.HList(row, 34);
+            Title(root, "JOGAR", "Escolha o modo de jogo");
+            var row = UiKit.Rect(root, "cartoes").Place(0, 0, 1, 1, 90, 230, 90, 300);
+            var hl = UiKit.HList(row, 28);
+            hl.childForceExpandHeight = true;
+            var desc = UiKit.Label(root, "", 30, Theme.Body, Theme.Text);
+            desc.rectTransform.Place(0, 0, 0.75f, 0, 94, 110, 0, -200);
+            UiKit.Shadow(desc, 2, 0.8f);
             Button first = null;
-            (string id, string name, string desc, Color c)[] modes =
-            {
-                (GameModes.Field, "CAMPO", "11 x 11  •  estádios de 3 portes\n22 ligas  •  400 clubes", new Color(0.1f, 0.55f, 0.3f)),
-                (GameModes.Futsal, "FUTSAL", "5 x 5  •  8 quadras com tela\nligas de futsal do mundo", new Color(0.15f, 0.35f, 0.75f)),
-                (GameModes.Street, "RUA", "3 x 3  •  8 ruas diferentes\nbola na parede vale", new Color(0.75f, 0.35f, 0.15f)),
-            };
-            foreach (var m in modes)
+            foreach (var m in ModeDefs)
             {
                 var mm = m;
-                var b = UiKit.Button(row, "", () => { _cfg.mode = mm.id; _cfg.venue = Random.Range(0, 8); FixTeamsForMode(); ShowSetup(); }, 30, mm.c);
-                var bl = b.GetComponentInChildren<Text>();
-                bl.text = "";
-                var big = UiKit.Label(b.transform, mm.name, 96, Theme.HeadItalic, Color.white, TextAnchor.MiddleCenter);
-                big.rectTransform.Place(0, 0.4f, 1, 0.85f);
-                UiKit.Shadow(big, 4);
-                var d = UiKit.Label(b.transform, mm.desc, 28, Theme.BodyBold, new Color(1, 1, 1, 0.85f), TextAnchor.MiddleCenter);
-                d.rectTransform.Place(0, 0.08f, 1, 0.4f, 20, 0, 20, 0);
-                b.GetComponent<SelectTint>().label = big;
+                var card = UiKit.Image(row, Color.white, Theme.Round, "modo " + mm.title);
+                var b = card.gameObject.AddComponent<Button>();
+                b.targetGraphic = card;
+                var cb = ColorBlock.defaultColorBlock;
+                cb.normalColor = new Color(0.12f, 0.16f, 0.26f);
+                cb.highlightedColor = cb.selectedColor = new Color(0.16f, 0.22f, 0.36f);
+                cb.pressedColor = Theme.Accent;
+                b.colors = cb;
+                var glow = UiKit.Image(card.transform, Theme.Accent, Theme.Round, "borda");
+                glow.rectTransform.Place(0, 0, 1, 1, -6, -6, -6, -6);
+                glow.transform.SetAsFirstSibling();
+                glow.enabled = false;
+                if (!_tileArt.TryGetValue(mm.art, out var tex) || tex == null) _tileArt[mm.art] = tex = MenuArt.Tile(mm.art);
+                var art = UiKit.Rect(card.transform, "arte").Place(0, 0.3f, 1, 1, 8, 0, 8, 8);
+                art.gameObject.AddComponent<RectMask2D>();
+                var ri = UiKit.Rect(art, "img").Place(0, 0, 1, 1).gameObject.AddComponent<RawImage>();
+                ri.texture = tex;
+                ri.raycastTarget = false;
+                var title = UiKit.Label(card.transform, mm.title, 44, Theme.HeadItalic, Color.white, TextAnchor.MiddleCenter);
+                title.rectTransform.Place(0, 0.12f, 1, 0.3f, 6, 0, 6, 0);
+                var sub = UiKit.Label(card.transform, mm.sub, 24, Theme.BodyBold, Theme.Accent, TextAnchor.MiddleCenter);
+                sub.rectTransform.Place(0, 0.02f, 1, 0.14f);
+                var fx = card.gameObject.AddComponent<TileFx>();
+                fx.glow = glow;
+                fx.onSelected = () => desc.text = mm.desc;
+                b.onClick.AddListener(() =>
+                {
+                    Sfx.Ui();
+                    _cfg.mode = mm.mode;
+                    _cfg.national = mm.national;
+                    _cfg.venue = Random.Range(0, 8);
+                    FixTeamsForMode();
+                    ShowSetup();
+                });
                 if (first == null) first = b;
             }
-            var opt = UiKit.Button(root, "Opções", ShowOptions, 34);
-            opt.GetComponent<RectTransform>().At(0, 0, 320, 80, 90, 90);
-            var ctl = UiKit.Label(root, "Controles: " + InputRouter.DeviceName(InputRouter.DefaultP1()), 26, Theme.BodyBold, Theme.TextDim, TextAnchor.MiddleRight);
-            ctl.rectTransform.Place(0.4f, 0, 1, 0, 0, 100, 90, -170);
+            var opt = UiKit.Button(root, "Opções", ShowOptions, 32);
+            opt.GetComponent<RectTransform>().At(1, 1, 260, 70, -90, -110);
             UiKit.Select(first);
         }
 
         void FixTeamsForMode()
         {
             bool futsal = _cfg.mode == GameModes.Futsal;
-            var lgs = LeaguesFor(futsal);
+            var lgs = LeaguesFor(futsal, _cfg.national);
             if (lgs.Count == 0) return;
-            bool ok(int t) { var l = Teams.Leagues[Teams.LeagueOf(t)]; return l.IsFutsal == futsal; }
+            bool ok(int t) { var l = Teams.Leagues[Teams.LeagueOf(t)]; return l.IsFutsal == futsal && l.IsNational == _cfg.national; }
             if (!ok(_cfg.teamA)) _cfg.teamA = lgs[0].first;
             if (!ok(_cfg.teamB)) _cfg.teamB = lgs[0].first + 1;
             _cfg.tacticsA = new Tactics();
@@ -264,10 +362,11 @@ namespace Craquez
             _cfg.kitB = -1;
         }
 
-        static List<League> LeaguesFor(bool futsal)
+        static List<League> LeaguesFor(bool futsal, bool national)
         {
             var l = new List<League>();
-            foreach (var lg in Teams.Leagues) if (lg.IsFutsal == futsal) l.Add(lg);
+            foreach (var lg in Teams.Leagues) if (lg.IsFutsal == futsal && lg.IsNational == national) l.Add(lg);
+            if (l.Count == 0) foreach (var lg in Teams.Leagues) if (lg.IsFutsal == futsal) l.Add(lg);
             return l;
         }
 
@@ -285,7 +384,7 @@ namespace Craquez
         {
             var root = Page();
             _back = ShowModes;
-            Title(root, "PARTIDA  •  " + GameModes.DisplayName(_cfg.mode).ToUpperInvariant(), "Ajuste a partida e escolha os times");
+            Title(root, (_cfg.mode == GameModes.Street ? "RUA" : (_cfg.national ? "SELEÇÕES" : "CLUBES")) + "  •  " + GameModes.DisplayName(_cfg.mode).ToUpperInvariant(), "Ajuste a partida e escolha os times");
             var list = UiKit.Rect(root, "lista").Place(0, 0, 0.55f, 1, 90, 150, 0, 260);
             UiKit.VList(list, 12, 0, false);
             int sideIdx = _cfg.sideB == Side.Player2 ? 1 : _cfg.sideA == Side.Cpu ? 2 : 0;
@@ -311,10 +410,52 @@ namespace Craquez
                 UiKit.Size(UiKit.Cycler(list, "Local", names, _cfg.venue, i => _cfg.venue = i), 72, 72);
             }
             UiKit.Size(UiKit.Cycler(list, "Cerimônia de abertura", new[] { "Mostrar", "Pular" }, _cfg.ceremony ? 0 : 1, i => _cfg.ceremony = i == 0), 72, 72);
-            var go = UiKit.Button(root, "ESCOLHER TIMES  ▶", ShowTeams, 40, new Color(0.0f, 0.55f, 0.38f));
+            // bola (30) e chuteiras (16) com pré-visualização
+            var card = UiKit.Panel(root).rectTransform.Place(0.58f, 0, 1, 1, 0, 200, 90, 300);
+            UiKit.Label(card, "BOLA", 30, Theme.Head, Theme.Accent, TextAnchor.MiddleLeft).rectTransform.Place(0, 1, 1, 1, 30, -70, 30, 20);
+            var holder = UiKit.Image(card, Color.white, Theme.Circle, "bola").rectTransform.At(0, 1, 210, 210, 30, -80);
+            holder.gameObject.AddComponent<Mask>().showMaskGraphic = false;
+            var ballImg = UiKit.Rect(holder, "tex").Place(0, 0, 1, 1).gameObject.AddComponent<RawImage>();
+            ballImg.uvRect = new Rect(0, 0, 0.5f, 1f);
+            ballImg.gameObject.AddComponent<SpinUv>().img = ballImg;
+            var shine = UiKit.Image(holder, new Color(1, 1, 1, 0.25f), Theme.Soft, "brilho").rectTransform.Place(0.05f, 0.45f, 0.6f, 0.98f);
+            var ballName = UiKit.Label(card, "", 34, Theme.HeadItalic, Theme.Text);
+            ballName.rectTransform.Place(0, 1, 1, 1, 260, -190, 20, 110);
+            void RefreshBall() { ballImg.texture = BallCatalog.Texture(_cfg.ball, 256); ballName.text = BallCatalog.All[_cfg.ball].name; }
+            var ballNames = new List<string>();
+            for (int i = 0; i < BallCatalog.All.Length; i++) ballNames.Add((i + 1) + ". " + BallCatalog.All[i].name);
+            var ballC = UiKit.Cycler(card, "Bola", ballNames, _cfg.ball, i => { _cfg.ball = i; RefreshBall(); });
+            ballC.GetComponent<RectTransform>().Place(0, 1, 1, 1, 24, -390, 24, 318);
+            RefreshBall();
+            UiKit.Label(card, "CHUTEIRAS", 30, Theme.Head, Theme.Accent, TextAnchor.MiddleLeft).rectTransform.Place(0, 1, 1, 1, 30, -460, 30, 410);
+            var bootRow = UiKit.Rect(card, "chuteira").Place(0, 1, 1, 1, 30, -560, 30, 470);
+            var bootNames = new List<string> { "Cada atleta com a sua" };
+            foreach (var d in BootPainter.Designs) bootNames.Add(d.name);
+            void RefreshBoots()
+            {
+                UiKit.Clear(bootRow);
+                var list2 = new List<int>();
+                if (_cfg.boots < 0) { for (int i = 0; i < 6; i++) list2.Add((i * 5 + 1) % BootPainter.Designs.Length); }
+                else list2.Add(_cfg.boots);
+                float x = 0;
+                foreach (int bi in list2)
+                {
+                    var d = BootPainter.Designs[bi];
+                    foreach (var col in new[] { d.baseC, d.accent, d.sole })
+                    {
+                        UiKit.Image(bootRow, col, Theme.RoundSmall, "cor").rectTransform.At(0, 0.5f, list2.Count > 1 ? 22 : 70, 70, x, 0);
+                        x += list2.Count > 1 ? 24 : 78;
+                    }
+                    x += list2.Count > 1 ? 14 : 0;
+                }
+            }
+            var bootC = UiKit.Cycler(card, "Chuteiras", bootNames, _cfg.boots + 1, i => { _cfg.boots = i - 1; RefreshBoots(); });
+            bootC.GetComponent<RectTransform>().Place(0, 1, 1, 1, 24, -660, 24, 588);
+            RefreshBoots();
+            var go = UiKit.Button(root, "ESCOLHER TIMES  ›", ShowTeams, 40, new Color(0.0f, 0.55f, 0.38f));
             go.GetComponent<RectTransform>().At(1, 0, 520, 100, -90, 90);
-            var help = UiKit.Label(root, InputRouter.Help(InputRouter.DefaultP1()), 24, Theme.Body, Theme.TextDim);
-            help.rectTransform.Place(0.58f, 0.35f, 1, 0.8f, 0, 0, 90, 0);
+            var help = UiKit.Label(root, InputRouter.Help(InputRouter.DefaultP1()), 22, Theme.Body, Theme.TextDim);
+            help.rectTransform.Place(0, 0, 0.6f, 0, 94, 76, 0, -150);
             UiKit.Select(first);
         }
 
@@ -323,9 +464,9 @@ namespace Craquez
         {
             var root = Page();
             _back = ShowSetup;
-            Title(root, "ESCOLHA DOS TIMES", null);
+            Title(root, _cfg.national ? "ESCOLHA DAS SELEÇÕES" : "ESCOLHA DOS TIMES", null);
             bool futsal = _cfg.mode == GameModes.Futsal;
-            var lgs = LeaguesFor(futsal);
+            var lgs = LeaguesFor(futsal, _cfg.national);
             Selectable first = null;
             for (int side = 0; side < 2; side++)
             {
@@ -357,7 +498,7 @@ namespace Craquez
                     int ovr = 0;
                     foreach (var r in t.roster) ovr += r.ovr;
                     ovr = t.roster.Count > 0 ? ovr / t.roster.Count : Mathf.RoundToInt(t.rating * 100);
-                    info.text = t.league + "\nGeral " + ovr + "  •  " + (string.IsNullOrEmpty(t.stadium.name) ? "" : t.stadium.name + (t.stadium.cap > 0 ? " (" + t.stadium.cap.ToString("N0") + ")" : ""));
+                    info.text = (t.IsNational ? "Ranking Craquez  #" + t.rank : t.league) + "\nGeral " + ovr + "  •  " + (string.IsNullOrEmpty(t.stadium.name) ? "" : t.stadium.name + (t.stadium.cap > 0 ? " (" + t.stadium.cap.ToString("N0") + ")" : ""));
                     UiKit.Clear(kitRow);
                     int kIdx = s == 0 ? _cfg.kitA : (_cfg.kitB < 0 ? 0 : _cfg.kitB);
                     var k = t.kits[Mathf.Clamp(kIdx, 0, t.kits.Count - 1)];
@@ -385,6 +526,7 @@ namespace Craquez
                     Refresh();
                 });
                 UiKit.Size(lgC, 70, 70);
+                if (lgs.Count == 1) lgC.gameObject.SetActive(false);   // seleções: uma "liga" só
                 teamC = UiKit.Cycler(list, "Time", TeamNames(lgs[lgIdx]), Team() - lgs[lgIdx].first, i =>
                 {
                     SetTeam(lgs[lgC.Index].first + i);
@@ -402,9 +544,9 @@ namespace Craquez
                 var tac = UiKit.Button(col, "Táticas e elenco", () => ShowTactics(s), 30);
                 tac.GetComponent<RectTransform>().Place(0, 0, 1, 0, 24, 30, 24, -110);
                 Refresh();
-                if (first == null) first = lgC;
+                if (first == null) first = lgs.Count == 1 ? (Selectable)teamC : lgC;
             }
-            var play = UiKit.Button(root, "JOGAR  ▶", StartMatch, 44, new Color(0.0f, 0.55f, 0.38f));
+            var play = UiKit.Button(root, "JOGAR  ›", StartMatch, 44, new Color(0.0f, 0.55f, 0.38f));
             play.GetComponent<RectTransform>().At(1, 0, 420, 100, -90, 70);
             UiKit.Select(first);
         }
@@ -475,8 +617,8 @@ namespace Craquez
                 var e = t.roster[ri];
                 int slot = System.Array.IndexOf(tac.lineup, ri);
                 string role = slot >= 0 ? GameModes.RoleFor(formation[slot], slot, mode.keeper) : "RES";
-                string traits = e.t.Count > 0 ? "  <color=#f5c518>★ " + string.Join(", ", e.t) + "</color>" : "";
-                string line = "<b>" + e.num.ToString().PadLeft(2) + "</b>  " + e.n + "   <color=#8fa3bf>" + e.pos + " → " + role + "  •  " + e.ovr + "</color>" + traits;
+                string traits = e.t.Count > 0 ? "  <color=#f5c518>+ " + string.Join(", ", e.t) + "</color>" : "";
+                string line = "<b>" + e.num.ToString().PadLeft(2) + "</b>  " + e.n + "   <color=#8fa3bf>" + e.pos + " / " + role + "  •  " + e.ovr + "</color>" + traits;
                 var b = UiKit.Button(content, "", null, 26, slot >= 0 ? new Color(0.1f, 0.3f, 0.22f) : Theme.PanelLight);
                 var lbl = b.GetComponentInChildren<Text>();
                 lbl.font = Theme.Body;
@@ -487,7 +629,7 @@ namespace Craquez
                 b.onClick.AddListener(() =>
                 {
                     Sfx.Ui();
-                    if (picked < 0) { picked = ri; lbl.text = "▶ " + line; return; }
+                    if (picked < 0) { picked = ri; lbl.text = "» " + line; return; }
                     int sa = System.Array.IndexOf(tac.lineup, picked), sb = System.Array.IndexOf(tac.lineup, ri);
                     if (sa >= 0 && sb >= 0) { tac.lineup[sa] = ri; tac.lineup[sb] = picked; }
                     else if (sa >= 0) tac.lineup[sa] = ri;

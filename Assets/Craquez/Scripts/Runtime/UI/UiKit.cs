@@ -267,11 +267,11 @@ namespace Craquez.UI
             Index = Mathf.Clamp(index, 0, Mathf.Max(0, options.Count - 1));
             caption = UiKit.Label(transform, cap, 26, Theme.BodyBold, Theme.TextDim);
             caption.rectTransform.Place(0, 0, 0.42f, 1, 24, 0, 0, 0);
-            var l = UiKit.Label(transform, "◀", 30, Theme.Head, Theme.Accent, TextAnchor.MiddleCenter);
+            var l = UiKit.Label(transform, "‹", 30, Theme.Head, Theme.Accent, TextAnchor.MiddleCenter);
             l.rectTransform.Place(0.42f, 0, 0.5f, 1);
             value = UiKit.Label(transform, "", 32, Theme.Head, Theme.Text, TextAnchor.MiddleCenter);
             value.rectTransform.Place(0.5f, 0, 0.92f, 1);
-            var r = UiKit.Label(transform, "▶", 30, Theme.Head, Theme.Accent, TextAnchor.MiddleCenter);
+            var r = UiKit.Label(transform, "›", 30, Theme.Head, Theme.Accent, TextAnchor.MiddleCenter);
             r.rectTransform.Place(0.92f, 0, 1, 1, 0, 0, 12, 0);
             Refresh();
         }
