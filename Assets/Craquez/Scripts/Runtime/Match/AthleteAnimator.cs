@@ -111,7 +111,8 @@ namespace Craquez
                 if (!Clips.TryGetValue(Loco[i], out var ci) || !ci.loop || i == IIdle) continue;
                 float len = ci.clip.length, best = float.MaxValue, bt = 0f;
                 const int N = 40;
-                var fwd = go.transform.parent != null ? go.transform.parent.forward : go.transform.forward;
+                var rigRoot = go.GetComponentInParent<AthleteRig>();
+                var fwd = rigRoot != null ? rigRoot.transform.forward : go.transform.forward;
                 fwd.y = 0f;
                 fwd.Normalize();
                 var lp = new Vector3[N];
@@ -120,8 +121,9 @@ namespace Craquez
                 {
                     float t = len * k / N;
                     ci.clip.SampleAnimation(go, t);
-                    lp[k] = fl.position - go.transform.position;
-                    rp[k] = fr.position - go.transform.position;
+                    var o = rigRoot != null ? rigRoot.transform.position : go.transform.position;
+                    lp[k] = fl.position - o;
+                    rp[k] = fr.position - o;
                     // apoio do pé esquerdo: pé esquerdo mais baixo e mais à frente que o direito
                     float d = (fl.position.y - fr.position.y) * 3f - Vector3.Dot(fl.position - fr.position, fwd);
                     if (d < best) { best = d; bt = (float)k / N; }

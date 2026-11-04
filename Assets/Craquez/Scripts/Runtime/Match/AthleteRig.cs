@@ -27,7 +27,14 @@ namespace Craquez
             if (head != null) headRest = head.localRotation;
             if (neck != null) neckRest = neck.localRotation; spine = B("spine_03"); pelvis = B("pelvis");
             footL = B("foot_l"); footR = B("foot_r"); handL = B("hand_l"); handR = B("hand_r");
-            animator = m.GetComponent<Animator>() ?? m.gameObject.AddComponent<Animator>();
+            // os clipes vêm de um FBX só com o esqueleto: a Unity remove o nó raiz e os caminhos
+            // começam em "Root/..."; no modelo eles ficam sob "Armature". O Animator vai no
+            // "Armature" para os caminhos baterem (antes nenhuma curva encontrava os ossos).
+            var arm = B("Armature");
+            var animHost = arm != null && arm != m ? arm.gameObject : m.gameObject;
+            var old = m.GetComponent<Animator>();
+            if (old != null && animHost != m.gameObject) old.enabled = false;
+            animator = animHost.GetComponent<Animator>() ?? animHost.AddComponent<Animator>();
             animator.applyRootMotion = false;
             animator.cullingMode = AnimatorCullingMode.AlwaysAnimate;   // ossos sempre atualizados (evita cabeça "solta")
             if (head != null)

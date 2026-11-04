@@ -16,6 +16,9 @@ namespace Craquez.EditorTools
     {
         const string AthleteDir = "Assets/Craquez/Resources/Athletes/";
 
+        /// <summary>Muda quando as regras mudam: força reimportar os FBX.</summary>
+        public override uint GetVersion() => 3;
+
         void OnPreprocessModel()
         {
             if (!assetPath.StartsWith(AthleteDir)) return;
@@ -88,7 +91,7 @@ namespace Craquez.EditorTools
                 bool pelvis = b.path.EndsWith("/pelvis") || b.path == "pelvis";
                 // nó do esqueleto ("Armature") e osso raiz: guardam a conversão de eixos do Blender
                 // (Z para cima); se a animação mexer neles, o atleta "deita". Só os ossos animam.
-                bool armatureNode = b.path == "" || b.path == "Armature" || b.path.EndsWith("/Root") || b.path == "Armature/Root";
+                bool armatureNode = b.path == "" || b.path == "Armature" || b.path == "Root" || b.path.EndsWith("/Root");
                 if (armatureNode || scale || (pos && !pelvis)) AnimationUtility.SetEditorCurve(clip, b, null);
             }
         }

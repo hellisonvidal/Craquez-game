@@ -39,7 +39,7 @@ namespace Craquez.Tests
             try
             {
                 Assert.IsTrue(AthleteAnimator.Clips.TryGetValue("Run", out var ci), "clipe Run ausente");
-                var model = r.model;
+                var model = r.animator.transform;   // os caminhos do clipe são relativos ao Animator
                 var paths = new System.Collections.Generic.HashSet<string>();
                 foreach (var t in model.GetComponentsInChildren<Transform>(true)) if (t != model) paths.Add(PathOf(t, model));
                 var binds = UnityEditor.AnimationUtility.GetCurveBindings(ci.clip);
@@ -59,8 +59,9 @@ namespace Craquez.Tests
                 float sampled = Quaternion.Angle(q0, thigh.localRotation);
                 // pelo grafo (como no jogo)
                 var anim = new AthleteAnimator(r.animator, "D", 3);
-                float minA = 999f, maxA = -999f;
-                var fwd = g.transform.forward;
+                float minA = 999f, maxA = -999f, drift = 0f;
+                var pelvis = B(r, "pelvis");
+                var p0 = pelvis.position;
                 for (int f = 0; f < 90; f++)
                 {
                     anim.Tick(1f / 60f, 5f, 5f, 0f, false);
@@ -68,11 +69,15 @@ namespace Craquez.Tests
                     float a = Vector3.SignedAngle(Vector3.down, d, g.transform.right);
                     minA = Mathf.Min(minA, a);
                     maxA = Mathf.Max(maxA, a);
+                    var dp = pelvis.position - p0;
+                    dp.y = 0f;
+                    drift = Mathf.Max(drift, dp.magnitude);
                 }
                 anim.Destroy();
-                Debug.Log($"[anim-diag] coxa: SampleAnimation varia {sampled:F1}°; pelo grafo a coxa oscila {maxA - minA:F1}° ({minA:F0}..{maxA:F0})");
+                Debug.Log($"[anim-diag] coxa: SampleAnimation varia {sampled:F1}°; pelo grafo a coxa oscila {maxA - minA:F1}° ({minA:F0}..{maxA:F0}); quadril sai do lugar até {drift:F2} m");
                 Assert.Greater(hit, binds.Length / 2, "curvas do clipe não encontram os ossos do modelo");
                 Assert.Greater(maxA - minA, 20f, "a corrida não move as pernas");
+                Assert.Less(drift, 0.35f, "o clipe de corrida desloca o quadril (deveria correr no lugar)");
             }
             finally { Object.DestroyImmediate(g); }
         }
