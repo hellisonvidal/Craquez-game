@@ -6,6 +6,33 @@ using UnityEngine.Playables;
 namespace Craquez
 {
     /// <summary>
+    /// Correções feitas por cima da animação (tronco, perna do toque, braços).
+    /// Guarda a rotação animada de cada osso antes de mexer e a devolve no quadro
+    /// seguinte, antes da animação ser avaliada: as correções nunca se acumulam,
+    /// mesmo quando a animação não reescreve um osso (curva constante).
+    /// </summary>
+    public class PoseEdits
+    {
+        readonly List<Transform> _t = new List<Transform>();
+        readonly List<Quaternion> _q = new List<Quaternion>();
+
+        /// <summary>Gira o osso no espaço do mundo (delta * rotação atual).</summary>
+        public void Rotate(Transform t, Quaternion worldDelta)
+        {
+            if (t == null) return;
+            if (!_t.Contains(t)) { _t.Add(t); _q.Add(t.localRotation); }
+            t.rotation = worldDelta * t.rotation;
+        }
+
+        public void Restore()
+        {
+            for (int i = 0; i < _t.Count; i++) if (_t[i] != null) _t[i].localRotation = _q[i];
+            _t.Clear();
+            _q.Clear();
+        }
+    }
+
+    /// <summary>
     /// Mistura as animações de captura de movimento (CMU, transferidas para o
     /// esqueleto dos atletas) pelo Playables API:
     ///   • locomoção: parado / andar / trotar / correr / de costas / de lado,

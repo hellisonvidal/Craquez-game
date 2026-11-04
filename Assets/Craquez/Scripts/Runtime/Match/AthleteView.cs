@@ -179,6 +179,7 @@ namespace Craquez
             }
             Cuts(dt, spd);
             Touches();
+            _pose.Restore();   // tira as correções do quadro anterior antes de avaliar a animação
             anim?.Tick(dt, animSpeed, animFwd, lv.x, guard);
             if (!_diag && rig.head != null && p.id == 3)
             {
@@ -188,6 +189,7 @@ namespace Craquez
             if (_celebrate > 0f) _celebrate -= dt;
         }
 
+        readonly PoseEdits _pose = new PoseEdits();
         float _accLean, _cutCd, _touchAnim, _lastTouchT;
         Vector2 _refDir;
         int _touchLeg;
@@ -227,8 +229,8 @@ namespace Craquez
             if (rig.bones.TryGetValue("spine_01", out var sp1) && Mathf.Abs(_accLean) > 0.05f)
             {
                 var ax = transform.right;
-                sp1.rotation = Quaternion.AngleAxis(_accLean * 0.55f, ax) * sp1.rotation;
-                if (rig.spine != null) rig.spine.rotation = Quaternion.AngleAxis(_accLean * 0.45f, ax) * rig.spine.rotation;
+                _pose.Rotate(sp1, Quaternion.AngleAxis(_accLean * 0.55f, ax));
+                _pose.Rotate(rig.spine, Quaternion.AngleAxis(_accLean * 0.45f, ax));
             }
             if (_touchAnim > 0f)
             {
@@ -238,8 +240,8 @@ namespace Craquez
                 rig.bones.TryGetValue("thigh" + sfx, out var th);
                 rig.bones.TryGetValue("calf" + sfx, out var cf);
                 var ax = transform.right;
-                if (th != null) th.rotation = Quaternion.AngleAxis(-26f * k, ax) * th.rotation;
-                if (cf != null) cf.rotation = Quaternion.AngleAxis(-16f * k, ax) * cf.rotation;
+                _pose.Rotate(th, Quaternion.AngleAxis(-26f * k, ax));
+                _pose.Rotate(cf, Quaternion.AngleAxis(-16f * k, ax));
             }
         }
 
@@ -311,9 +313,9 @@ namespace Craquez
                 float s = Mathf.Sign(Vector3.Dot(up.position - (rig.spine != null ? rig.spine.position : transform.position), transform.right));
                 var target = (Vector3.up * 2.2f + transform.right * s * 0.9f + transform.forward * 0.15f).normalized;
                 var cur = lo.position - up.position;
-                up.rotation = Quaternion.Slerp(Quaternion.identity, Quaternion.FromToRotation(cur, target), _armsUp * pump) * up.rotation;
+                _pose.Rotate(up, Quaternion.Slerp(Quaternion.identity, Quaternion.FromToRotation(cur, target), _armsUp * pump));
                 var cur2 = hd.position - lo.position;
-                lo.rotation = Quaternion.Slerp(Quaternion.identity, Quaternion.FromToRotation(cur2, (target + Vector3.up * 0.3f).normalized), _armsUp * 0.8f) * lo.rotation;
+                _pose.Rotate(lo, Quaternion.Slerp(Quaternion.identity, Quaternion.FromToRotation(cur2, (target + Vector3.up * 0.3f).normalized), _armsUp * 0.8f));
             }
         }
 
