@@ -7,7 +7,7 @@ using UnityEngine;
 
 namespace Craquez.Tests
 {
-    /// <summary>Compila de verdade os shaders de cel shading (OpenGL ES, Vulkan, OpenGL) com as variantes principais.</summary>
+    /// <summary>Compila de verdade os shaders de cel shading (Vulkan e OpenGL; o OpenGL ES é conferido no build Android) com as variantes principais.</summary>
     public class ShaderTests
     {
         static readonly string[][] Variants =
@@ -29,7 +29,7 @@ namespace Craquez.Tests
             for (int p = 0; p < sub.PassCount; p++)
             {
                 var pass = sub.GetPass(p);
-                foreach (var plat in new[] { ShaderCompilerPlatform.GLES3x, ShaderCompilerPlatform.Vulkan, ShaderCompilerPlatform.OpenGLCore })
+                foreach (var plat in new[] { ShaderCompilerPlatform.Vulkan, ShaderCompilerPlatform.OpenGLCore })
                     foreach (var kw in Variants)
                         foreach (var stage in new[] { ShaderType.Vertex, ShaderType.Fragment })
                         {
