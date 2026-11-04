@@ -25,7 +25,7 @@ namespace Craquez.UI
             _sim = sim;
             _cfg = cfg;
             canvas = UiKit.Canvas("HUD", 10, transform);
-            var root = (RectTransform)canvas.transform;
+            var root = UiKit.SafeRoot(canvas);
             var ta = Teams.Get(cfg.teamA);
             var tb = Teams.Get(cfg.teamB);
             // placar

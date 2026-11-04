@@ -90,7 +90,7 @@ def _taubin(bm, verts, iters):
             v.co = c
 
 
-def _drape(verts, center_fn, ang_win=0.45, h_win=0.05, keep=0.985):
+def _drape(verts, center_fn, ang_win=0.35, h_win=0.04, keep=0.99):
     """Tecido esticado: em coordenadas cilíndricas em volta do eixo do tronco, cada
     ponto sobe até o raio dos vizinhos mais salientes (cobre vãos entre músculos)."""
     data = []
@@ -169,7 +169,7 @@ def make_shirt(body, rig, slot):
     def on_arm(co):
         b = "upperarm_l" if co.x > 0 else "upperarm_r"
         return _t_along(rig, b, co) > 0.05 and _dist_axis(rig, b, co).length < 0.12
-    torso = [v for v in interior if not on_arm(v.co)]
+    torso = [v for v in interior if not on_arm(v.co) and abs(v.co.x) < 0.13]
     ys = [v.co.y for v in torso] or [0.0]
     cy = (max(ys) + min(ys)) / 2
     _drape(torso, lambda co: Vector((0.0, cy, co.z)))
@@ -189,17 +189,17 @@ def make_shirt(body, rig, slot):
         on_arm = t_arm > 0.08 and _dist_axis(rig, arm_b, p).length < 0.11
         if on_arm:
             # manga: mais larga perto da boca
-            d = 0.012 + 0.016 * min(1.0, max(0.0, (t_arm - 0.1) / 0.4))
+            d = 0.007 + 0.008 * min(1.0, max(0.0, (t_arm - 0.1) / 0.4))
             # dobras transversais na manga
-            d += 0.0025 * math.sin(t_arm * 60.0 + noise.noise(p * 9.0) * 3.0)
+            d += 0.0012 * math.sin(t_arm * 60.0 + noise.noise(p * 9.0) * 3.0)
         else:
             h = (p.z - pelvis_z) / torso_h            # 0 cintura .. 1 pescoço
-            loose = 0.018 + 0.022 * max(0.0, 1.0 - h * 1.3)   # barriga/lombar mais folgadas
+            loose = 0.008 + 0.01 * max(0.0, 1.0 - h * 1.3)    # corte justo (camisa moderna)
             if h > 0.85:
                 loose = 0.006                          # gola rente ao pescoço
             # dobras horizontais na cintura e nas laterais
             side = abs(p.x) / 0.18
-            fold = math.sin(p.z * 70.0 + noise.noise(p * 6.0) * 4.0) * (0.004 * max(0.0, 1.0 - h * 1.6)) * (0.5 + 0.5 * min(1.0, side))
+            fold = math.sin(p.z * 70.0 + noise.noise(p * 6.0) * 4.0) * (0.0022 * max(0.0, 1.0 - h * 1.6)) * (0.5 + 0.5 * min(1.0, side))
             d = loose + fold
         v.co = p + v.normal * d
     # barra da camisa, punhos e gola
@@ -211,15 +211,15 @@ def make_shirt(body, rig, slot):
         if cz < pelvis_z + 0.15:          # barra (para fora do calção)
             def off(v, cx=cx):
                 outward = Vector((v.co.x, v.co.y, 0.0)).normalized() * 0.012
-                return Vector((0, 0, -0.085)) + outward
+                return Vector((0, 0, -0.055)) + outward * 0.4
             _extrude_loop(bm, lp, off)
         elif cz > neck_z - 0.03:          # gola: pequena faixa levantada
-            _extrude_loop(bm, lp, lambda v: Vector((0, 0, 0.012)) + Vector((v.co.x, v.co.y, 0)).normalized() * -0.004)
+            _extrude_loop(bm, lp, lambda v: Vector((0, 0, 0.006)) + Vector((v.co.x, v.co.y, 0)).normalized() * -0.002)
         else:                             # manga: punho levemente aberto
             arm_b = "upperarm_l" if cx > 0 else "upperarm_r"
             h, t = _bone(rig, arm_b)
             ax = (t - h).normalized()
-            _extrude_loop(bm, lp, lambda v, ax=ax: ax * 0.02)
+            _extrude_loop(bm, lp, lambda v, ax=ax: ax * 0.012)
     _finish(ob, bm)
     log("camisa", len(ob.data.vertices), "vértices")
     return ob
@@ -237,7 +237,7 @@ def make_shorts(body, rig, slot):
         p = v.co.copy()
         thigh = "thigh_l" if p.x > 0 else "thigh_r"
         t = _t_along(rig, thigh, p)
-        d = 0.016 + 0.024 * max(0.0, min(1.0, t / 0.45))     # perna do calção mais solta embaixo
+        d = 0.009 + 0.011 * max(0.0, min(1.0, t / 0.45))     # perna do calção levemente solta
         d += 0.003 * math.sin(math.atan2(p.y, p.x - (0.09 if p.x > 0 else -0.09)) * 9.0 + noise.noise(p * 7.0) * 2.0) * max(0.0, t)
         v.co = p + v.normal * d
     pelvis_z = _bone(rig, "pelvis")[0].z
@@ -250,7 +250,7 @@ def make_shorts(body, rig, slot):
                 h, t = _bone(rig, thigh)
                 ax = (t - h).normalized()
                 rad = _dist_axis(rig, thigh, v.co).normalized()
-                return ax * 0.03 + rad * 0.008
+                return ax * 0.02 + rad * 0.002
             _extrude_loop(bm, lp, off)
     _finish(ob, bm)
     log("calção", len(ob.data.vertices), "vértices")

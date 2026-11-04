@@ -19,7 +19,10 @@ namespace Craquez
             if (m == null)
             {
                 string shader = name.StartsWith("Unlit") ? "Universal Render Pipeline/Unlit" :
-                    name == "Particles" ? "Universal Render Pipeline/Particles/Unlit" : "Universal Render Pipeline/Lit";
+                    name == "Particles" ? "Universal Render Pipeline/Particles/Unlit" :
+                    name.StartsWith("ToonOutline") ? "Craquez/ToonOutline" :
+                    name == "LitTransparent" ? "Universal Render Pipeline/Lit" : "Craquez/Toon";
+                if (Shader.Find(shader) == null) shader = "Universal Render Pipeline/Lit";
                 var sh = Shader.Find(shader) ?? Shader.Find("Standard");
                 m = new Material(sh);
                 Debug.LogWarning("Material base ausente, usando " + shader + ": " + name);
@@ -37,6 +40,76 @@ namespace Craquez
             m.SetFloat("_Metallic", metal);
             return m;
         }
+
+        /// <summary>
+        /// Personagens e bola: cel shading com contorno preto. cutout = recorte alfa e
+        /// dois lados (uniformes).
+        /// </summary>
+        public static Material Character(Color c, Texture tex = null, float smooth = 0.2f, bool cutout = false)
+        {
+            var m = new Material(Template(cutout ? "ToonOutlineCutout" : "ToonOutline"));
+            Set(m, c, tex);
+            m.SetFloat("_Smoothness", smooth);
+            if (cutout) m.SetFloat("_Cutoff", 0.01f);
+            return m;
+        }
+
+        /// <summary>Parâmetros globais do cel shading (faixas, sombra, contorno).</summary>
+        public static void ToonLook(bool night)
+        {
+            Shader.SetGlobalVector("_ToonShadowTint", night ? new Vector4(0.42f, 0.45f, 0.62f, 1f) : new Vector4(0.6f, 0.62f, 0.8f, 1f));
+            // x = limiar, y = suavidade da borda, z = luz de recorte, w = ambiente
+            Shader.SetGlobalVector("_ToonParams", new Vector4(0.06f, 0.035f, 0.22f, night ? 0.32f : 0.22f));
+            Shader.SetGlobalColor("_ToonOutlineColor", new Color(0.035f, 0.035f, 0.06f, 1f));
+            // espessura: 1,1 cm a 10 m da câmera, crescendo com a distância (≈ constante na tela)
+            Shader.SetGlobalVector("_ToonOutline", new Vector4(0.011f, 0.004f, 0.06f, 0f));
+        }
+
+        /// <summary>Lit com mapa de relevo (normal map) — grama, madeira, tecido, asfalto.</summary>
+        public static Material LitN(Color c, Texture tex, Texture2D normal, float smooth = 0.2f, float bump = 1f, bool twoSided = false)
+        {
+            var m = new Material(Template(twoSided ? "LitNormalCutout" : "LitNormal"));
+            Set(m, c, tex);
+            m.SetFloat("_Smoothness", smooth);
+            if (twoSided) m.SetFloat("_Cutoff", 0.01f);
+            if (normal != null)
+            {
+                m.SetTexture("_BumpMap", normal);
+                m.SetFloat("_BumpScale", bump);
+            }
+            return m;
+        }
+
+        /// <summary>
+        /// Normal map a partir de um campo de altura (tileável). RGB = normal, A = 1:
+        /// funciona tanto no desktop (formato AG) quanto no celular (RGB).
+        /// </summary>
+        public static Texture2D NormalFromHeight(int size, System.Func<float, float, float> height, float strength)
+        {
+            var h = new float[size * size];
+            for (int y = 0; y < size; y++)
+                for (int x = 0; x < size; x++)
+                    h[y * size + x] = height(x / (float)size, y / (float)size);
+            var t = new Texture2D(size, size, TextureFormat.RGBA32, true, true) { wrapMode = TextureWrapMode.Repeat, filterMode = FilterMode.Trilinear, anisoLevel = 4 };
+            var px = new Color32[size * size];
+            for (int y = 0; y < size; y++)
+                for (int x = 0; x < size; x++)
+                {
+                    float l = h[y * size + (x + size - 1) % size], r = h[y * size + (x + 1) % size];
+                    float d = h[((y + size - 1) % size) * size + x], u = h[((y + 1) % size) * size + x];
+                    var n = new Vector3((l - r) * strength, (d - u) * strength, 1f).normalized;
+                    px[y * size + x] = new Color32((byte)((n.x * 0.5f + 0.5f) * 255), (byte)((n.y * 0.5f + 0.5f) * 255), (byte)((n.z * 0.5f + 0.5f) * 255), 255);
+                }
+            t.SetPixels32(px);
+            t.Apply(true);
+            return t;
+        }
+
+        static Texture2D _grassN, _woodN, _knitN, _asphaltN;
+        public static Texture2D GrassNormal => _grassN ??= NormalFromHeight(256, (u, v) => Hash((int)(u * 256), (int)(v * 256), 41) * 0.6f + VNoise(u * 64, v * 6, 64, 9) * 0.4f, 6f);
+        public static Texture2D WoodNormal => _woodN ??= NormalFromHeight(256, (u, v) => VNoise(u * 4, v * 64, 64, 5) * 0.7f + (Mathf.Abs(v * 8 - Mathf.Round(v * 8)) < 0.02f ? -0.6f : 0f), 3f);
+        public static Texture2D KnitNormal => _knitN ??= NormalFromHeight(128, (u, v) => Mathf.Sin(u * Mathf.PI * 2 * 64) * Mathf.Sin(v * Mathf.PI * 2 * 64) * 0.5f + VNoise(u * 16, v * 16, 16, 7) * 0.3f, 2.5f);
+        public static Texture2D AsphaltNormal => _asphaltN ??= NormalFromHeight(256, (u, v) => Hash((int)(u * 256), (int)(v * 256), 17) * 0.5f + Fbm(u * 8, v * 8, 8, 3, 3) * 0.6f, 4f);
 
         /// <summary>Lit com recorte alfa e dois lados (cabelo, cílios, redes, bandeiras).</summary>
         public static Material Cutout(Color c, Texture tex, float cutoff = 0.4f, float smooth = 0.15f)
@@ -191,6 +264,48 @@ namespace Craquez
             return t;
         }
 
+        /// <summary>Piso esportivo sintético (poliuretano): liso, só manchas suaves de uso.</summary>
+        public static Texture2D SportFloor(int size, int seed)
+        {
+            var t = Tex(size, size);
+            var px = new Color32[size * size];
+            for (int y = 0; y < size; y++)
+                for (int x = 0; x < size; x++)
+                {
+                    float u = x / (float)size, v = y / (float)size;
+                    float n = Fbm(u * 4, v * 4, 4, seed, 4);
+                    float fine = Hash(x, y, seed + 1);
+                    float k = 0.94f + (n - 0.5f) * 0.1f + (fine - 0.5f) * 0.025f;
+                    var c = new Color(k, k, k, 1f);
+                    px[y * size + x] = c;
+                }
+            t.SetPixels32(px);
+            t.Apply(true);
+            return t;
+        }
+
+        /// <summary>Desgaste do gramado (pequena área, meio-campo): manchas de terra/grama rala com alfa suave.</summary>
+        public static Texture2D Wear(int size, int seed)
+        {
+            var t = Tex(size, size, true, TextureWrapMode.Clamp);
+            var px = new Color32[size * size];
+            for (int y = 0; y < size; y++)
+                for (int x = 0; x < size; x++)
+                {
+                    float u = x / (float)size, v = y / (float)size;
+                    float r = new Vector2(u - 0.5f, v - 0.5f).magnitude * 2f;
+                    float n = Fbm(u * 6, v * 6, 6, seed, 4);
+                    float a = Mathf.Clamp01((1f - r) * 1.6f) * Mathf.Clamp01((n - 0.35f) * 2.2f);
+                    float g = Hash(x, y, seed + 2);
+                    var c = Color.Lerp(new Color(0.42f, 0.36f, 0.2f), new Color(0.45f, 0.5f, 0.22f), n) * (0.85f + g * 0.25f);
+                    c.a = a * 0.6f;
+                    px[y * size + x] = c;
+                }
+            t.SetPixels32(px);
+            t.Apply(true);
+            return t;
+        }
+
         /// <summary>Asfalto / concreto.</summary>
         public static Texture2D Asphalt(int size, Color baseC, int seed, float cracks = 0.4f)
         {
@@ -242,9 +357,77 @@ namespace Craquez
                         }
                 }
             t.SetPixels32(px);
-            t.filterMode = FilterMode.Bilinear;
+            t.filterMode = FilterMode.Trilinear;
             t.Apply(true);
             return t;
+        }
+
+        /// <summary>Silhuetas de torcedores (cabeça, ombros, braços, cachecóis e bandeiras) com alfa, repetível.</summary>
+        public static Texture2D CrowdPeople(int w, int h, Color home, Color home2, Color away, int seed)
+        {
+            var t = Tex(w, h, true);
+            var px = new Color32[w * h];
+            int pw = 14;
+            int n = w / pw;
+            for (int i = 0; i < n; i++)
+            {
+                float r = Hash(i, 1, seed);
+                if (r > 0.94f) continue;   // lugar vazio
+                bool awaySide = i > n * 0.82f;
+                Color shirt = awaySide ? away : (r < 0.55f ? home : r < 0.8f ? home2 : Color.HSVToRGB(Hash(i, 5, seed), 0.35f, 0.75f));
+                Color skin = Color.Lerp(new Color(0.36f, 0.22f, 0.15f), new Color(0.95f, 0.78f, 0.65f), Hash(i, 2, seed));
+                Color hair = Color.Lerp(new Color(0.05f, 0.04f, 0.03f), new Color(0.45f, 0.32f, 0.2f), Hash(i, 3, seed) * 0.7f);
+                int cx = i * pw + pw / 2 + (int)((Hash(i, 4, seed) - 0.5f) * 4);
+                float hgt = 0.82f + Hash(i, 6, seed) * 0.18f;
+                bool armsUp = Hash(i, 7, seed) > 0.72f;
+                bool flag = Hash(i, 8, seed) > 0.95f;
+                for (int y = 0; y < h; y++)
+                    for (int x = Mathf.Max(0, cx - pw); x < Mathf.Min(w, cx + pw); x++)
+                    {
+                        float u = (x - cx) / (float)pw, v = y / (float)h / hgt;   // v: 0 base .. 1 topo da cabeça
+                        Color c = new Color(0, 0, 0, 0);
+                        if (v < 0.62f && Mathf.Abs(u) < 0.42f - (v > 0.5f ? (v - 0.5f) * 1.5f : 0f)) c = shirt * (0.8f + v * 0.3f);
+                        if (v > 0.6f && v < 0.7f && Mathf.Abs(u) < 0.12f) c = skin * 0.9f;                                     // pescoço
+                        if (new Vector2(u * 1.3f, (v - 0.8f) * 1.0f).magnitude < 0.2f) c = v > 0.86f ? hair : skin;          // cabeça
+                        if (armsUp && v > 0.45f && v < 1.05f && Mathf.Abs(Mathf.Abs(u) - 0.42f + (v - 0.45f) * 0.25f) < 0.08f) c = v > 0.95f ? skin : shirt * 0.9f;
+                        if (v > 0.52f && v < 0.58f && Mathf.Abs(u) < 0.4f && Hash(i, 9, seed) > 0.6f) c = home2;           // cachecol
+                        if (flag && u > 0.2f && v > 0.7f && v < 1.15f && u < 1.4f) c = Mathf.Repeat(v * 6f, 1f) < 0.5f ? home : home2;
+                        c.a = c.a > 0f ? 1f : 0f;
+                        if (c.a > 0f) px[Mathf.Min(h - 1, y) * w + x] = c;
+                    }
+            }
+            t.SetPixels32(px);
+            t.filterMode = FilterMode.Trilinear;
+            t.Apply(true);
+            KeepCoverage(t);
+            return t;
+        }
+
+        /// <summary>
+        /// Mipmaps de textura recortada perdem alfa com a distância (a torcida "some" e pisca).
+        /// Reforça o alfa de cada nível para manter a mesma cobertura.
+        /// </summary>
+        public static void KeepCoverage(Texture2D t)
+        {
+            for (int m = 1; m < t.mipmapCount; m++)
+            {
+                var px = t.GetPixels32(m);
+                for (int i = 0; i < px.Length; i++)
+                {
+                    int a = px[i].a;
+                    if (a > 0)
+                    {
+                        // desfaz a mistura com o fundo transparente (preto) e endurece o alfa
+                        float k = 255f / a;
+                        px[i].r = (byte)Mathf.Min(255, px[i].r * k);
+                        px[i].g = (byte)Mathf.Min(255, px[i].g * k);
+                        px[i].b = (byte)Mathf.Min(255, px[i].b * k);
+                    }
+                    px[i].a = (byte)(a > 70 ? 255 : 0);
+                }
+                t.SetPixels32(px, m);
+            }
+            t.Apply(false);
         }
 
         /// <summary>Rede de gol (losangos), com alfa.</summary>

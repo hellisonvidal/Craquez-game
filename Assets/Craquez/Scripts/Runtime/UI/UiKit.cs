@@ -88,8 +88,20 @@ namespace Craquez.UI
             var s = go.GetComponent<CanvasScaler>();
             s.uiScaleMode = CanvasScaler.ScaleMode.ScaleWithScreenSize;
             s.referenceResolution = new Vector2(1920, 1080);
-            s.matchWidthOrHeight = 0.5f;
+            // telas mais largas que 16:9 (celulares 19,5:9 / 20:9): escala pela altura e usa a largura extra
+            s.matchWidthOrHeight = Screen.height > 0 && Screen.width / (float)Screen.height >= 1.77f ? 1f : 0f;   // tablets 4:3/16:10: pela largura
             return c;
+        }
+
+        /// <summary>Área útil do canvas respeitando entalhes/câmera frontal e cantos (Screen.safeArea).</summary>
+        public static RectTransform SafeRoot(Canvas c)
+        {
+            var rt = Rect(c.transform, "area segura");
+            rt.anchorMin = Vector2.zero;
+            rt.anchorMax = Vector2.one;
+            rt.offsetMin = rt.offsetMax = Vector2.zero;
+            rt.gameObject.AddComponent<SafeArea>();
+            return rt;
         }
 
         public static RectTransform Rect(Transform parent, string name = "rect")
@@ -243,6 +255,24 @@ namespace Craquez.UI
         }
     }
 
+    /// <summary>Ajusta o retângulo à área segura da tela (Android com entalhe, cantos arredondados).</summary>
+    public class SafeArea : MonoBehaviour
+    {
+        Rect _last;
+        Vector2Int _res;
+        void Update()
+        {
+            var sa = Screen.safeArea;
+            if (sa == _last && _res.x == Screen.width && _res.y == Screen.height) return;
+            _last = sa;
+            _res = new Vector2Int(Screen.width, Screen.height);
+            if (Screen.width <= 0 || Screen.height <= 0) return;
+            var rt = (RectTransform)transform;
+            rt.anchorMin = new Vector2(sa.xMin / Screen.width, sa.yMin / Screen.height);
+            rt.anchorMax = new Vector2(sa.xMax / Screen.width, sa.yMax / Screen.height);
+        }
+    }
+
     /// <summary>Destaca o texto do botão quando selecionado por controle/teclado.</summary>
     public class SelectTint : MonoBehaviour, ISelectHandler, IDeselectHandler, IPointerEnterHandler
     {
@@ -265,15 +295,29 @@ namespace Craquez.UI
             _options = options;
             _onChange = onChange;
             Index = Mathf.Clamp(index, 0, Mathf.Max(0, options.Count - 1));
-            caption = UiKit.Label(transform, cap, 26, Theme.BodyBold, Theme.TextDim);
-            caption.rectTransform.Place(0, 0, 0.42f, 1, 24, 0, 0, 0);
-            var l = UiKit.Label(transform, "‹", 30, Theme.Head, Theme.Accent, TextAnchor.MiddleCenter);
-            l.rectTransform.Place(0.42f, 0, 0.5f, 1);
-            value = UiKit.Label(transform, "", 32, Theme.Head, Theme.Text, TextAnchor.MiddleCenter);
-            value.rectTransform.Place(0.5f, 0, 0.92f, 1);
-            var r = UiKit.Label(transform, "›", 30, Theme.Head, Theme.Accent, TextAnchor.MiddleCenter);
-            r.rectTransform.Place(0.92f, 0, 1, 1, 0, 0, 12, 0);
+            caption = UiKit.Label(transform, cap, 30, Theme.BodyBold, Theme.TextDim);
+            caption.rectTransform.Place(0, 0, 0.4f, 1, 26, 0, 0, 0);
+            // setas em "botões" redondos, grandes o bastante para o dedo
+            Arrow("‹", 0.4f, 0.4f);
+            value = UiKit.Label(transform, "", 36, Theme.Head, Theme.Text, TextAnchor.MiddleCenter);
+            value.rectTransform.Place(0.48f, 0, 0.9f, 1);
+            Arrow("›", 1f, 1f);
             Refresh();
+        }
+
+        void Arrow(string glyph, float x0, float x1)
+        {
+            var chip = UiKit.Image(transform, new Color(0f, 0.9f, 0.62f, 0.22f), Theme.Circle, "seta " + glyph);
+            chip.raycastTarget = false;
+            var rt = chip.rectTransform;
+            rt.anchorMin = new Vector2(x0, 0.5f);
+            rt.anchorMax = new Vector2(x1, 0.5f);
+            rt.pivot = new Vector2(x0 >= 1f ? 1f : 0f, 0.5f);
+            rt.sizeDelta = new Vector2(54, 54);
+            rt.anchoredPosition = new Vector2(x0 >= 1f ? -10 : 4, 0);
+            var l = UiKit.Label(chip.transform, glyph, 46, Theme.Head, Theme.Accent, TextAnchor.MiddleCenter);
+            l.rectTransform.Place(0, 0, 1, 1, 0, 4, 0, 0);
+            l.raycastTarget = false;
         }
 
         public void SetOptions(IList<string> options, int index)
@@ -310,7 +354,7 @@ namespace Craquez.UI
             var rt = (RectTransform)transform;
             RectTransformUtility.ScreenPointToLocalPointInRectangle(rt, e.position, e.pressEventCamera, out var lp);
             float u = Mathf.InverseLerp(rt.rect.xMin, rt.rect.xMax, lp.x);
-            SetIndex(Index + (u < 0.62f ? -1 : 1), true);
+            SetIndex(Index + (u < 0.6f ? -1 : 1), true);
             Sfx.Ui();
         }
 

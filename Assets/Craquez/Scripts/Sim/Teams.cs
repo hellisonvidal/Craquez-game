@@ -56,6 +56,7 @@ namespace Craquez.Sim
         public int mentality = 1;   // 0 defensiva, 1 equilibrada, 2 ofensiva
         public int press = 1;       // 0 baixa, 1 média, 2 alta
         public int[] lineup = new int[0];
+        public int boots = -1;      // modelo de chuteira do time (-1 = cada atleta com a sua)
     }
 
     /// <summary>
@@ -64,7 +65,7 @@ namespace Craquez.Sim
     /// </summary>
     public static class Teams
     {
-        public static readonly string[] PatternNames = { "liso", "listras", "aros", "faixa", "metades", "riscas", "faixa_peito" };
+        public static readonly string[] PatternNames = { "liso", "listras", "aros", "faixa", "metades", "riscas", "faixa_peito", "faixa_vertical" };
         public static readonly string[] KitNames = { "Principal", "Reserva", "Terceiro" };
 
         static bool _loaded;

@@ -17,7 +17,7 @@ namespace Craquez
         {
             var c = UiKit.Canvas("Toque", 20, parent);
             var tc = c.gameObject.AddComponent<TouchControls>();
-            tc.Build((RectTransform)c.transform);
+            tc.Build(UiKit.SafeRoot(c));
             TouchState.active = true;
             return tc;
         }
@@ -39,15 +39,16 @@ namespace Craquez
             var swipe = UiKit.Image(root, new Color(0, 0, 0, 0.001f), null, "area dribles").rectTransform.Place(0.42f, 0.45f, 0.78f, 0.85f);
             swipe.gameObject.AddComponent<TouchSwipe>();
             // botões principais (losango)
-            float bx = -150, by = 210;
-            Btn(root, "PASSE", InputFrame.Pass, new Vector2(bx, by - 120), 150, new Color(0.15f, 0.75f, 0.35f));
-            Btn(root, "CHUTE", InputFrame.Shoot, new Vector2(bx + 130, by), 150, new Color(0.9f, 0.25f, 0.25f));
-            Btn(root, "ALTO", InputFrame.Lob, new Vector2(bx - 130, by), 130, new Color(0.2f, 0.5f, 0.95f));
-            Btn(root, "ENFIADA", InputFrame.Through, new Vector2(bx, by + 120), 130, new Color(0.95f, 0.75f, 0.15f));
-            Btn(root, "CORRER", InputFrame.Sprint, new Vector2(bx - 300, by - 140), 140, new Color(0.35f, 0.38f, 0.45f));
-            Btn(root, "PROTEGER", InputFrame.Shield, new Vector2(bx - 300, by + 20), 110, new Color(0.35f, 0.38f, 0.45f));
-            Btn(root, "COLOCADO", InputFrame.Finesse, new Vector2(bx + 140, by + 160), 100, new Color(0.55f, 0.3f, 0.8f));
-            Btn(root, "TROCAR", InputFrame.Switch, new Vector2(bx - 160, by + 230), 100, new Color(0.35f, 0.38f, 0.45f));
+            // losango de ação (centro a 250 da direita, 230 de baixo) + correr/proteger à esquerda dele
+            float cx = -250, cy = 230;
+            Btn(root, "CHUTE", InputFrame.Shoot, new Vector2(cx + 140, cy), 140, new Color(0.9f, 0.25f, 0.25f));
+            Btn(root, "PASSE", InputFrame.Pass, new Vector2(cx, cy - 125), 140, new Color(0.15f, 0.75f, 0.35f));
+            Btn(root, "ALTO", InputFrame.Lob, new Vector2(cx - 140, cy), 125, new Color(0.2f, 0.5f, 0.95f));
+            Btn(root, "ENFIADA", InputFrame.Through, new Vector2(cx, cy + 125), 125, new Color(0.95f, 0.75f, 0.15f));
+            Btn(root, "COLOCADO", InputFrame.Finesse, new Vector2(cx + 140, cy + 150), 95, new Color(0.55f, 0.3f, 0.8f));
+            Btn(root, "CORRER", InputFrame.Sprint, new Vector2(cx - 300, cy - 130), 130, new Color(0.35f, 0.38f, 0.45f));
+            Btn(root, "PROTEGER", InputFrame.Shield, new Vector2(cx - 300, cy + 20), 105, new Color(0.35f, 0.38f, 0.45f));
+            Btn(root, "TROCAR", InputFrame.Switch, new Vector2(cx - 150, cy + 245), 95, new Color(0.35f, 0.38f, 0.45f));
             var pause = UiKit.Button(root, "II", () => TouchState.buttons |= InputFrame.Pause, 34);
             pause.GetComponent<RectTransform>().At(1, 1, 90, 70, -30, -30);
             pause.gameObject.AddComponent<PulseRelease>();
@@ -56,8 +57,12 @@ namespace Craquez
         static void Btn(RectTransform root, string label, int bit, Vector2 pos, float size, Color c)
         {
             var img = UiKit.Image(root, new Color(c.r, c.g, c.b, 0.55f), Theme.Circle, "btn " + label);
-            img.rectTransform.At(1, 0, size, size, pos.x, pos.y);
-            img.rectTransform.pivot = new Vector2(0.5f, 0.5f);
+            // centro do botão em (pos) a partir do canto inferior direito, sempre dentro da tela
+            var rt = img.rectTransform;
+            rt.anchorMin = rt.anchorMax = new Vector2(1, 0);
+            rt.pivot = new Vector2(0.5f, 0.5f);
+            rt.sizeDelta = new Vector2(size, size);
+            rt.anchoredPosition = new Vector2(Mathf.Min(pos.x, -size * 0.5f - 16f), Mathf.Max(pos.y, size * 0.5f + 16f));
             var t = UiKit.Label(img.transform, label, size > 120 ? 30 : 22, Theme.Head, Color.white, TextAnchor.MiddleCenter);
             t.rectTransform.Place(0, 0, 1, 1);
             var b = img.gameObject.AddComponent<TouchButton>();

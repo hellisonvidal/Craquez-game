@@ -160,6 +160,27 @@ namespace Craquez.UI
         }
     }
 
+    /// <summary>Cartão do carrossel: esquerda/direita trocam de opção; arrastar para o lado também.</summary>
+    public class CarouselButton : Button, IBeginDragHandler, IDragHandler, IEndDragHandler
+    {
+        public System.Action<int> onStep;
+        float _dragX;
+
+        public override void OnMove(AxisEventData e)
+        {
+            if (e.moveDir == MoveDirection.Left) { onStep?.Invoke(-1); e.Use(); return; }
+            if (e.moveDir == MoveDirection.Right) { onStep?.Invoke(1); e.Use(); return; }
+            base.OnMove(e);
+        }
+
+        public void OnBeginDrag(PointerEventData e) => _dragX = 0f;
+        public void OnDrag(PointerEventData e) => _dragX += e.delta.x;
+        public void OnEndDrag(PointerEventData e)
+        {
+            if (Mathf.Abs(_dragX) > Screen.width * 0.05f) onStep?.Invoke(_dragX > 0f ? -1 : 1);
+        }
+    }
+
     /// <summary>Bola girando dentro de um círculo (pré-visualização).</summary>
     public class SpinUv : MonoBehaviour
     {

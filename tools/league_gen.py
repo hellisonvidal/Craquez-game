@@ -541,6 +541,9 @@ def nearest_face(lib: list, f: list[int]) -> int:
     return best
 
 
+from kit_traditions import TRAD  # noqa: E402
+
+
 def add_nations(out: dict, lib: list) -> int:
     """Seleções de futebol (23 convocados) e de futsal (14), ordenadas pelo ranking."""
     import nations
@@ -611,6 +614,9 @@ def main() -> None:
             stadium = {"name": f"{r.choice(STADIUM_WORDS)} {city}" if sport == "football" else f"Ginásio {city}",
                        "tier": tier, "cap": int(r.uniform(*{3: (55, 82), 2: (28, 50), 1: (8, 24)}[tier])) * 1000}
             kits = kits_for(r, c1, c2)
+            if name in TRAD:   # uniforme principal tradicional (desenho clássico e cores)
+                pat, k1, k2, sh, so = TRAD[name]
+                kits[0] = {"c1": k1, "c2": k2, "shorts": sh, "socks": so, "pattern": pat}
             lg["teams"].append({"name": name, "short": short, "c1": c1, "c2": c2, "rating": rating, "kits": kits,
                                 "stadium": stadium, "roster": roster})
         out["leagues"].append(lg)

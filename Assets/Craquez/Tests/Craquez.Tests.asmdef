@@ -3,6 +3,7 @@
     "rootNamespace": "Craquez.Tests",
     "references": [
         "Craquez.Sim",
+        "Craquez.Runtime",
         "UnityEngine.TestRunner",
         "UnityEditor.TestRunner"
     ],

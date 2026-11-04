@@ -84,15 +84,15 @@ def asset(name, sub):
 def make_human(v):
     afr, asi, cau, skin, brow, height, weight = v
     h = HumanService.create_human()
-    for k, val in [("gender", 1.0), ("age", 0.5), ("muscle", 0.78), ("weight", weight), ("height", height),
+    for k, val in [("gender", 1.0), ("age", 0.5), ("muscle", 0.6), ("weight", weight), ("height", height),
                    ("proportions", 0.75), ("african", afr), ("asian", asi), ("caucasian", cau)]:
         HumanObjectProperties.set_value(k, val, entity_reference=h)
     TargetService.reapply_macro_details(h)
     # físico de atleta: pernas e glúteos fortes, cintura fina
-    for name, w in [("legs/l-upperleg-muscle-incr", 0.5), ("legs/r-upperleg-muscle-incr", 0.5),
+    for name, w in [("legs/l-upperleg-muscle-incr", 0.35), ("legs/r-upperleg-muscle-incr", 0.35),
                     ("legs/l-lowerleg-muscle-incr", 0.4), ("legs/r-lowerleg-muscle-incr", 0.4),
-                    ("stomach/stomach-pregnant-decr", 0.4), ("torso/torso-vshape-incr", 0.35),
-                    ("neck/neck-scale-horiz-incr", 0.35)]:
+                    ("stomach/stomach-pregnant-decr", 0.45), ("torso/torso-vshape-incr", 0.12),
+                    ("neck/neck-scale-horiz-incr", 0.1)]:
         p = TargetService.target_full_path(name.split("/")[-1])
         if p:
             TargetService.load_target(h, p, weight=w, name=name.split("/")[-1])
@@ -195,7 +195,7 @@ def apply_kit(obj, rig):
     waist = (ph + Vector((0, 0, 0.085)), Vector((0, 0, 1)))
     # gola: plano inclinado (mais baixa na frente, -Y é a frente do MakeHuman)
     collar_no = Vector((0, -0.45, 1)).normalized()
-    collar = (nh + Vector((0, -0.01, 0.018)), collar_no)
+    collar = (nh + Vector((0, -0.012, 0.004)), collar_no)
     cuts.append(("waist", ("pelvis", "spine_01"), waist[0], waist[1]))
     cuts.append(("collar", ("neck_01", "spine_03", "clavicle", "head"), collar[0], collar[1]))
 

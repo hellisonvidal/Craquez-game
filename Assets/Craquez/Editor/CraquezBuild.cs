@@ -23,9 +23,22 @@ namespace Craquez.EditorTools
         [InitializeOnLoadMethod]
         static void OnLoad()
         {
+            // Linux (só usado nas screenshots do CI): Vulkan + OpenGL, para rodar com lavapipe
+            try
+            {
+                var want = new[] { UnityEngine.Rendering.GraphicsDeviceType.Vulkan, UnityEngine.Rendering.GraphicsDeviceType.OpenGLCore };
+                var cur = PlayerSettings.GetGraphicsAPIs(BuildTarget.StandaloneLinux64);
+                if (PlayerSettings.GetUseDefaultGraphicsAPIs(BuildTarget.StandaloneLinux64) || cur.Length == 0 || cur[0] != want[0])
+                {
+                    PlayerSettings.SetUseDefaultGraphicsAPIs(BuildTarget.StandaloneLinux64, false);
+                    PlayerSettings.SetGraphicsAPIs(BuildTarget.StandaloneLinux64, want);
+                    Debug.Log("Craquez: APIs gráficas do Linux = Vulkan, OpenGLCore");
+                }
+            }
+            catch (Exception e) { Debug.LogWarning("Craquez: APIs do Linux: " + e.Message); }
             EditorApplication.delayCall += () =>
             {
-                try { if (!File.Exists(MatDir + "/Lit.mat")) PrepareAssets(); }
+                try { if (!File.Exists(MatDir + "/ToonOutline.mat")) PrepareAssets(); }
                 catch (Exception e) { Debug.LogWarning("Craquez: materiais não gerados ainda: " + e.Message); }
             };
         }
@@ -43,8 +56,25 @@ namespace Craquez.EditorTools
             var particles = Shader.Find("Universal Render Pipeline/Particles/Unlit");
             var sky = Shader.Find("Skybox/Procedural");
             if (lit == null) { Debug.LogError("Craquez: shader URP Lit não encontrado"); return; }
+            var litReal = lit;
+            // visual em cel shading: os materiais opacos usam o shader toon (mesmas propriedades do Lit)
+            var toon = Shader.Find("Craquez/Toon");
+            var toonOl = Shader.Find("Craquez/ToonOutline");
+            if (toon != null) lit = toon;
+            else Debug.LogError("Craquez: shader Craquez/Toon não encontrado");
 
             Save("Lit", new Material(lit));
+            if (toonOl != null)
+            {
+                Save("ToonOutline", new Material(toonOl));
+                var oc = new Material(toonOl);
+                oc.SetFloat("_AlphaClip", 1f);
+                oc.SetFloat("_Cutoff", 0.4f);
+                oc.SetFloat("_Cull", (float)CullMode.Off);
+                oc.EnableKeyword("_ALPHATEST_ON");
+                oc.renderQueue = (int)RenderQueue.AlphaTest;
+                Save("ToonOutlineCutout", oc);
+            }
 
             var cut = new Material(lit);
             cut.SetFloat("_AlphaClip", 1f);
@@ -55,9 +85,23 @@ namespace Craquez.EditorTools
             cut.doubleSidedGI = true;
             Save("LitCutout", cut);
 
-            var tr = new Material(lit);
+            var tr = new Material(litReal);
             Transparent(tr);
             Save("LitTransparent", tr);
+
+            var nm = new Material(lit);
+            nm.EnableKeyword("_NORMALMAP");
+            nm.SetFloat("_BumpScale", 1f);
+            Save("LitNormal", nm);
+
+            var nmc = new Material(lit);
+            nmc.EnableKeyword("_NORMALMAP");
+            nmc.SetFloat("_AlphaClip", 1f);
+            nmc.SetFloat("_Cutoff", 0.4f);
+            nmc.SetFloat("_Cull", (float)CullMode.Off);
+            nmc.EnableKeyword("_ALPHATEST_ON");
+            nmc.renderQueue = (int)RenderQueue.AlphaTest;
+            Save("LitNormalCutout", nmc);
 
             var em = new Material(lit);
             em.EnableKeyword("_EMISSION");

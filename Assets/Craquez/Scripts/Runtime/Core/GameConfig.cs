@@ -56,6 +56,13 @@ namespace Craquez
             set { PlayerPrefs.SetInt("camera", value); PlayerPrefs.Save(); }
         }
 
+        /// <summary>-2 (aberto) .. +2 (perto).</summary>
+        public static int CameraZoom
+        {
+            get => PlayerPrefs.GetInt("camera_zoom", 0);
+            set { PlayerPrefs.SetInt("camera_zoom", value); PlayerPrefs.Save(); }
+        }
+
         public static bool SeenIntro
         {
             get => PlayerPrefs.GetInt("seen_intro", 0) == 1;

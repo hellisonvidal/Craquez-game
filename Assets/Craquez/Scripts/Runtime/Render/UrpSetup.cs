@@ -52,6 +52,7 @@ namespace Craquez
                 p.Add<WhiteBalance>(true);
                 _volume.sharedProfile = p;
             }
+            Gfx.ToonLook(night);
             var prof = _volume.sharedProfile;
             if (prof.TryGet<Bloom>(out var b))
             {
@@ -59,12 +60,13 @@ namespace Craquez
                 b.threshold.Override(night ? 0.95f : 1.1f);
                 b.scatter.Override(0.65f);
             }
-            if (prof.TryGet<Tonemapping>(out var t)) t.mode.Override(TonemappingMode.ACES);
+            // cel shading: tonemapping neutro (o ACES lava as cores chapadas) e cor mais viva
+            if (prof.TryGet<Tonemapping>(out var t)) t.mode.Override(TonemappingMode.Neutral);
             if (prof.TryGet<ColorAdjustments>(out var c))
             {
                 c.postExposure.Override(exposure);
-                c.saturation.Override(saturation);
-                c.contrast.Override(contrast);
+                c.saturation.Override(saturation + 14f);
+                c.contrast.Override(contrast * 0.6f);
             }
             if (prof.TryGet<Vignette>(out var v))
             {

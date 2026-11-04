@@ -10,7 +10,13 @@ namespace Craquez
     /// </summary>
     public class BroadcastCamera : MonoBehaviour
     {
-        public static readonly string[] Modes = { "TV", "TV Próxima", "Alta" };
+        public static readonly string[] Modes = { "TV", "TV Próxima", "Alta (tática)", "Atrás do Jogador", "Dinâmica", "Beira do Campo" };
+        public static readonly string[] Zooms = { "Bem aberto", "Aberto", "Normal", "Perto", "Bem perto" };
+        /// <summary>Zoom: -2 (aberto) .. +2 (perto).</summary>
+        public int zoom;
+        /// <summary>Time humano seguido pela câmera "Atrás do Jogador".</summary>
+        public int followTeam;
+        Vector3 _attackDir = Vector3.right;
         public Camera cam;
         public MatchSim sim;
         public int mode;
@@ -25,7 +31,8 @@ namespace Craquez
         {
             cam = c;
             sim = s;
-            mode = m;
+            mode = Mathf.Clamp(m, 0, Modes.Length - 1);
+            zoom = Settings.CameraZoom;
             _focus = Vector3.zero;
             cam.nearClipPlane = 0.3f;
             cam.farClipPlane = 900f;
@@ -57,13 +64,46 @@ namespace Craquez
             _focus = Vector3.SmoothDamp(_focus, target, ref _vel, 0.35f, 60f, dt);
             // perto do gol: aproxima um pouco
             float nearGoal = Mathf.Clamp01((Mathf.Abs(_focus.x) - hl * 0.55f) / (hl * 0.35f));
+            float zk = 1f - zoom * 0.14f;   // zoom afasta/aproxima mantendo o ângulo
+            if (mode == 3 || mode == 4)
+            {
+                // câmeras "por trás": seguem a direção do ataque (jogador controlado ou time com a bola)
+                Vector3 anchor;
+                float dir;
+                if (mode == 3)
+                {
+                    var pl = sim.Controlled(followTeam);
+                    anchor = new Vector3(pl.position.x, 0, pl.position.y);
+                    dir = sim.TeamDir(followTeam);
+                }
+                else
+                {
+                    int t = sim.ball.owner >= 0 ? sim.players[sim.ball.owner].team : (sim.ball.lastTouchTeam >= 0 ? sim.ball.lastTouchTeam : 0);
+                    anchor = ball;
+                    dir = sim.TeamDir(t);
+                }
+                _attackDir = Vector3.Slerp(_attackDir, new Vector3(dir, 0, 0), 1f - Mathf.Exp(-dt * 1.2f));
+                float bk = (field ? (mode == 3 ? 10f : 20f) : (mode == 3 ? 7f : 11f)) * zk;
+                float up = (field ? (mode == 3 ? 4.2f : 9f) : (mode == 3 ? 3.2f : 6f)) * zk;
+                var focus = Vector3.Lerp(anchor, ball, mode == 3 ? 0.35f : 1f);
+                _focus = Vector3.SmoothDamp(_focus, focus, ref _vel, 0.25f, 80f, dt);
+                var p3 = _focus - _attackDir * bk + Vector3.up * up;
+                if (_shake > 0f) { _shake = Mathf.MoveTowards(_shake, 0f, dt * 2.5f); p3 += Random.insideUnitSphere * _shake * 0.2f; }
+                cam.transform.position = Vector3.Lerp(cam.transform.position, p3, 1f - Mathf.Exp(-dt * 6f));
+                cam.transform.rotation = Quaternion.Slerp(cam.transform.rotation, Quaternion.LookRotation(_focus + _attackDir * (field ? 8f : 4f) + Vector3.up * 0.5f - cam.transform.position), 1f - Mathf.Exp(-dt * 6f));
+                cam.fieldOfView = Mathf.Lerp(cam.fieldOfView, 52f, 1f - Mathf.Exp(-dt * 2f));
+                return;
+            }
             float height, back, fov;
             switch (mode)
             {
                 case 1: height = field ? 11f : 7f; back = field ? 28f : 15f; fov = 34f; break;
                 case 2: height = field ? 42f : 20f; back = field ? 36f : 18f; fov = 38f; break;
+                case 5: height = field ? 3.2f : 2.4f; back = field ? 14f : 6f; fov = 44f; break;
                 default: height = field ? 17f : 9f; back = field ? 40f : 20f; fov = 31f; break;
             }
+            height *= zk;
+            back *= zk;
             fov -= nearGoal * 4f;
             _dist = Mathf.Lerp(_dist <= 0 ? back : _dist, back * (1f - nearGoal * 0.1f), 1f - Mathf.Exp(-dt * 1.5f));
             var pos = new Vector3(_focus.x * 0.82f, height, -(hw + _dist) + _focus.z * 0.25f);

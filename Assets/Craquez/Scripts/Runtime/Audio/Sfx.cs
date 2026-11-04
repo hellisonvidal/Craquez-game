@@ -13,6 +13,9 @@ namespace Craquez
         AudioSource[] _pool;
         int _next;
         AudioSource _crowd, _chant;
+        AudioClip _boo, _drums;
+        AudioSource _drumSrc;
+        float _drumTarget;
         AudioClip _ui, _move, _kick, _kickHard, _whistle, _whistleLong, _whistleEnd, _net, _post, _crowdLoop, _cheer, _ooh, _chantLoop, _thud;
         float _crowdTarget = 0.35f, _chantTarget;
 
@@ -49,6 +52,13 @@ namespace Craquez
             _chantLoop = Chant(rng);
             _cheer = Swell(3.5f, rng);
             _ooh = Ooh(rng);
+            _boo = Boo(rng);
+            _drums = Drums(rng);
+            _drumSrc = gameObject.AddComponent<AudioSource>();
+            _drumSrc.clip = _drums;
+            _drumSrc.loop = true;
+            _drumSrc.volume = 0f;
+            _drumSrc.Play();
             _crowd = gameObject.AddComponent<AudioSource>();
             _crowd.clip = _crowdLoop;
             _crowd.loop = true;
@@ -65,6 +75,7 @@ namespace Craquez
         {
             _crowd.volume = Mathf.MoveTowards(_crowd.volume, _crowdTarget, Time.unscaledDeltaTime * 0.4f);
             _chant.volume = Mathf.MoveTowards(_chant.volume, _chantTarget, Time.unscaledDeltaTime * 0.2f);
+            _drumSrc.volume = Mathf.MoveTowards(_drumSrc.volume, _drumTarget, Time.unscaledDeltaTime * 0.3f);
         }
 
         static void Play(AudioClip c, float vol = 1f, float pitch = 1f)
@@ -86,6 +97,9 @@ namespace Craquez
         public static void Net() => Play(_i?._net, 0.6f);
         public static void Post() => Play(_i?._post, 0.7f);
         public static void Cheer() => Play(_i?._cheer, 1f);
+        public static void Boo() => Play(_i?._boo, 0.7f, 0.95f + Random.value * 0.1f);
+        /// <summary>Batucada da torcida (0..1).</summary>
+        public static void Drums(float v) { if (_i != null) _i._drumTarget = v; }
         public static void Ooh() => Play(_i?._ooh, 0.7f, 0.9f + Random.value * 0.2f);
 
         /// <summary>Volume da torcida (0 = silêncio, menu) e canto organizado.</summary>
@@ -272,6 +286,43 @@ namespace Craquez
                 d[i] = (lp2 * 1.6f + roar) * env;
             }
             return Make("cheer", d);
+        }
+
+        static AudioClip Boo(System.Random r)
+        {
+            int n = (int)(1.8f * Rate);
+            var d = new float[n];
+            float lp = 0;
+            for (int i = 0; i < n; i++)
+            {
+                float t = i / (float)Rate, u = t / 1.8f;
+                float s = 0;
+                for (int k = 0; k < 10; k++) s += Mathf.Sin(2 * Mathf.PI * (120f + k * 7f) * t + k);
+                lp += ((float)(r.NextDouble() * 2 - 1) - lp) * 0.05f;
+                float env = Mathf.Min(1f, u * 5f) * (1f - u);
+                d[i] = (s * 0.035f * (1f + lp * 2f) + lp * 0.2f) * env;
+            }
+            return Make("boo", d);
+        }
+
+        /// <summary>Batucada (surdo, caixa e repique) em loop.</summary>
+        static AudioClip Drums(System.Random r)
+        {
+            float beat = 60f / 128f;
+            int n = (int)(beat * 8 * Rate);
+            var d = new float[n];
+            for (int i = 0; i < n; i++)
+            {
+                float t = i / (float)Rate;
+                int bi = (int)(t / beat);
+                float bt = t - bi * beat;
+                float surdo = (bi % 2 == 0) ? Mathf.Sin(2 * Mathf.PI * 60f * bt) * Mathf.Exp(-bt * 9f) : 0f;
+                float half = bt - beat * 0.5f;
+                float caixa = half > 0f ? (float)(r.NextDouble() * 2 - 1) * Mathf.Exp(-half * 35f) * 0.5f : 0f;
+                float rep = (bi % 4 == 3 && bt > beat * 0.25f) ? Mathf.Sin(2 * Mathf.PI * 420f * bt) * Mathf.Exp(-(bt - beat * 0.25f) * 25f) * 0.3f : 0f;
+                d[i] = (surdo * 0.8f + caixa + rep) * 0.5f;
+            }
+            return Make("drums", d);
         }
 
         static AudioClip Ooh(System.Random r)
