@@ -604,6 +604,30 @@ func _do_kick(p: SimPlayer, kind: int, power: float, aim: Vector2, finesse: bool
 			_pass(p, aim, power, false, true)
 		InputFrame.SHOOT:
 			_shoot(p, aim, power, finesse)
+			_try_block(p)
+
+
+## Chute travado: defensor colado na frente de quem chuta pode bloquear a bola.
+func _try_block(kicker: SimPlayer) -> void:
+	var dirv := ball.vel.normalized()
+	for o in players:
+		if o.team == kicker.team or o.is_keeper or o.stun > 0.0:
+			continue
+		var to := o.pos - kicker.pos
+		var d := to.length()
+		if d < 0.3 or d > 1.7 or to.normalized().dot(dirv) < 0.82:
+			continue
+		var chance := 0.25 + 0.35 * o.defense + (0.1 if o.has_trait(SimPlayer.Trait.MURALHA) else 0.0) - 0.15 * (d - 0.3)
+		if rng.chance(chance):
+			var spd := ball.vel.length()
+			var side := Vector2(-dirv.y, dirv.x) * (1.0 if rng.chance(0.5) else -1.0)
+			ball.vel = (-dirv * 0.35 + side * 0.65).normalized() * spd * rng.range_f(0.25, 0.45)
+			ball.vz = rng.range_f(1.0, 4.0)
+			ball.spin = 0.0
+			ball.last_touch_team = o.team
+			ball.last_touch_id = o.id
+			_emit("block", {"team": o.team, "id": o.id})
+		return
 
 
 func _release_ball(p: SimPlayer) -> void:

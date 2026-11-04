@@ -14,6 +14,7 @@ uniform int layout = 0;      // 0 campo, 1 futsal, 2 street
 uniform float goal_half = 3.66;
 uniform float line_w = 0.12;
 uniform float stripes = 1.0;
+uniform int mow_style = 0;    // 0 faixas, 1 xadrez, 2 círculos
 uniform float night = 0.0;
 // quadras de futsal: cores do piso, tipo (0 madeira, 1 sintético, 2 grama sintética)
 uniform vec4 floor_a : source_color = vec4(0.74, 0.50, 0.29, 1.0);
@@ -78,7 +79,12 @@ void fragment() {
 		vec3 g1 = vec3(0.20, 0.50, 0.21);
 		vec3 g2 = vec3(0.25, 0.58, 0.25);
 		float band = mod(floor((p.x + hl) / (hl / 10.0)), 2.0);
+		if (mow_style == 1) band = mod(floor((p.x + hl) / (hl / 8.0)) + floor((p.y + hw) / (hw / 5.0)), 2.0);
+		else if (mow_style == 2) band = mod(floor(length(p) / 5.0), 2.0);
 		c = mix(g1, g2, band * stripes);
+		// textura de folhas (fina, some ao longe)
+		float blades = noise(p * 38.0) * 0.5 + noise(p * 71.0 + 3.0) * 0.5;
+		c *= 0.95 + 0.1 * blades * (1.0 - clamp(fwidth(p.x) * 6.0, 0.0, 1.0));
 		// faixas cruzadas leves (corte em xadrez)
 		float band2 = mod(floor((p.y + hw) / (hw / 6.0)), 2.0);
 		c *= 0.97 + 0.04 * band2 * stripes;

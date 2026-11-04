@@ -60,6 +60,8 @@ var _flares: Array = []             # [{node, t}]
 var _confetti: Array[CPUParticles3D] = []
 var _goal_end: float = 1.0          # lado (x) da torcida que comemora
 var _stadium_tier: int = 3
+var _net_mats: Array = [[], []]     # materiais da rede de cada gol (lado -x, +x)
+var _net_hit: Array = [0.0, 0.0]
 
 const CAMS := {
 	"field": {"height": 21.0, "back": 22.0, "fov": 29.0, "clamp": 22.0, "look_z": 0.45},
@@ -247,6 +249,7 @@ func _build_ground() -> void:
 	mat.set_shader_parameter("line_w", 0.12 if mid == GameModes.FIELD else 0.08)
 	mat.set_shader_parameter("stripes", 1.0 if Settings.detail["stripes"] else 0.0)
 	mat.set_shader_parameter("night", 1.0 if _night else 0.0)
+	mat.set_shader_parameter("mow_style", posmod(visual_seed + int(home_team.get("rating", 0.7) * 100.0), 3))
 	_pitch_mat = mat
 	_mesh(pm, mat, Vector3.ZERO)
 
@@ -308,6 +311,8 @@ func _net_quad(shader: Shader, a: Vector3, b: Vector3, c: Vector3, d: Vector3) -
 	m.set_shader_parameter("size", Vector2(a.distance_to(b), b.distance_to(c)))
 	m.set_shader_parameter("cell", 0.14 if sim.mode["id"] == GameModes.FIELD else 0.1)
 	_mesh(st.commit(), m, Vector3.ZERO)
+	if absf(a.x) >= sim.half_len - 0.01 and absf(b.x) >= sim.half_len - 0.01 and absf(a.x) < sim.half_len + 5.0:
+		_net_mats[0 if a.x < 0.0 else 1].append(m)
 
 
 func _crowd_mat(cols: Vector2, bias: float = 0.5) -> ShaderMaterial:
@@ -974,6 +979,12 @@ func _build_confetti() -> void:
 
 ## Gol: torcida comemora, confete nas cores do time e sinalizadores (à noite).
 func on_goal(team: int) -> void:
+	# rede estufa onde a bola entrou
+	var side := 0 if sim.ball.pos.x < 0.0 else 1
+	_net_hit[side] = 0.55
+	for m: ShaderMaterial in _net_mats[side]:
+		m.set_shader_parameter("hit_pos", Vector3(sim.ball.pos.x, sim.ball.z + 0.3, sim.ball.pos.y))
+		m.set_shader_parameter("push_dir", Vector3(signf(sim.ball.pos.x), 0.05, 0.0))
 	_celebrate = 1.0
 	_wave = -1.0
 	var attack_dir := sim.team_dir(team)
@@ -999,7 +1010,17 @@ func on_goal(team: int) -> void:
 			_flares.append({"node": mi, "t": 7.0 + randf() * 3.0, "mat": m})
 
 
+func _update_nets(delta: float) -> void:
+	for side in 2:
+		if _net_hit[side] > 0.0:
+			_net_hit[side] = maxf(0.0, _net_hit[side] - delta * 0.35)
+			var amp: float = sin(_net_hit[side] * 9.0) * _net_hit[side] * 0.9
+			for m: ShaderMaterial in _net_mats[side]:
+				m.set_shader_parameter("hit_amp", amp)
+
+
 func _update_crowd(delta: float) -> void:
+	_update_nets(delta)
 	_celebrate = maxf(0.0, _celebrate - delta * 0.11)
 	# "ola" de vez em quando, com o jogo parado ou morno
 	_wave_cd -= delta

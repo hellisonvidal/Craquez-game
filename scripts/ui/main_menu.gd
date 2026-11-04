@@ -45,6 +45,7 @@ var _theme: Theme
 var _bg_t := 0.0
 var _side_widgets: Array = [{}, {}]   # widgets de cada lado na tela de times
 var _first_focus: Control
+var _confetti: Array = []     # [pos, vel, cor, giro] (tela título)
 
 
 func _ready() -> void:
@@ -121,6 +122,9 @@ func _make_theme() -> Theme:
 
 ## Fundo animado: gramado noturno com faixas, linhas e feixes de refletor.
 func _draw() -> void:
+	if page == Page.TITLE:
+		_draw_title_bg()
+		return
 	var s := size
 	draw_rect(Rect2(Vector2.ZERO, s), Color("#06101d"))
 	var gy := s.y * 0.58
@@ -147,8 +151,99 @@ func _draw() -> void:
 	draw_rect(Rect2(Vector2.ZERO, s), Color(0.02, 0.04, 0.08, 0.35))
 
 
+## Abertura: céu em degradê, estádio em silhueta com refletores, feixes
+## coloridos girando, confete caindo e bola quicando.
+func _draw_title_bg() -> void:
+	var s := size
+	var t := _bg_t
+	# céu em degradê (azul-noite → roxo → laranja no horizonte)
+	var bands := 24
+	for i in bands:
+		var u := float(i) / bands
+		var c := Color("#0b1033").lerp(Color("#5b21b6"), clampf(u * 1.4, 0.0, 1.0)).lerp(Color("#f97316"), clampf((u - 0.55) * 2.2, 0.0, 1.0))
+		draw_rect(Rect2(0, s.y * 0.62 * u, s.x, s.y * 0.62 / bands + 1.0), c)
+	# feixes de luz coloridos
+	var beam_cols := [Color(1.0, 0.85, 0.2, 0.16), Color(0.2, 0.9, 0.5, 0.13), Color(0.3, 0.6, 1.0, 0.14), Color(1.0, 0.3, 0.6, 0.12)]
+	for k in 4:
+		var src := Vector2(s.x * (0.12 + k * 0.25), s.y * 0.66)
+		var ang := -PI / 2 + sin(t * 0.5 + k * 1.7) * 0.55
+		var dir := Vector2(cos(ang), sin(ang))
+		var perp := Vector2(-dir.y, dir.x)
+		var far := src + dir * s.y * 1.2
+		draw_colored_polygon(PackedVector2Array([src, far + perp * s.x * 0.09, far - perp * s.x * 0.09]), beam_cols[k])
+	# estádio em silhueta (arquibancada em arco) com pontinhos de torcida
+	var base_y := s.y * 0.62
+	var arc := PackedVector2Array([Vector2(0, s.y), Vector2(0, base_y - s.y * 0.06)])
+	for i in 33:
+		var x := s.x * i / 32.0
+		arc.append(Vector2(x, base_y - s.y * 0.06 - sin(PI * i / 32.0) * s.y * 0.07))
+	arc.append(Vector2(s.x, s.y))
+	draw_colored_polygon(arc, Color("#0a0f1f"))
+	var rng := RandomNumberGenerator.new()
+	rng.seed = 7
+	var crowd_cols := [Color("#facc15"), Color("#22c55e"), Color("#3b82f6"), Color("#ef4444"), Color("#f8fafc"), Color("#a855f7")]
+	for i in 420:
+		var x := rng.randf() * s.x
+		var top := base_y - s.y * 0.06 - sin(PI * x / s.x) * s.y * 0.07
+		var y := top + rng.randf() * s.y * 0.08
+		var jump := maxf(0.0, sin(t * 6.0 + i)) * 2.0
+		draw_circle(Vector2(x, y - jump), 2.2, crowd_cols[i % crowd_cols.size()].darkened(0.25))
+	# torres de refletor acesas
+	for k in 4:
+		var px := s.x * (0.08 + k * 0.28)
+		var py := base_y - s.y * 0.22
+		draw_line(Vector2(px, py), Vector2(px, base_y), Color("#1e293b"), 6.0)
+		draw_rect(Rect2(px - 26, py - 16, 52, 18), Color("#fffbeb"))
+		draw_circle(Vector2(px, py - 7), 46.0, Color(1, 0.97, 0.8, 0.12))
+		draw_circle(Vector2(px, py - 7), 22.0, Color(1, 0.97, 0.85, 0.25))
+	# gramado em perspectiva
+	var gy := base_y + s.y * 0.04
+	for i in 14:
+		var x0 := s.x * float(i) / 14.0
+		var c2 := Color("#15803d") if i % 2 == 0 else Color("#16a34a")
+		draw_colored_polygon(PackedVector2Array([
+			Vector2(s.x * 0.5 + (x0 - s.x * 0.5) * 0.5, gy), Vector2(s.x * 0.5 + (x0 + s.x / 14.0 - s.x * 0.5) * 0.5, gy),
+			Vector2(s.x * 0.5 + (x0 + s.x / 14.0 - s.x * 0.5) * 2.0, s.y), Vector2(s.x * 0.5 + (x0 - s.x * 0.5) * 2.0, s.y)]), c2)
+	draw_rect(Rect2(0, base_y, s.x, gy - base_y), Color("#0f172a"))
+	draw_arc(Vector2(s.x * 0.5, s.y * 1.05), s.x * 0.2, PI, TAU, 48, Color(1, 1, 1, 0.35), 4.0)
+	# bola quicando
+	var bounce := absf(sin(t * 2.6))
+	var bp := Vector2(s.x * 0.5 + sin(t * 0.7) * s.x * 0.18, s.y * 0.9 - bounce * s.y * 0.14)
+	draw_circle(Vector2(bp.x, s.y * 0.92), 26.0 * (1.0 - bounce * 0.4), Color(0, 0, 0, 0.35))
+	draw_circle(bp, 24.0, Color.WHITE)
+	for k in 5:
+		var a := t * 3.0 + TAU * k / 5.0
+		draw_circle(bp + Vector2(cos(a), sin(a)) * 12.0, 5.5, Color("#111827"))
+	draw_circle(bp, 6.0, Color("#111827"))
+	draw_arc(bp, 24.0, 0, TAU, 32, Color("#111827"), 2.0)
+	# confete
+	for c in _confetti:
+		var pos: Vector2 = c[0]
+		var rot: float = c[3]
+		var d := Vector2(cos(rot), sin(rot)) * 6.0
+		draw_line(pos - d, pos + d, c[2], 5.0)
+	# brilho atrás do logotipo
+	var lc := Vector2(s.x * 0.5, s.y * 0.3)
+	for r in 6:
+		draw_circle(lc, s.x * (0.32 - r * 0.045), Color(1.0, 0.85, 0.2, 0.03 + r * 0.012))
+
+
+func _update_confetti(delta: float) -> void:
+	var s := size
+	if _confetti.size() < 140:
+		var cols := [Color("#facc15"), Color("#22c55e"), Color("#3b82f6"), Color("#ef4444"), Color("#f8fafc"), Color("#ec4899"), Color("#f97316")]
+		_confetti.append([Vector2(randf() * s.x, -10.0), Vector2(randf_range(-30, 30), randf_range(60, 140)), cols[randi() % cols.size()], randf() * TAU])
+	for c in _confetti:
+		c[0] = (c[0] as Vector2) + (c[1] as Vector2) * delta + Vector2(sin(_bg_t * 2.0 + float(c[3])) * 20.0 * delta, 0)
+		c[3] = float(c[3]) + delta * 4.0
+		if (c[0] as Vector2).y > s.y + 20.0:
+			c[0] = Vector2(randf() * s.x, -10.0)
+
+
 func _process(delta: float) -> void:
 	_bg_t += delta
+	if page == Page.TITLE:
+		_update_confetti(delta)
 	queue_redraw()
 	if page == Page.TITLE and _labels.has("_press"):
 		(_labels["_press"] as Label).modulate.a = 0.55 + 0.45 * sin(_bg_t * 3.0)
@@ -295,8 +390,24 @@ func _nav_row(parent: Control, back: Callable, next_text: String, next: Callable
 
 func _page_title() -> void:
 	var vb := _center_box(900)
-	_title_label(vb, "CRAQUEZ", 190)
-	_small(vb, "TEMPORADA 2026/27  ·  CAMPO  ·  FUTSAL  ·  STREET", Color("#e2e8f0"), 28)
+	var logo := Control.new()
+	logo.custom_minimum_size = Vector2(900, 230)
+	vb.add_child(logo)
+	# camadas de sombra coloridas atrás do nome
+	for layer in [[Vector2(10, 12), Color("#7c3aed")], [Vector2(6, 7), Color("#16a34a")], [Vector2(0, 0), Color("#facc15")]]:
+		var l := Label.new()
+		l.text = "CRAQUEZ"
+		l.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		l.size = Vector2(900, 230)
+		l.position = layer[0]
+		l.add_theme_font_size_override("font_size", 190)
+		l.add_theme_color_override("font_color", layer[1])
+		l.add_theme_color_override("font_outline_color", Color("#0b1033"))
+		l.add_theme_constant_override("outline_size", 22)
+		logo.add_child(l)
+	var sub := _small(vb, "TEMPORADA 2026/27  ·  CAMPO  ·  FUTSAL  ·  STREET", Color("#f8fafc"), 30)
+	sub.add_theme_color_override("font_outline_color", Color("#0b1033"))
+	sub.add_theme_constant_override("outline_size", 8)
 	var gap := Control.new()
 	gap.custom_minimum_size = Vector2(0, 70)
 	vb.add_child(gap)

@@ -64,6 +64,9 @@ func on_event(e: Dictionary) -> void:
 			play("kick", 0.18, 1.5 + randf() * 0.2)
 		"fooled":
 			play("ooh", 0.45)
+		"block":
+			play("tackle", 0.7, 1.2)
+			play("ooh", 0.55)
 		"bounce":
 			play("bounce", 0.35, 0.9 + randf() * 0.2)
 		"post":
