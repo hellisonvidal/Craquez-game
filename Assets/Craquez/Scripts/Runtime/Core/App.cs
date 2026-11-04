@@ -37,6 +37,7 @@ namespace Craquez
 
         void Start()
         {
+            Debug.Log("[craquez] início " + Application.version + " em " + SystemInfo.graphicsDeviceName + " / " + SystemInfo.graphicsDeviceType);
             Application.runInBackground = false;
             if (!ShotTour.Requested()) GoFullscreen();   // (o servidor gráfico virtual do CI não suporta trocar de modo)
             Screen.sleepTimeout = SleepTimeout.NeverSleep;

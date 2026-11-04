@@ -59,6 +59,20 @@ namespace Craquez.EditorTools
             Transparent(tr);
             Save("LitTransparent", tr);
 
+            var nm = new Material(lit);
+            nm.EnableKeyword("_NORMALMAP");
+            nm.SetFloat("_BumpScale", 1f);
+            Save("LitNormal", nm);
+
+            var nmc = new Material(lit);
+            nmc.EnableKeyword("_NORMALMAP");
+            nmc.SetFloat("_AlphaClip", 1f);
+            nmc.SetFloat("_Cutoff", 0.4f);
+            nmc.SetFloat("_Cull", (float)CullMode.Off);
+            nmc.EnableKeyword("_ALPHATEST_ON");
+            nmc.renderQueue = (int)RenderQueue.AlphaTest;
+            Save("LitNormalCutout", nmc);
+
             var em = new Material(lit);
             em.EnableKeyword("_EMISSION");
             em.SetColor("_EmissionColor", Color.white);

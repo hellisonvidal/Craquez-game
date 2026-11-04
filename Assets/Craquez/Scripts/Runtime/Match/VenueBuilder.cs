@@ -57,8 +57,8 @@ namespace Craquez
             int ts = quality >= 2 ? 512 : 256;
             var grass = Gfx.Grass(ts, new Color(0.23f, 0.5f, 0.16f), (int)(seed % 997));
             // faixas de corte: duas tonalidades alternadas
-            v.pitchMat = Gfx.Lit(new Color(1.0f, 1.0f, 1.0f), grass, 0.12f);
-            v.pitchMat2 = Gfx.Lit(new Color(0.86f, 0.92f, 0.84f), grass, 0.12f);
+            v.pitchMat = Gfx.LitN(new Color(1.0f, 1.0f, 1.0f), grass, Gfx.GrassNormal, 0.16f, 0.8f);
+            v.pitchMat2 = Gfx.LitN(new Color(0.86f, 0.92f, 0.84f), grass, Gfx.GrassNormal, 0.16f, 0.8f);
             Gfx.Tiling(v.pitchMat, new Vector2(1, 1));
             Gfx.Tiling(v.pitchMat2, new Vector2(1, 1));
             var a = new MeshKit();
@@ -331,7 +331,7 @@ namespace Craquez
             };
             var pp = pal[variant];
             Texture2D courtTex = pp.kind == 0 ? Gfx.Wood(1024, Color.white, variant) : pp.kind == 2 ? Gfx.Grass(512, Color.white, variant) : Gfx.Asphalt(256, Color.white, variant, 0f);
-            var courtMat = Gfx.Lit(pp.court * (pp.kind == 0 ? 1.05f : 1f), courtTex, pp.kind == 0 ? 0.62f : pp.kind == 1 ? 0.45f : 0.1f);
+            var courtMat = Gfx.LitN(pp.court * (pp.kind == 0 ? 1.05f : 1f), courtTex, pp.kind == 0 ? Gfx.WoodNormal : pp.kind == 2 ? Gfx.GrassNormal : Gfx.AsphaltNormal, pp.kind == 0 ? 0.62f : pp.kind == 1 ? 0.45f : 0.1f, pp.kind == 1 ? 0.25f : 0.6f);
             var surMat = Gfx.Lit(pp.surround, pp.kind == 2 ? courtTex : Gfx.Asphalt(256, Color.white, variant + 9, 0f), pp.kind == 2 ? 0.1f : 0.4f);
             v.pitchMat = courtMat;
             v.pitchMat2 = surMat;
@@ -484,7 +484,7 @@ namespace Craquez
             bool grassy = variant == 7;
             var groundTex = sand ? Gfx.Grass(256, new Color(0.95f, 0.85f, 0.6f), variant) : grassy ? Gfx.Grass(256, new Color(0.35f, 0.5f, 0.25f), variant) : Gfx.Asphalt(256, Color.white, variant, 0.6f);
             Color gc = sand ? new Color(0.95f, 0.86f, 0.62f) : grassy ? new Color(0.55f, 0.65f, 0.45f) : variant == 1 ? new Color(0.55f, 0.45f, 0.38f) : new Color(0.42f, 0.42f, 0.45f);
-            var ground = Gfx.Lit(gc, groundTex, sand ? 0.05f : 0.2f);
+            var ground = Gfx.LitN(gc, groundTex, sand || grassy ? Gfx.GrassNormal : Gfx.AsphaltNormal, sand ? 0.05f : 0.2f, 1f);
             v.pitchMat = ground;
             var k = new MeshKit();
             float mx = hl + 25f, mz = hw + 25f;

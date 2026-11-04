@@ -23,8 +23,23 @@ namespace Craquez
             return false;
         }
 
+        float _beat;
+        int _frames;
+
+        void Update()
+        {
+            _frames++;
+            if (Time.realtimeSinceStartup - _beat > 10f)
+            {
+                Debug.Log($"[shots] batimento: {Time.realtimeSinceStartup:F0}s, {_frames} quadros desde o último ({_frames / Mathf.Max(0.01f, Time.realtimeSinceStartup - _beat):F1} fps), tela {Screen.width}x{Screen.height}");
+                _beat = Time.realtimeSinceStartup;
+                _frames = 0;
+            }
+        }
+
         public void Run(App app)
         {
+            Debug.Log("[shots] início do roteiro em " + Dir);
             _app = app;
             Directory.CreateDirectory(Dir);
             StartCoroutine(Tour());

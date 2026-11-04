@@ -38,6 +38,52 @@ namespace Craquez
             return m;
         }
 
+        /// <summary>Lit com mapa de relevo (normal map) — grama, madeira, tecido, asfalto.</summary>
+        public static Material LitN(Color c, Texture tex, Texture2D normal, float smooth = 0.2f, float bump = 1f, bool twoSided = false)
+        {
+            var m = new Material(Template(twoSided ? "LitNormalCutout" : "LitNormal"));
+            Set(m, c, tex);
+            m.SetFloat("_Smoothness", smooth);
+            if (twoSided) m.SetFloat("_Cutoff", 0.01f);
+            if (normal != null)
+            {
+                m.SetTexture("_BumpMap", normal);
+                m.SetFloat("_BumpScale", bump);
+            }
+            return m;
+        }
+
+        /// <summary>
+        /// Normal map a partir de um campo de altura (tileável). RGB = normal, A = 1:
+        /// funciona tanto no desktop (formato AG) quanto no celular (RGB).
+        /// </summary>
+        public static Texture2D NormalFromHeight(int size, System.Func<float, float, float> height, float strength)
+        {
+            var h = new float[size * size];
+            for (int y = 0; y < size; y++)
+                for (int x = 0; x < size; x++)
+                    h[y * size + x] = height(x / (float)size, y / (float)size);
+            var t = new Texture2D(size, size, TextureFormat.RGBA32, true, true) { wrapMode = TextureWrapMode.Repeat, filterMode = FilterMode.Trilinear, anisoLevel = 4 };
+            var px = new Color32[size * size];
+            for (int y = 0; y < size; y++)
+                for (int x = 0; x < size; x++)
+                {
+                    float l = h[y * size + (x + size - 1) % size], r = h[y * size + (x + 1) % size];
+                    float d = h[((y + size - 1) % size) * size + x], u = h[((y + 1) % size) * size + x];
+                    var n = new Vector3((l - r) * strength, (d - u) * strength, 1f).normalized;
+                    px[y * size + x] = new Color32((byte)((n.x * 0.5f + 0.5f) * 255), (byte)((n.y * 0.5f + 0.5f) * 255), (byte)((n.z * 0.5f + 0.5f) * 255), 255);
+                }
+            t.SetPixels32(px);
+            t.Apply(true);
+            return t;
+        }
+
+        static Texture2D _grassN, _woodN, _knitN, _asphaltN;
+        public static Texture2D GrassNormal => _grassN ??= NormalFromHeight(256, (u, v) => Hash((int)(u * 256), (int)(v * 256), 41) * 0.6f + VNoise(u * 64, v * 6, 64, 9) * 0.4f, 6f);
+        public static Texture2D WoodNormal => _woodN ??= NormalFromHeight(256, (u, v) => VNoise(u * 4, v * 64, 64, 5) * 0.7f + (Mathf.Abs(v * 8 - Mathf.Round(v * 8)) < 0.02f ? -0.6f : 0f), 3f);
+        public static Texture2D KnitNormal => _knitN ??= NormalFromHeight(128, (u, v) => Mathf.Sin(u * Mathf.PI * 2 * 64) * Mathf.Sin(v * Mathf.PI * 2 * 64) * 0.5f + VNoise(u * 16, v * 16, 16, 7) * 0.3f, 2.5f);
+        public static Texture2D AsphaltNormal => _asphaltN ??= NormalFromHeight(256, (u, v) => Hash((int)(u * 256), (int)(v * 256), 17) * 0.5f + Fbm(u * 8, v * 8, 8, 3, 3) * 0.6f, 4f);
+
         /// <summary>Lit com recorte alfa e dois lados (cabelo, cílios, redes, bandeiras).</summary>
         public static Material Cutout(Color c, Texture tex, float cutoff = 0.4f, float smooth = 0.15f)
         {

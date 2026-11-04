@@ -153,7 +153,7 @@ namespace Craquez
                         var part = n == "Shirt" ? KitPart.Shirt : n == "Shorts" ? KitPart.Shorts : KitPart.Socks;
                         var kt = KitPainter.Paint(smr.sharedMesh, part, kit, axes, part == KitPart.Socks ? tex / 2 : tex);
                         // tecido dos dois lados (vê-se o avesso pela gola e pelas mangas)
-                        smr.sharedMaterial = Shared("kit:" + kt.GetInstanceID(), () => Gfx.Cutout(Color.white, kt, 0.01f, part == KitPart.Shirt ? 0.32f : 0.25f));
+                        smr.sharedMaterial = Shared("kit:" + kt.GetInstanceID(), () => Gfx.LitN(Color.white, kt, Gfx.KnitNormal, part == KitPart.Shirt ? 0.34f : 0.26f, 0.35f, true));
                         break;
                     }
                     case "Boots":
