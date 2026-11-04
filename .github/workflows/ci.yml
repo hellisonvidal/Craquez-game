@@ -2,133 +2,105 @@ name: CI
 
 on:
   push:
-    branches: [main]
   pull_request:
+  workflow_dispatch:
 
-env:
-  GODOT_VERSION: "4.4.1"
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
-  test:
+  # Não precisa de licença: compila todo o C# contra as DLLs do editor e roda os testes da simulação.
+  check:
+    name: Compilar e testar (sem licença)
     runs-on: ubuntu-latest
-    container: barichello/godot-ci:4.4.1
+    container: unityci/editor:ubuntu-6000.3.28f1-base-3
     steps:
       - uses: actions/checkout@v4
-      - name: Importar projeto
-        run: godot --headless --path . --import 2>&1 | tee import.log || true
-      - name: Testes da simulação
-        run: godot --headless --path . -s tests/run_tests.gd
-      - name: Teste de fumaça (menu + partidas com renderização)
+        with:
+          lfs: true
+      - run: bash tools/ci/check.sh /opt/unity/Editor/Data
+
+  license:
+    name: Licença Unity configurada?
+    runs-on: ubuntu-latest
+    outputs:
+      ok: ${{ steps.chk.outputs.ok }}
+    steps:
+      - id: chk
+        env:
+          UNITY_LICENSE: ${{ secrets.UNITY_LICENSE }}
+          UNITY_EMAIL: ${{ secrets.UNITY_EMAIL }}
         run: |
-          for m in field futsal street; do
-            godot --headless --path . --quit-after 2400 -- --autoplay=$m 2>&1 | tee smoke_$m.log
-          done
-          if grep -E "SCRIPT ERROR|Parse Error|Invalid call|Invalid access|Invalid get|Invalid set" import.log smoke_*.log; then
-            echo "Erros de script encontrados"; exit 1
+          if [ -n "$UNITY_LICENSE" ] && [ -n "$UNITY_EMAIL" ]; then
+            echo "ok=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "ok=false" >> "$GITHUB_OUTPUT"
+            echo "::warning::Segredos UNITY_LICENSE / UNITY_EMAIL / UNITY_PASSWORD não configurados: os builds de Android e Windows foram pulados. Veja docs/BUILD.md."
           fi
 
-  export-windows:
-    needs: test
+  tests:
+    name: Testes no editor Unity
+    needs: [check, license]
+    if: needs.license.outputs.ok == 'true'
     runs-on: ubuntu-latest
-    container: barichello/godot-ci:4.4.1
     steps:
       - uses: actions/checkout@v4
-      - name: Preparar Godot
-        run: |
-          mkdir -p ~/.local/share/godot/export_templates ~/.config
-          cp -r /root/.config/godot ~/.config/godot || true
-          cp -r /root/.local/share/godot/export_templates/* ~/.local/share/godot/export_templates/
-      - name: Exportar Windows
-        run: |
-          mkdir -p build/windows
-          godot --headless --path . --import || true
-          godot --headless --path . --export-release "Windows Desktop" build/windows/Craquez.exe
-      - uses: actions/upload-artifact@v4
         with:
-          name: craquez-windows
-          path: build/windows
+          lfs: true
+      - uses: actions/cache@v4
+        with:
+          path: Library
+          key: Library-tests-${{ hashFiles('Packages/manifest.json', 'ProjectSettings/ProjectVersion.txt') }}
+          restore-keys: Library-tests-
+      - uses: game-ci/unity-test-runner@v4
+        env:
+          UNITY_LICENSE: ${{ secrets.UNITY_LICENSE }}
+          UNITY_EMAIL: ${{ secrets.UNITY_EMAIL }}
+          UNITY_PASSWORD: ${{ secrets.UNITY_PASSWORD }}
+        with:
+          testMode: editmode
+          githubToken: ${{ secrets.GITHUB_TOKEN }}
+          checkName: Resultados dos testes
 
-  export-android:
-    needs: test
+  build:
+    name: Build ${{ matrix.name }}
+    needs: [check, license]
+    if: needs.license.outputs.ok == 'true'
     runs-on: ubuntu-latest
-    container: barichello/godot-ci:4.4.1
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: Android
+            targetPlatform: Android
+          - name: Windows
+            targetPlatform: StandaloneWindows64
     steps:
+      - uses: jlumbroso/free-disk-space@v1.3.1
+        with:
+          android: false
+          large-packages: false
       - uses: actions/checkout@v4
-      - name: Preparar Godot + Android
-        run: |
-          mkdir -p ~/.local/share/godot/export_templates ~/.config
-          cp -r /root/.config/godot ~/.config/godot || true
-          cp -r /root/.local/share/godot/export_templates/* ~/.local/share/godot/export_templates/
-          keytool -keyalg RSA -genkeypair -alias androiddebugkey -keypass android -keystore debug.keystore \
-            -storepass android -dname "CN=Android Debug,O=Android,C=US" -validity 9999 -deststoretype pkcs12
-          JAVA_HOME_DIR=$(dirname $(dirname $(readlink -f $(which java))))
-          SETTINGS=$(ls ~/.config/godot/editor_settings-4*.tres | head -1)
-          echo "Editor settings: $SETTINGS ; java: $JAVA_HOME_DIR"
-          grep -q "java_sdk_path" "$SETTINGS" || echo "export/android/java_sdk_path = \"$JAVA_HOME_DIR\"" >> "$SETTINGS"
-          grep -q "android_sdk_path" "$SETTINGS" || echo "export/android/android_sdk_path = \"/usr/lib/android-sdk\"" >> "$SETTINGS"
-          echo "GODOT_ANDROID_KEYSTORE_DEBUG_PATH=$GITHUB_WORKSPACE/debug.keystore" >> $GITHUB_ENV
-          echo "GODOT_ANDROID_KEYSTORE_DEBUG_USER=androiddebugkey" >> $GITHUB_ENV
-          echo "GODOT_ANDROID_KEYSTORE_DEBUG_PASSWORD=android" >> $GITHUB_ENV
-      - name: Exportar APK (debug)
-        run: |
-          mkdir -p build/android
-          godot --headless --path . --import || true
-          godot --headless --path . --export-debug "Android" build/android/Craquez-debug.apk
+        with:
+          lfs: true
+      - uses: actions/cache@v4
+        with:
+          path: Library
+          key: Library-${{ matrix.targetPlatform }}-${{ hashFiles('Packages/manifest.json', 'ProjectSettings/ProjectVersion.txt') }}
+          restore-keys: Library-${{ matrix.targetPlatform }}-
+      - uses: game-ci/unity-builder@v4
+        env:
+          UNITY_LICENSE: ${{ secrets.UNITY_LICENSE }}
+          UNITY_EMAIL: ${{ secrets.UNITY_EMAIL }}
+          UNITY_PASSWORD: ${{ secrets.UNITY_PASSWORD }}
+        with:
+          targetPlatform: ${{ matrix.targetPlatform }}
+          buildName: Craquez
+          versioning: None
+          androidExportType: androidPackage
       - uses: actions/upload-artifact@v4
         with:
-          name: craquez-android-debug
-          path: build/android
-
-  screenshots:
-    needs: test
-    runs-on: ubuntu-latest
-    container: barichello/godot-ci:4.4.1
-    steps:
-      - uses: actions/checkout@v4
-      - name: Instalar tela virtual + OpenGL por software
-        run: |
-          apt-get update -qq
-          DEBIAN_FRONTEND=noninteractive apt-get install -y -qq xvfb xauth libgl1-mesa-dri libglx-mesa0 libegl1 libgl1 > /dev/null
-      - name: Tirar screenshots
-        run: |
-          godot --headless --path . --import || true
-          mkdir -p shots
-          xvfb-run -a -s "-screen 0 2400x1080x24" godot --path . --rendering-driver opengl3 \
-            --resolution 1920x1080 --audio-driver Dummy -- --shots=$GITHUB_WORKSPACE/shots 2>&1 | tee shots.log
-          ls -la shots
-          echo "---- erros ----"
-          grep -nE "ERROR|Error|error" shots.log | head -60 || true
-      - uses: actions/upload-artifact@v4
-        with:
-          name: craquez-screenshots
-          path: shots
-
-  android-emulator:
-    needs: export-android
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/download-artifact@v4
-        with:
-          name: craquez-android-debug
-          path: apk
-      - name: Habilitar KVM
-        run: |
-          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
-          sudo udevadm control --reload-rules
-          sudo udevadm trigger --name-match=kvm
-      - name: Emulador Android (API 34) — abrir e jogar
-        uses: reactivecircus/android-emulator-runner@v2
-        with:
-          api-level: 34
-          arch: x86_64
-          target: google_apis
-          profile: pixel_6
-          disable-animations: true
-          emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none
-          script: bash tools/android_smoke.sh
-      - uses: actions/upload-artifact@v4
-        if: always()
-        with:
-          name: craquez-android-teste
-          path: android_shots
+          name: Craquez-${{ matrix.name }}
+          path: build/${{ matrix.targetPlatform }}
+          retention-days: 14

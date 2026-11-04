@@ -8,8 +8,10 @@ O Craquez vem com clubes de nomes alterados e jogadores fictícios. Como nos
 O jogo procura `option_file/option_file.json` em:
 
 1. **Windows:** pasta `option_file` ao lado do `Craquez.exe`.
-2. Pasta de dados do jogo (`user://option_file`), que também vale no Android.
-   No Windows ela fica em `%APPDATA%\Godot\app_userdata\Craquez\option_file`.
+2. Pasta de dados do jogo (`Application.persistentDataPath/option_file`), que também vale no Android.
+   - Windows: `%USERPROFILE%\AppData\LocalLow\Craquez\Craquez\option_file`
+   - Android: `Android/data/com.hellisonvidal.craquez/files/option_file`
+   A tela de Opções mostra o caminho exato.
 
 ## Como começar
 

@@ -20,6 +20,9 @@ namespace Craquez
         public Hud hud;
         public System.Action onExit;
         public System.Action<MatchConfig> onRestart;
+        /// <summary>Partida CPU x CPU de fundo nos menus (sem interface, câmera cinematográfica).</summary>
+        public bool attract;
+        float _orbit;
         Phase _phase;
         float _acc, _cereT;
         int _cereStep = -1;
@@ -56,6 +59,14 @@ namespace Craquez
             {
                 if (sides[t] == Side.Cpu) _cpu[t] = new CpuBrain(t, c.difficulty);
                 _dev[t] = sides[t] == Side.Player2 ? InputRouter.DefaultP2(p1) : p1;
+            }
+            if (attract)
+            {
+                hud.canvas.enabled = false;
+                view.bcam.cinematic = true;
+                _phase = Phase.Playing;
+                Sfx.Crowd(0.25f, 0.12f);
+                return;
             }
             if ((sides[0] != Side.Cpu && _dev[0] == DeviceKind.Touch) || (sides[1] != Side.Cpu && _dev[1] == DeviceKind.Touch))
                 _touch = TouchControls.Create(transform);
@@ -207,6 +218,14 @@ namespace Craquez
                 case Phase.Ended:
                     return;
             }
+            if (attract)
+            {
+                _orbit += dt * 0.06f;
+                var b = new Vector3(sim.ball.pos.x, 0, sim.ball.pos.y);
+                view.bcam.cinePos = b + new Vector3(Mathf.Cos(_orbit) * 26f, 9f + Mathf.Sin(_orbit * 0.7f) * 3f, Mathf.Sin(_orbit) * 26f);
+                view.bcam.cineLook = b + Vector3.up * 1f;
+                view.bcam.cineFov = 38f;
+            }
             var frames = new InputFrame[2];
             for (int t = 0; t < 2; t++)
             {
@@ -225,7 +244,12 @@ namespace Craquez
                 sim.Step(frames);
                 view.OnTick();
                 HandleEvents();
-                if (sim.state == MatchState.Fulltime) { ShowEnd(); break; }
+                if (sim.state == MatchState.Fulltime)
+                {
+                    if (attract) { sim.half = 1; sim.clock = 0; sim.state = MatchState.Kickoff; sim.stateTimer = 1f; break; }
+                    ShowEnd();
+                    break;
+                }
             }
             view.Alpha = _acc / MatchSim.DT;
         }
