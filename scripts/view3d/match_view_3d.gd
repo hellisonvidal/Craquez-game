@@ -23,6 +23,10 @@ var _officials: Array = []               # [{rig, p, kind}] árbitro e assistent
 var _shadow_mat: ShaderMaterial
 var _quad: QuadMesh
 var _intro: float = 3.2
+## cerimônia antes do jogo (entrada dos times); 0 = desligada
+const PREMATCH_LEN := 14.0
+var prematch_t: float = 0.0
+var _pm_actors: Array = []          # [{rig, sp (SimPlayer de cena), slot: Vector2, delay, shadows}]
 var _night: bool = false
 var _crowd_mats: Array[ShaderMaterial] = []
 var _overlay: MarkerOverlay
@@ -1057,6 +1061,13 @@ func _process(delta: float) -> void:
 	if sim == null:
 		return
 	var b := sim.ball
+	if prematch_t > 0.0:
+		_update_prematch(delta)
+		_update_crowd(delta)
+		if weather_fx != null:
+			weather_fx.update(delta)
+		_overlay.queue_redraw()
+		return
 	for i in rigs.size():
 		var p: SimPlayer = sim.players[i]
 		rigs[i].animate(p, b.pos, b.z, delta, b.owner == p.id)
@@ -1087,6 +1098,100 @@ func _process(delta: float) -> void:
 		weather_fx.update(delta)
 	_update_camera(delta)
 	_overlay.queue_redraw()
+
+
+# ------------------------------------------------------------------ cerimônia de entrada
+
+## Liga a cerimônia: times saem do túnel, perfilam no meio-campo; câmera de TV conduz.
+func start_prematch() -> void:
+	prematch_t = PREMATCH_LEN
+	_intro = 0.0
+	_pm_actors.clear()
+	var hw := sim.half_w
+	var gap := 1.05 if sim.mode["id"] == GameModes.FIELD else 0.95
+	var k := 0
+	var counts := [0, 0]
+	for i in rigs.size():
+		var p: SimPlayer = sim.players[i]
+		var sp := SimPlayer.new()
+		sp.id = p.id
+		sp.team = p.team
+		sp.number = p.number
+		sp.face_id = p.face_id
+		sp.is_keeper = p.is_keeper
+		sp.pos = Vector2(0, -(hw + 2.5))
+		sp.facing = Vector2(0, 1)
+		var idx: int = counts[p.team]
+		counts[p.team] += 1
+		var slot := Vector2((-1.0 if p.team == 0 else 1.0) * (1.6 + idx * gap), 3.0)
+		_pm_actors.append({"rig": rigs[i], "sp": sp, "slot": slot, "delay": 3.6 + (idx * 2 + p.team) * 0.11, "shadows": _shadows[i] if i < _shadows.size() else []})
+		k += 1
+	var oi := 0
+	for o in _officials:
+		var sp: SimPlayer = o["p"]
+		sp.pos = Vector2(0, -(hw + 2.5))
+		_pm_actors.append({"rig": o["rig"], "sp": sp, "slot": Vector2([0.0, -0.55, 0.55][oi % 3], 3.0), "delay": 3.4 + oi * 0.1, "shadows": o["shadows"], "official": true})
+		oi += 1
+
+
+func end_prematch() -> void:
+	prematch_t = 0.0
+	_cam_x = sim.ball.pos.x
+	_look = Vector3(sim.ball.pos.x, 0, 0)
+
+
+func prematch_elapsed() -> float:
+	return PREMATCH_LEN - prematch_t if prematch_t > 0.0 else -1.0
+
+
+func _update_prematch(delta: float) -> void:
+	prematch_t = maxf(0.0, prematch_t - delta)
+	var e := PREMATCH_LEN - prematch_t
+	for a in _pm_actors:
+		var sp: SimPlayer = a["sp"]
+		var slot: Vector2 = a["slot"]
+		if e >= float(a["delay"]):
+			var to := slot - sp.pos
+			var d := to.length()
+			var want := to / d * minf(2.3, d * 2.0) if d > 0.05 else Vector2.ZERO
+			sp.vel = sp.vel.move_toward(want, 6.0 * delta)
+			sp.pos += sp.vel * delta
+			if sp.vel.length() > 0.3:
+				sp.facing = sp.vel.normalized()
+			else:
+				sp.facing = sp.facing.slerp(Vector2(0, 1), minf(1.0, delta * 4.0)).normalized()
+		(a["rig"] as PlayerRig).animate(sp, Vector2(0, 30), 0.0, delta, false)
+		(a["rig"] as PlayerRig).visible = e >= float(a["delay"]) - 0.2
+		_place_shadows(a["shadows"], sp.pos, (a["rig"] as PlayerRig).rotation.y, false)
+	ball_node.position = Vector3(0, sim.ball.radius, 0)
+	if prematch_t <= 0.0:
+		for a in _pm_actors:
+			(a["rig"] as PlayerRig).visible = true
+		end_prematch()
+	_update_prematch_camera(e, delta)
+
+
+func _update_prematch_camera(e: float, _delta: float) -> void:
+	var hw := sim.half_w
+	if e < 3.5:
+		var t := e / 3.5
+		var r := sim.half_len * 1.35 + 10.0
+		var ang := lerpf(-1.4, -0.3, t)
+		cam.fov = 40.0
+		cam.position = Vector3(sin(ang) * r, sim.half_len * 0.5 + 8.0, cos(ang) * r)
+		cam.look_at(Vector3.ZERO, Vector3.UP)
+	elif e < 8.5:
+		var t := (e - 3.5) / 5.0
+		cam.fov = 42.0
+		cam.position = Vector3(lerpf(-4.0, 4.0, t), 4.2, 3.0 + lerpf(15.0, 11.0, t))
+		cam.look_at(Vector3(0, 1.2, lerpf(-hw * 0.4, 2.0, clampf(t * 1.4, 0.0, 1.0))), Vector3.UP)
+	else:
+		var t := clampf((e - 8.5) / 5.5, 0.0, 1.0)
+		var span := 1.6 + 10.0 * (1.05 if sim.mode["id"] == GameModes.FIELD else 0.95) * (1.0 if sim.mode["id"] == GameModes.FIELD else 0.4)
+		var x := lerpf(-span, span, t)
+		cam.fov = 38.0
+		cam.position = Vector3(x, 2.0, 9.5)
+		cam.look_at(Vector3(x, 1.45, 3.0), Vector3.UP)
 
 
 func _update_camera(delta: float) -> void:

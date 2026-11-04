@@ -19,6 +19,8 @@ var brains: Array = [null, null]
 var paused := false
 var lockstep: Lockstep
 var _prev_pause := [false, false]
+var _pm_steps: Array = []        # cartões da cerimônia: [tempo, Callable]
+var _ref_name := ""
 
 
 func start(cfg: Dictionary) -> void:
@@ -27,6 +29,10 @@ func start(cfg: Dictionary) -> void:
 	ta["index"] = cfg["team_a"]
 	var tb: Dictionary = Teams.get_team(cfg["team_b"]).duplicate()
 	tb["index"] = cfg["team_b"]
+	var tacs: Array = cfg.get("tactics", [])
+	if tacs.size() == 2:
+		ta["tactics"] = tacs[0]
+		tb["tactics"] = tacs[1]
 	sim = MatchSim.new()
 	var seed_value: int = cfg.get("seed", 1234)
 	sim.setup(cfg["mode"], ta, tb, seed_value, float(cfg.get("half_minutes", 3.0)) * 60.0)
@@ -94,6 +100,17 @@ func start(cfg: Dictionary) -> void:
 		parts.append(view.weather_fx.label())
 	if not parts.is_empty():
 		hud.show_toast(" · ".join(parts), 4.0)
+	# cerimônia de entrada (offline; no online as duas telas começam juntas)
+	if session == null or not session.is_online():
+		if not bool(cfg.get("skip_intro", false)):
+			view.start_prematch()
+			_ref_name = _referee_name(seed_value)
+			var names: Array = [String(ta["name"]), String(tb["name"])]
+			_pm_steps = [
+				[4.0, func(): hud.show_toast("Arbitragem: %s" % _ref_name, 3.5) if cfg["mode"] != GameModes.STREET else hud.show_toast("Rachão sem juiz: no respeito!", 3.0)],
+				[8.5, func(): hud.show_lineup(names[0], colors[0][0], _lineup_entries(0), false, 2.8)],
+				[11.3, func(): hud.show_lineup(names[1], colors[1][0], _lineup_entries(1), true, 2.7)],
+			]
 	hud.resume_requested.connect(func(): _set_paused(false))
 	hud.quit_requested.connect(_quit)
 	hud.rematch_requested.connect(_rematch)
@@ -104,6 +121,22 @@ func start(cfg: Dictionary) -> void:
 		touch = TouchControls.new()
 		layer.add_child(touch)
 		touch.visible = "touch" in devices
+
+
+func _lineup_entries(t: int) -> Array:
+	var out: Array = []
+	for p in sim.players:
+		if p.team == t:
+			var role := GameModes.role_for(p.base, p.index, bool(sim.mode["keeper"]))
+			out.append([p.number, p.name, role, p.face_id])
+	return out
+
+
+func _referee_name(seed_value: int) -> String:
+	var first := ["Carlos", "Eduardo", "Gilson", "Renato", "Mauro", "Sérgio", "Otávio", "Leonel", "Ivan", "Hélio"]
+	var last := ["Valadares", "Montenegro", "Bittencourt", "Quintela", "Arruda", "Fontoura", "Prado", "Teles", "Vasconcelos", "Brandão"]
+	var h := absi(seed_value * 7919 + 13)
+	return "%s %s" % [first[h % first.size()], last[(h / 7) % last.size()]]
 
 
 func _similar(a: Color, b: Color) -> bool:
@@ -123,6 +156,20 @@ func _physics_process(_delta: float) -> void:
 		_physics_online()
 		return
 	var frames: Array = [_frame_for(0), _frame_for(1)]
+	if view.prematch_t > 0.0:
+		var e := view.prematch_elapsed()
+		while not _pm_steps.is_empty() and e >= float(_pm_steps[0][0]):
+			(_pm_steps.pop_front()[1] as Callable).call()
+		# qualquer botão pula a cerimônia (depois de meio segundo)
+		var skip := false
+		for t in 2:
+			if brains[t] == null and (frames[t] as InputFrame).buttons != 0:
+				skip = true
+		if (skip or Input.is_action_just_pressed("ui_accept")) and e > 0.5:
+			view.end_prematch()
+			hud.hide_lineup()
+			_pm_steps.clear()
+		return
 	# Start / Esc pausa (borda de subida)
 	for t in 2:
 		var pz: bool = (frames[t] as InputFrame).has(InputFrame.PAUSE)

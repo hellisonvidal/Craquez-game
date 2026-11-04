@@ -75,6 +75,8 @@ func run(dir: String, main_node: Node) -> void:
 	await _match(GameModes.FIELD, _t("rus", 0), _t("rus", 3), ["cpu", "cpu"], 32, [[14.0, "13_neve_entardecer"]], {"weather": "neve", "tod": "tarde"})
 	await _match(GameModes.FIELD, _t("uru", 15), _t("uru", 14), ["cpu", "cpu"], 33, [[12.0, "14_tempestade_estadio_modesto"]], {"weather": "tempestade", "tod": "noite"})
 	await _match(GameModes.FIELD, _t("sau", 0), _t("sau", 1), ["cpu", "cpu"], 34, [[12.0, "15_saudita_dia"]], {"weather": "sol", "tod": "dia"})
+	# cerimônia de entrada
+	await _match(GameModes.FIELD, _t("bra", 8), _t("bra", 13), ["kb1", "cpu"], 61, [[2.0, "18a_abertura_estadio"], [6.5, "18b_entrada_times"], [9.6, "18c_escalacao_casa"], [12.4, "18d_escalacao_visitante"]], {"skip_intro": false})
 	# variações de quadra de futsal e de rua
 	for v in [1, 4, 5]:
 		await _match(GameModes.FUTSAL, _t("fes", 0), _t("fes", 1), ["cpu", "cpu"], 40 + v, [[7.0, "16_futsal_local_%d" % v]], {"venue": v})
@@ -97,7 +99,7 @@ func _t(id: String, k: int) -> int:
 
 func _match(mode: String, a: int, b: int, devices: Array, seed_value: int, shots: Array, extra: Dictionary = {}) -> void:
 	var cfg := {"mode": mode, "team_a": a, "team_b": b, "devices": devices,
-		"seed": seed_value, "half_minutes": 3.0, "weather": "sol", "tod": "noite"}
+		"seed": seed_value, "half_minutes": 3.0, "weather": "sol", "tod": "noite", "skip_intro": true}
 	cfg.merge(extra, true)
 	main._start_match(cfg)
 	var t := 0.0

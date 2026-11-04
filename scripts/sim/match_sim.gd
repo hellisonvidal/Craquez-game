@@ -69,6 +69,8 @@ var no_offside_kick: bool = false
 var last_scorer: int = -1
 var last_goal_team: int = -1
 var stats_shots: Array[int] = [0, 0]
+var team_mentality: Array[int] = [1, 1]   # 0 defensiva, 1 equilibrada, 2 ofensiva
+var team_press: Array[int] = [1, 1]       # 0 baixa, 1 média, 2 alta
 
 ## Eventos do último passo (para som, câmera, HUD). Ex.: {"type": "goal", "team": 0}
 var events: Array[Dictionary] = []
@@ -85,12 +87,21 @@ func setup(mode_id: String, team_a: Dictionary, team_b: Dictionary, seed_value: 
 	team_info = [team_a, team_b]
 	players.clear()
 	ctrl = [Ctrl.new(), Ctrl.new()]
-	var formation: Array = mode["formation"]
+	var default_formation: Array = mode["formation"]
+	var forms := GameModes.formations(mode_id)
+	team_mentality = [1, 1]
+	team_press = [1, 1]
 	var name_pool: Array = Teams.NAMES.duplicate()
 	for t in 2:
 		var rating: float = team_info[t]["rating"]
 		var roster: Array = team_info[t].get("roster", [])
 		var used := {}
+		# táticas do time (formação, mentalidade, pressão, titulares)
+		var tac: Dictionary = team_info[t].get("tactics", {})
+		var formation: Array = forms.get(String(tac.get("formation", "")), default_formation)
+		team_mentality[t] = clampi(int(tac.get("mentality", 1)), 0, 2)
+		team_press[t] = clampi(int(tac.get("press", 1)), 0, 2)
+		var lineup: Array = tac.get("lineup", [])
 		for i in formation.size():
 			var p := SimPlayer.new()
 			p.id = players.size()
@@ -113,7 +124,12 @@ func setup(mode_id: String, team_a: Dictionary, team_b: Dictionary, seed_value: 
 			if not roster.is_empty():
 				# escala o elenco real do time: melhor disponível em cada posição
 				var want := "GK" if p.is_keeper else ("DF" if p.base.x < -0.6 else ("MF" if p.base.x < -0.3 else "FW"))
-				var e := _pick_from_roster(roster, want, used, not bool(mode["keeper"]))
+				var e: Dictionary = {}
+				if lineup.size() == formation.size() and int(lineup[i]) >= 0 and int(lineup[i]) < roster.size() and not used.has(int(lineup[i])):
+					e = roster[int(lineup[i])]
+					used[int(lineup[i])] = true
+				else:
+					e = _pick_from_roster(roster, want, used, not bool(mode["keeper"]))
 				if not e.is_empty():
 					p.name = String(e["n"])
 					p.number = int(e["num"])
@@ -939,6 +955,7 @@ func _formation_target(p: SimPlayer, attacking: bool) -> Vector2:
 	var bx_rel := ball.pos.x * dir
 	var base_x := p.base.x * half_len
 	var tx := base_x * 0.55 + bx_rel * 0.55 + (half_len * 0.24 if attacking else -half_len * 0.06)
+	tx += float(team_mentality[p.team] - 1) * half_len * 0.09
 	if not attacking:
 		tx = minf(tx, bx_rel + 1.0)   # fica entre a bola e o próprio gol
 	tx = clampf(tx, -half_len * 0.9, half_len * 0.86)
@@ -969,8 +986,12 @@ func _ai_outfield(p: SimPlayer, frozen: bool) -> void:
 				if ctrl[t].help_t > 0.0:
 					target = ball.pos
 					urgent = true
-				elif p.pos.distance_to(ball.pos) < half_len * 0.5:
-					target = ball.pos + (own_goal - ball.pos).normalized() * 3.0
+				elif team_press[t] == 2 and p.pos.distance_to(ball.pos) < half_len * 0.45:
+					# pressão alta: o segundo homem vai no portador
+					target = ball.pos
+					urgent = true
+				elif p.pos.distance_to(ball.pos) < half_len * (0.3 + 0.15 * team_press[t]):
+					target = ball.pos + (own_goal - ball.pos).normalized() * (4.5 - 1.5 * team_press[t])
 	_steer_to(p, target, urgent)
 
 

@@ -21,6 +21,11 @@ var weather_i := 0
 var tod_i := 2
 var dyn_weather := true
 var venue_i := -1   # -1 aleatório
+var _tactics: Array = [{}, {}]   # por lado: {formation, mentality, press, lineup}
+var _swap_sel := -1
+var _roster_side := 0
+const MENTALITIES := ["Defensiva", "Equilibrada", "Ofensiva"]
+const PRESSES := ["Baixa", "Média", "Alta"]
 var kit_a := 0     # 0 principal, 1 reserva, 2 terceiro
 var kit_b := -1    # -1 automático (evita cores parecidas)
 var _roster_overlay: Control
@@ -423,7 +428,7 @@ func _page_teams() -> void:
 		badges.add_child(kit)
 		var info := _small(inner, "", Color("#94a3b8"), 18)
 		var roster_btn := Button.new()
-		roster_btn.text = "Ver elenco e habilidades"
+		roster_btn.text = "Táticas e elenco"
 		roster_btn.custom_minimum_size = Vector2(0, 44)
 		roster_btn.add_theme_font_size_override("font_size", 20)
 		roster_btn.pressed.connect(_show_roster.bind(side))
@@ -558,6 +563,7 @@ func _unhandled_input(event: InputEvent) -> void:
 	if event.is_action_pressed("ui_cancel"):
 		get_viewport().set_input_as_handled()
 		if _roster_overlay != null:
+			_swap_sel = -1
 			_close_roster()
 			return
 		match page:
@@ -626,12 +632,31 @@ func _cycle(key: String, d: int) -> void:
 			_ensure_teams_fit_mode()
 		"league_a":
 			team_a = _league_step(team_a, d, team_b)
+			_tactics[0] = {}
 		"league_b":
 			team_b = _league_step(team_b, d, team_a)
+			_tactics[1] = {}
 		"team_a":
 			team_a = _team_step(team_a, d, team_b, n)
+			_tactics[0] = {}
 		"team_b":
 			team_b = _team_step(team_b, d, team_a, n)
+			_tactics[1] = {}
+		"form0", "form1":
+			var sd := 0 if key == "form0" else 1
+			var names := GameModes.formations(GameModes.ALL[mode_i]).keys()
+			var cur := names.find(String(_tactics[sd].get("formation", names[0])))
+			_tactics[sd]["formation"] = names[posmod(cur + d, names.size())]
+			_tactics[sd]["lineup"] = []
+			_ensure_tactics(sd)
+			_show_roster(sd)
+			return
+		"ment0", "ment1":
+			var sd2 := 0 if key == "ment0" else 1
+			_tactics[sd2]["mentality"] = posmod(int(_tactics[sd2].get("mentality", 1)) + d, 3)
+		"press0", "press1":
+			var sd3 := 0 if key == "press0" else 1
+			_tactics[sd3]["press"] = posmod(int(_tactics[sd3].get("press", 1)) + d, 3)
 		"p1":
 			p1_dev = posmod(p1_dev + d, _devices.size())
 		"p2":
@@ -722,6 +747,11 @@ func _refresh() -> void:
 	_set_label("weather", WEATHERS[weather_i][1])
 	_set_label("tod", TIMES[tod_i][1])
 	_set_label("venue", "Aleatório" if venue_i < 0 else String(_venues()[venue_i][0]))
+	for sd in 2:
+		if not _tactics[sd].is_empty():
+			_set_label("form%d" % sd, "Formação: " + String(_tactics[sd].get("formation", "")))
+			_set_label("ment%d" % sd, "Mentalidade: " + MENTALITIES[int(_tactics[sd].get("mentality", 1))])
+			_set_label("press%d" % sd, "Pressão: " + PRESSES[int(_tactics[sd].get("press", 1))])
 	_set_label("kit_a", "Uniforme: " + Teams.KIT_NAMES[kit_a])
 	_set_label("kit_b", "Uniforme: " + ("Automático" if kit_b < 0 else Teams.KIT_NAMES[kit_b]))
 	_set_label("dyn", "Sim — o tempo pode mudar durante o jogo" if dyn_weather else "Não")
@@ -789,8 +819,14 @@ func _on_play() -> void:
 		"devices": [p1, p2], "seed": int(Time.get_unix_time_from_system()) & 0xFFFFFF,
 		"half_minutes": minutes_opts[minutes_i],
 		"weather": _weather_pick(), "tod": TIMES[tod_i][0], "dynamic_weather": dyn_weather,
-		"kit_a": kit_a, "kit_b": kit_b, "venue": _venue_pick(),
+		"kit_a": kit_a, "kit_b": kit_b, "venue": _venue_pick(), "tactics": _tactics_cfg(),
 	})
+
+
+func _tactics_cfg() -> Array:
+	for sd in 2:
+		_ensure_tactics(sd)
+	return [_tactics[0].duplicate(true), _tactics[1].duplicate(true)]
 
 
 func _venues() -> Array:
@@ -825,6 +861,8 @@ const ATTR_NAMES := ["VEL", "ACE", "FIN", "PAS", "DRI", "DEF"]
 
 
 func _show_roster(side: int) -> void:
+	for k in ["form0", "form1", "ment0", "ment1", "press0", "press1"]:
+		_labels.erase(k)
 	if _roster_overlay != null:
 		_roster_overlay.queue_free()
 	var t := Teams.get_team(team_a if side == 0 else team_b)
@@ -851,7 +889,7 @@ func _show_roster(side: int) -> void:
 	crest.setup_team(t, Teams.crest_texture(team_a if side == 0 else team_b))
 	head.add_child(crest)
 	var title := Label.new()
-	title.text = "%s — elenco" % t["name"]
+	title.text = "%s — táticas e elenco" % t["name"]
 	title.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	title.add_theme_font_size_override("font_size", 34)
 	title.add_theme_color_override("font_color", Color("#facc15"))
@@ -861,7 +899,19 @@ func _show_roster(side: int) -> void:
 	close.custom_minimum_size = Vector2(160, 56)
 	close.pressed.connect(_close_roster)
 	head.add_child(close)
-	var legend := _small(vb, "VEL velocidade · ACE aceleração · FIN finalização · PAS passe · DRI drible · DEF defesa", Color("#64748b"), 16)
+	_roster_side = side
+	_ensure_tactics(side)
+	var tac: Dictionary = _tactics[side]
+	var trow := HBoxContainer.new()
+	trow.add_theme_constant_override("separation", 10)
+	vb.add_child(trow)
+	for k in ["form", "ment", "press"]:
+		var box := VBoxContainer.new()
+		box.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		trow.add_child(box)
+		_cycler(box, "%s%d" % [k, side], "")
+		(_labels["%s%d" % [k, side]] as Button).add_theme_font_size_override("font_size", 20)
+	var legend := _small(vb, "Toque em dois jogadores para trocá-los (titular ↔ reserva ou de posição) · VEL velocidade · ACE aceleração · FIN finalização · PAS passe · DRI drible · DEF defesa", Color("#64748b"), 15)
 	legend.horizontal_alignment = HORIZONTAL_ALIGNMENT_LEFT
 	var scroll := ScrollContainer.new()
 	scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
@@ -871,20 +921,102 @@ func _show_roster(side: int) -> void:
 	list.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	list.add_theme_constant_override("separation", 6)
 	scroll.add_child(list)
-	for e: Dictionary in t.get("roster", []):
-		list.add_child(_player_row(e))
+	var roster: Array = t.get("roster", [])
+	var lineup: Array = tac.get("lineup", [])
+	var forms := GameModes.formations(GameModes.ALL[mode_i])
+	var form: Array = forms.get(String(tac.get("formation", "")), [])
+	var has_gk := GameModes.ALL[mode_i] != GameModes.STREET
+	# titulares primeiro (na ordem da formação), depois reservas
+	var order: Array = []
+	for slot in lineup.size():
+		order.append([int(lineup[slot]), slot])
+	for i in roster.size():
+		if not lineup.has(i):
+			order.append([i, -1])
+	var sep_done := false
+	for it in order:
+		var ri: int = it[0]
+		var slot: int = it[1]
+		if slot < 0 and not sep_done:
+			sep_done = true
+			var sl := _small(list, "RESERVAS", Color("#94a3b8"), 18)
+			sl.horizontal_alignment = HORIZONTAL_ALIGNMENT_LEFT
+		var role := GameModes.role_for(form[slot], slot, has_gk) if slot >= 0 and slot < form.size() else ""
+		list.add_child(_player_row(roster[ri], ri, role))
 	close.call_deferred("grab_focus")
 
 
+## Formação/mentalidade/pressão/titulares padrão do lado (escalação automática).
+func _ensure_tactics(side: int) -> void:
+	var tac: Dictionary = _tactics[side]
+	var forms := GameModes.formations(GameModes.ALL[mode_i])
+	if not forms.has(String(tac.get("formation", ""))):
+		tac["formation"] = forms.keys()[0]
+		tac["lineup"] = []
+	if not tac.has("mentality"):
+		tac["mentality"] = 1
+	if not tac.has("press"):
+		tac["press"] = 1
+	var form: Array = forms[tac["formation"]]
+	var lineup: Array = tac.get("lineup", [])
+	if lineup.size() != form.size():
+		var t := Teams.get_team(team_a if side == 0 else team_b)
+		var roster: Array = t.get("roster", [])
+		var used := {}
+		lineup = []
+		var has_gk := GameModes.ALL[mode_i] != GameModes.STREET
+		for slot in form.size():
+			MatchSim._pick_from_roster(roster, GameModes.role_for(form[slot], slot, has_gk), used, not has_gk)
+			var picked := -1
+			for k in used:
+				if not lineup.has(int(k)):
+					picked = int(k)
+			lineup.append(picked)
+		tac["lineup"] = lineup
+	_tactics[side] = tac
+
+
+func _on_player_pick(ri: int) -> void:
+	if _swap_sel < 0:
+		_swap_sel = ri
+		_show_roster(_roster_side)
+		return
+	var tac: Dictionary = _tactics[_roster_side]
+	var lineup: Array = tac["lineup"]
+	var a := lineup.find(_swap_sel)
+	var b := lineup.find(ri)
+	if a >= 0 and b >= 0:
+		lineup[a] = ri
+		lineup[b] = _swap_sel
+	elif a >= 0:
+		lineup[a] = ri
+	elif b >= 0:
+		lineup[b] = _swap_sel
+	_swap_sel = -1
+	_show_roster(_roster_side)
+
+
 func _close_roster() -> void:
+	for k in ["form0", "form1", "ment0", "ment1", "press0", "press1"]:
+		_labels.erase(k)
 	if _roster_overlay != null:
 		_roster_overlay.queue_free()
 		_roster_overlay = null
 
 
-func _player_row(e: Dictionary) -> Control:
+func _player_row(e: Dictionary, ri: int = -1, role: String = "") -> Control:
 	var row := HBoxContainer.new()
 	row.add_theme_constant_override("separation", 12)
+	var pick := Button.new()
+	pick.text = (role if role != "" else "RES") + ("  ✓" if ri == _swap_sel else "")
+	pick.custom_minimum_size = Vector2(110, 56)
+	pick.add_theme_font_size_override("font_size", 18)
+	if role != "":
+		pick.add_theme_color_override("font_color", Color("#4ade80"))
+	if ri == _swap_sel:
+		pick.add_theme_color_override("font_color", Color("#facc15"))
+	pick.pressed.connect(_on_player_pick.bind(ri))
+	row.add_child(pick)
 	var face := TextureRect.new()
 	face.custom_minimum_size = Vector2(56, 56)
 	face.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
@@ -1037,7 +1169,7 @@ func _net_cfg() -> Dictionary:
 		"mode": GameModes.ALL[mode_i], "team_a": team_a, "team_b": team_b,
 		"seed": int(Time.get_unix_time_from_system()) & 0xFFFFFF, "half_minutes": minutes_opts[minutes_i],
 		"weather": _weather_pick(), "tod": TIMES[tod_i][0], "dynamic_weather": dyn_weather,
-		"venue": _venue_pick(), "kit_a": kit_a, "kit_b": kit_b,
+		"venue": _venue_pick(), "kit_a": kit_a, "kit_b": kit_b, "tactics": _tactics_cfg(),
 	}
 
 
@@ -1064,6 +1196,7 @@ func _client_got_config(c: Dictionary) -> void:
 		"seed": int(c["seed"]), "half_minutes": float(c["half_minutes"]),
 		"weather": String(c.get("weather", "sol")), "tod": String(c.get("tod", "noite")), "dynamic_weather": bool(c.get("dynamic_weather", false)),
 		"venue": int(c.get("venue", 0)), "kit_a": int(c.get("kit_a", 0)), "kit_b": int(c.get("kit_b", -1)),
+		"tactics": c.get("tactics", []),
 		"devices": ["remote", _devices[p1_dev]], "session": _session,
 	}
 	_session = null

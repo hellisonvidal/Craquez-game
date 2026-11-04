@@ -195,6 +195,59 @@ func on_event(e: Dictionary) -> void:
 				_toast.visible = true
 
 
+var _lineup: PanelContainer
+var _lineup_t := 0.0
+
+
+## Escalação (cerimônia de entrada): nome do time e titulares com rosto, número e posição.
+func show_lineup(title: String, col: Color, entries: Array, right_side: bool, t: float) -> void:
+	hide_lineup()
+	_lineup = PanelContainer.new()
+	_lineup.add_theme_stylebox_override("panel", _panel(Color(0.02, 0.03, 0.06, 0.86)))
+	add_child(_lineup)
+	var vb := VBoxContainer.new()
+	vb.add_theme_constant_override("separation", 4)
+	_lineup.add_child(vb)
+	var head := Label.new()
+	head.text = title
+	head.add_theme_font_size_override("font_size", 30)
+	head.add_theme_color_override("font_color", col if col.get_luminance() > 0.25 else Color("#e2e8f0"))
+	vb.add_child(head)
+	var bar := ColorRect.new()
+	bar.color = col
+	bar.custom_minimum_size = Vector2(360, 4)
+	vb.add_child(bar)
+	for e in entries:
+		var row := HBoxContainer.new()
+		row.add_theme_constant_override("separation", 10)
+		var face := TextureRect.new()
+		face.custom_minimum_size = Vector2(40, 40)
+		face.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+		face.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+		face.texture = FaceLibrary.texture(int(e[3]), 128)
+		row.add_child(face)
+		var num := Label.new()
+		num.text = str(e[0])
+		num.custom_minimum_size = Vector2(36, 0)
+		num.add_theme_font_size_override("font_size", 22)
+		num.add_theme_color_override("font_color", Color("#facc15"))
+		row.add_child(num)
+		var nm := Label.new()
+		nm.text = "%s   %s" % [e[1], e[2]]
+		nm.add_theme_font_size_override("font_size", 20)
+		row.add_child(nm)
+		vb.add_child(row)
+	var vw := get_viewport().get_visible_rect().size
+	_lineup.position = Vector2(vw.x - 470.0 if right_side else 40.0, 110.0)
+	_lineup_t = t
+
+
+func hide_lineup() -> void:
+	if _lineup != null:
+		_lineup.queue_free()
+		_lineup = null
+
+
 ## Ajuda de controles mostrada na pausa (conforme o dispositivo do jogador).
 func set_controls_help(text: String) -> void:
 	var l := Label.new()
@@ -235,6 +288,10 @@ func _process(delta: float) -> void:
 		match_min = 20.0
 	var game_t := sim.clock / sim.half_seconds * match_min + (sim.half - 1) * match_min
 	_clock_lbl.text = "%02d:%02d  %dºT" % [int(game_t), int(fmod(game_t, 1.0) * 60.0), sim.half]
+	if _lineup_t > 0.0:
+		_lineup_t -= delta
+		if _lineup_t <= 0.0:
+			hide_lineup()
 	if _toast_t > 0.0:
 		_toast_t -= delta
 		var vw := get_viewport().get_visible_rect().size.x

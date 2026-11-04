@@ -9,6 +9,45 @@ const STREET := "street"
 const ALL: Array[String] = [FIELD, FUTSAL, STREET]
 
 
+## Formações disponíveis por modo (posições normalizadas: x de -1 = próprio gol a 0 = meio; y lateral).
+## O primeiro item é o goleiro (campo/futsal). Street não tem goleiro.
+static func formations(id: String) -> Dictionary:
+	match id:
+		FUTSAL:
+			return {
+				"2-1-1": [Vector2(-0.95, 0), Vector2(-0.62, -0.5), Vector2(-0.62, 0.5), Vector2(-0.35, 0.0), Vector2(-0.12, 0.0)],
+				"1-2-1": [Vector2(-0.95, 0), Vector2(-0.65, 0.0), Vector2(-0.4, -0.55), Vector2(-0.4, 0.55), Vector2(-0.12, 0.0)],
+				"2-2": [Vector2(-0.95, 0), Vector2(-0.62, -0.5), Vector2(-0.62, 0.5), Vector2(-0.2, -0.4), Vector2(-0.2, 0.4)],
+				"3-1": [Vector2(-0.95, 0), Vector2(-0.6, -0.6), Vector2(-0.65, 0.0), Vector2(-0.6, 0.6), Vector2(-0.15, 0.0)],
+			}
+		STREET:
+			return {
+				"1-2": [Vector2(-0.7, 0.0), Vector2(-0.3, -0.5), Vector2(-0.3, 0.5)],
+				"2-1": [Vector2(-0.6, -0.45), Vector2(-0.6, 0.45), Vector2(-0.25, 0.0)],
+				"1-1-1": [Vector2(-0.7, 0.0), Vector2(-0.45, 0.0), Vector2(-0.2, 0.0)],
+			}
+	var gk := Vector2(-0.96, 0.0)
+	var back4 := [Vector2(-0.72, -0.62), Vector2(-0.76, -0.22), Vector2(-0.76, 0.22), Vector2(-0.72, 0.62)]
+	return {
+		"4-4-2": [gk] + back4 + [Vector2(-0.42, -0.66), Vector2(-0.46, -0.2), Vector2(-0.46, 0.2), Vector2(-0.42, 0.66), Vector2(-0.12, -0.2), Vector2(-0.14, 0.22)],
+		"4-3-3": [gk] + back4 + [Vector2(-0.48, -0.35), Vector2(-0.52, 0.0), Vector2(-0.48, 0.35), Vector2(-0.16, -0.6), Vector2(-0.1, 0.0), Vector2(-0.16, 0.6)],
+		"4-2-3-1": [gk] + back4 + [Vector2(-0.55, -0.2), Vector2(-0.55, 0.2), Vector2(-0.32, -0.6), Vector2(-0.3, 0.0), Vector2(-0.32, 0.6), Vector2(-0.1, 0.0)],
+		"3-5-2": [gk, Vector2(-0.74, -0.4), Vector2(-0.78, 0.0), Vector2(-0.74, 0.4), Vector2(-0.42, -0.78), Vector2(-0.5, -0.3), Vector2(-0.54, 0.0), Vector2(-0.5, 0.3), Vector2(-0.42, 0.78), Vector2(-0.12, -0.2), Vector2(-0.14, 0.22)],
+		"5-3-2": [gk, Vector2(-0.66, -0.8), Vector2(-0.76, -0.38), Vector2(-0.8, 0.0), Vector2(-0.76, 0.38), Vector2(-0.66, 0.8), Vector2(-0.46, -0.4), Vector2(-0.5, 0.0), Vector2(-0.46, 0.4), Vector2(-0.14, -0.2), Vector2(-0.14, 0.22)],
+	}
+
+
+## Função do atleta pela posição na formação (GK/DF/MF/FW).
+static func role_for(base: Vector2, slot: int, has_keeper: bool) -> String:
+	if has_keeper and slot == 0:
+		return "GK"
+	if base.x < -0.6:
+		return "DF"
+	if base.x < -0.3:
+		return "MF"
+	return "FW"
+
+
 static func display_name(id: String) -> String:
 	match id:
 		FUTSAL:
