@@ -383,7 +383,7 @@ func _page_teams() -> void:
 	root.offset_bottom = -20
 	root.add_theme_constant_override("separation", 12)
 	_content.add_child(root)
-	_title_label(root, "ESCOLHA OS TIMES", 52)
+	_title_label(root, "ESCOLHA OS TIMES", 40)
 	var row := HBoxContainer.new()
 	row.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	row.add_theme_constant_override("separation", 20)
@@ -409,15 +409,15 @@ func _page_teams() -> void:
 		badges.add_theme_constant_override("separation", 24)
 		inner.add_child(badges)
 		var crest := Crest.new()
-		crest.custom_minimum_size = Vector2(120, 120)
+		crest.custom_minimum_size = Vector2(100, 100)
 		badges.add_child(crest)
 		var kit := KitBadge.new()
-		kit.custom_minimum_size = Vector2(150, 120)
+		kit.custom_minimum_size = Vector2(130, 100)
 		badges.add_child(kit)
 		var info := _small(inner, "", Color("#94a3b8"), 18)
 		var roster_btn := Button.new()
 		roster_btn.text = "Ver elenco e habilidades"
-		roster_btn.custom_minimum_size = Vector2(0, 50)
+		roster_btn.custom_minimum_size = Vector2(0, 44)
 		roster_btn.add_theme_font_size_override("font_size", 20)
 		roster_btn.pressed.connect(_show_roster.bind(side))
 		inner.add_child(roster_btn)
@@ -698,7 +698,7 @@ func _refresh() -> void:
 				var e: Dictionary = roster[k]
 				var col := VBoxContainer.new()
 				var tr := TextureRect.new()
-				tr.custom_minimum_size = Vector2(96, 96)
+				tr.custom_minimum_size = Vector2(64, 64)
 				tr.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
 				tr.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
 				tr.texture = FaceLibrary.texture(int(e.get("fid", 0)), 256)
@@ -706,7 +706,7 @@ func _refresh() -> void:
 				var nm := Label.new()
 				nm.text = "%s\n%d · %s" % [e.get("n", ""), int(e.get("num", 0)), e.get("pos", "")]
 				nm.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-				nm.add_theme_font_size_override("font_size", 15)
+				nm.add_theme_font_size_override("font_size", 13)
 				nm.add_theme_color_override("font_color", Color("#cbd5e1"))
 				col.add_child(nm)
 				faces.add_child(col)

@@ -46,7 +46,7 @@ static func _ensure() -> void:
 			_flat.append({
 				"name": String(t["name"]), "short": String(t["short"]),
 				"c1": Color(String(t["c1"])), "c2": Color(String(t["c2"])),
-				"rating": float(t["rating"]), "roster": t.get("roster", []),
+				"rating": float(t["rating"]), "roster": t.get("roster", []), "stadium": t.get("stadium", {}),
 				"league": String(lg["name"]), "country": String(lg.get("country", "")),
 			})
 		_leagues.append({"id": String(lg["id"]), "name": String(lg["name"]), "sport": String(lg.get("sport", "football")), "first": first, "count": _flat.size() - first})
