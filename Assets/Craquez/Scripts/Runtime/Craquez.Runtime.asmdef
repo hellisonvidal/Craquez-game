@@ -1,0 +1,16 @@
+{
+    "name": "Craquez.Runtime",
+    "rootNamespace": "Craquez",
+    "references": [
+        "Craquez.Sim",
+        "Unity.InputSystem",
+        "UnityEngine.UI",
+        "Unity.RenderPipelines.Core.Runtime",
+        "Unity.RenderPipelines.Universal.Runtime"
+    ],
+    "includePlatforms": [],
+    "excludePlatforms": [],
+    "allowUnsafeCode": false,
+    "autoReferenced": true,
+    "noEngineReferences": false
+}

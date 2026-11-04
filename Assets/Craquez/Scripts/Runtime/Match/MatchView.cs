@@ -1,0 +1,352 @@
+using System.Collections.Generic;
+using Craquez.Sim;
+using UnityEngine;
+
+namespace Craquez
+{
+    /// <summary>
+    /// Mundo 3D da partida: local (estádio/quadra/rua), luz por horário, clima,
+    /// atletas, bola, árbitro, câmera de transmissão e reações aos eventos.
+    /// </summary>
+    public class MatchView : MonoBehaviour
+    {
+        public MatchSim sim;
+        public MatchConfig cfg;
+        public Venue venue;
+        public BroadcastCamera bcam;
+        public Camera cam;
+        public WeatherFx weather;
+        public Light sun;
+        public readonly List<AthleteView> athletes = new List<AthleteView>();
+        public Kit[] kits;
+        public float Alpha;   // interpolação entre passos da simulação (0..1)
+        Transform _ball, _ballShadow, _marker0, _marker1;
+        Vector3 _ballPrev, _ballCur;
+        Quaternion _ballRot = Quaternion.identity;
+        float _crowdT, _crowdHype;
+        AthleteView _referee;
+        bool _night;
+
+        public void Build(MatchSim s, MatchConfig c, Camera camera)
+        {
+            sim = s;
+            cfg = c;
+            cam = camera;
+            int q = Settings.Quality;
+            var home = Teams.Get(c.teamA);
+            var away = Teams.Get(c.teamB);
+            kits = Teams.PickKits(home, away, c.kitA, c.kitB);
+            _night = c.timeOfDay == "noite";
+            Lighting(c.timeOfDay, s.mode.id, q);
+            if (s.mode.id == GameModes.Futsal) venue = VenueBuilder.Futsal(s, home, away, kits[0], kits[1], c.venue, _night, q, transform);
+            else if (s.mode.id == GameModes.Street) venue = VenueBuilder.Street(s, home, away, kits[0], kits[1], c.venue, _night, q, transform);
+            else venue = VenueBuilder.Stadium(s, home, away, kits[0], kits[1], _night, q, transform);
+            // goleiros: uniforme de cor neutra que não confunde com nenhum dos dois
+            var gk = new[] { KeeperKit(kits[0], kits[1], 0), KeeperKit(kits[1], kits[0], 1) };
+            var parent = new GameObject("Atletas").transform;
+            parent.SetParent(transform, false);
+            foreach (var p in s.players)
+            {
+                var rig = AthleteFactory.Create(p, kits[p.team], gk[p.team], parent, q);
+                var av = rig.gameObject.AddComponent<AthleteView>();
+                av.Setup(p, rig, this);
+                athletes.Add(av);
+            }
+            if (s.mode.id == GameModes.Field) BuildReferee(parent, q);
+            BuildBall(q);
+            _marker0 = Marker(new Color(0.1f, 0.85f, 1f));
+            _marker1 = Marker(new Color(1f, 0.55f, 0.1f));
+            bcam = cam.gameObject.GetComponent<BroadcastCamera>() ?? cam.gameObject.AddComponent<BroadcastCamera>();
+            bcam.Setup(cam, s, Settings.Camera);
+            bcam.SnapToBall();
+            weather = gameObject.AddComponent<WeatherFx>();
+            string wk = c.weather == "aleatorio" ? WeatherFx.Kinds[(int)(c.seed % 5)] : c.weather;
+            if (s.mode.id == GameModes.Futsal) wk = "sol";   // ginásio coberto
+            weather.Setup(wk, c.dynamicWeather && s.mode.id != GameModes.Futsal, c.seed, cam, sun, venue.pitchMat);
+            weather.pitch2 = venue.pitchMat2;
+            UrpSetup.Camera(cam, q);
+            Sfx.Crowd(s.mode.id == GameModes.Field ? 0.55f : 0.3f, s.mode.id == GameModes.Field ? 0.25f : 0f);
+        }
+
+        static Kit KeeperKit(Kit own, Kit other, int t)
+        {
+            Color[] opts = { new Color(0.1f, 0.75f, 0.3f), new Color(0.95f, 0.8f, 0.1f), new Color(0.55f, 0.2f, 0.7f), new Color(0.15f, 0.15f, 0.15f), new Color(1f, 0.45f, 0.1f) };
+            foreach (var c in opts)
+            {
+                var k = new Kit { c1 = c, c2 = Color.Lerp(c, Color.black, 0.5f), shorts = Color.Lerp(c, Color.black, 0.6f), socks = c, pattern = 0 };
+                if (Teams.KitDistance(k, own) > 0.4f && Teams.KitDistance(k, other) > 0.4f && (t == 0 || c != opts[0])) return k;
+            }
+            return new Kit { c1 = opts[t + 1], c2 = Color.black, shorts = Color.black, socks = opts[t + 1] };
+        }
+
+        void Lighting(string tod, string mode, int q)
+        {
+            var go = new GameObject("Sol");
+            go.transform.SetParent(transform, false);
+            sun = go.AddComponent<Light>();
+            sun.type = LightType.Directional;
+            sun.shadows = q >= 1 ? LightShadows.Soft : LightShadows.Hard;
+            sun.shadowStrength = 0.85f;
+            var sky = Gfx.Sky();
+            RenderSettings.skybox = sky;
+            RenderSettings.ambientMode = UnityEngine.Rendering.AmbientMode.Trilight;
+            RenderSettings.fog = true;
+            RenderSettings.fogMode = FogMode.Exponential;
+            bool indoor = mode == GameModes.Futsal;
+            switch (indoor ? "indoor" : tod)
+            {
+                case "dia":
+                    go.transform.rotation = Quaternion.Euler(52f, -35f, 0);
+                    sun.color = new Color(1f, 0.96f, 0.9f);
+                    sun.intensity = 1.35f;
+                    SkyColors(sky, new Color(0.32f, 0.55f, 0.95f), new Color(0.8f, 0.88f, 0.95f), 1.2f, 0.9f);
+                    Ambient(new Color(0.55f, 0.65f, 0.8f), new Color(0.42f, 0.45f, 0.42f), new Color(0.2f, 0.22f, 0.18f));
+                    RenderSettings.fogColor = new Color(0.72f, 0.8f, 0.9f);
+                    RenderSettings.fogDensity = 0.0012f;
+                    UrpSetup.Grade(false, 0.25f, 0.1f, 8f, 12f, 0.18f);
+                    break;
+                case "tarde":
+                    go.transform.rotation = Quaternion.Euler(18f, -60f, 0);
+                    sun.color = new Color(1f, 0.72f, 0.45f);
+                    sun.intensity = 1.25f;
+                    SkyColors(sky, new Color(0.35f, 0.45f, 0.75f), new Color(1f, 0.7f, 0.45f), 0.9f, 1.4f);
+                    Ambient(new Color(0.55f, 0.5f, 0.55f), new Color(0.5f, 0.38f, 0.3f), new Color(0.18f, 0.15f, 0.12f));
+                    RenderSettings.fogColor = new Color(0.9f, 0.7f, 0.55f);
+                    RenderSettings.fogDensity = 0.0016f;
+                    UrpSetup.Grade(false, 0.4f, 0.0f, 12f, 14f, 0.22f);
+                    break;
+                case "indoor":
+                    go.transform.rotation = Quaternion.Euler(80f, 20f, 0);
+                    sun.color = new Color(1f, 0.97f, 0.93f);
+                    sun.intensity = 0.9f;
+                    SkyColors(sky, new Color(0.05f, 0.06f, 0.09f), new Color(0.1f, 0.1f, 0.12f), 0.2f, 0.2f);
+                    Ambient(new Color(0.55f, 0.55f, 0.58f), new Color(0.45f, 0.43f, 0.42f), new Color(0.25f, 0.22f, 0.2f));
+                    RenderSettings.fogColor = new Color(0.2f, 0.2f, 0.22f);
+                    RenderSettings.fogDensity = 0.001f;
+                    UrpSetup.Grade(true, 0.5f, 0.15f, 10f, 12f, 0.2f);
+                    break;
+                default: // noite
+                    go.transform.rotation = Quaternion.Euler(62f, 25f, 0);
+                    sun.color = new Color(0.92f, 0.95f, 1f);
+                    sun.intensity = 1.05f;
+                    SkyColors(sky, new Color(0.01f, 0.015f, 0.04f), new Color(0.06f, 0.08f, 0.14f), 0.0f, 0.05f);
+                    Ambient(new Color(0.32f, 0.36f, 0.45f), new Color(0.3f, 0.32f, 0.35f), new Color(0.12f, 0.13f, 0.12f));
+                    RenderSettings.fogColor = new Color(0.05f, 0.06f, 0.1f);
+                    RenderSettings.fogDensity = 0.0015f;
+                    UrpSetup.Grade(true, 0.85f, 0.2f, 10f, 16f, 0.26f);
+                    break;
+            }
+            RenderSettings.sun = sun;
+        }
+
+        static void SkyColors(Material sky, Color top, Color horizon, float sunSize, float exposure)
+        {
+            if (sky == null) return;
+            if (sky.HasProperty("_SkyTint")) sky.SetColor("_SkyTint", top);
+            if (sky.HasProperty("_GroundColor")) sky.SetColor("_GroundColor", horizon * 0.5f);
+            if (sky.HasProperty("_Exposure")) sky.SetFloat("_Exposure", exposure);
+            if (sky.HasProperty("_SunSize")) sky.SetFloat("_SunSize", 0.03f * sunSize);
+            if (sky.HasProperty("_AtmosphereThickness")) sky.SetFloat("_AtmosphereThickness", exposure < 0.3f ? 0.3f : 1f);
+        }
+
+        static void Ambient(Color sky, Color eq, Color ground)
+        {
+            RenderSettings.ambientSkyColor = sky;
+            RenderSettings.ambientEquatorColor = eq;
+            RenderSettings.ambientGroundColor = ground;
+            RenderSettings.ambientLight = sky;
+        }
+
+        void BuildBall(int q)
+        {
+            var go = GameObject.CreatePrimitive(PrimitiveType.Sphere);
+            go.name = "Bola";
+            Destroy(go.GetComponent<Collider>());
+            go.transform.SetParent(transform, false);
+            go.transform.localScale = Vector3.one * 0.22f;
+            go.GetComponent<MeshRenderer>().sharedMaterial = Gfx.Lit(Color.white, BallTex(), 0.55f);
+            _ball = go.transform;
+            var sh = GameObject.CreatePrimitive(PrimitiveType.Quad);
+            sh.name = "Sombra da bola";
+            Destroy(sh.GetComponent<Collider>());
+            sh.transform.SetParent(transform, false);
+            sh.transform.rotation = Quaternion.Euler(90, 0, 0);
+            sh.GetComponent<MeshRenderer>().sharedMaterial = Gfx.UnlitTransparent(new Color(0, 0, 0, 0.45f), Gfx.Radial(64, Color.white, new Color(1, 1, 1, 0), 1.5f));
+            sh.GetComponent<MeshRenderer>().shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
+            _ballShadow = sh.transform;
+        }
+
+        /// <summary>Bola com gomos (padrão original).</summary>
+        static Texture2D BallTex()
+        {
+            int s = 256;
+            var t = Gfx.Tex(s, s / 2);
+            var px = new Color32[s * s / 2];
+            for (int y = 0; y < s / 2; y++)
+                for (int x = 0; x < s; x++)
+                {
+                    float u = x / (float)s * Mathf.PI * 2, v = y / (float)(s / 2) * Mathf.PI;
+                    var p = new Vector3(Mathf.Sin(v) * Mathf.Cos(u), Mathf.Cos(v), Mathf.Sin(v) * Mathf.Sin(u));
+                    float a = Mathf.Abs(Mathf.Sin(p.x * 5f + p.y * 3f)) * Mathf.Abs(Mathf.Sin(p.z * 5f - p.y * 2f));
+                    Color c = a > 0.62f ? new Color(0.05f, 0.35f, 0.75f) : a > 0.55f ? new Color(0.95f, 0.75f, 0.1f) : new Color(0.97f, 0.97f, 0.97f);
+                    float seam = Mathf.Abs(Mathf.Sin(p.x * 9f)) < 0.04f || Mathf.Abs(Mathf.Sin(p.z * 9f)) < 0.04f ? 0.75f : 1f;
+                    c *= seam;
+                    c.a = 1;
+                    px[y * s + x] = c;
+                }
+            t.SetPixels32(px);
+            t.Apply(true);
+            return t;
+        }
+
+        Transform Marker(Color c)
+        {
+            var go = new GameObject("Marcador");
+            go.transform.SetParent(transform, false);
+            var mk = new MeshKit();
+            mk.Arc(Vector3.zero, 0.55f, 0.09f, 0, Mathf.PI * 2, 32, 0.02f);
+            // seta indicando a direção
+            mk.Quad(new Vector3(-0.14f, 0.021f, 0.62f), new Vector3(0, 0.021f, 0.85f), new Vector3(0.14f, 0.021f, 0.62f), new Vector3(0, 0.021f, 0.66f));
+            go.AddComponent<MeshFilter>().sharedMesh = mk.Build("marcador");
+            var mr = go.AddComponent<MeshRenderer>();
+            mr.sharedMaterial = Gfx.Unlit(c);
+            mr.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
+            return go.transform;
+        }
+
+        void BuildReferee(Transform parent, int q)
+        {
+            var refP = new SimPlayer { id = -1, name = "Árbitro", number = 0, face = new float[] { 2, 0, 3, 0, 1, 2 } };
+            var black = new Kit { c1 = new Color(0.08f, 0.08f, 0.1f), c2 = new Color(0.85f, 0.75f, 0.1f), shorts = new Color(0.05f, 0.05f, 0.06f), socks = new Color(0.08f, 0.08f, 0.1f) };
+            var rig = AthleteFactory.Create(refP, black, black, parent, q);
+            var av = rig.gameObject.AddComponent<AthleteView>();
+            refP.position = new Vector2(-6, 6);
+            av.Setup(refP, rig, this);
+            _referee = av;
+        }
+
+        /// <summary>Árbitro: acompanha o lance de longe (não interfere na simulação).</summary>
+        void RefereeStep()
+        {
+            if (_referee == null) return;
+            var p = _referee.p;
+            var target = sim.ball.pos + new Vector2(-sim.TeamDir(0) * 8f, sim.ball.pos.y > 0 ? -10f : 10f);
+            target.y = Mathf.Clamp(target.y, -sim.halfW * 0.8f, sim.halfW * 0.8f);
+            var to = target - p.position;
+            var want = to.magnitude > 3f ? to.normalized * Mathf.Min(6.5f, to.magnitude) : Vector2.zero;
+            p.vel = Vector2.MoveTowards(p.vel, want, 8f * MatchSim.DT);
+            p.position += p.vel * MatchSim.DT;
+            var tb = sim.ball.pos - p.position;
+            if (tb.sqrMagnitude > 0.01f) p.facing = Vector2.Lerp(p.facing, tb.normalized, 0.08f).normalized;
+            _referee.OnTick();
+        }
+
+        /// <summary>Após cada passo da simulação.</summary>
+        public void OnTick()
+        {
+            foreach (var a in athletes) a.OnTick();
+            RefereeStep();
+            _ballPrev = _ballCur;
+            _ballCur = new Vector3(sim.ball.pos.x, sim.ball.z + sim.ball.radius, sim.ball.pos.y);
+            foreach (var e in sim.events) OnEvent(e);
+        }
+
+        public void SnapAll()
+        {
+            foreach (var a in athletes) a.Snap();
+            _ballPrev = _ballCur = new Vector3(sim.ball.pos.x, sim.ball.z + sim.ball.radius, sim.ball.pos.y);
+            bcam.SnapToBall();
+        }
+
+        void OnEvent(SimEvent e)
+        {
+            if (e.id >= 0 && e.id < athletes.Count) athletes[e.id].OnEvent(e);
+            switch (e.type)
+            {
+                case "kick":
+                    Sfx.Kick(e.power);
+                    if (e.kind == "shot") { _crowdHype = Mathf.Max(_crowdHype, 0.5f); bcam.Shake(0.15f); }
+                    break;
+                case "header": Sfx.Touch(); break;
+                case "touch": case "block": Sfx.Touch(); break;
+                case "post": Sfx.Post(); Sfx.Ooh(); bcam.Shake(0.3f); break;
+                case "save": if (!e.ok) Sfx.Ooh(); Sfx.Touch(); break;
+                case "whistle":
+                    if (e.kind == "fulltime") Sfx.WhistleEnd();
+                    else if (e.kind == "halftime" || e.kind == "penalty") Sfx.WhistleLong();
+                    else if (e.kind != "throwin" && e.kind != "goalkick" && e.kind != "corner") Sfx.Whistle();
+                    break;
+                case "foul":
+                    Sfx.Whistle();
+                    foreach (var a in athletes) if (a.p.team != e.team && a.p.stun > 0.8f) a.OnVictimFoul();
+                    break;
+                case "goal":
+                    Sfx.Net();
+                    Sfx.Cheer();
+                    _crowdHype = 1.6f;
+                    bcam.Shake(0.6f);
+                    foreach (var n in venue.nets)
+                        n.Hit(new Vector3(sim.ball.pos.x, sim.ball.z + 0.3f, sim.ball.pos.y), sim.ball.Speed + 10f);
+                    break;
+            }
+        }
+
+        void Update()
+        {
+            if (sim == null) return;
+            // bola interpolada + rotação pelo rolamento
+            var bp = Vector3.Lerp(_ballPrev, _ballCur, Alpha);
+            if (_ball != null)
+            {
+                var d = bp - _ball.position;
+                d.y = 0;
+                if (d.sqrMagnitude > 1e-6f)
+                {
+                    var axis = Vector3.Cross(Vector3.up, d.normalized);
+                    _ballRot = Quaternion.AngleAxis(d.magnitude / 0.11f * Mathf.Rad2Deg, axis) * _ballRot;
+                }
+                _ball.position = bp;
+                _ball.rotation = _ballRot;
+                _ballShadow.position = new Vector3(bp.x, 0.015f, bp.z);
+                float hz = Mathf.Clamp01(1f - sim.ball.z / 6f);
+                _ballShadow.localScale = Vector3.one * Mathf.Lerp(0.6f, 0.3f, hz);
+            }
+            // marcadores dos jogadores controlados
+            PlaceMarker(_marker0, 0);
+            PlaceMarker(_marker1, 1);
+            // torcida pulsando (mais forte em ataque perigoso e no gol)
+            _crowdT += Time.deltaTime;
+            float danger = Mathf.Clamp01((Mathf.Abs(sim.ball.pos.x) - sim.halfLen * 0.6f) / (sim.halfLen * 0.4f));
+            _crowdHype = Mathf.MoveTowards(_crowdHype, danger * 0.5f, Time.deltaTime * 0.3f);
+            float bounce = Mathf.Abs(Mathf.Sin(_crowdT * (6f + _crowdHype * 6f))) * (0.002f + _crowdHype * 0.006f);
+            foreach (var m in venue.crowdMats)
+            {
+                m.mainTextureOffset = new Vector2(0, bounce);
+                if (m.HasProperty("_BaseMap")) m.SetTextureOffset("_BaseMap", new Vector2(0, bounce));
+            }
+            Sfx.Crowd((sim.mode.id == GameModes.Field ? 0.5f : 0.28f) + _crowdHype * 0.3f, sim.mode.id == GameModes.Field ? 0.22f + danger * 0.1f : 0f);
+            foreach (var m in venue.ledMats)
+            {
+                var o = new Vector2(Time.time * 0.015f, 0);
+                m.mainTextureOffset = o;
+                if (m.HasProperty("_BaseMap")) m.SetTextureOffset("_BaseMap", o);
+            }
+        }
+
+        public Side[] sides = { Side.Player1, Side.Cpu };
+
+        void PlaceMarker(Transform m, int team)
+        {
+            if (m == null) return;
+            bool human = sides != null && team < sides.Length && sides[team] != Side.Cpu;
+            m.gameObject.SetActive(human && sim.state != MatchState.Goal);
+            if (!human) return;
+            var p = sim.Controlled(team);
+            var av = athletes[p.id];
+            m.position = new Vector3(av.transform.position.x, 0, av.transform.position.z);
+            m.rotation = Quaternion.Euler(0, Mathf.Atan2(p.facing.x, p.facing.y) * Mathf.Rad2Deg, 0);
+        }
+
+        public AthleteView ViewOf(int id) => id >= 0 && id < athletes.Count ? athletes[id] : null;
+    }
+}

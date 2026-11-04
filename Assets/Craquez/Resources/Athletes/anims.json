@@ -1,0 +1,163 @@
+{
+ "Idle": {
+  "frames": 34,
+  "fps": 30,
+  "loop": true,
+  "speed": 0.835,
+  "source": "141_20"
+ },
+ "Jog": {
+  "frames": 24,
+  "fps": 30,
+  "loop": true,
+  "speed": 3.363,
+  "source": "35_17"
+ },
+ "Run": {
+  "frames": 19,
+  "fps": 30,
+  "loop": true,
+  "speed": 5.288,
+  "source": "102_05"
+ },
+ "Sprint": {
+  "frames": 23,
+  "fps": 30,
+  "loop": true,
+  "speed": 3.933,
+  "source": "09_01"
+ },
+ "RunTurnL": {
+  "frames": 28,
+  "fps": 30,
+  "loop": false,
+  "speed": 3.89,
+  "source": "102_02"
+ },
+ "RunTurnR": {
+  "frames": 54,
+  "fps": 30,
+  "loop": false,
+  "speed": 3.148,
+  "source": "102_01"
+ },
+ "CutL": {
+  "frames": 29,
+  "fps": 30,
+  "loop": false,
+  "speed": 3.013,
+  "source": "102_03"
+ },
+ "CutR": {
+  "frames": 32,
+  "fps": 30,
+  "loop": false,
+  "speed": 2.801,
+  "source": "102_04"
+ },
+ "SideStepL": {
+  "frames": 37,
+  "fps": 30,
+  "loop": false,
+  "speed": 3.62,
+  "source": "127_13"
+ },
+ "SideStepR": {
+  "frames": 28,
+  "fps": 30,
+  "loop": false,
+  "speed": 4.02,
+  "source": "127_14"
+ },
+ "Backpedal": {
+  "frames": 17,
+  "fps": 30,
+  "loop": true,
+  "speed": 1.838,
+  "source": "141_31"
+ },
+ "Jockey": {
+  "frames": 27,
+  "fps": 30,
+  "loop": false,
+  "speed": 3.203,
+  "source": "102_27"
+ },
+ "FeintL": {
+  "frames": 47,
+  "fps": 30,
+  "loop": false,
+  "speed": 3.329,
+  "source": "102_19"
+ },
+ "FeintR": {
+  "frames": 48,
+  "fps": 30,
+  "loop": false,
+  "speed": 3.237,
+  "source": "102_18"
+ },
+ "Spin": {
+  "frames": 34,
+  "fps": 30,
+  "loop": false,
+  "speed": 2.713,
+  "source": "102_11"
+ },
+ "QuickStop": {
+  "frames": 75,
+  "fps": 30,
+  "loop": false,
+  "speed": 1.15,
+  "source": "127_05"
+ },
+ "Kick": {
+  "frames": 60,
+  "fps": 30,
+  "loop": false,
+  "speed": 0.894,
+  "source": "10_02"
+ },
+ "KickPower": {
+  "frames": 60,
+  "fps": 30,
+  "loop": false,
+  "speed": 0.816,
+  "source": "10_01"
+ },
+ "Pass": {
+  "frames": 60,
+  "fps": 30,
+  "loop": false,
+  "speed": 1.628,
+  "source": "10_03"
+ },
+ "Shot": {
+  "frames": 60,
+  "fps": 30,
+  "loop": false,
+  "speed": 1.633,
+  "source": "10_05"
+ },
+ "ShotLeft": {
+  "frames": 60,
+  "fps": 30,
+  "loop": false,
+  "speed": 1.625,
+  "source": "10_06"
+ },
+ "Volley": {
+  "frames": 60,
+  "fps": 30,
+  "loop": false,
+  "speed": 1.394,
+  "source": "11_01"
+ },
+ "Walk": {
+  "frames": 35,
+  "fps": 30,
+  "loop": true,
+  "speed": 1.386,
+  "source": "35_01"
+ }
+}
