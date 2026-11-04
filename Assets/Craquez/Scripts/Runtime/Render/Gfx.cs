@@ -1,0 +1,442 @@
+using System.Collections.Generic;
+using UnityEngine;
+
+namespace Craquez
+{
+    /// <summary>
+    /// Materiais e texturas. Os materiais-base (URP Lit/Unlit com as variantes
+    /// certas) são gerados no build em Resources/Materials (ver CraquezBuild);
+    /// aqui criamos cópias e texturas procedurais (gramado, linhas, torcida...).
+    /// </summary>
+    public static class Gfx
+    {
+        static readonly Dictionary<string, Material> _templates = new Dictionary<string, Material>();
+
+        static Material Template(string name)
+        {
+            if (_templates.TryGetValue(name, out var m) && m != null) return m;
+            m = Resources.Load<Material>("Materials/" + name);
+            if (m == null)
+            {
+                string shader = name.StartsWith("Unlit") ? "Universal Render Pipeline/Unlit" :
+                    name == "Particles" ? "Universal Render Pipeline/Particles/Unlit" : "Universal Render Pipeline/Lit";
+                var sh = Shader.Find(shader) ?? Shader.Find("Standard");
+                m = new Material(sh);
+                Debug.LogWarning("Material base ausente, usando " + shader + ": " + name);
+            }
+            _templates[name] = m;
+            return m;
+        }
+
+        /// <summary>Material Lit opaco.</summary>
+        public static Material Lit(Color c, Texture tex = null, float smooth = 0.2f, float metal = 0f)
+        {
+            var m = new Material(Template("Lit"));
+            Set(m, c, tex);
+            m.SetFloat("_Smoothness", smooth);
+            m.SetFloat("_Metallic", metal);
+            return m;
+        }
+
+        /// <summary>Lit com recorte alfa e dois lados (cabelo, cílios, redes, bandeiras).</summary>
+        public static Material Cutout(Color c, Texture tex, float cutoff = 0.4f, float smooth = 0.15f)
+        {
+            var m = new Material(Template("LitCutout"));
+            Set(m, c, tex);
+            m.SetFloat("_Cutoff", cutoff);
+            m.SetFloat("_Smoothness", smooth);
+            return m;
+        }
+
+        public static Material Emissive(Color c, Color emission, Texture tex = null)
+        {
+            var m = new Material(Template("LitEmissive"));
+            Set(m, c, tex);
+            m.SetColor("_EmissionColor", emission);
+            if (tex != null) m.SetTexture("_EmissionMap", tex);
+            return m;
+        }
+
+        public static Material Unlit(Color c, Texture tex = null)
+        {
+            var m = new Material(Template("Unlit"));
+            Set(m, c, tex);
+            return m;
+        }
+
+        public static Material UnlitTransparent(Color c, Texture tex = null)
+        {
+            var m = new Material(Template("UnlitTransparent"));
+            Set(m, c, tex);
+            return m;
+        }
+
+        public static Material Transparent(Color c, Texture tex = null)
+        {
+            var m = new Material(Template("LitTransparent"));
+            Set(m, c, tex);
+            return m;
+        }
+
+        public static Material Particles(Color c, Texture tex)
+        {
+            var m = new Material(Template("Particles"));
+            Set(m, c, tex);
+            return m;
+        }
+
+        public static Material Sky() => new Material(Template("Sky"));
+
+        static void Set(Material m, Color c, Texture tex)
+        {
+            m.color = c;
+            if (m.HasProperty("_BaseColor")) m.SetColor("_BaseColor", c);
+            if (tex != null)
+            {
+                m.mainTexture = tex;
+                if (m.HasProperty("_BaseMap")) m.SetTexture("_BaseMap", tex);
+            }
+        }
+
+        public static void Tiling(Material m, Vector2 t)
+        {
+            m.mainTextureScale = t;
+            if (m.HasProperty("_BaseMap")) m.SetTextureScale("_BaseMap", t);
+        }
+
+        // --------------------------------------------------------------- texturas
+        public static Texture2D Tex(int w, int h, bool mips = true, TextureWrapMode wrap = TextureWrapMode.Repeat)
+            => new Texture2D(w, h, TextureFormat.RGBA32, mips) { wrapMode = wrap, filterMode = FilterMode.Trilinear, anisoLevel = 4 };
+
+        static float Hash(int x, int y, int s)
+        {
+            unchecked
+            {
+                uint h = (uint)(x * 374761393 + y * 668265263 + s * 982451653);
+                h = (h ^ (h >> 13)) * 1274126177u;
+                return (h & 0xFFFFFF) / 16777215f;
+            }
+        }
+
+        /// <summary>Ruído de valor suave, periódico (para tiling sem emenda).</summary>
+        public static float VNoise(float x, float y, int period, int seed)
+        {
+            int x0 = Mathf.FloorToInt(x), y0 = Mathf.FloorToInt(y);
+            float fx = x - x0, fy = y - y0;
+            fx = fx * fx * (3 - 2 * fx);
+            fy = fy * fy * (3 - 2 * fy);
+            int P(int v) => ((v % period) + period) % period;
+            float a = Hash(P(x0), P(y0), seed), b = Hash(P(x0 + 1), P(y0), seed);
+            float c = Hash(P(x0), P(y0 + 1), seed), d = Hash(P(x0 + 1), P(y0 + 1), seed);
+            return Mathf.Lerp(Mathf.Lerp(a, b, fx), Mathf.Lerp(c, d, fx), fy);
+        }
+
+        public static float Fbm(float x, float y, int period, int seed, int oct = 4)
+        {
+            float s = 0, amp = 0.5f, norm = 0;
+            for (int i = 0; i < oct; i++)
+            {
+                s += VNoise(x, y, period, seed + i * 17) * amp;
+                norm += amp;
+                x *= 2; y *= 2; period *= 2; amp *= 0.5f;
+            }
+            return s / norm;
+        }
+
+        /// <summary>Grama: folhas finas + variação de tom (textura repetível de ~2 m).</summary>
+        public static Texture2D Grass(int size, Color baseC, int seed)
+        {
+            var t = Tex(size, size);
+            var px = new Color32[size * size];
+            for (int y = 0; y < size; y++)
+                for (int x = 0; x < size; x++)
+                {
+                    float u = x / (float)size, v = y / (float)size;
+                    float n = Fbm(u * 8, v * 8, 8, seed, 4);
+                    float blades = Hash(x, y, seed + 3);
+                    float streak = VNoise(u * 64, v * 6, 64, seed + 9);
+                    float k = 0.82f + n * 0.28f + (blades - 0.5f) * 0.18f + (streak - 0.5f) * 0.1f;
+                    var c = baseC * k;
+                    c.a = 1;
+                    px[y * size + x] = c;
+                }
+            t.SetPixels32(px);
+            t.Apply(true);
+            return t;
+        }
+
+        /// <summary>Madeira de quadra (tábuas).</summary>
+        public static Texture2D Wood(int size, Color baseC, int seed)
+        {
+            var t = Tex(size, size);
+            var px = new Color32[size * size];
+            int boards = 8;
+            for (int y = 0; y < size; y++)
+                for (int x = 0; x < size; x++)
+                {
+                    float u = x / (float)size, v = y / (float)size;
+                    int bi = (int)(v * boards);
+                    float off = Hash(bi, 0, seed) * 3f;
+                    float grain = Fbm(u * 3 + off, v * 40, 16, seed + bi, 3);
+                    float rings = Mathf.Sin((u * 30 + grain * 6 + off) * 2.2f) * 0.5f + 0.5f;
+                    float tone = 0.86f + Hash(bi, 7, seed) * 0.18f;
+                    float gap = Mathf.Abs(v * boards - bi - 0.5f) > 0.48f ? 0.55f : 1f;
+                    float joint = Mathf.Abs(((u + Hash(bi, 3, seed)) * 2f) % 1f) < 0.004f ? 0.6f : 1f;
+                    var c = baseC * (tone * (0.85f + rings * 0.15f + grain * 0.1f) * gap * joint);
+                    c.a = 1;
+                    px[y * size + x] = c;
+                }
+            t.SetPixels32(px);
+            t.Apply(true);
+            return t;
+        }
+
+        /// <summary>Asfalto / concreto.</summary>
+        public static Texture2D Asphalt(int size, Color baseC, int seed, float cracks = 0.4f)
+        {
+            var t = Tex(size, size);
+            var px = new Color32[size * size];
+            for (int y = 0; y < size; y++)
+                for (int x = 0; x < size; x++)
+                {
+                    float u = x / (float)size, v = y / (float)size;
+                    float n = Fbm(u * 6, v * 6, 6, seed, 5);
+                    float grit = Hash(x, y, seed);
+                    float crack = Mathf.Abs(VNoise(u * 10, v * 10, 10, seed + 5) - 0.5f) < 0.012f * cracks ? 0.55f : 1f;
+                    var c = baseC * ((0.78f + n * 0.35f + (grit - 0.5f) * 0.16f) * crack);
+                    c.a = 1;
+                    px[y * size + x] = c;
+                }
+            t.SetPixels32(px);
+            t.Apply(true);
+            return t;
+        }
+
+        /// <summary>Arquibancada lotada: "pixels" de gente com camisas nas cores do time e da torcida rival.</summary>
+        public static Texture2D CrowdTex(int w, int h, Color home, Color home2, Color away, int seed, float occupancy = 0.92f)
+        {
+            var t = Tex(w, h, true);
+            var px = new Color32[w * h];
+            int cell = 8;
+            for (int cy = 0; cy < h / cell; cy++)
+                for (int cx = 0; cx < w / cell; cx++)
+                {
+                    float r = Hash(cx, cy, seed);
+                    bool empty = Hash(cx, cy, seed + 1) > occupancy;
+                    bool awaySide = cx > (w / cell) * 0.82f;
+                    Color shirt = awaySide ? away : (r < 0.55f ? home : r < 0.8f ? home2 : Color.HSVToRGB(Hash(cx, cy, seed + 5), 0.3f, 0.8f));
+                    Color skin = Color.Lerp(new Color(0.36f, 0.22f, 0.15f), new Color(0.95f, 0.78f, 0.65f), Hash(cx, cy, seed + 2));
+                    Color hair = Color.Lerp(new Color(0.05f, 0.04f, 0.03f), new Color(0.5f, 0.35f, 0.2f), Hash(cx, cy, seed + 3) * 0.6f);
+                    Color seat = new Color(0.18f, 0.2f, 0.25f);
+                    for (int y = 0; y < cell; y++)
+                        for (int x = 0; x < cell; x++)
+                        {
+                            Color c;
+                            float dx = x - cell / 2f + 0.5f;
+                            if (empty) c = seat * (y < 2 ? 0.7f : 1f);
+                            else if (y >= 6) c = Mathf.Abs(dx) < 1.6f ? hair : seat * 0.6f;
+                            else if (y >= 4) c = Mathf.Abs(dx) < 1.8f ? skin : seat * 0.6f;
+                            else c = Mathf.Abs(dx) < 3.2f ? shirt * (0.85f + 0.15f * (y / 4f)) : seat * 0.5f;
+                            c.a = 1;
+                            px[(cy * cell + y) * w + cx * cell + x] = c;
+                        }
+                }
+            t.SetPixels32(px);
+            t.filterMode = FilterMode.Bilinear;
+            t.Apply(true);
+            return t;
+        }
+
+        /// <summary>Rede de gol (losangos), com alfa.</summary>
+        public static Texture2D Net(int size, float cell = 12f, float thick = 1.4f)
+        {
+            var t = Tex(size, size);
+            var px = new Color32[size * size];
+            for (int y = 0; y < size; y++)
+                for (int x = 0; x < size; x++)
+                {
+                    float a = (x + y) % cell, b = (x - y + 4 * size) % cell;
+                    bool line = a < thick || b < thick;
+                    px[y * size + x] = line ? new Color32(245, 245, 245, 255) : new Color32(0, 0, 0, 0);
+                }
+            t.SetPixels32(px);
+            t.Apply(true);
+            return t;
+        }
+
+        /// <summary>Painel de LED com texto repetido (placas de publicidade fictícias).</summary>
+        public static Texture2D Led(string[] texts, Color[] colors, int w = 1024, int h = 64)
+        {
+            var t = Tex(w, h, true, TextureWrapMode.Repeat);
+            var px = new Color32[w * h];
+            int seg = w / texts.Length;
+            for (int i = 0; i < texts.Length; i++)
+            {
+                var bg = colors[i % colors.Length];
+                var fg = bg.grayscale > 0.55f ? new Color(0.05f, 0.06f, 0.1f) : Color.white;
+                var glyphs = Glyphs.Render(texts[i], h - 16);
+                int gx0 = i * seg + (seg - glyphs.GetLength(0)) / 2;
+                for (int y = 0; y < h; y++)
+                    for (int x = 0; x < seg; x++)
+                    {
+                        int X = i * seg + x;
+                        int lx = X - gx0, ly = y - 8;
+                        bool on = lx >= 0 && ly >= 0 && lx < glyphs.GetLength(0) && ly < glyphs.GetLength(1) && glyphs[lx, ly];
+                        float scan = (X % 3 == 0 || y % 3 == 0) ? 0.82f : 1f;
+                        var c = (on ? fg : bg) * scan;
+                        c.a = 1;
+                        px[y * w + X] = c;
+                    }
+            }
+            t.SetPixels32(px);
+            t.Apply(true);
+            return t;
+        }
+
+        /// <summary>Gradiente radial (brilho de refletor, sombra de contato).</summary>
+        public static Texture2D Radial(int size, Color center, Color edge, float power = 2f)
+        {
+            var t = Tex(size, size, true, TextureWrapMode.Clamp);
+            var px = new Color32[size * size];
+            for (int y = 0; y < size; y++)
+                for (int x = 0; x < size; x++)
+                {
+                    float d = Vector2.Distance(new Vector2(x + 0.5f, y + 0.5f), new Vector2(size / 2f, size / 2f)) / (size / 2f);
+                    float k = Mathf.Pow(Mathf.Clamp01(1 - d), power);
+                    px[y * size + x] = Color.Lerp(edge, center, k);
+                }
+            t.SetPixels32(px);
+            t.Apply(true);
+            return t;
+        }
+
+        public static Texture2D Solid(Color c)
+        {
+            var t = new Texture2D(4, 4);
+            var px = new Color[16];
+            for (int i = 0; i < 16; i++) px[i] = c;
+            t.SetPixels(px);
+            t.Apply();
+            return t;
+        }
+    }
+
+    /// <summary>Fonte bitmap 5x7 para texturas geradas (placas, números).</summary>
+    public static class Glyphs
+    {
+        static readonly Dictionary<char, string[]> G = new Dictionary<char, string[]>
+        {
+            ['A'] = new[] { " ### ", "#   #", "#   #", "#####", "#   #", "#   #", "#   #" },
+            ['B'] = new[] { "#### ", "#   #", "#   #", "#### ", "#   #", "#   #", "#### " },
+            ['C'] = new[] { " ####", "#    ", "#    ", "#    ", "#    ", "#    ", " ####" },
+            ['D'] = new[] { "#### ", "#   #", "#   #", "#   #", "#   #", "#   #", "#### " },
+            ['E'] = new[] { "#####", "#    ", "#    ", "#### ", "#    ", "#    ", "#####" },
+            ['F'] = new[] { "#####", "#    ", "#    ", "#### ", "#    ", "#    ", "#    " },
+            ['G'] = new[] { " ####", "#    ", "#    ", "#  ##", "#   #", "#   #", " ### " },
+            ['H'] = new[] { "#   #", "#   #", "#   #", "#####", "#   #", "#   #", "#   #" },
+            ['I'] = new[] { "#####", "  #  ", "  #  ", "  #  ", "  #  ", "  #  ", "#####" },
+            ['J'] = new[] { "#####", "    #", "    #", "    #", "#   #", "#   #", " ### " },
+            ['K'] = new[] { "#   #", "#  # ", "# #  ", "##   ", "# #  ", "#  # ", "#   #" },
+            ['L'] = new[] { "#    ", "#    ", "#    ", "#    ", "#    ", "#    ", "#####" },
+            ['M'] = new[] { "#   #", "## ##", "# # #", "#   #", "#   #", "#   #", "#   #" },
+            ['N'] = new[] { "#   #", "##  #", "# # #", "#  ##", "#   #", "#   #", "#   #" },
+            ['O'] = new[] { " ### ", "#   #", "#   #", "#   #", "#   #", "#   #", " ### " },
+            ['P'] = new[] { "#### ", "#   #", "#   #", "#### ", "#    ", "#    ", "#    " },
+            ['Q'] = new[] { " ### ", "#   #", "#   #", "#   #", "# # #", "#  # ", " ## #" },
+            ['R'] = new[] { "#### ", "#   #", "#   #", "#### ", "# #  ", "#  # ", "#   #" },
+            ['S'] = new[] { " ####", "#    ", "#    ", " ### ", "    #", "    #", "#### " },
+            ['T'] = new[] { "#####", "  #  ", "  #  ", "  #  ", "  #  ", "  #  ", "  #  " },
+            ['U'] = new[] { "#   #", "#   #", "#   #", "#   #", "#   #", "#   #", " ### " },
+            ['V'] = new[] { "#   #", "#   #", "#   #", "#   #", "#   #", " # # ", "  #  " },
+            ['W'] = new[] { "#   #", "#   #", "#   #", "# # #", "# # #", "## ##", "#   #" },
+            ['X'] = new[] { "#   #", "#   #", " # # ", "  #  ", " # # ", "#   #", "#   #" },
+            ['Y'] = new[] { "#   #", "#   #", " # # ", "  #  ", "  #  ", "  #  ", "  #  " },
+            ['Z'] = new[] { "#####", "    #", "   # ", "  #  ", " #   ", "#    ", "#####" },
+            ['0'] = new[] { " ### ", "#   #", "#  ##", "# # #", "##  #", "#   #", " ### " },
+            ['1'] = new[] { "  #  ", " ##  ", "# #  ", "  #  ", "  #  ", "  #  ", "#####" },
+            ['2'] = new[] { " ### ", "#   #", "    #", "   # ", "  #  ", " #   ", "#####" },
+            ['3'] = new[] { "#### ", "    #", "    #", " ### ", "    #", "    #", "#### " },
+            ['4'] = new[] { "   # ", "  ## ", " # # ", "#  # ", "#####", "   # ", "   # " },
+            ['5'] = new[] { "#####", "#    ", "#### ", "    #", "    #", "#   #", " ### " },
+            ['6'] = new[] { " ### ", "#    ", "#    ", "#### ", "#   #", "#   #", " ### " },
+            ['7'] = new[] { "#####", "    #", "   # ", "  #  ", " #   ", " #   ", " #   " },
+            ['8'] = new[] { " ### ", "#   #", "#   #", " ### ", "#   #", "#   #", " ### " },
+            ['9'] = new[] { " ### ", "#   #", "#   #", " ####", "    #", "    #", " ### " },
+            ['-'] = new[] { "     ", "     ", "     ", " ### ", "     ", "     ", "     " },
+            ['.'] = new[] { "     ", "     ", "     ", "     ", "     ", "     ", "  #  " },
+            ['!'] = new[] { "  #  ", "  #  ", "  #  ", "  #  ", "  #  ", "     ", "  #  " },
+            [' '] = new[] { "     ", "     ", "     ", "     ", "     ", "     ", "     " },
+        };
+
+        // traços dos algarismos numa grade 0..2 (x) por 0..4 (y), estilo camisa de futebol
+        static readonly Dictionary<char, float[]> Strokes = new Dictionary<char, float[]>
+        {
+            ['0'] = new float[] { 0, 0, 2, 0, 2, 0, 2, 4, 2, 4, 0, 4, 0, 4, 0, 0 },
+            ['1'] = new float[] { 1, 0, 1, 4, 1, 4, 0.3f, 3.3f },
+            ['2'] = new float[] { 0, 4, 2, 4, 2, 4, 2, 2, 2, 2, 0, 2, 0, 2, 0, 0, 0, 0, 2, 0 },
+            ['3'] = new float[] { 0, 4, 2, 4, 2, 4, 2, 0, 2, 0, 0, 0, 0.5f, 2, 2, 2 },
+            ['4'] = new float[] { 0, 4, 0, 2, 0, 2, 2, 2, 2, 4, 2, 0 },
+            ['5'] = new float[] { 2, 4, 0, 4, 0, 4, 0, 2, 0, 2, 2, 2, 2, 2, 2, 0, 2, 0, 0, 0 },
+            ['6'] = new float[] { 2, 4, 0, 4, 0, 4, 0, 0, 0, 0, 2, 0, 2, 0, 2, 2, 2, 2, 0, 2 },
+            ['7'] = new float[] { 0, 4, 2, 4, 2, 4, 0.8f, 0 },
+            ['8'] = new float[] { 0, 0, 2, 0, 2, 0, 2, 4, 2, 4, 0, 4, 0, 4, 0, 0, 0, 2, 2, 2 },
+            ['9'] = new float[] { 2, 0, 2, 4, 2, 4, 0, 4, 0, 4, 0, 2, 0, 2, 2, 2, 0, 0, 2, 0 },
+        };
+
+        /// <summary>Textura do número da camisa (branco com alfa, cantos levemente arredondados).</summary>
+        public static Texture2D Number(int n, int size)
+        {
+            string s = Mathf.Clamp(n, 0, 99).ToString();
+            var t = new Texture2D(size, size, TextureFormat.RGBA32, true) { wrapMode = TextureWrapMode.Clamp };
+            var px = new Color32[size * size];
+            float digitW = 2f, gap = 1.1f, thick = 0.62f;
+            float totalW = s.Length * digitW + (s.Length - 1) * gap;
+            float scale = size * 0.78f / Mathf.Max(4f + thick, totalW + thick);
+            float ox = (size - totalW * scale) * 0.5f, oy = (size - 4f * scale) * 0.5f;
+            for (int y = 0; y < size; y++)
+                for (int x = 0; x < size; x++)
+                {
+                    float best = 99f;
+                    for (int i = 0; i < s.Length; i++)
+                    {
+                        var st = Strokes[s[i]];
+                        float dx0 = ox + i * (digitW + gap) * scale;
+                        for (int k = 0; k + 3 < st.Length; k += 4)
+                        {
+                            var a = new Vector2(dx0 + st[k] * scale, oy + st[k + 1] * scale);
+                            var b = new Vector2(dx0 + st[k + 2] * scale, oy + st[k + 3] * scale);
+                            var p = new Vector2(x + 0.5f, y + 0.5f);
+                            var ab = b - a;
+                            float tt = Mathf.Clamp01(Vector2.Dot(p - a, ab) / Mathf.Max(1e-5f, ab.sqrMagnitude));
+                            best = Mathf.Min(best, Vector2.Distance(p, a + ab * tt));
+                        }
+                    }
+                    float alpha = Mathf.Clamp01((thick * scale * 0.5f - best) + 0.5f);
+                    px[y * size + x] = new Color32(255, 255, 255, (byte)(alpha * 255));
+                }
+            t.SetPixels32(px);
+            t.Apply(true);
+            return t;
+        }
+
+        /// <summary>Matriz [x, y] (y para cima) do texto em altura h pixels.</summary>
+        public static bool[,] Render(string text, int h)
+        {
+            text = text.ToUpperInvariant();
+            int scale = Mathf.Max(1, h / 7);
+            int w = text.Length * 6 * scale;
+            var m = new bool[Mathf.Max(1, w), 7 * scale];
+            for (int i = 0; i < text.Length; i++)
+            {
+                if (!G.TryGetValue(text[i], out var rows)) rows = G[' '];
+                for (int ry = 0; ry < 7; ry++)
+                    for (int rx = 0; rx < 5; rx++)
+                        if (rows[ry][rx] == '#')
+                            for (int sy = 0; sy < scale; sy++)
+                                for (int sx = 0; sx < scale; sx++)
+                                    m[i * 6 * scale + rx * scale + sx, (6 - ry) * scale + sy] = true;
+            }
+            return m;
+        }
+    }
+}

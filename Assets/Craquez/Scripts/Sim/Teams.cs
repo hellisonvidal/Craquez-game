@@ -1,0 +1,365 @@
+using System.Collections.Generic;
+using System.IO;
+using UnityEngine;
+
+namespace Craquez.Sim
+{
+    public class Kit
+    {
+        public Color c1, c2, shorts, socks;
+        public int pattern;   // 0 liso, 1 listras, 2 aros, 3 faixa, 4 metades, 5 riscas, 6 faixa no peito
+    }
+
+    public class RosterEntry
+    {
+        public string n = "", pos = "", nat = "";
+        public int num, fid, ovr;
+        public float[] f = new float[0];
+        public float[] a = new float[0];
+        public List<string> t = new List<string>();
+    }
+
+    public class Stadium
+    {
+        public string name = "";
+        public int tier = 1, cap;
+    }
+
+    public class TeamData
+    {
+        public int index;
+        public string name = "", shortName = "", league = "", leagueId = "", country = "";
+        public Color c1 = Color.white, c2 = Color.black;
+        public float rating = 0.7f;
+        public List<Kit> kits = new List<Kit>();
+        public Stadium stadium = new Stadium();
+        public List<RosterEntry> roster = new List<RosterEntry>();
+        public string Key => leagueId + "/" + shortName;
+    }
+
+    public class League
+    {
+        public string id = "", name = "", sport = "football", country = "";
+        public int first, count;
+        public bool IsFutsal => sport == "futsal";
+    }
+
+    /// <summary>Táticas escolhidas para a partida.</summary>
+    public class Tactics
+    {
+        public string formation = "";
+        public int mentality = 1;   // 0 defensiva, 1 equilibrada, 2 ofensiva
+        public int press = 1;       // 0 baixa, 1 média, 2 alta
+        public int[] lineup = new int[0];
+    }
+
+    /// <summary>
+    /// Times e ligas (Resources/Data/leagues.json — nomes alterados, sem licenças)
+    /// + "option file" do usuário com nomes, uniformes, estádios e escudos reais.
+    /// </summary>
+    public static class Teams
+    {
+        public static readonly string[] PatternNames = { "liso", "listras", "aros", "faixa", "metades", "riscas", "faixa_peito" };
+        public static readonly string[] KitNames = { "Principal", "Reserva", "Terceiro" };
+
+        static bool _loaded;
+        static readonly List<League> _leagues = new List<League>();
+        static readonly List<TeamData> _flat = new List<TeamData>();
+        static readonly Dictionary<int, Texture2D> _crests = new Dictionary<int, Texture2D>();
+        public static int OverrideCount { get; private set; }
+        public static string OptionDir { get; private set; } = "";
+        /// <summary>Texto do banco (para testes fora do Unity).</summary>
+        public static string SourceOverride;
+
+        public static IReadOnlyList<League> Leagues { get { Ensure(); return _leagues; } }
+        public static int Count { get { Ensure(); return _flat.Count; } }
+
+        public static TeamData Get(int i)
+        {
+            Ensure();
+            int n = Mathf.Max(1, _flat.Count);
+            return _flat[((i % n) + n) % n];
+        }
+
+        public static int LeagueOf(int i)
+        {
+            Ensure();
+            for (int li = 0; li < _leagues.Count; li++)
+                if (i >= _leagues[li].first && i < _leagues[li].first + _leagues[li].count) return li;
+            return 0;
+        }
+
+        public static Texture2D Crest(int i)
+        {
+            Ensure();
+            return _crests.TryGetValue(i, out var t) ? t : null;
+        }
+
+        public static void Reload()
+        {
+            _loaded = false;
+            _leagues.Clear();
+            _flat.Clear();
+            Ensure();
+        }
+
+        static void Ensure()
+        {
+            if (_loaded) return;
+            _loaded = true;
+            string text = SourceOverride;
+            if (text == null)
+            {
+                var ta = Resources.Load<TextAsset>("Data/leagues");
+                text = ta != null ? ta.text : null;
+            }
+            if (text != null)
+            {
+                var root = MiniJson.Parse(text);
+                foreach (var lo in MiniJson.L(root, "leagues") ?? new List<object>())
+                {
+                    var lg = new League
+                    {
+                        id = MiniJson.S(lo, "id"), name = MiniJson.S(lo, "name"),
+                        sport = MiniJson.S(lo, "sport", "football"), country = MiniJson.S(lo, "country"),
+                        first = _flat.Count,
+                    };
+                    foreach (var to in MiniJson.L(lo, "teams") ?? new List<object>())
+                    {
+                        var t = ParseTeam(to);
+                        t.index = _flat.Count;
+                        t.league = lg.name;
+                        t.leagueId = lg.id;
+                        t.country = lg.country;
+                        _flat.Add(t);
+                    }
+                    lg.count = _flat.Count - lg.first;
+                    _leagues.Add(lg);
+                }
+            }
+            if (_flat.Count == 0) Fallback();
+            ApplyOptionFile();
+        }
+
+        static void Fallback()
+        {
+            var lg = new League { id = "craq", name = "Liga Craquez", first = 0 };
+            string[] names = { "Trovão FC", "Atlético Maré", "Canarinhos EC", "Verdão da Vila" };
+            string[] cols = { "#d62828", "#1d4ed8", "#facc15", "#16a34a" };
+            for (int i = 0; i < names.Length; i++)
+            {
+                var t = new TeamData { index = i, name = names[i], shortName = names[i].Substring(0, 3).ToUpperInvariant(), c1 = Col(cols[i]), c2 = Color.white, league = lg.name, leagueId = lg.id };
+                t.kits = DefaultKits(t.c1, t.c2);
+                _flat.Add(t);
+            }
+            lg.count = _flat.Count;
+            _leagues.Add(lg);
+        }
+
+        /// <summary>"#rrggbb" -> Color (sem depender do código nativo do Unity).</summary>
+        public static Color Col(string s, Color? def = null)
+        {
+            if (string.IsNullOrEmpty(s)) return def ?? Color.white;
+            s = s.TrimStart('#');
+            if (s.Length < 6 || !int.TryParse(s.Substring(0, 6), System.Globalization.NumberStyles.HexNumber, null, out int v))
+                return def ?? Color.white;
+            return new Color(((v >> 16) & 255) / 255f, ((v >> 8) & 255) / 255f, (v & 255) / 255f, 1f);
+        }
+
+        public static string Hex(Color c)
+        {
+            int r = Mathf.Clamp(Mathf.RoundToInt(c.r * 255f), 0, 255), g = Mathf.Clamp(Mathf.RoundToInt(c.g * 255f), 0, 255), b = Mathf.Clamp(Mathf.RoundToInt(c.b * 255f), 0, 255);
+            return "#" + r.ToString("x2") + g.ToString("x2") + b.ToString("x2");
+        }
+
+        static List<Kit> DefaultKits(Color c1, Color c2)
+        {
+            return new List<Kit>
+            {
+                new Kit { c1 = c1, c2 = c2, shorts = c2, socks = c1 },
+                new Kit { c1 = c2, c2 = c1, shorts = c2, socks = c2 },
+                new Kit { c1 = Col("#111827"), c2 = c1, shorts = Col("#111827"), socks = Col("#111827") },
+            };
+        }
+
+        static List<Kit> ParseKits(List<object> list, Color c1, Color c2)
+        {
+            var kits = new List<Kit>();
+            if (list != null)
+                foreach (var k in list)
+                {
+                    var kc1 = Col(MiniJson.S(k, "c1", "#ffffff"));
+                    var kc2 = Col(MiniJson.S(k, "c2", "#000000"));
+                    kits.Add(new Kit
+                    {
+                        c1 = kc1, c2 = kc2,
+                        shorts = Col(MiniJson.S(k, "shorts", ""), kc2),
+                        socks = Col(MiniJson.S(k, "socks", ""), kc1),
+                        pattern = Mathf.Max(0, System.Array.IndexOf(PatternNames, MiniJson.S(k, "pattern", "liso"))),
+                    });
+                }
+            if (kits.Count == 0) kits = DefaultKits(c1, c2);
+            while (kits.Count < 3) kits.Add(DefaultKits(c1, c2)[kits.Count]);
+            return kits;
+        }
+
+        static TeamData ParseTeam(object to)
+        {
+            var t = new TeamData
+            {
+                name = MiniJson.S(to, "name"), shortName = MiniJson.S(to, "short"),
+                c1 = Col(MiniJson.S(to, "c1", "#ffffff")), c2 = Col(MiniJson.S(to, "c2", "#000000")),
+                rating = MiniJson.F(to, "rating", 0.7f),
+            };
+            t.kits = ParseKits(MiniJson.L(to, "kits"), t.c1, t.c2);
+            var st = MiniJson.D(to, "stadium");
+            if (st != null) t.stadium = new Stadium { name = MiniJson.S(st, "name"), tier = MiniJson.I(st, "tier", 1), cap = MiniJson.I(st, "cap") };
+            foreach (var r in MiniJson.L(to, "roster") ?? new List<object>())
+                t.roster.Add(ParseRoster(r));
+            return t;
+        }
+
+        static float[] Floats(List<object> l)
+        {
+            if (l == null) return new float[0];
+            var a = new float[l.Count];
+            for (int i = 0; i < l.Count; i++) a[i] = l[i] is double d ? (float)d : 0f;
+            return a;
+        }
+
+        static RosterEntry ParseRoster(object r)
+        {
+            var e = new RosterEntry
+            {
+                n = MiniJson.S(r, "n"), pos = MiniJson.S(r, "pos"), nat = MiniJson.S(r, "nat"),
+                num = MiniJson.I(r, "num"), fid = MiniJson.I(r, "fid"), ovr = MiniJson.I(r, "ovr"),
+                f = Floats(MiniJson.L(r, "f")), a = Floats(MiniJson.L(r, "a")),
+            };
+            foreach (var x in MiniJson.L(r, "t") ?? new List<object>()) e.t.Add(x as string);
+            return e;
+        }
+
+        /// <summary>Uniformes da partida: casa usa o pedido; visitante usa o pedido ou o primeiro que não se confunda.</summary>
+        public static Kit[] PickKits(TeamData a, TeamData b, int ka = 0, int kb = -1)
+        {
+            var A = a.kits[Mathf.Clamp(ka, 0, a.kits.Count - 1)];
+            if (kb >= 0) return new[] { A, b.kits[Mathf.Clamp(kb, 0, b.kits.Count - 1)] };
+            foreach (int i in new[] { 1, 0, 2 })
+                if (KitDistance(A, b.kits[i]) > 0.28f) return new[] { A, b.kits[i] };
+            return new[] { A, b.kits[2] };
+        }
+
+        public static float KitDistance(Kit a, Kit b)
+        {
+            var x = a.c1;
+            var y = b.c1;
+            float lum(Color c) => 0.2126f * c.r + 0.7152f * c.g + 0.0722f * c.b;
+            return new Vector3(x.r - y.r, x.g - y.g, x.b - y.b).magnitude + Mathf.Abs(lum(x) - lum(y)) * 0.5f;
+        }
+
+        // ------------------------------------------------------------- option file
+        static IEnumerable<string> OptionDirs()
+        {
+#if !UNITY_EDITOR && UNITY_STANDALONE
+            yield return Path.Combine(Path.GetDirectoryName(Application.dataPath) ?? ".", "option_file");
+#endif
+            yield return Path.Combine(Application.persistentDataPath, "option_file");
+        }
+
+        static void ApplyOptionFile()
+        {
+            OverrideCount = 0;
+            _crests.Clear();
+            if (SourceOverride != null) return;
+            foreach (var dir in OptionDirs())
+            {
+                string path = Path.Combine(dir, "option_file.json");
+                if (!File.Exists(path)) continue;
+                OptionDir = dir;
+                object doc;
+                try { doc = MiniJson.Parse(File.ReadAllText(path)); }
+                catch (System.Exception e) { Debug.LogWarning("option_file.json inválido: " + e.Message); return; }
+                var teams = MiniJson.D(doc, "teams");
+                if (teams == null) return;
+                for (int i = 0; i < _flat.Count; i++)
+                {
+                    var t = _flat[i];
+                    if (!teams.TryGetValue(t.Key, out var o)) continue;
+                    if (MiniJson.S(o, "name", null) is string nm) t.name = nm;
+                    if (MiniJson.S(o, "short", null) is string sh) t.shortName = sh;
+                    var kl = MiniJson.L(o, "kits");
+                    if (kl != null)
+                    {
+                        t.kits = ParseKits(kl, t.c1, t.c2);
+                        t.c1 = t.kits[0].c1;
+                        t.c2 = t.kits[0].c2;
+                    }
+                    var st = MiniJson.D(o, "stadium");
+                    if (st != null)
+                    {
+                        if (st.ContainsKey("name")) t.stadium.name = MiniJson.S(st, "name");
+                        if (st.ContainsKey("cap")) t.stadium.cap = MiniJson.I(st, "cap");
+                        if (st.ContainsKey("tier")) t.stadium.tier = MiniJson.I(st, "tier", 1);
+                    }
+                    foreach (var pl in MiniJson.L(o, "players") ?? new List<object>())
+                    {
+                        int idx = MiniJson.I(pl, "index", -1);
+                        if (idx < 0 || idx >= t.roster.Count) continue;
+                        var e = t.roster[idx];
+                        var pd = (Dictionary<string, object>)pl;
+                        if (pd.ContainsKey("n")) e.n = MiniJson.S(pl, "n");
+                        if (pd.ContainsKey("num")) e.num = MiniJson.I(pl, "num");
+                        if (pd.ContainsKey("pos")) e.pos = MiniJson.S(pl, "pos");
+                        if (pd.ContainsKey("nat")) e.nat = MiniJson.S(pl, "nat");
+                    }
+                    string crest = MiniJson.S(o, "crest", "");
+                    if (crest != "" && File.Exists(Path.Combine(dir, crest)))
+                    {
+                        var tex = new Texture2D(2, 2);
+                        if (tex.LoadImage(File.ReadAllBytes(Path.Combine(dir, crest)))) _crests[i] = tex;
+                    }
+                    OverrideCount++;
+                }
+                return;
+            }
+        }
+
+        /// <summary>Grava um modelo com todos os times para o usuário editar. Retorna o caminho.</summary>
+        public static string ExportOptionTemplate()
+        {
+            Ensure();
+            string dir = Path.Combine(Application.persistentDataPath, "option_file");
+            Directory.CreateDirectory(Path.Combine(dir, "crests"));
+            var teams = new Dictionary<string, object>();
+            foreach (var t in _flat)
+            {
+                var kits = new List<object>();
+                foreach (var k in t.kits)
+                    kits.Add(new Dictionary<string, object>
+                    {
+                        ["c1"] = Hex(k.c1), ["c2"] = Hex(k.c2),
+                        ["shorts"] = Hex(k.shorts), ["socks"] = Hex(k.socks),
+                        ["pattern"] = PatternNames[Mathf.Clamp(k.pattern, 0, PatternNames.Length - 1)],
+                    });
+                var players = new List<object>();
+                for (int i = 0; i < t.roster.Count; i++)
+                    players.Add(new Dictionary<string, object> { ["index"] = i, ["n"] = t.roster[i].n, ["num"] = t.roster[i].num, ["pos"] = t.roster[i].pos });
+                teams[t.Key] = new Dictionary<string, object>
+                {
+                    ["name"] = t.name, ["short"] = t.shortName, ["kits"] = kits,
+                    ["stadium"] = new Dictionary<string, object> { ["name"] = t.stadium.name, ["cap"] = t.stadium.cap },
+                    ["crest"] = "crests/" + t.Key.Replace("/", "_") + ".png", ["players"] = players,
+                };
+            }
+            var doc = new Dictionary<string, object>
+            {
+                ["formato"] = "craquez-option-file-1",
+                ["ajuda"] = "Edite os valores e salve como option_file.json nesta pasta. Escudos: PNG quadrado em crests/. Apague os times que não quiser alterar.",
+                ["teams"] = teams,
+            };
+            string path = Path.Combine(dir, "option_file_modelo.json");
+            File.WriteAllText(path, MiniJson.Write(doc));
+            return path;
+        }
+    }
+}

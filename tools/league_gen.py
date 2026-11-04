@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Gera data/leagues.json: 8 ligas da temporada 2026/27 com a composição real
+"""Gera Assets/Craquez/Resources/Data/leagues.json: 8 ligas da temporada 2026/27 com a composição real
 de clubes (promovidos/rebaixados), cores reais de uniforme e nomes ALTERADOS
 (sem licença: como os times "não licenciados" do PES). Elencos são fictícios,
 com nomes e aparência coerentes com a nacionalidade de cada atleta.
@@ -538,7 +538,7 @@ def nearest_face(lib: list, f: list[int]) -> int:
 
 def main() -> None:
     lib_n = 360
-    lib = face_gen.write_library(lib_n, 2026, ROOT / "assets" / "faces")
+    lib = face_gen.write_library(lib_n, 2026, Path("/tmp") / "craquez_faces")  # rostos 2D só servem de metadados; o Unity usa atletas 3D
     out = {"season": SEASON, "note": "Nomes alterados (sem licença). Edite à vontade.", "leagues": []}
     total = 0
     all_leagues = [(L, "football") for L in LEAGUES] + [(L, "futsal") for L in FUTSAL_LEAGUES]
@@ -569,7 +569,7 @@ def main() -> None:
             lg["teams"].append({"name": name, "short": short, "c1": c1, "c2": c2, "rating": rating, "kits": kits,
                                 "stadium": stadium, "roster": roster})
         out["leagues"].append(lg)
-    p = ROOT / "data" / "leagues.json"
+    p = ROOT / "Assets" / "Craquez" / "Resources" / "Data" / "leagues.json"
     p.parent.mkdir(exist_ok=True)
     p.write_text(json.dumps(out, ensure_ascii=False, separators=(",", ":")), encoding="utf-8")
     print(f"{len(out['leagues'])} ligas, {sum(len(l['teams']) for l in out['leagues'])} times, {total} jogadores -> {p} ({p.stat().st_size // 1024} KB)")

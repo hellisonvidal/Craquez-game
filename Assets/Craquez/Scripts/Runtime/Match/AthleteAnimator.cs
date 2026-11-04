@@ -1,0 +1,208 @@
+using System.Collections.Generic;
+using UnityEngine;
+using UnityEngine.Animations;
+using UnityEngine.Playables;
+
+namespace Craquez
+{
+    /// <summary>
+    /// Mistura as animações de captura de movimento (CMU, transferidas para o
+    /// esqueleto dos atletas) pelo Playables API:
+    ///   • locomoção: parado / andar / trotar / correr / de costas / de lado,
+    ///     com fase sincronizada e velocidade de reprodução casada com a do atleta;
+    ///   • ações por cima: passe, chute, voleio, fintas, giro, cortes...
+    /// </summary>
+    public class AthleteAnimator
+    {
+        public static readonly string[] Loco = { "Idle", "Walk", "Jog", "Run", "Backpedal", "Jockey" };
+        const int IIdle = 0, IWalk = 1, IJog = 2, IRun = 3, IBack = 4, IJockey = 5;
+
+        public class ClipInfo
+        {
+            public AnimationClip clip;
+            public float speed;   // m/s médio do clipe (anims.json)
+            public bool loop;
+        }
+
+        static Dictionary<string, ClipInfo> _clips;
+
+        public static Dictionary<string, ClipInfo> Clips
+        {
+            get
+            {
+                if (_clips != null) return _clips;
+                _clips = new Dictionary<string, ClipInfo>();
+                var meta = Resources.Load<TextAsset>("Athletes/anims");
+                var md = meta != null ? Sim.MiniJson.Parse(meta.text) as Dictionary<string, object> : null;
+                foreach (var c in Resources.LoadAll<AnimationClip>("Athletes/Athlete_Anims"))
+                {
+                    string n = c.name;
+                    int bar = n.LastIndexOf('|');
+                    if (bar >= 0) n = n.Substring(bar + 1);
+                    if (n.StartsWith("__")) continue;
+                    object m = null;
+                    md?.TryGetValue(n, out m);
+                    _clips[n] = new ClipInfo { clip = c, speed = Sim.MiniJson.F(m, "speed", 0f), loop = m is Dictionary<string, object> d && d.TryGetValue("loop", out var l) && l is bool b && b };
+                }
+                if (_clips.Count == 0) Debug.LogError("Nenhuma animação encontrada em Resources/Athletes/Athlete_Anims");
+                return _clips;
+            }
+        }
+
+        PlayableGraph _graph;
+        AnimationMixerPlayable _top, _loco;
+        readonly AnimationClipPlayable[] _locoP = new AnimationClipPlayable[Loco.Length];
+        readonly float[] _locoW = new float[Loco.Length];
+        readonly float[] _locoSpeed = new float[Loco.Length];
+        AnimationClipPlayable _action;
+        float _actionW, _actionT, _actionEnd, _actionRate, _fadeOut;
+        float _phase;
+        bool _valid;
+        public string CurrentAction { get; private set; }
+        public float ActionWeight => _actionW;
+
+        public AthleteAnimator(Animator animator, string name)
+        {
+            var clips = Clips;
+            if (clips.Count == 0 || animator == null) return;
+            _graph = PlayableGraph.Create("anim:" + name);
+            _graph.SetTimeUpdateMode(DirectorUpdateMode.Manual);
+            var output = AnimationPlayableOutput.Create(_graph, "out", animator);
+            _top = AnimationMixerPlayable.Create(_graph, 2);
+            _loco = AnimationMixerPlayable.Create(_graph, Loco.Length);
+            for (int i = 0; i < Loco.Length; i++)
+            {
+                if (!clips.TryGetValue(Loco[i], out var ci)) ci = clips.TryGetValue("Idle", out var idle) ? idle : null;
+                if (ci == null) continue;
+                _locoP[i] = AnimationClipPlayable.Create(_graph, ci.clip);
+                _locoP[i].SetApplyFootIK(false);
+                _locoSpeed[i] = Mathf.Max(0.01f, ci.speed);
+                _graph.Connect(_locoP[i], 0, _loco, i);
+            }
+            _graph.Connect(_loco, 0, _top, 0);
+            _top.SetInputWeight(0, 1f);
+            output.SetSourcePlayable(_top);
+            _valid = true;
+        }
+
+        public void Destroy()
+        {
+            if (_graph.IsValid()) _graph.Destroy();
+            _valid = false;
+        }
+
+        /// <summary>Dispara uma ação (clipe inteiro ou trecho). start/len em segundos do clipe.</summary>
+        public void Play(string clip, float start = 0f, float len = -1f, float rate = 1f, float fadeIn = 0.08f)
+        {
+            if (!_valid || !Clips.TryGetValue(clip, out var ci)) return;
+            if (_action.IsValid())
+            {
+                _graph.Disconnect(_top, 1);
+                _action.Destroy();
+            }
+            _action = AnimationClipPlayable.Create(_graph, ci.clip);
+            _action.SetApplyFootIK(false);
+            _graph.Connect(_action, 0, _top, 1);
+            _actionT = Mathf.Clamp(start, 0f, ci.clip.length);
+            _actionEnd = len > 0f ? Mathf.Min(ci.clip.length, _actionT + len) : ci.clip.length;
+            _actionRate = rate;
+            _fadeOut = 0.18f;
+            CurrentAction = clip;
+            if (_actionW < 0.01f) _actionW = 0.01f;
+            _fadeIn = Mathf.Max(0.01f, fadeIn);
+        }
+
+        float _fadeIn = 0.08f;
+
+        public void Stop(float fade = 0.15f)
+        {
+            if (CurrentAction == null) return;
+            _actionEnd = Mathf.Min(_actionEnd, _actionT + fade * _actionRate);
+            _fadeOut = fade;
+        }
+
+        /// <summary>
+        /// Atualiza a locomoção. speed em m/s; fwd/side = velocidade no referencial do corpo (m/s);
+        /// guard = postura de marcação (contenção).
+        /// </summary>
+        public void Tick(float dt, float speed, float fwd, float side, bool guard)
+        {
+            if (!_valid) return;
+            for (int i = 0; i < _locoW.Length; i++) _locoW[i] = 0f;
+            float back = Mathf.Clamp01(-fwd / Mathf.Max(0.4f, speed));
+            float lateral = Mathf.Clamp01(Mathf.Abs(side) / Mathf.Max(0.4f, speed) - 0.35f) * 1.6f;
+            if (speed < 0.25f)
+            {
+                if (guard) _locoW[IJockey] = 1f;
+                else _locoW[IIdle] = 1f;
+            }
+            else if (guard || lateral > 0.6f)
+            {
+                float k = Mathf.Clamp01(speed / 1.2f);
+                _locoW[IJockey] = k;
+                _locoW[IIdle] = 1f - k;
+            }
+            else if (back > 0.55f && speed < 4.5f)
+            {
+                float k = Mathf.Clamp01(speed / 0.8f);
+                _locoW[IBack] = k;
+                _locoW[IIdle] = 1f - k;
+            }
+            else
+            {
+                // parado -> andar -> trotar -> correr (por velocidade)
+                float[] sp = { 0f, 1.4f, 3.4f, 5.3f };
+                int[] ix = { IIdle, IWalk, IJog, IRun };
+                float s = Mathf.Min(speed, 9.5f);
+                int seg = s >= sp[3] ? 2 : s >= sp[2] ? 2 : s >= sp[1] ? 1 : 0;
+                float t = Mathf.Clamp01((s - sp[seg]) / (sp[seg + 1] - sp[seg]));
+                _locoW[ix[seg]] += 1f - t;
+                _locoW[ix[seg + 1]] += t;
+            }
+            // fase única: avança pela distância percorrida / passada do clipe dominante
+            float cyclesPerSec = 0f, wsum = 0f;
+            for (int i = 0; i < Loco.Length; i++)
+            {
+                if (!_locoP[i].IsValid() || _locoW[i] <= 0f) continue;
+                float len = (float)_locoP[i].GetAnimationClip().length;
+                float rate = (i == IIdle || speed < 0.2f) ? 1f : Mathf.Clamp(speed / _locoSpeed[i], 0.6f, 1.8f);
+                cyclesPerSec += _locoW[i] * rate / Mathf.Max(0.1f, len);
+                wsum += _locoW[i];
+            }
+            if (wsum > 0f) _phase = Mathf.Repeat(_phase + dt * cyclesPerSec / wsum, 1f);
+            for (int i = 0; i < Loco.Length; i++)
+            {
+                if (!_locoP[i].IsValid()) continue;
+                float len = (float)_locoP[i].GetAnimationClip().length;
+                _locoP[i].SetTime(_phase * len);
+                _loco.SetInputWeight(i, _locoW[i]);
+            }
+            // ação por cima
+            float target = 0f;
+            if (CurrentAction != null)
+            {
+                _actionT += dt * _actionRate;
+                if (_actionT >= _actionEnd)
+                {
+                    CurrentAction = null;
+                }
+                else
+                {
+                    target = 1f;
+                    _action.SetTime(_actionT);
+                    if (_actionEnd - _actionT < _fadeOut * _actionRate) target = (_actionEnd - _actionT) / (_fadeOut * _actionRate);
+                }
+            }
+            float rateW = target > _actionW ? dt / _fadeIn : dt / 0.18f;
+            _actionW = Mathf.MoveTowards(_actionW, target, rateW);
+            if (_action.IsValid()) _top.SetInputWeight(1, _actionW);
+            _top.SetInputWeight(0, 1f - _actionW);
+            if (_actionW <= 0f && _action.IsValid() && CurrentAction == null)
+            {
+                _graph.Disconnect(_top, 1);
+                _action.Destroy();
+            }
+            _graph.Evaluate(0f);
+        }
+    }
+}
