@@ -54,7 +54,6 @@ namespace Craquez
                     m.localRotation = modelFix * m.localRotation;
                 }
             }
-            Athletic();
             if (pelvis != null) pelvisRest = transform.InverseTransformPoint(pelvis.position);
             // pés no chão
             if (footL != null)
@@ -80,21 +79,26 @@ namespace Craquez
             pelvis.position = transform.TransformPoint(lp);
         }
 
-        // espessura (largura/profundidade) de cada osso: cintura fina, peito e ombros mais largos,
-        // coxas, panturrilhas e braços mais cheios. O comprimento não muda.
-        static readonly (string bone, float k)[] Shape =
+        // espessura (largura/profundidade) de cada osso para o biotipo: (osso, magro, forte).
+        // O modelo base já é encorpado: o "médio" afina um pouco; o forte fica perto do original.
+        static readonly (string bone, float slim, float strong)[] Shape =
         {
-            ("spine_01", 0.86f), ("spine_02", 0.93f), ("spine_03", 1.06f),
-            ("clavicle_l", 1.04f), ("clavicle_r", 1.04f), ("upperarm_l", 1.08f), ("upperarm_r", 1.08f),
-            ("lowerarm_l", 1.04f), ("lowerarm_r", 1.04f),
-            ("thigh_l", 1.06f), ("thigh_r", 1.06f), ("calf_l", 1.06f), ("calf_r", 1.06f), ("neck_01", 1.05f),
+            ("spine_01", 0.84f, 0.96f), ("spine_02", 0.88f, 0.99f), ("spine_03", 0.92f, 1.02f),
+            ("clavicle_l", 0.95f, 1.01f), ("clavicle_r", 0.95f, 1.01f),
+            ("upperarm_l", 0.86f, 1.02f), ("upperarm_r", 0.86f, 1.02f), ("lowerarm_l", 0.9f, 1.01f), ("lowerarm_r", 0.9f, 1.01f),
+            ("thigh_l", 0.88f, 1.03f), ("thigh_r", 0.88f, 1.03f), ("calf_l", 0.9f, 1.02f), ("calf_r", 0.9f, 1.02f), ("neck_01", 0.92f, 1.01f),
         };
 
-        /// <summary>Corpo de atleta: escala os ossos só na espessura e compensa nos filhos.</summary>
-        void Athletic()
+        /// <summary>
+        /// Biotipo (0 = magro .. 1 = forte): escala os ossos só na espessura e compensa nos filhos.
+        /// Chamar uma vez, logo depois de Init.
+        /// </summary>
+        public void Physique(float build)
         {
-            foreach (var (name, k) in Shape)
+            build = Mathf.Clamp01(build);
+            foreach (var (name, slim, strong) in Shape)
             {
+                float k = Mathf.Lerp(slim, strong, build);
                 if (!bones.TryGetValue(name, out var b) || b.childCount == 0) continue;
                 // eixo do comprimento: o que aponta para o primeiro osso filho
                 Transform child = null;

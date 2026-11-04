@@ -65,6 +65,7 @@ namespace Craquez
             public int hair;
             public Color hairColor, skinTint;
             public float scale;
+            public float build;   // 0 magro .. 1 forte
             public float[] face;
             public int boots;
         }
@@ -89,7 +90,9 @@ namespace Craquez
             return new Look
             {
                 baseName = b, hair = Mathf.Clamp(hair, 0, Hairs.Length - 1), hairColor = HairColors[Mathf.Clamp(hc, 0, HairColors.Length - 1)],
-                skinTint = tint, scale = Mathf.Lerp(0.95f, 1.05f, F(5, R(6) * 4f) / 4f), face = f,
+                skinTint = tint, scale = Mathf.Lerp(0.95f, 1.04f, F(5, R(6) * 4f) / 4f), face = f,
+                // maioria magro/médio; só alguns fortes (porte do banco + sorteio por nome)
+                build = Mathf.Clamp01(Mathf.Pow(Mathf.Clamp01(F(5, R(6) * 4f) / 4f * 0.6f + R(7) * 0.4f), 1.6f)),
                 boots = (int)((h >> 5) % (uint)BootPainter.Designs.Length),
             };
         }
@@ -113,6 +116,7 @@ namespace Craquez
             inst.name = "model";
             var rig = root.AddComponent<AthleteRig>();
             rig.Init(inst.transform);
+            rig.Physique(look.build);
             inst.transform.localScale = Vector3.one * look.scale;
             Dress(rig, look, p.isKeeper ? keeperKit : kit, p.number, quality);
             return rig;

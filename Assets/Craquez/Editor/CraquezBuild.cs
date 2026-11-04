@@ -43,6 +43,43 @@ namespace Craquez.EditorTools
             };
         }
 
+        const string IconDir = "Assets/Craquez/Icons/";
+
+        /// <summary>Ícone original (bola-globo com órbita) no APK (normal, redondo e adaptativo) e no .exe.</summary>
+        static void Icons()
+        {
+            Texture2D L(string n)
+            {
+                var path = IconDir + n + ".png";
+                if (AssetImporter.GetAtPath(path) is TextureImporter ti && (ti.textureCompression != TextureImporterCompression.Uncompressed || ti.mipmapEnabled))
+                {
+                    ti.textureCompression = TextureImporterCompression.Uncompressed;
+                    ti.mipmapEnabled = false;
+                    ti.npotScale = TextureImporterNPOTScale.None;
+                    ti.SaveAndReimport();
+                }
+                return AssetDatabase.LoadAssetAtPath<Texture2D>(path);
+            }
+            var full = L("craquez_icon");
+            var fg = L("craquez_icon_fg");
+            var bg = L("craquez_icon_bg");
+            if (full == null) { Debug.LogWarning("Ícone não encontrado em " + IconDir); return; }
+            PlayerSettings.SetIcons(NamedBuildTarget.Unknown, new[] { full }, IconKind.Any);
+            PlayerSettings.SetIcons(NamedBuildTarget.Standalone, new[] { full }, IconKind.Any);
+            // Android: todos os tipos (legado, redondo e adaptativo com frente/fundo separados)
+            foreach (var kind in PlayerSettings.GetSupportedIconKinds(NamedBuildTarget.Android))
+            {
+                var icons = PlayerSettings.GetPlatformIcons(NamedBuildTarget.Android, kind);
+                foreach (var ic in icons)
+                {
+                    if (ic.maxLayerCount >= 2 && fg != null && bg != null) ic.SetTextures(bg, fg);
+                    else ic.SetTexture(full);
+                }
+                PlayerSettings.SetPlatformIcons(NamedBuildTarget.Android, kind, icons);
+            }
+            Debug.Log("[build] ícones aplicados");
+        }
+
         [MenuItem("Craquez/Gerar materiais")]
         public static void PrepareAssets()
         {
@@ -171,6 +208,7 @@ namespace Craquez.EditorTools
             PlayerSettings.allowedAutorotateToLandscapeLeft = true;
             PlayerSettings.allowedAutorotateToLandscapeRight = true;
             PlayerSettings.colorSpace = ColorSpace.Linear;
+            Icons();
             // sempre em tela cheia
             PlayerSettings.fullScreenMode = FullScreenMode.FullScreenWindow;
             PlayerSettings.defaultIsNativeResolution = true;

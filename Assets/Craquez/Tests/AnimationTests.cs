@@ -131,6 +131,7 @@ namespace Craquez.Tests
         public void CorpoProporcional()
         {
             var (g, r) = Make("P");
+            r.Physique(0.4f);
             try
             {
                 var root = g.transform;

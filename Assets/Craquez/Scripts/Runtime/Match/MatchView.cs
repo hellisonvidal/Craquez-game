@@ -361,10 +361,12 @@ namespace Craquez
             {
                 var d = bp - _ball.position;
                 d.y = 0;
-                if (d.sqrMagnitude > 1e-6f)
+                // nas mãos do goleiro a bola não gira (ele a reposiciona em LateUpdate)
+                bool held = sim.ball.owner >= 0 && sim.players[sim.ball.owner].isKeeper && sim.players[sim.ball.owner].hold > 0f;
+                if (!held && d.sqrMagnitude > 1e-6f && d.magnitude < 1.5f)
                 {
                     var axis = Vector3.Cross(Vector3.up, d.normalized);
-                    _ballRot = Quaternion.AngleAxis(d.magnitude / 0.11f * Mathf.Rad2Deg, axis) * _ballRot;
+                    _ballRot = Quaternion.AngleAxis(d.magnitude / sim.ball.radius * Mathf.Rad2Deg, axis) * _ballRot;
                 }
                 _ball.position = bp;
                 _ball.rotation = _ballRot;

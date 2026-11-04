@@ -111,6 +111,21 @@ jobs:
           name: Craquez-${{ matrix.name }}
           path: build/${{ matrix.targetPlatform }}
           retention-days: 14
+      # instalador do Windows (NSIS) com o ícone do jogo
+      - name: Instalador do Windows
+        if: matrix.targetPlatform == 'StandaloneWindows64'
+        run: |
+          sudo apt-get update -qq && sudo apt-get install -y -qq nsis > /dev/null
+          sudo chown -R "$USER" build
+          cd tools/installer
+          makensis -V2 -DSRC="$GITHUB_WORKSPACE/build/StandaloneWindows64" -DOUT="$GITHUB_WORKSPACE/Craquez-Setup.exe" -DVER="1.0.${{ github.run_number }}" craquez.nsi
+          ls -la "$GITHUB_WORKSPACE/Craquez-Setup.exe"
+      - uses: actions/upload-artifact@v4
+        if: matrix.targetPlatform == 'StandaloneWindows64'
+        with:
+          name: Craquez-Windows-Instalador
+          path: Craquez-Setup.exe
+          retention-days: 14
       # roda o jogo (renderização por software) e tira screenshots de todas as telas e modos
       - name: Screenshots
         if: matrix.targetPlatform == 'StandaloneLinux64'

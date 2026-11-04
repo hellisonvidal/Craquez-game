@@ -1067,7 +1067,16 @@ namespace Craquez.Sim
                     }
                 }
             }
+            // bola solta perto do gol é do goleiro: o zagueiro não disputa com ele
+            if (!urgent || (ball.owner < 0 && KeeperClaims(t))) target = KeeperSpace(p, target);
             SteerTo(p, target, urgent);
+        }
+
+        bool KeeperClaims(int t)
+        {
+            foreach (var k in players)
+                if (k.isKeeper && k.team == t && ball.pos.Dist(k.position) < 3f) return true;
+            return false;
         }
 
         Vector2 InterceptPoint(SimPlayer p)
@@ -1122,8 +1131,7 @@ namespace Craquez.Sim
                 if (!frozen && p.hold > 0f)
                 {
                     p.hold -= DT;
-                    if (p.hold <= 0f)
-                        Pass(p, new Vector2(dir, rng.Range(-0.6f, 0.6f)).Norm(), 0.55f, false, rng.Chance(0.4f));
+                    if (p.hold <= 0f) KeeperDistribute(p);
                 }
                 else if (!frozen && state == MatchState.Playing) Pass(p, new Vector2(dir, 0), 0.5f, false, true);
                 return;
@@ -1169,6 +1177,44 @@ namespace Craquez.Sim
                 }
             }
             SteerTo(p, target, urgent);
+        }
+
+        /// <summary>Goleiro solta a bola para o companheiro mais livre (curto se der, longo se não).</summary>
+        void KeeperDistribute(SimPlayer p)
+        {
+            float dir = TeamDir(p.team);
+            SimPlayer best = null;
+            float bestS = float.MinValue;
+            foreach (var m in players)
+            {
+                if (m.team != p.team || m == p) continue;
+                float free = float.MaxValue;
+                foreach (var o in players) if (o.team != p.team) free = Mathf.Min(free, o.position.Dist(m.position));
+                float d = m.position.Dist(p.position);
+                float ahead = (m.position.x - p.position.x) * dir;
+                if (ahead < 2f) continue;   // nunca para trás nem para o lado colado no gol
+                float sc = Mathf.Min(free, 10f) - d * 0.06f + ahead * 0.03f + rng.Range(0f, 1.5f);
+                if (sc > bestS) { bestS = sc; best = m; }
+            }
+            if (best == null) { Pass(p, new Vector2(dir, rng.Range(-0.3f, 0.3f)), 0.75f, false, true); return; }
+            float dist = best.position.Dist(p.position);
+            bool lofted = dist > halfLen * 0.55f;
+            float power = Mathf.Clamp(dist / (halfLen * (lofted ? 1.3f : 0.9f)), 0.35f, 0.9f);
+            Pass(p, best.position + best.vel * 0.4f - p.position, power, false, lofted);
+        }
+
+        /// <summary>Defensores não invadem o espaço do goleiro (nem ficam colados nele).</summary>
+        Vector2 KeeperSpace(SimPlayer p, Vector2 target)
+        {
+            foreach (var k in players)
+            {
+                if (!k.isKeeper || k.team != p.team) continue;
+                float room = ball.owner == k.id ? 3f : 1.8f;
+                var d = target - k.position;
+                if (d.magnitude < room)
+                    target = k.position + (d.magnitude > 0.05f ? d.normalized : new Vector2(TeamDir(p.team), p.basePos.y >= 0 ? 0.5f : -0.5f).Norm()) * room;
+            }
+            return target;
         }
 
         // ------------------------------------------------------------ movimento
@@ -1326,6 +1372,9 @@ namespace Craquez.Sim
                     {
                         var push = d / l * (minD - l) * 0.5f;
                         float wa = 0.5f + Mathf.Clamp((b.vel.magnitude - a.vel.magnitude) * 0.05f, -0.3f, 0.3f);
+                        // goleiro (sobretudo com a bola) não é empurrado: quem sai é o outro
+                        if (a.isKeeper && !b.isKeeper) wa = a.hold > 0f ? 0f : 0.2f;
+                        else if (b.isKeeper && !a.isKeeper) wa = b.hold > 0f ? 1f : 0.8f;
                         a.position -= push * 2f * wa;
                         b.position += push * 2f * (1f - wa);
                     }
