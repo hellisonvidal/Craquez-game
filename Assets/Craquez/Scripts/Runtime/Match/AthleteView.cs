@@ -24,7 +24,7 @@ namespace Craquez
             p = sp;
             rig = r;
             view = v;
-            anim = new AthleteAnimator(r.animator, sp.name);
+            anim = new AthleteAnimator(r.animator, sp.name, sp.id);
             _prev = _cur = W(sp.position);
             _yaw = Yaw(sp.facing);
             transform.position = _cur;
@@ -125,7 +125,9 @@ namespace Craquez
             float centri = -_yawRate * Mathf.Deg2Rad * spd * 1.6f;
             _lean = Mathf.Lerp(_lean, Mathf.Clamp(-local.x * 0.6f + centri, -16f, 16f), 1f - Mathf.Exp(-dt * 6f));
             _pitch = Mathf.Lerp(_pitch, 0f, 1f - Mathf.Exp(-dt * 5f));
-            float lift = 0f, roll = _lean, pitch = _pitch + Mathf.Clamp(local.z * 0.35f, -4f, 6f);
+            // aceleração inclina o tronco (na coluna, em LateUpdate), não o corpo inteiro: pés firmes
+            _accLean = Mathf.Lerp(_accLean, Mathf.Clamp(local.z * 1.1f, -7f, 9f) + Mathf.Clamp01((spd - 6f) / 3f) * 4f, 1f - Mathf.Exp(-dt * 5f));
+            float lift = 0f, roll = _lean, pitch = _pitch;
             if (_celebrate > 0f && p.vel.magnitude < 3f)
             {
                 // pulos em séries (pula, pula, respira...)
@@ -167,13 +169,78 @@ namespace Craquez
             var v3 = W(p.vel);
             var lv = Quaternion.Euler(0, -_yaw, 0) * v3;
             bool guard = p.shielding && !p.isKeeper && view.sim.ball.owner >= 0 && view.sim.players[view.sim.ball.owner].team != p.team;
-            anim?.Tick(dt, p.vel.magnitude, lv.z, lv.x, guard);
+            float animSpeed = p.vel.magnitude, animFwd = lv.z;
+            // girando parado: passinhos no lugar em vez de "patinar" sobre os pés
+            float turnStep = Mathf.Clamp(Mathf.Abs(_yawRate) * 0.0065f, 0f, 1.3f);
+            if (animSpeed < 1.2f && turnStep > 0.35f && !guard)
+            {
+                animSpeed = Mathf.Max(animSpeed, turnStep);
+                animFwd = Mathf.Max(animFwd, animSpeed * 0.8f);
+            }
+            Cuts(dt, spd);
+            Touches();
+            anim?.Tick(dt, animSpeed, animFwd, lv.x, guard);
             if (!_diag && rig.head != null && p.id == 3)
             {
                 _diag = true;
                 Debug.Log($"[diag] atleta {p.name}: cabeça a {rig.head.position.y - transform.position.y:F2} m do chão (raiz), pés {rig.footL?.position.y - transform.position.y:F2} m; rotação do modelo {rig.model.localEulerAngles}");
             }
             if (_celebrate > 0f) _celebrate -= dt;
+        }
+
+        float _accLean, _cutCd, _touchAnim, _lastTouchT;
+        Vector2 _refDir;
+        int _touchLeg;
+
+        /// <summary>Corte brusco em velocidade: animação de corte (pé de apoio cravado).</summary>
+        void Cuts(float dt, float spd)
+        {
+            _cutCd -= dt;
+            var dir = spd > 0.5f ? p.vel / spd : _refDir;
+            if (_refDir == Vector2.zero) _refDir = dir;
+            float ang = Vector2.SignedAngle(_refDir, dir);   // + = anti-horário visto de cima (esquerda)
+            if (spd > 3.6f && Mathf.Abs(ang) > 70f && _cutCd <= 0f && (anim.CurrentAction == null || anim.ActionWeight < 0.2f) && p.slide <= 0f && !p.isKeeper)
+            {
+                anim.Play(ang > 0f ? "CutL" : "CutR", 0.28f, 0.5f, 1.4f, 0.1f);
+                _cutCd = 0.9f;
+            }
+            _refDir = Vector2.Lerp(_refDir, dir, 1f - Mathf.Exp(-dt * 5f)).normalized;
+        }
+
+        /// <summary>Toque de condução: o pé que está no ar vai na bola quando a simulação a empurra.</summary>
+        void Touches()
+        {
+            var sim = view.sim;
+            if (p.touchT > _lastTouchT + 0.08f && sim.ball.owner == p.id && sim.ball.z < 0.3f && (anim.CurrentAction == null || anim.ActionWeight < 0.3f))
+            {
+                _touchAnim = 1f;
+                // a perna em balanço (pé mais alto) é a que toca
+                _touchLeg = rig.footL != null && rig.footR != null && rig.footL.position.y > rig.footR.position.y ? 0 : 1;
+            }
+            _lastTouchT = p.touchT;
+        }
+
+        /// <summary>Correções por cima da animação: tronco na aceleração e perna do toque.</summary>
+        void BodyLayer()
+        {
+            float dt = Time.deltaTime;
+            if (rig.bones.TryGetValue("spine_01", out var sp1) && Mathf.Abs(_accLean) > 0.05f)
+            {
+                var ax = transform.right;
+                sp1.rotation = Quaternion.AngleAxis(_accLean * 0.55f, ax) * sp1.rotation;
+                if (rig.spine != null) rig.spine.rotation = Quaternion.AngleAxis(_accLean * 0.45f, ax) * rig.spine.rotation;
+            }
+            if (_touchAnim > 0f)
+            {
+                _touchAnim = Mathf.Max(0f, _touchAnim - dt / 0.24f);
+                float k = Mathf.Sin((1f - _touchAnim) * Mathf.PI);
+                string sfx = _touchLeg == 0 ? "_l" : "_r";
+                rig.bones.TryGetValue("thigh" + sfx, out var th);
+                rig.bones.TryGetValue("calf" + sfx, out var cf);
+                var ax = transform.right;
+                if (th != null) th.rotation = Quaternion.AngleAxis(-26f * k, ax) * th.rotation;
+                if (cf != null) cf.rotation = Quaternion.AngleAxis(-16f * k, ax) * cf.rotation;
+            }
         }
 
         float _ground;
@@ -217,6 +284,7 @@ namespace Craquez
 
         void LateUpdate()
         {
+            if (p != null && rig != null) BodyLayer();
             GroundFeet();
             if (p == null || rig == null || rig.head == null) return;
             HeadAndNeck();

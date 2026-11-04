@@ -164,7 +164,7 @@ namespace Craquez
             Destroy(go.GetComponent<Collider>());
             go.transform.SetParent(transform, false);
             go.transform.localScale = Vector3.one * 0.22f;
-            go.GetComponent<MeshRenderer>().sharedMaterial = Gfx.Lit(Color.white, BallCatalog.Texture(cfg.ball, q >= 2 ? 1024 : 512), 0.6f);
+            go.GetComponent<MeshRenderer>().sharedMaterial = Gfx.Character(Color.white, BallCatalog.Texture(cfg.ball, q >= 2 ? 1024 : 512), 0.6f);
             _ball = go.transform;
             var sh = GameObject.CreatePrimitive(PrimitiveType.Quad);
             sh.name = "Sombra da bola";

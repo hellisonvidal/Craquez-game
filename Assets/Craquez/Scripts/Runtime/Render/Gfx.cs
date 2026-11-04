@@ -19,7 +19,10 @@ namespace Craquez
             if (m == null)
             {
                 string shader = name.StartsWith("Unlit") ? "Universal Render Pipeline/Unlit" :
-                    name == "Particles" ? "Universal Render Pipeline/Particles/Unlit" : "Universal Render Pipeline/Lit";
+                    name == "Particles" ? "Universal Render Pipeline/Particles/Unlit" :
+                    name.StartsWith("ToonOutline") ? "Craquez/ToonOutline" :
+                    name == "LitTransparent" ? "Universal Render Pipeline/Lit" : "Craquez/Toon";
+                if (Shader.Find(shader) == null) shader = "Universal Render Pipeline/Lit";
                 var sh = Shader.Find(shader) ?? Shader.Find("Standard");
                 m = new Material(sh);
                 Debug.LogWarning("Material base ausente, usando " + shader + ": " + name);
@@ -36,6 +39,30 @@ namespace Craquez
             m.SetFloat("_Smoothness", smooth);
             m.SetFloat("_Metallic", metal);
             return m;
+        }
+
+        /// <summary>
+        /// Personagens e bola: cel shading com contorno preto. cutout = recorte alfa e
+        /// dois lados (uniformes).
+        /// </summary>
+        public static Material Character(Color c, Texture tex = null, float smooth = 0.2f, bool cutout = false)
+        {
+            var m = new Material(Template(cutout ? "ToonOutlineCutout" : "ToonOutline"));
+            Set(m, c, tex);
+            m.SetFloat("_Smoothness", smooth);
+            if (cutout) m.SetFloat("_Cutoff", 0.01f);
+            return m;
+        }
+
+        /// <summary>Parâmetros globais do cel shading (faixas, sombra, contorno).</summary>
+        public static void ToonLook(bool night)
+        {
+            Shader.SetGlobalVector("_ToonShadowTint", night ? new Vector4(0.42f, 0.45f, 0.62f, 1f) : new Vector4(0.6f, 0.62f, 0.8f, 1f));
+            // x = limiar, y = suavidade da borda, z = luz de recorte, w = ambiente
+            Shader.SetGlobalVector("_ToonParams", new Vector4(0.06f, 0.035f, 0.22f, night ? 0.32f : 0.22f));
+            Shader.SetGlobalColor("_ToonOutlineColor", new Color(0.035f, 0.035f, 0.06f, 1f));
+            // espessura: 1,1 cm a 10 m da câmera, crescendo com a distância (≈ constante na tela)
+            Shader.SetGlobalVector("_ToonOutline", new Vector4(0.011f, 0.004f, 0.06f, 0f));
         }
 
         /// <summary>Lit com mapa de relevo (normal map) — grama, madeira, tecido, asfalto.</summary>

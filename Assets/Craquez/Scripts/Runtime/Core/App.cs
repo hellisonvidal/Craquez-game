@@ -44,6 +44,7 @@ namespace Craquez
             Screen.sleepTimeout = SleepTimeout.NeverSleep;
             Sfx.Init();
             UrpSetup.Quality(Settings.Quality);
+            Gfx.ToonLook(false);
             var cgo = new GameObject("Câmera");
             cgo.transform.SetParent(transform, false);
             cam = cgo.AddComponent<Camera>();
