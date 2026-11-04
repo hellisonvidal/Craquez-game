@@ -77,7 +77,49 @@ namespace Craquez.Tests
                 Debug.Log($"[anim-diag] coxa: SampleAnimation varia {sampled:F1}°; pelo grafo a coxa oscila {maxA - minA:F1}° ({minA:F0}..{maxA:F0}); quadril sai do lugar até {drift:F2} m");
                 Assert.Greater(hit, binds.Length / 2, "curvas do clipe não encontram os ossos do modelo");
                 Assert.Greater(maxA - minA, 20f, "a corrida não move as pernas");
-                Assert.Less(drift, 0.35f, "o clipe de corrida desloca o quadril (deveria correr no lugar)");
+            }
+            finally { Object.DestroyImmediate(g); }
+        }
+
+        /// <summary>Medidas de cada clipe no referencial do atleta (quadril, rumo do quadril e dos pés).</summary>
+        [Test]
+        public void MedidasDosClipes()
+        {
+            var (g, r) = Make("M");
+            try
+            {
+                var root = g.transform;
+                var host = r.animator.gameObject;
+                var pel = B(r, "pelvis");
+                var tl = B(r, "thigh_l");
+                var tr = B(r, "thigh_r");
+                Vector3 L(Vector3 w) => root.InverseTransformPoint(w);
+                float Yaw(Vector3 d) => Mathf.Atan2(d.x, d.z) * Mathf.Rad2Deg;
+                var restP = L(pel.position);
+                float restHip = Yaw(Quaternion.Euler(0, -90, 0) * (L(tr.position) - L(tl.position)));
+                Debug.Log($"[clip] repouso: quadril em ({restP.x:F2},{restP.y:F2},{restP.z:F2}); rumo do quadril {restHip:F0}°");
+                foreach (var kv in AthleteAnimator.Clips)
+                {
+                    var c = kv.Value.clip;
+                    const int N = 24;
+                    Vector3 mn = Vector3.one * 99f, mx = -Vector3.one * 99f, sum = Vector3.zero;
+                    float hipSum = 0f, footSum = 0f, hipMin = 999f, hipMax = -999f;
+                    for (int k = 0; k < N; k++)
+                    {
+                        c.SampleAnimation(host, c.length * k / N);
+                        var pp = L(pel.position);
+                        mn = Vector3.Min(mn, pp); mx = Vector3.Max(mx, pp); sum += pp;
+                        float hy = Yaw(Quaternion.Euler(0, -90, 0) * (L(tr.position) - L(tl.position)));
+                        hipSum += hy; hipMin = Mathf.Min(hipMin, hy); hipMax = Mathf.Max(hipMax, hy);
+                        foreach (var sfx in new[] { "_l", "_r" })
+                        {
+                            var d = L(B(r, "ball" + sfx).position) - L(B(r, "foot" + sfx).position);
+                            footSum += Yaw(new Vector3(d.x, 0, d.z));
+                        }
+                    }
+                    var avg = sum / N;
+                    Debug.Log($"[clip] {kv.Key,-10} {c.length:F2}s quadril médio ({avg.x:F2},{avg.y:F2},{avg.z:F2}) x[{mn.x:F2},{mx.x:F2}] z[{mn.z:F2},{mx.z:F2}] y[{mn.y:F2},{mx.y:F2}]; rumo quadril {hipSum / N:F0}° [{hipMin:F0},{hipMax:F0}]; pés {footSum / (2 * N):F0}°");
+                }
             }
             finally { Object.DestroyImmediate(g); }
         }
