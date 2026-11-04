@@ -11,6 +11,7 @@ namespace Craquez
         public AthleteAnimator anim;
         public MatchView view;
         Vector3 _prev, _cur;
+        float _yawRate;
         float _yaw, _lean, _pitch, _hop, _hopT, _celebrate, _fall, _diveSide, _slideT;
         Vector2 _lastVel;
         bool _diag;
@@ -98,6 +99,9 @@ namespace Craquez
 
         public void OnVictimFoul() => _fall = 1.1f;
 
+        /// <summary>Comemoração: pulinhos e braços para cima por alguns segundos.</summary>
+        public void Celebrate(float seconds) => _celebrate = Mathf.Max(_celebrate, seconds);
+
         void Update()
         {
             if (p == null) return;
@@ -106,16 +110,28 @@ namespace Craquez
             var pos = Vector3.Lerp(_prev, _cur, a);
             // rumo suave (o corpo gira um pouco atrás da direção da simulação)
             float target = Yaw(p.facing);
-            _yaw = Mathf.LerpAngle(_yaw, target, 1f - Mathf.Exp(-dt * 16f));
+            // giro com velocidade angular limitada (mais lento em alta velocidade, como um atleta real)
+            float spd = p.vel.magnitude;
+            float diff = Mathf.DeltaAngle(_yaw, target);
+            float maxRate = Mathf.Lerp(900f, 340f, Mathf.Clamp01(spd / 8f));
+            float step = Mathf.Clamp(diff * (1f - Mathf.Exp(-dt * 14f)), -maxRate * dt, maxRate * dt);
+            _yaw += step;
+            _yawRate = Mathf.Lerp(_yawRate, step / Mathf.Max(1e-4f, dt), 1f - Mathf.Exp(-dt * 8f));
             // inclinação nas curvas e na aceleração
             var acc = (p.vel - _lastVel) / Mathf.Max(1e-4f, dt);
             _lastVel = p.vel;
             var local = Quaternion.Euler(0, -_yaw, 0) * W(acc);
-            _lean = Mathf.Lerp(_lean, Mathf.Clamp(-local.x * 0.9f, -12f, 12f), 1f - Mathf.Exp(-dt * 6f));
+            // inclinação para dentro da curva (força centrípeta) + aceleração lateral
+            float centri = -_yawRate * Mathf.Deg2Rad * spd * 1.6f;
+            _lean = Mathf.Lerp(_lean, Mathf.Clamp(-local.x * 0.6f + centri, -16f, 16f), 1f - Mathf.Exp(-dt * 6f));
             _pitch = Mathf.Lerp(_pitch, 0f, 1f - Mathf.Exp(-dt * 5f));
             float lift = 0f, roll = _lean, pitch = _pitch + Mathf.Clamp(local.z * 0.35f, -4f, 6f);
             if (_celebrate > 0f && p.vel.magnitude < 3f)
-                lift += Mathf.Abs(Mathf.Sin(_celebrate * 7f)) * 0.22f * Mathf.Clamp01(_celebrate);
+            {
+                // pulos em séries (pula, pula, respira...)
+                float burst = Mathf.Sin(_celebrate * 1.6f);
+                if (burst > 0f) lift += Mathf.Abs(Mathf.Sin(_celebrate * 7f)) * 0.2f * Mathf.Clamp01(_celebrate) * Mathf.Clamp01(burst * 3f);
+            }
             if (_hopT > 0f)
             {
                 _hopT -= dt;
@@ -203,16 +219,75 @@ namespace Craquez
         {
             GroundFeet();
             if (p == null || rig == null || rig.head == null) return;
-            // cabeça acompanha a bola (limitado)
+            HeadAndNeck();
+            Arms();
+        }
+
+        float _armsUp;
+
+        /// <summary>Braços erguidos na comemoração (sobre a animação).</summary>
+        void Arms()
+        {
+            float want = _celebrate > 0f && p.vel.magnitude < 4.5f ? 1f : 0f;
+            _armsUp = Mathf.MoveTowards(_armsUp, want, Time.deltaTime * 3f);
+            if (_armsUp <= 0.001f) return;
+            float pump = 0.8f + 0.2f * Mathf.Sin(_celebrate * 9f);
+            for (int side = -1; side <= 1; side += 2)
+            {
+                string sfx = side < 0 ? "_l" : "_r";
+                rig.bones.TryGetValue("upperarm" + sfx, out var up);
+                rig.bones.TryGetValue("lowerarm" + sfx, out var lo);
+                rig.bones.TryGetValue("hand" + sfx, out var hd);
+                if (up == null || lo == null || hd == null) continue;
+                // lado do corpo: decide pelo ombro em relação ao peito
+                float s = Mathf.Sign(Vector3.Dot(up.position - (rig.spine != null ? rig.spine.position : transform.position), transform.right));
+                var target = (Vector3.up * 2.2f + transform.right * s * 0.9f + transform.forward * 0.15f).normalized;
+                var cur = lo.position - up.position;
+                up.rotation = Quaternion.Slerp(Quaternion.identity, Quaternion.FromToRotation(cur, target), _armsUp * pump) * up.rotation;
+                var cur2 = hd.position - lo.position;
+                lo.rotation = Quaternion.Slerp(Quaternion.identity, Quaternion.FromToRotation(cur2, (target + Vector3.up * 0.3f).normalized), _armsUp * 0.8f) * lo.rotation;
+            }
+        }
+
+        Quaternion _neckSet, _headSet, _neckBase, _headBase, _look = Quaternion.identity;
+        bool _headInit;
+
+        /// <summary>
+        /// Cabeça firme: parte da pose animada deste quadro (nunca acumula a correção do
+        /// quadro anterior), amortece o balanço da captura e vira suavemente para a bola.
+        /// </summary>
+        void HeadAndNeck()
+        {
+            var neck = rig.neck;
+            var head = rig.head;
+            var nCur = neck != null ? neck.localRotation : Quaternion.identity;
+            var hCur = head.localRotation;
+            // se a animação não reescreveu os ossos neste quadro, usa a base anterior
+            if (_headInit && Quaternion.Angle(hCur, _headSet) < 0.01f && (neck == null || Quaternion.Angle(nCur, _neckSet) < 0.01f))
+            {
+                nCur = _neckBase;
+                hCur = _headBase;
+            }
+            _neckBase = nCur;
+            _headBase = hCur;
+            _headInit = true;
+            // amortece o pescoço/cabeça da captura (metade do movimento, sem cabeça caída)
+            if (neck != null) neck.localRotation = Quaternion.Slerp(rig.neckRest, nCur, 0.45f);
+            head.localRotation = Quaternion.Slerp(rig.headRest, hCur, 0.4f);
+            // olhar para a bola, suavizado
             var ballW = W(view.sim.ball.pos, view.sim.ball.z + 0.11f);
-            var toBall = ballW - rig.head.position;
+            var toBall = ballW - head.position;
             var fwd = transform.forward;
             float yawTo = Vector3.SignedAngle(Vector3.ProjectOnPlane(fwd, Vector3.up), Vector3.ProjectOnPlane(toBall, Vector3.up), Vector3.up);
-            yawTo = Mathf.Clamp(yawTo, -60f, 60f) * (anim != null ? 1f - anim.ActionWeight * 0.7f : 1f);
-            float pitchTo = Mathf.Clamp(-Mathf.Atan2(toBall.y, new Vector2(toBall.x, toBall.z).magnitude) * Mathf.Rad2Deg, -25f, 35f);
-            var add = Quaternion.AngleAxis(yawTo * 0.6f, Vector3.up) * Quaternion.AngleAxis(pitchTo * 0.4f, transform.right);
-            if (rig.neck != null) rig.neck.rotation = Quaternion.Slerp(Quaternion.identity, add, 0.4f) * rig.neck.rotation;
-            rig.head.rotation = Quaternion.Slerp(Quaternion.identity, add, 0.6f) * rig.head.rotation;
+            float busy = anim != null ? 1f - anim.ActionWeight * 0.8f : 1f;
+            yawTo = Mathf.Clamp(yawTo, -55f, 55f) * busy;
+            float pitchTo = Mathf.Clamp(-Mathf.Atan2(toBall.y, new Vector2(toBall.x, toBall.z).magnitude) * Mathf.Rad2Deg, -20f, 25f) * busy;
+            var want = Quaternion.AngleAxis(yawTo * 0.7f, Vector3.up) * Quaternion.AngleAxis(pitchTo * 0.5f, transform.right);
+            _look = Quaternion.Slerp(_look, want, 1f - Mathf.Exp(-Time.deltaTime * 5f));
+            if (neck != null) neck.rotation = Quaternion.Slerp(Quaternion.identity, _look, 0.4f) * neck.rotation;
+            head.rotation = Quaternion.Slerp(Quaternion.identity, _look, 0.6f) * head.rotation;
+            _neckSet = neck != null ? neck.localRotation : Quaternion.identity;
+            _headSet = head.localRotation;
         }
 
         /// <summary>Marcador do jogador controlado (anel sob os pés).</summary>

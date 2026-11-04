@@ -237,6 +237,48 @@ namespace Craquez
             return t;
         }
 
+        /// <summary>Piso esportivo sintético (poliuretano): liso, só manchas suaves de uso.</summary>
+        public static Texture2D SportFloor(int size, int seed)
+        {
+            var t = Tex(size, size);
+            var px = new Color32[size * size];
+            for (int y = 0; y < size; y++)
+                for (int x = 0; x < size; x++)
+                {
+                    float u = x / (float)size, v = y / (float)size;
+                    float n = Fbm(u * 4, v * 4, 4, seed, 4);
+                    float fine = Hash(x, y, seed + 1);
+                    float k = 0.94f + (n - 0.5f) * 0.1f + (fine - 0.5f) * 0.025f;
+                    var c = new Color(k, k, k, 1f);
+                    px[y * size + x] = c;
+                }
+            t.SetPixels32(px);
+            t.Apply(true);
+            return t;
+        }
+
+        /// <summary>Desgaste do gramado (pequena área, meio-campo): manchas de terra/grama rala com alfa suave.</summary>
+        public static Texture2D Wear(int size, int seed)
+        {
+            var t = Tex(size, size, true, TextureWrapMode.Clamp);
+            var px = new Color32[size * size];
+            for (int y = 0; y < size; y++)
+                for (int x = 0; x < size; x++)
+                {
+                    float u = x / (float)size, v = y / (float)size;
+                    float r = new Vector2(u - 0.5f, v - 0.5f).magnitude * 2f;
+                    float n = Fbm(u * 6, v * 6, 6, seed, 4);
+                    float a = Mathf.Clamp01((1f - r) * 1.6f) * Mathf.Clamp01((n - 0.35f) * 2.2f);
+                    float g = Hash(x, y, seed + 2);
+                    var c = Color.Lerp(new Color(0.42f, 0.36f, 0.2f), new Color(0.45f, 0.5f, 0.22f), n) * (0.85f + g * 0.25f);
+                    c.a = a * 0.6f;
+                    px[y * size + x] = c;
+                }
+            t.SetPixels32(px);
+            t.Apply(true);
+            return t;
+        }
+
         /// <summary>Asfalto / concreto.</summary>
         public static Texture2D Asphalt(int size, Color baseC, int seed, float cracks = 0.4f)
         {
@@ -288,7 +330,7 @@ namespace Craquez
                         }
                 }
             t.SetPixels32(px);
-            t.filterMode = FilterMode.Bilinear;
+            t.filterMode = FilterMode.Trilinear;
             t.Apply(true);
             return t;
         }
@@ -328,9 +370,37 @@ namespace Craquez
                     }
             }
             t.SetPixels32(px);
-            t.filterMode = FilterMode.Bilinear;
+            t.filterMode = FilterMode.Trilinear;
             t.Apply(true);
+            KeepCoverage(t);
             return t;
+        }
+
+        /// <summary>
+        /// Mipmaps de textura recortada perdem alfa com a distância (a torcida "some" e pisca).
+        /// Reforça o alfa de cada nível para manter a mesma cobertura.
+        /// </summary>
+        public static void KeepCoverage(Texture2D t)
+        {
+            for (int m = 1; m < t.mipmapCount; m++)
+            {
+                var px = t.GetPixels32(m);
+                for (int i = 0; i < px.Length; i++)
+                {
+                    int a = px[i].a;
+                    if (a > 0)
+                    {
+                        // desfaz a mistura com o fundo transparente (preto) e endurece o alfa
+                        float k = 255f / a;
+                        px[i].r = (byte)Mathf.Min(255, px[i].r * k);
+                        px[i].g = (byte)Mathf.Min(255, px[i].g * k);
+                        px[i].b = (byte)Mathf.Min(255, px[i].b * k);
+                    }
+                    px[i].a = (byte)(a > 70 ? 255 : 0);
+                }
+                t.SetPixels32(px, m);
+            }
+            t.Apply(false);
         }
 
         /// <summary>Rede de gol (losangos), com alfa.</summary>

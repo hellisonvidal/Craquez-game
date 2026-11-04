@@ -12,7 +12,7 @@ namespace Craquez
     /// </summary>
     public class MatchController : MonoBehaviour
     {
-        enum Phase { Ceremony, Playing, Paused, Ended }
+        enum Phase { Ceremony, Playing, Paused, Ended, Goal }
 
         public MatchConfig cfg;
         public MatchSim sim;
@@ -30,6 +30,8 @@ namespace Craquez
         readonly DeviceKind[] _dev = new DeviceKind[2];
         readonly int[] _prevPause = new int[2];
         TouchControls _touch;
+        readonly GoalShow _show = new GoalShow();
+        int _showTeam = -1, _showScorer = -1;
         GameObject _pauseMenu, _endMenu, _lineup;
         Camera _cam;
 
@@ -218,6 +220,15 @@ namespace Craquez
                 case Phase.Paused:
                 case Phase.Ended:
                     return;
+                case Phase.Goal:
+                    if (!_show.Update(dt, AnyPress()))
+                    {
+                        _phase = Phase.Playing;
+                        _acc = 0f;
+                        sim.stateTimer = Mathf.Min(sim.stateTimer, 1.2f);
+                        if (_touch) _touch.gameObject.SetActive(true);
+                    }
+                    return;
             }
             if (attract)
             {
@@ -244,7 +255,18 @@ namespace Craquez
                     if (_cpu[t] != null) frames[t] = _cpu[t].MakeInput(sim);
                 sim.Step(frames);
                 view.OnTick();
+                if (!attract) _show.Record(sim);
                 HandleEvents();
+                if (_showTeam >= 0)
+                {
+                    // gol: comemoração + replay antes do reinício
+                    _show.Begin(sim, view, hud, _showTeam, _showScorer);
+                    _showTeam = -1;
+                    _phase = Phase.Goal;
+                    _acc = 0f;
+                    if (_touch) _touch.gameObject.SetActive(false);
+                    return;
+                }
                 if (sim.state == MatchState.Fulltime)
                 {
                     if (attract) { sim.half = 1; sim.clock = 0; sim.state = MatchState.Kickoff; sim.stateTimer = 1f; break; }
@@ -253,6 +275,18 @@ namespace Craquez
                 }
             }
             view.Alpha = _acc / MatchSim.DT;
+        }
+
+        static bool AnyPress()
+        {
+            var k = UnityEngine.InputSystem.Keyboard.current;
+            if (k != null && k.anyKey.wasPressedThisFrame) return true;
+            var g = UnityEngine.InputSystem.Gamepad.current;
+            if (g != null && (g.buttonSouth.wasPressedThisFrame || g.startButton.wasPressedThisFrame || g.buttonEast.wasPressedThisFrame)) return true;
+            var t = UnityEngine.InputSystem.Touchscreen.current;
+            if (t != null && t.primaryTouch.press.wasPressedThisFrame) return true;
+            var m = UnityEngine.InputSystem.Mouse.current;
+            return m != null && m.leftButton.wasPressedThisFrame;
         }
 
         void HandleEvents()
@@ -267,6 +301,7 @@ namespace Craquez
                         string scorer = e.id >= 0 ? sim.players[e.id].name : "";
                         if (e.kind == "own") scorer += " (contra)";
                         hud.Goal(td.name, scorer, view.kits[e.team].c1);
+                        if (!attract) { _showTeam = e.team; _showScorer = e.id; }
                         for (int t = 0; t < 2; t++) if (_cpu[t] == null) InputRouter.Rumble(_dev[t], 0.8f, 0.9f, 0.6f, this);
                         break;
                     }

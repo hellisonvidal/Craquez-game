@@ -52,13 +52,25 @@ namespace Craquez
             return v;
         }
 
+        /// <summary>
+        /// UV de um "espelho" de degrau com torcida: uma fileira de células (8 px) por degrau
+        /// e ~0,5 m por torcedor — em escala real (antes cada pessoa tinha ~10 cm e virava chiado).
+        /// </summary>
+        static (Vector2 a, Vector2 b) RowUV(int row, float len, int texW, int texH, float seat = 0.5f)
+        {
+            int rowsInTex = Mathf.Max(1, texH / 8);
+            float v0 = (row * 7 % rowsInTex) * 8f / texH;
+            float u0 = (row * 0.318f) % 1f;
+            return (new Vector2(u0, v0 + 0.5f / texH), new Vector2(u0 + len / (texW / 8f * seat), v0 + 7.5f / texH));
+        }
+
         static void Pitch(Venue v, float hl, float hw, uint seed, int quality)
         {
             int ts = quality >= 2 ? 512 : 256;
-            var grass = Gfx.Grass(ts, new Color(0.26f, 0.5f, 0.15f), (int)(seed % 997));
-            // faixas de corte: duas tonalidades alternadas
-            v.pitchMat = Gfx.LitN(new Color(1.0f, 1.0f, 1.0f), grass, Gfx.GrassNormal, 0.16f, 0.8f);
-            v.pitchMat2 = Gfx.LitN(new Color(0.78f, 0.86f, 0.74f), grass, Gfx.GrassNormal, 0.16f, 0.8f);   // faixas de corte bem visíveis
+            var grass = Gfx.Grass(ts, new Color(0.22f, 0.44f, 0.13f), (int)(seed % 997));
+            // faixas de corte: duas tonalidades alternadas (contraste de gramado de TV)
+            v.pitchMat = Gfx.LitN(new Color(1.0f, 1.0f, 1.0f), grass, Gfx.GrassNormal, 0.2f, 0.7f);
+            v.pitchMat2 = Gfx.LitN(new Color(0.84f, 0.9f, 0.8f), grass, Gfx.GrassNormal, 0.2f, 0.7f);
             Gfx.Tiling(v.pitchMat, new Vector2(1, 1));
             Gfx.Tiling(v.pitchMat2, new Vector2(1, 1));
             var a = new MeshKit();
@@ -81,7 +93,22 @@ namespace Craquez
             var ring = new MeshKit();
             float ox = mx + 22f, oz = mz + 22f;
             ring.Quad(new Vector3(-ox, -0.01f, -oz), new Vector3(-ox, -0.01f, oz), new Vector3(ox, -0.01f, oz), new Vector3(ox, -0.01f, -oz), new Vector2(0, 0), new Vector2(ox / 4f, oz / 4f));
-            ring.Object("Entorno", Gfx.LitN(new Color(0.55f, 0.66f, 0.5f), grass, Gfx.GrassNormal, 0.1f, 0.6f), v.root, false);
+            ring.Object("Entorno", Gfx.LitN(new Color(0.62f, 0.7f, 0.56f), grass, Gfx.GrassNormal, 0.1f, 0.6f), v.root, false);
+            // desgaste natural: pequenas áreas, marca do pênalti e círculo central
+            var wear = Gfx.Transparent(Color.white, Gfx.Wear(256, (int)(seed % 991)));
+            var wk = new MeshKit();
+            void Patch(Vector3 c, float sx, float sz)
+            {
+                wk.Quad(c + new Vector3(-sx, 0.004f, -sz), c + new Vector3(-sx, 0.004f, sz), c + new Vector3(sx, 0.004f, sz), c + new Vector3(sx, 0.004f, -sz), Vector2.zero, Vector2.one);
+            }
+            foreach (float s in new[] { -1f, 1f })
+            {
+                Patch(new Vector3(s * (hl - 3f), 0, 0), 3.2f, 5.5f);    // pequena área (goleiro)
+                Patch(new Vector3(s * (hl - 11f), 0, 0), 1.6f, 1.6f);   // marca do pênalti
+            }
+            Patch(Vector3.zero, 2.4f, 2.4f);
+            var wg = wk.Object("Desgaste", wear, v.root, false);
+            wg.GetComponent<MeshRenderer>().shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
         }
 
         static void Lines(Venue v, MatchSim sim, float hl, float hw)
@@ -211,14 +238,14 @@ namespace Craquez
                 {
                     float y0 = 1.1f + r * rise, y1 = y0 + rise;
                     float d0 = dist + r * step, d1 = d0 + step;
-                    float u0 = r / (float)rows, u1 = (r + 1) / (float)rows;
-                    float uLen = len / 30f;
                     var A = new Vector3(-len / 2, y0, -d0);
                     var B = new Vector3(len / 2, y0, -d0);
                     var C = new Vector3(len / 2, y1, -d0);
                     var D = new Vector3(-len / 2, y1, -d0);
-                    k.Quad(A, B, C, D, new Vector2(0, u0), new Vector2(uLen, u1));
-                    k.Quad(D, C, new Vector3(len / 2, y1, -d1), new Vector3(-len / 2, y1, -d1), new Vector2(0, u0), new Vector2(uLen, u0 + 0.002f));
+                    var uv = RowUV(r, len, tw, 512);
+                    k.Quad(A, B, C, D, uv.a, uv.b);
+                    // piso do degrau: concreto (antes usava a textura da torcida e virava listras)
+                    back.Quad(D, C, new Vector3(len / 2, y1, -d1), new Vector3(-len / 2, y1, -d1), new Vector2(0, 0), new Vector2(len / 4f, step / 4f));
                 }
                 // parede de trás e base
                 float topY = 1.1f + rows * rise, far = dist + rows * step;
@@ -230,7 +257,7 @@ namespace Craquez
                     float y1 = 1.1f + (r + 1) * rise, d = dist + r * step + step * 0.55f;
                     float off = (r * 0.37f) % 1f;
                     ppl.Quad(new Vector3(-len / 2, y1, -d), new Vector3(len / 2, y1, -d), new Vector3(len / 2, y1 + 0.85f, -d), new Vector3(-len / 2, y1 + 0.85f, -d),
-                        new Vector2(off, 0f), new Vector2(off + len / 14f, 1f));
+                        new Vector2(off, 0f), new Vector2(off + len / ((quality >= 2 ? 2048 : 1024) / 14f * 0.55f), 1f));
                 }
                 var gp = ppl.Object("Torcedores " + side, peopleMat, v.root, false);
                 gp.transform.localRotation = Quaternion.Euler(0, side == 0 ? 0 : side == 1 ? 180 : side == 2 ? 90 : -90, 0);
@@ -346,9 +373,9 @@ namespace Craquez
                 (new Color(0.3f, 0.6f, 0.25f), new Color(0.2f, 0.35f, 0.18f), 2),      // society (grama sintética)
             };
             var pp = pal[variant];
-            Texture2D courtTex = pp.kind == 0 ? Gfx.Wood(1024, Color.white, variant) : pp.kind == 2 ? Gfx.Grass(512, Color.white, variant) : Gfx.Asphalt(256, Color.white, variant, 0f);
-            var courtMat = Gfx.LitN(pp.court * (pp.kind == 0 ? 1.05f : 1f), courtTex, pp.kind == 0 ? Gfx.WoodNormal : pp.kind == 2 ? Gfx.GrassNormal : Gfx.AsphaltNormal, pp.kind == 0 ? 0.62f : pp.kind == 1 ? 0.45f : 0.1f, pp.kind == 1 ? 0.25f : 0.6f);
-            var surMat = Gfx.Lit(pp.surround, pp.kind == 2 ? courtTex : Gfx.Asphalt(256, Color.white, variant + 9, 0f), pp.kind == 2 ? 0.1f : 0.4f);
+            Texture2D courtTex = pp.kind == 0 ? Gfx.Wood(1024, Color.white, variant) : pp.kind == 2 ? Gfx.Grass(512, Color.white, variant) : Gfx.SportFloor(256, variant);
+            var courtMat = Gfx.LitN(pp.court * (pp.kind == 0 ? 1.05f : 1f), courtTex, pp.kind == 0 ? Gfx.WoodNormal : pp.kind == 2 ? Gfx.GrassNormal : Gfx.AsphaltNormal, pp.kind == 0 ? 0.7f : pp.kind == 1 ? 0.6f : 0.1f, pp.kind == 1 ? 0.08f : 0.45f);
+            var surMat = Gfx.Lit(pp.surround, pp.kind == 2 ? courtTex : Gfx.SportFloor(256, variant + 9), pp.kind == 2 ? 0.1f : 0.5f);
             v.pitchMat = courtMat;
             v.pitchMat2 = surMat;
             var k = new MeshKit();
@@ -420,8 +447,9 @@ namespace Craquez
                     float y0 = 1.0f + r * 0.45f, y1 = y0 + 0.45f, d0 = start + r * 0.85f, d1 = d0 + 0.85f;
                     var A = new Vector3(-sx, y0, d0 * sz); var B = new Vector3(sx, y0, d0 * sz);
                     var C = new Vector3(sx, y1, d0 * sz); var Dd = new Vector3(-sx, y1, d0 * sz);
-                    if (sz > 0) st.Quad(B, A, Dd, C, new Vector2(0, r / (float)rows), new Vector2(sx / 12f, (r + 1) / (float)rows));
-                    else st.Quad(A, B, C, Dd, new Vector2(0, r / (float)rows), new Vector2(sx / 12f, (r + 1) / (float)rows));
+                    var ruv = RowUV(r, sx * 2f, 1024, 256);
+                    if (sz > 0) st.Quad(B, A, Dd, C, ruv.a, ruv.b);
+                    else st.Quad(A, B, C, Dd, ruv.a, ruv.b);
                     var E = new Vector3(-sx, y1, d1 * sz); var F = new Vector3(sx, y1, d1 * sz);
                     if (sz > 0) stc.Quad(Dd, E, F, C); else stc.Quad(C, F, E, Dd);   // piso dos degraus voltado para cima
                 }

@@ -58,6 +58,40 @@ namespace Craquez
         float _actionW, _actionT, _actionEnd, _actionRate, _fadeOut;
         float _phase;
         bool _valid;
+        readonly float[] _locoTarget = new float[Loco.Length];
+        static float[] _contact;   // fase (0..1) do apoio do pé esquerdo em cada clipe de locomoção
+
+        /// <summary>
+        /// Acha, uma vez, em que ponto de cada ciclo o pé esquerdo toca o chão, para que
+        /// andar/trotar/correr se misturem com as pernas na mesma fase (sem "tesoura").
+        /// </summary>
+        static void FindContacts(Animator animator)
+        {
+            _contact = new float[Loco.Length];
+            var go = animator.gameObject;
+            Transform fl = null, fr = null;
+            foreach (var t in go.GetComponentsInChildren<Transform>(true))
+            {
+                if (t.name == "foot_l") fl = t;
+                else if (t.name == "foot_r") fr = t;
+            }
+            if (fl == null || fr == null) return;
+            for (int i = 0; i < Loco.Length; i++)
+            {
+                if (!Clips.TryGetValue(Loco[i], out var ci) || !ci.loop || i == IIdle) continue;
+                float len = ci.clip.length, best = float.MaxValue, bt = 0f;
+                const int N = 40;
+                for (int k = 0; k < N; k++)
+                {
+                    float t = len * k / N;
+                    ci.clip.SampleAnimation(go, t);
+                    // apoio do pé esquerdo: pé esquerdo mais baixo e mais à frente que o direito
+                    float d = (fl.position.y - fr.position.y) * 3f - Vector3.Dot(fl.position - fr.position, (go.transform.parent != null ? go.transform.parent.forward : Vector3.forward));
+                    if (d < best) { best = d; bt = (float)k / N; }
+                }
+                _contact[i] = bt;
+            }
+        }
         public string CurrentAction { get; private set; }
         public float ActionWeight => _actionW;
 
@@ -65,6 +99,11 @@ namespace Craquez
         {
             var clips = Clips;
             if (clips.Count == 0 || animator == null) return;
+            if (_contact == null)
+            {
+                try { FindContacts(animator); }
+                catch (System.Exception e) { Debug.LogWarning("contatos: " + e.Message); _contact = new float[Loco.Length]; }
+            }
             _graph = PlayableGraph.Create("anim:" + name);
             _graph.SetTimeUpdateMode(DirectorUpdateMode.Manual);
             var output = AnimationPlayableOutput.Create(_graph, "out", animator);
@@ -128,25 +167,26 @@ namespace Craquez
         public void Tick(float dt, float speed, float fwd, float side, bool guard)
         {
             if (!_valid) return;
-            for (int i = 0; i < _locoW.Length; i++) _locoW[i] = 0f;
+            var _w = _locoTarget;
+            for (int i = 0; i < _w.Length; i++) _w[i] = 0f;
             float back = Mathf.Clamp01(-fwd / Mathf.Max(0.4f, speed));
             float lateral = Mathf.Clamp01(Mathf.Abs(side) / Mathf.Max(0.4f, speed) - 0.35f) * 1.6f;
             if (speed < 0.25f)
             {
-                if (guard) _locoW[IJockey] = 1f;
-                else _locoW[IIdle] = 1f;
+                if (guard) _w[IJockey] = 1f;
+                else _w[IIdle] = 1f;
             }
             else if (guard || lateral > 0.6f)
             {
                 float k = Mathf.Clamp01(speed / 1.2f);
-                _locoW[IJockey] = k;
-                _locoW[IIdle] = 1f - k;
+                _w[IJockey] = k;
+                _w[IIdle] = 1f - k;
             }
             else if (back > 0.55f && speed < 4.5f)
             {
                 float k = Mathf.Clamp01(speed / 0.8f);
-                _locoW[IBack] = k;
-                _locoW[IIdle] = 1f - k;
+                _w[IBack] = k;
+                _w[IIdle] = 1f - k;
             }
             else
             {
@@ -156,9 +196,12 @@ namespace Craquez
                 float s = Mathf.Min(speed, 9.5f);
                 int seg = s >= sp[3] ? 2 : s >= sp[2] ? 2 : s >= sp[1] ? 1 : 0;
                 float t = Mathf.Clamp01((s - sp[seg]) / (sp[seg + 1] - sp[seg]));
-                _locoW[ix[seg]] += 1f - t;
-                _locoW[ix[seg + 1]] += t;
+                _w[ix[seg]] += 1f - t;
+                _w[ix[seg + 1]] += t;
             }
+            // transições suaves entre posturas (sem "pulos" de pose)
+            float wk = 1f - Mathf.Exp(-dt * 9f);
+            for (int i = 0; i < _locoW.Length; i++) _locoW[i] = Mathf.Lerp(_locoW[i], _w[i], wk);
             // fase única: avança pela distância percorrida / passada do clipe dominante
             float cyclesPerSec = 0f, wsum = 0f;
             for (int i = 0; i < Loco.Length; i++)
@@ -174,7 +217,8 @@ namespace Craquez
             {
                 if (!_locoP[i].IsValid()) continue;
                 float len = (float)_locoP[i].GetAnimationClip().length;
-                _locoP[i].SetTime(_phase * len);
+                float off = (_contact != null && i != IIdle) ? _contact[i] : 0f;
+                _locoP[i].SetTime(Mathf.Repeat(_phase + off, 1f) * len);
                 _loco.SetInputWeight(i, _locoW[i]);
             }
             // ação por cima

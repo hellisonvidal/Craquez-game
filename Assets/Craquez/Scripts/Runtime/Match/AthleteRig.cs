@@ -14,6 +14,8 @@ namespace Craquez
         public Transform head, neck, spine, pelvis, footL, footR, handL, handR;
         /// <summary>Rotação que alinha a frente do modelo com +Z do objeto raiz.</summary>
         public Quaternion modelFix = Quaternion.identity;
+        /// <summary>Rotações locais de repouso do pescoço e da cabeça.</summary>
+        public Quaternion headRest = Quaternion.identity, neckRest = Quaternion.identity;
         Transform _number, _numberFront;
 
         public void Init(Transform m)
@@ -21,11 +23,13 @@ namespace Craquez
             model = m;
             foreach (var t in m.GetComponentsInChildren<Transform>(true)) bones[t.name] = t;
             Transform B(string n) => bones.TryGetValue(n, out var t) ? t : null;
-            head = B("head"); neck = B("neck_01"); spine = B("spine_03"); pelvis = B("pelvis");
+            head = B("head"); neck = B("neck_01");
+            if (head != null) headRest = head.localRotation;
+            if (neck != null) neckRest = neck.localRotation; spine = B("spine_03"); pelvis = B("pelvis");
             footL = B("foot_l"); footR = B("foot_r"); handL = B("hand_l"); handR = B("hand_r");
             animator = m.GetComponent<Animator>() ?? m.gameObject.AddComponent<Animator>();
             animator.applyRootMotion = false;
-            animator.cullingMode = AnimatorCullingMode.CullUpdateTransforms;
+            animator.cullingMode = AnimatorCullingMode.AlwaysAnimate;   // ossos sempre atualizados (evita cabeça "solta")
             if (head != null)
                 Debug.Log($"[diag] modelo {m.name}: cabeça em repouso a {head.position.y - transform.position.y:F2} m; filhos {m.childCount}; Armature rot {(B("Armature") != null ? B("Armature").localEulerAngles.ToString() : "-")}");
             // descobre para onde o modelo olha (pé -> ponta do pé) e corrige para +Z
