@@ -75,6 +75,11 @@ func run(dir: String, main_node: Node) -> void:
 	await _match(GameModes.FIELD, _t("rus", 0), _t("rus", 3), ["cpu", "cpu"], 32, [[14.0, "13_neve_entardecer"]], {"weather": "neve", "tod": "tarde"})
 	await _match(GameModes.FIELD, _t("uru", 15), _t("uru", 14), ["cpu", "cpu"], 33, [[12.0, "14_tempestade_estadio_modesto"]], {"weather": "tempestade", "tod": "noite"})
 	await _match(GameModes.FIELD, _t("sau", 0), _t("sau", 1), ["cpu", "cpu"], 34, [[12.0, "15_saudita_dia"]], {"weather": "sol", "tod": "dia"})
+	# variações de quadra de futsal e de rua
+	for v in [1, 4, 5]:
+		await _match(GameModes.FUTSAL, _t("fes", 0), _t("fes", 1), ["cpu", "cpu"], 40 + v, [[7.0, "16_futsal_local_%d" % v]], {"venue": v})
+	for v in [1, 2, 4, 6]:
+		await _match(GameModes.STREET, _t("bra", 2), _t("bra", 5), ["cpu", "cpu"], 50 + v, [[7.0, "17_rua_local_%d" % v]], {"venue": v, "tod": "dia"})
 	# caça um gol para mostrar o banner com a face do artilheiro
 	Settings.quality = Settings.Quality.ULTRA
 	Settings.apply()

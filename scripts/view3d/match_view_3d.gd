@@ -472,24 +472,77 @@ func _build_stadium() -> void:
 			_box(Vector3(0.45, 0.9, 0.45), Color("#0f172a"), Vector3(sx * (hl + 3.0), 0.45, y))
 
 
+# ------------------------------------------------------------------ quadras de futsal (8)
+## [nome, piso A, piso B, tipo de piso, fora da quadra, área, parede, arquibancadas (0-2), cor da tela, faixa]
+const FUTSAL_VENUES := [
+	["Ginásio Clássico", "#bd8048", "#d4975c", 0, "#29497a", "#3366b3", "#1e3a5f", 1, "#e2e8f0", "#facc15"],
+	["Arena Azul", "#1d4ed8", "#2563eb", 1, "#0f172a", "#f97316", "#0b1220", 2, "#93c5fd", "#38bdf8"],
+	["Quadra Verde", "#15803d", "#16a34a", 1, "#334155", "#0ea5e9", "#475569", 0, "#e5e7eb", "#4ade80"],
+	["Ginásio Escolar", "#c2410c", "#ea580c", 1, "#fde68a", "#1d4ed8", "#fef3c7", 1, "#f8fafc", "#1d4ed8"],
+	["Arena Noturna", "#27272a", "#3f3f46", 1, "#09090b", "#7c3aed", "#18181b", 2, "#a855f7", "#e879f9"],
+	["Society Coberto", "#3f8f3f", "#4ea24e", 2, "#1f2937", "#3f8f3f", "#374151", 0, "#f8fafc", "#facc15"],
+	["Ginásio Municipal", "#b91c1c", "#dc2626", 1, "#e5e7eb", "#1e3a8a", "#f1f5f9", 1, "#cbd5e1", "#1e3a8a"],
+	["Arena Internacional", "#d6a46a", "#e3b884", 0, "#1e293b", "#0f766e", "#0f172a", 2, "#e2e8f0", "#facc15"],
+]
+## [nome, tipo de piso, linha, muro, cenário]
+const STREET_VENUES := [
+	["Quadra do Bairro", 0, "#facc15", "#9ca3af", "predios"],
+	["Morro Colorido", 6, "#f8fafc", "#e5e7eb", "morro"],
+	["Praia", 2, "#1d4ed8", "#d6b98c", "praia"],
+	["Terrão", 3, "#f8fafc", "#a16207", "terrao"],
+	["Gaiola Urbana", 4, "#f8fafc", "#64748b", "gaiola"],
+	["Telhado", 1, "#f97316", "#94a3b8", "telhado"],
+	["Debaixo do Viaduto", 6, "#22d3ee", "#6b7280", "viaduto"],
+	["Praça", 5, "#f8fafc", "#a8a29e", "praca"],
+]
+var venue: int = 0
+
+
 func _build_gym() -> void:
 	var hl := sim.half_len
 	var hw := sim.half_w
-	var wall := Color("#1e3a5f")
-	_box(Vector3(hl * 2.0 + 16.0, 6.0, 0.4), wall, Vector3(0, 3.0, -(hw + 8.0)), false)
-	_box(Vector3(0.4, 6.0, hw * 2.0 + 16.0), wall, Vector3(-(hl + 8.0), 3.0, 0), false)
-	_box(Vector3(0.4, 6.0, hw * 2.0 + 16.0), wall, Vector3(hl + 8.0, 3.0, 0), false)
-	_stand(Vector3(0, 0.5, -(hw + 3.0)), hl * 2.0 + 6.0, 4.8, 3.6, 0.0, 1.8)
-	_box(Vector3(hl * 2.0 + 16.0, 0.9, 0.12), Color("#facc15"), Vector3(0, 6.5, -(hw + 7.8)), false)
-	for i in 3:
-		var l := Label3D.new()
-		l.text = "CRAQUEZ FUTSAL"
-		l.font_size = 120
-		l.pixel_size = 0.007
-		l.modulate = Color("#e2e8f0")
-		l.shaded = false
-		l.position = Vector3(-hl * 0.7 + i * hl * 0.7, 5.0, -(hw + 7.7))
-		add_child(l)
+	var v: Array = FUTSAL_VENUES[posmod(venue, FUTSAL_VENUES.size())]
+	if _pitch_mat != null:
+		_pitch_mat.set_shader_parameter("floor_a", Color(String(v[1])))
+		_pitch_mat.set_shader_parameter("floor_b", Color(String(v[2])))
+		_pitch_mat.set_shader_parameter("floor_kind", int(v[3]))
+		_pitch_mat.set_shader_parameter("outside_col", Color(String(v[4])))
+		_pitch_mat.set_shader_parameter("area_col", Color(String(v[5])))
+	var wall := Color(String(v[6]))
+	var stands := int(v[7])
+	_box(Vector3(hl * 2.0 + 16.0, 7.0, 0.4), wall, Vector3(0, 3.5, -(hw + 8.0)), false)
+	_box(Vector3(0.4, 7.0, hw * 2.0 + 16.0), wall, Vector3(-(hl + 8.0), 3.5, 0), false)
+	_box(Vector3(0.4, 7.0, hw * 2.0 + 16.0), wall, Vector3(hl + 8.0, 3.5, 0), false)
+	if stands >= 1:
+		_stand(Vector3(0, 0.5, -(hw + 3.2)), hl * 2.0 + 6.0, 4.8, 3.6, 0.0, 1.8)
+	if stands >= 2:
+		_stand(Vector3(-(hl + 3.6), 0.5, 0), hw * 2.0 + 2.0, 4.0, 3.0, PI / 2, 1.8, 0.92)
+		_stand(Vector3(hl + 3.6, 0.5, 0), hw * 2.0 + 2.0, 4.0, 3.0, -PI / 2, 1.8, 0.08)
+	_box(Vector3(hl * 2.0 + 16.0, 0.9, 0.12), Color(String(v[9])), Vector3(0, 6.6, -(hw + 7.8)), false)
+	var l := Label3D.new()
+	l.text = String(v[0]).to_upper()
+	l.font_size = 120
+	l.pixel_size = 0.008
+	l.modulate = Color("#e2e8f0")
+	l.shaded = false
+	l.position = Vector3(0, 5.2, -(hw + 7.7))
+	add_child(l)
+	# telas de proteção fechando a quadra (lado da câmera bem transparente)
+	if Settings.detail["net"]:
+		var ns := preload("res://shaders/net.gdshader")
+		var nh := 5.5
+		var mx := hl + 2.0
+		var mz := hw + 2.0
+		var nc := Color(String(v[8]))
+		_net_wall(ns, Vector3(-mx, 0, -mz), Vector3(mx, 0, -mz), nh, nc, 0.55)
+		_net_wall(ns, Vector3(-mx, 0, -mz), Vector3(-mx, 0, mz), nh, nc, 0.5)
+		_net_wall(ns, Vector3(mx, 0, -mz), Vector3(mx, 0, mz), nh, nc, 0.5)
+		_net_wall(ns, Vector3(-mx, 0, mz), Vector3(mx, 0, mz), nh, nc, 0.12)
+		# postes da tela
+		for i in 9:
+			var x := -mx + i * (mx * 2.0) / 8.0
+			for z: float in [-mz, mz]:
+				_box(Vector3(0.08, nh, 0.08), Color("#475569"), Vector3(x, nh * 0.5, z), false)
 	# luminárias no teto
 	for lp in _lights2d:
 		_box(Vector3(3.0, 0.2, 1.0), Color("#fffbeb"), Vector3(lp.x, 9.0, lp.y), false)
@@ -499,11 +552,35 @@ func _build_gym() -> void:
 		_box(Vector3(0.3, 1.2, hw * 2.0), Color("#334155"), Vector3(s * (hl + 3.5), 0.6, 0))
 
 
+## Parede de tela entre dois pontos no chão.
+func _net_wall(shader: Shader, a: Vector3, b: Vector3, h: float, col: Color, alpha: float) -> void:
+	var st := SurfaceTool.new()
+	st.begin(Mesh.PRIMITIVE_TRIANGLES)
+	var pts := [a, b, b + Vector3(0, h, 0), a + Vector3(0, h, 0)]
+	var uvs := [Vector2(0, 1), Vector2(1, 1), Vector2(1, 0), Vector2(0, 0)]
+	for i: int in [0, 1, 2, 0, 2, 3]:
+		st.set_uv(uvs[i])
+		st.add_vertex(pts[i])
+	var m := ShaderMaterial.new()
+	m.shader = shader
+	m.set_shader_parameter("size", Vector2(a.distance_to(b), h))
+	m.set_shader_parameter("cell", 0.12)
+	m.set_shader_parameter("alpha", alpha)
+	m.set_shader_parameter("tint", col)
+	_mesh(st.commit(), m, Vector3.ZERO)
+
+
+# ------------------------------------------------------------------ cenários de rua (8)
 func _build_street() -> void:
 	var hl := sim.half_len
 	var hw := sim.half_w
 	var gh := sim.goal_half
-	var wall := Color("#9ca3af")
+	var v: Array = STREET_VENUES[posmod(venue, STREET_VENUES.size())]
+	var kind: String = v[4]
+	if _pitch_mat != null:
+		_pitch_mat.set_shader_parameter("street_kind", int(v[1]))
+		_pitch_mat.set_shader_parameter("street_line", Color(String(v[2])))
+	var wall := Color(String(v[3]))
 	var wh := 1.0
 	# muros da "tabela" (os mesmos da simulação)
 	for s: float in [-1.0, 1.0]:
@@ -511,53 +588,178 @@ func _build_street() -> void:
 		var seg := hw - gh
 		for sy: float in [-1.0, 1.0]:
 			_box(Vector3(0.3, wh, seg), wall, Vector3(s * (hl + 0.15), wh * 0.5, sy * (gh + seg * 0.5)))
-	# alambrado acima do muro
-	if Settings.detail["net"]:
-		var net_shader := preload("res://shaders/net.gdshader")
-		var y0 := wh
-		var y1 := 4.0
-		_net_quad(net_shader, Vector3(-hl, y0, -hw - 0.2), Vector3(hl, y0, -hw - 0.2), Vector3(hl, y1, -hw - 0.2), Vector3(-hl, y1, -hw - 0.2))
-		for s: float in [-1.0, 1.0]:
-			_net_quad(net_shader, Vector3(s * (hl + 0.2), y0, -hw), Vector3(s * (hl + 0.2), y0, hw), Vector3(s * (hl + 0.2), y1, hw), Vector3(s * (hl + 0.2), y1, -hw))
-	# prédios ao fundo
 	var rng := RandomNumberGenerator.new()
-	rng.seed = 7
-	var palette := [Color("#b45309"), Color("#7c2d12"), Color("#475569"), Color("#9a3412"), Color("#57534e"), Color("#0f766e")]
-	var x := -hl - 14.0
-	while x < hl + 14.0:
-		var w := rng.randf_range(5.0, 9.0)
-		var h := rng.randf_range(7.0, 16.0)
-		var col: Color = palette[rng.randi() % palette.size()]
-		_box(Vector3(w, h, 6.0), col, Vector3(x + w * 0.5, h * 0.5, -(hw + 9.0)))
-		# janelas
-		var rows := int(h / 2.6)
-		for r in rows:
-			for c in int(w / 2.2):
-				if rng.randf() < 0.75:
-					_box(Vector3(0.9, 1.1, 0.05), Color("#fde68a") if rng.randf() < 0.3 else Color("#1e293b"),
-						Vector3(x + 1.2 + c * 2.2, 1.6 + r * 2.6, -(hw + 5.97)), false)
-		x += w + 0.3
-	# postes de luz
-	for sx: float in [-1.0, 1.0]:
-		var lp := Vector3(sx * (hl + 2.5), 0, -(hw + 2.5))
-		var post := CylinderMesh.new()
-		post.top_radius = 0.07
-		post.bottom_radius = 0.1
-		post.height = 6.0
-		_mesh(post, Toon.mat(Color("#27272a"), true), lp + Vector3(0, 3.0, 0))
-		_box(Vector3(0.9, 0.18, 0.35), Color("#fde68a"), lp + Vector3(-sx * 0.4, 6.0, 0), false)
-		_glow(lp + Vector3(-sx * 0.4, 5.9, 0), 5.0, Color(1.0, 0.85, 0.55), 2.2)
+	rng.seed = 7 + venue * 13
+	var ns := preload("res://shaders/net.gdshader")
+	var fence := kind in ["predios", "gaiola", "telhado", "viaduto"]
+	if fence and Settings.detail["net"]:
+		var y1 := 7.0 if kind == "gaiola" else 4.0
+		_net_wall(ns, Vector3(-hl, wh, -hw - 0.2), Vector3(hl, wh, -hw - 0.2), y1 - wh, Color("#d1d5db"), 0.55)
+		for sx: float in [-1.0, 1.0]:
+			_net_wall(ns, Vector3(sx * (hl + 0.2), wh, -hw), Vector3(sx * (hl + 0.2), wh, hw), y1 - wh, Color("#d1d5db"), 0.5)
+		if kind == "gaiola":
+			_net_wall(ns, Vector3(-hl, wh, hw + 0.2), Vector3(hl, wh, hw + 0.2), y1 - wh, Color("#d1d5db"), 0.12)
+	match kind:
+		"predios", "telhado":
+			var palette := [Color("#b45309"), Color("#7c2d12"), Color("#475569"), Color("#9a3412"), Color("#57534e"), Color("#0f766e")]
+			var far := -(hw + 9.0) if kind == "predios" else -(hw + 40.0)
+			var base := 0.0 if kind == "predios" else -12.0
+			var x := -hl - 30.0
+			while x < hl + 30.0:
+				var w := rng.randf_range(5.0, 9.0)
+				var h := rng.randf_range(7.0, 16.0) * (1.0 if kind == "predios" else 3.0)
+				var col: Color = palette[rng.randi() % palette.size()]
+				_box(Vector3(w, h, 6.0), col, Vector3(x + w * 0.5, base + h * 0.5, far))
+				var rows := int(h / 2.6)
+				for r in mini(rows, 18):
+					for c in int(w / 2.2):
+						if rng.randf() < 0.7:
+							_box(Vector3(0.9, 1.1, 0.05), Color("#fde68a") if rng.randf() < 0.3 else Color("#1e293b"),
+								Vector3(x + 1.2 + c * 2.2, base + 1.6 + r * 2.6, far + 3.03), false)
+				x += w + 0.3
+			if kind == "telhado":
+				# parapeito e caixas d'água
+				_box(Vector3(hl * 2.0 + 12.0, 1.1, 0.3), Color("#a8a29e"), Vector3(0, 0.55, -(hw + 5.0)))
+				for i in 3:
+					var tank := CylinderMesh.new()
+					tank.top_radius = 1.2
+					tank.bottom_radius = 1.2
+					tank.height = 2.2
+					_mesh(tank, Toon.mat(Color("#2563eb"), true), Vector3(-hl + i * hl, 1.1, -(hw + 7.0)))
+		"morro":
+			# casinhas coloridas subindo o morro
+			var colors := [Color("#f97316"), Color("#22c55e"), Color("#3b82f6"), Color("#facc15"), Color("#ec4899"), Color("#a855f7"), Color("#f1f5f9"), Color("#ef4444")]
+			for row in 6:
+				var x := -hl - 26.0 + rng.randf() * 3.0
+				while x < hl + 26.0:
+					var w := rng.randf_range(3.0, 5.5)
+					var h := rng.randf_range(2.6, 4.2)
+					var y0 := row * 3.4
+					var z := -(hw + 6.0 + row * 4.0)
+					_box(Vector3(w, h, 3.5), colors[rng.randi() % colors.size()], Vector3(x + w * 0.5, y0 + h * 0.5, z))
+					_box(Vector3(0.8, 1.0, 0.05), Color("#1e293b"), Vector3(x + w * 0.5, y0 + h * 0.55, z + 1.78), false)
+					x += w + 0.2
+		"praia":
+			# mar, guarda-sóis e coqueiros
+			var sea := PlaneMesh.new()
+			sea.size = Vector2(400, 200)
+			_mesh(sea, Toon.mat(Color("#0ea5e9"), false, 0.0), Vector3(0, 0.02, -(hw + 110.0)))
+			_box(Vector3(400, 0.05, 6), Color("#bae6fd"), Vector3(0, 0.04, -(hw + 12.0)), false)
+			for i in 7:
+				var px := -hl - 10.0 + i * (hl * 2.0 + 20.0) / 6.0
+				var pole := CylinderMesh.new()
+				pole.top_radius = 0.05
+				pole.bottom_radius = 0.05
+				pole.height = 2.6
+				_mesh(pole, Toon.mat(Color("#f8fafc"), true), Vector3(px, 1.3, -(hw + 5.0)))
+				var um := CylinderMesh.new()
+				um.top_radius = 0.05
+				um.bottom_radius = 1.4
+				um.height = 0.5
+				_mesh(um, Toon.mat([Color("#ef4444"), Color("#facc15"), Color("#22c55e")][i % 3], true), Vector3(px, 2.7, -(hw + 5.0)))
+			for i in 5:
+				_palm(Vector3(-hl - 6.0 + i * (hl * 2.0 + 12.0) / 4.0, 0, -(hw + 8.0) - rng.randf() * 3.0), rng)
+		"terrao":
+			# cerca de madeira, árvores e morros ao fundo
+			for i in 16:
+				_box(Vector3(0.15, 1.6, 0.15), Color("#78350f"), Vector3(-hl - 4.0 + i * (hl * 2.0 + 8.0) / 15.0, 0.8, -(hw + 3.0)))
+			_box(Vector3(hl * 2.0 + 8.0, 0.15, 0.08), Color("#92400e"), Vector3(0, 1.3, -(hw + 3.0)))
+			for i in 10:
+				var tp := Vector3(rng.randf_range(-hl - 20.0, hl + 20.0), 0, -(hw + 9.0 + rng.randf() * 10.0))
+				_tree(tp, rng)
+			var hill := SphereMesh.new()
+			hill.radius = 40.0
+			hill.height = 30.0
+			_mesh(hill, Toon.mat(Color("#3f6212"), false, 0.0), Vector3(-20, -5, -(hw + 70.0)))
+			_mesh(hill, Toon.mat(Color("#4d7c0f"), false, 0.0), Vector3(40, -8, -(hw + 80.0)))
+		"gaiola":
+			for i in 4:
+				var g := Label3D.new()
+				g.text = ["CRAQUEZ", "RUA", "STREET", "JOGO BONITO"][i]
+				g.font_size = 160
+				g.pixel_size = 0.009
+				g.modulate = [Color("#f472b6"), Color("#22d3ee"), Color("#facc15"), Color("#4ade80")][i]
+				g.outline_size = 24
+				g.outline_modulate = Color("#111827")
+				g.shaded = false
+				g.position = Vector3(-hl * 0.75 + i * hl * 0.5, 2.0, -(hw + 6.0))
+				add_child(g)
+			_box(Vector3(hl * 2.0 + 20.0, 6.0, 0.5), Color("#374151"), Vector3(0, 3.0, -(hw + 6.3)), false)
+		"viaduto":
+			# laje do viaduto passando por cima e pilares grafitados
+			_box(Vector3(hl * 2.0 + 60.0, 1.6, 14.0), Color("#6b7280"), Vector3(0, 12.0, -hw * 0.3), true)
+			for i in 4:
+				var x := -hl - 6.0 + i * (hl * 2.0 + 12.0) / 3.0
+				_box(Vector3(1.6, 12.0, 1.6), Color("#9ca3af"), Vector3(x, 6.0, -(hw + 3.5)), true)
+				var g := Label3D.new()
+				g.text = ["CRAQUEZ", "10", "GOL", "RUA"][i]
+				g.font_size = 140
+				g.pixel_size = 0.008
+				g.modulate = [Color("#f472b6"), Color("#22d3ee"), Color("#facc15"), Color("#4ade80")][i]
+				g.outline_size = 20
+				g.outline_modulate = Color("#111827")
+				g.shaded = false
+				g.position = Vector3(x, 3.0, -(hw + 2.68))
+				add_child(g)
+		"praca":
+			for i in 12:
+				var tp := Vector3(rng.randf_range(-hl - 18.0, hl + 18.0), 0, -(hw + 5.0 + rng.randf() * 12.0))
+				_tree(tp, rng)
+			for i in 4:
+				_box(Vector3(2.0, 0.45, 0.6), Color("#92400e"), Vector3(-hl + i * hl * 0.66, 0.45, -(hw + 2.6)))
+			var fountain := CylinderMesh.new()
+			fountain.top_radius = 3.0
+			fountain.bottom_radius = 3.2
+			fountain.height = 0.8
+			_mesh(fountain, Toon.mat(Color("#cbd5e1"), true), Vector3(hl + 10.0, 0.4, -(hw + 8.0)))
+	# postes de luz (em quase todos)
+	if kind != "praia":
+		for sx: float in [-1.0, 1.0]:
+			var lp := Vector3(sx * (hl + 2.5), 0, -(hw + 2.5))
+			var post := CylinderMesh.new()
+			post.top_radius = 0.07
+			post.bottom_radius = 0.1
+			post.height = 6.0
+			_mesh(post, Toon.mat(Color("#27272a"), true), lp + Vector3(0, 3.0, 0))
+			_box(Vector3(0.9, 0.18, 0.35), Color("#fde68a"), lp + Vector3(-sx * 0.4, 6.0, 0), false)
+			_glow(lp + Vector3(-sx * 0.4, 5.9, 0), 5.0, Color(1.0, 0.85, 0.55), 2.2)
 	# grafite no muro
-	var g := Label3D.new()
-	g.text = "CRAQUEZ STREET"
-	g.font_size = 160
-	g.pixel_size = 0.006
-	g.modulate = Color("#facc15")
-	g.outline_modulate = Color("#7c3aed")
-	g.outline_size = 24
-	g.shaded = false
-	g.position = Vector3(0, 0.5, -hw - 0.01)
-	add_child(g)
+	var gl := Label3D.new()
+	gl.text = String(v[0]).to_upper()
+	gl.font_size = 160
+	gl.pixel_size = 0.006
+	gl.modulate = Color("#facc15")
+	gl.outline_modulate = Color("#7c3aed")
+	gl.outline_size = 24
+	gl.shaded = false
+	gl.position = Vector3(0, 0.5, -hw - 0.01)
+	add_child(gl)
+
+
+func _tree(p: Vector3, rng: RandomNumberGenerator) -> void:
+	var trunk := CylinderMesh.new()
+	trunk.top_radius = 0.22
+	trunk.bottom_radius = 0.32
+	trunk.height = 3.6
+	_mesh(trunk, Toon.mat(Color("#5b3a1e"), true), p + Vector3(0, 1.8, 0))
+	var crown := SphereMesh.new()
+	crown.radius = rng.randf_range(1.8, 3.0)
+	crown.height = crown.radius * 2.0
+	_mesh(crown, Toon.mat(Color("#166534").lerp(Color("#22c55e"), rng.randf() * 0.5), true, 0.1), p + Vector3(0, 4.6, 0))
+
+
+func _palm(p: Vector3, rng: RandomNumberGenerator) -> void:
+	var trunk := CylinderMesh.new()
+	trunk.top_radius = 0.15
+	trunk.bottom_radius = 0.25
+	trunk.height = 7.0
+	var t := _mesh(trunk, Toon.mat(Color("#a16207"), true), p + Vector3(0, 3.5, 0))
+	t.rotation.z = rng.randf_range(-0.15, 0.15)
+	for i in 6:
+		var leaf := BoxMesh.new()
+		leaf.size = Vector3(3.2, 0.08, 0.7)
+		var lm := _mesh(leaf, Toon.mat(Color("#15803d"), true), p + Vector3(0, 7.0, 0))
+		lm.rotation = Vector3(0, TAU * i / 6.0, -0.35)
 
 
 func _make_shadows() -> Array:

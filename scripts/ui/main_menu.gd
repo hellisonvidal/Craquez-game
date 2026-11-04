@@ -20,6 +20,7 @@ const TIMES := [["dia", "Dia"], ["tarde", "Entardecer"], ["noite", "Noite"]]
 var weather_i := 0
 var tod_i := 2
 var dyn_weather := true
+var venue_i := -1   # -1 aleatório
 var kit_a := 0     # 0 principal, 1 reserva, 2 terceiro
 var kit_b := -1    # -1 automático (evita cores parecidas)
 var _roster_overlay: Control
@@ -364,6 +365,8 @@ func _page_setup() -> void:
 		_cycler(inner, "p2", "Jogador 2")
 		_cycler(inner, "skill", "Dificuldade CPU")
 	_cycler(inner, "minutes", "Tempo de jogo")
+	if GameModes.ALL[mode_i] in [GameModes.FUTSAL, GameModes.STREET]:
+		_cycler(inner, "venue", "Local")
 	if GameModes.ALL[mode_i] != GameModes.FUTSAL or online:
 		_cycler(inner, "weather", "Clima")
 		_cycler(inner, "tod", "Horário")
@@ -642,6 +645,8 @@ func _cycle(key: String, d: int) -> void:
 			tod_i = posmod(tod_i + d, TIMES.size())
 		"dyn":
 			dyn_weather = not dyn_weather
+		"venue":
+			venue_i = posmod(venue_i + 1 + d, _venues().size() + 1) - 1
 		"kit_a":
 			kit_a = posmod(kit_a + d, 3)
 		"kit_b":
@@ -716,6 +721,7 @@ func _refresh() -> void:
 	_set_label("minutes", "%d min cada tempo" % int(minutes_opts[minutes_i]))
 	_set_label("weather", WEATHERS[weather_i][1])
 	_set_label("tod", TIMES[tod_i][1])
+	_set_label("venue", "Aleatório" if venue_i < 0 else String(_venues()[venue_i][0]))
 	_set_label("kit_a", "Uniforme: " + Teams.KIT_NAMES[kit_a])
 	_set_label("kit_b", "Uniforme: " + ("Automático" if kit_b < 0 else Teams.KIT_NAMES[kit_b]))
 	_set_label("dyn", "Sim — o tempo pode mudar durante o jogo" if dyn_weather else "Não")
@@ -783,8 +789,16 @@ func _on_play() -> void:
 		"devices": [p1, p2], "seed": int(Time.get_unix_time_from_system()) & 0xFFFFFF,
 		"half_minutes": minutes_opts[minutes_i],
 		"weather": _weather_pick(), "tod": TIMES[tod_i][0], "dynamic_weather": dyn_weather,
-		"kit_a": kit_a, "kit_b": kit_b,
+		"kit_a": kit_a, "kit_b": kit_b, "venue": _venue_pick(),
 	})
+
+
+func _venues() -> Array:
+	return MatchView3D.FUTSAL_VENUES if GameModes.ALL[mode_i] == GameModes.FUTSAL else MatchView3D.STREET_VENUES
+
+
+func _venue_pick() -> int:
+	return venue_i if venue_i >= 0 else randi() % 8
 
 
 ## "Aleatório" sorteia um clima (é sorteado aqui, no menu, para valer igual nos dois lados do online).
@@ -1023,6 +1037,7 @@ func _net_cfg() -> Dictionary:
 		"mode": GameModes.ALL[mode_i], "team_a": team_a, "team_b": team_b,
 		"seed": int(Time.get_unix_time_from_system()) & 0xFFFFFF, "half_minutes": minutes_opts[minutes_i],
 		"weather": _weather_pick(), "tod": TIMES[tod_i][0], "dynamic_weather": dyn_weather,
+		"venue": _venue_pick(), "kit_a": kit_a, "kit_b": kit_b,
 	}
 
 
@@ -1048,6 +1063,7 @@ func _client_got_config(c: Dictionary) -> void:
 		"mode": String(c["mode"]), "team_a": int(c["team_a"]), "team_b": int(c["team_b"]),
 		"seed": int(c["seed"]), "half_minutes": float(c["half_minutes"]),
 		"weather": String(c.get("weather", "sol")), "tod": String(c.get("tod", "noite")), "dynamic_weather": bool(c.get("dynamic_weather", false)),
+		"venue": int(c.get("venue", 0)), "kit_a": int(c.get("kit_a", 0)), "kit_b": int(c.get("kit_b", -1)),
 		"devices": ["remote", _devices[p1_dev]], "session": _session,
 	}
 	_session = null

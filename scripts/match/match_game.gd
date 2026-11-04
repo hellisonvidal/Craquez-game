@@ -53,7 +53,16 @@ func start(cfg: Dictionary) -> void:
 	var colors := [[kits[0]["c1"], kits[0]["c2"]], [kits[1]["c1"], kits[1]["c2"]]]
 	# uniformes parecidos? o visitante usa as cores invertidas
 
+	var venue := int(cfg.get("venue", 0))
+	if cfg["mode"] == GameModes.STREET:
+		# areia e terra seguram a bola
+		var kind := int(MatchView3D.STREET_VENUES[posmod(venue, MatchView3D.STREET_VENUES.size())][1])
+		if kind == 2:
+			sim.mode["roll_decel"] = float(sim.mode["roll_decel"]) * 1.6
+		elif kind == 3:
+			sim.mode["roll_decel"] = float(sim.mode["roll_decel"]) * 1.25
 	view = MatchView3D.new()
+	view.venue = venue
 	view.weather = weather if cfg["mode"] != GameModes.FUTSAL else "sol"
 	view.tod = String(cfg.get("tod", "noite"))
 	view.dynamic_weather = bool(cfg.get("dynamic_weather", false)) and cfg["mode"] != GameModes.FUTSAL
