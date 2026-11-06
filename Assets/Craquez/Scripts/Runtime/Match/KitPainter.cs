@@ -141,6 +141,7 @@ namespace Craquez
                     case 4: if (x > 0f) c = k.c2; break;                                                     // metades
                     case 5: if (Mathf.Repeat(x / 0.07f, 1f) < 0.14f) c = k.c2; break;                         // riscas finas
                     case 6: if (h > 0.14f && h < 0.25f && Mathf.Abs(x) < 0.3f) c = k.c2; break;               // faixa no peito
+                    case 8: if ((Mathf.FloorToInt(x / 0.075f + 100f) + Mathf.FloorToInt(h / 0.075f)) % 2 == 0) c = k.c2; break;   // xadrez
                     case 7:                                                                                  // faixa vertical central
                         if (Mathf.Abs(x) < 0.075f) c = k.c2;
                         else if (Mathf.Abs(x) < 0.09f) c = Color.white;
