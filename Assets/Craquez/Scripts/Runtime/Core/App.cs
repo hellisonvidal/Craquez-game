@@ -357,9 +357,11 @@ namespace Craquez
             }
             Row("FUTEBOL", "Campo  •  11 x 11  •  22 ligas e 40 seleções", MenuArt.Kind.FieldClubs,
                 new (string, System.Action)[] { ("CLUBES", () => Choose(GameModes.Field, false)), ("SELEÇÕES", () => Choose(GameModes.Field, true)) });
-            Row("FUTSAL", "Quadra  •  5 x 5  •  9 ginásios", MenuArt.Kind.FutsalClubs,
+            Row("FUTSAL", "Quadra  •  5 x 5  •  8 ginásios", MenuArt.Kind.FutsalClubs,
                 new (string, System.Action)[] { ("CLUBES", () => Choose(GameModes.Futsal, false)), ("SELEÇÕES", () => Choose(GameModes.Futsal, true)) });
-            Row("RUA", "3 x 3  •  8 ruas  •  a bola bate na parede", MenuArt.Kind.Street,
+            Row("SOCIETY", "Grama sintética  •  7 x 7  •  4 campos", MenuArt.Kind.FieldNations,
+                new (string, System.Action)[] { ("CLUBES", () => Choose(GameModes.Society, false)), ("SELEÇÕES", () => Choose(GameModes.Society, true)) });
+            Row("RUA", "3x3, 4x4 ou 5x5  •  times de rua  •  8 ruas", MenuArt.Kind.Street,
                 new (string, System.Action)[] { ("JOGAR", () => Choose(GameModes.Street, false)) });
             var opt = UiKit.Button(left, "OPÇÕES", ShowOptions, 30);
             UiKit.Size(opt, 76, 76);
@@ -429,7 +431,8 @@ namespace Craquez
         {
             _cfg.mode = mode;
             _cfg.national = national;
-            _cfg.venue = Random.Range(0, mode == GameModes.Futsal ? VenueBuilder.FutsalNames.Length : 8);
+            _cfg.venue = Random.Range(0, VenueNames(mode).Length);
+            _cfg.stadium = 0;
             FixTeamsForMode();
             ShowSetup();
         }
@@ -552,6 +555,8 @@ namespace Craquez
             _cfg.kitB = -1;
         }
 
+        static string[] VenueNames(string mode) => mode == GameModes.Futsal ? VenueBuilder.FutsalNames : mode == GameModes.Society ? VenueBuilder.SocietyNames : VenueBuilder.StreetNames;
+
         /// <summary>Ligas de cada modalidade: rua = times de rua; futsal = ligas/seleções de futsal; campo e society = de campo.</summary>
         static List<League> LeaguesFor(string mode, bool national)
         {
@@ -601,10 +606,20 @@ namespace Craquez
             var mins = new List<string>();
             foreach (var m in MinuteOpts) mins.Add(m + " minutos");
             UiKit.Size(UiKit.Cycler(list, "Duração", mins, Mathf.Max(0, System.Array.IndexOf(MinuteOpts, _cfg.minutes)), i => _cfg.minutes = MinuteOpts[i]), 60, 60);
+            if (_cfg.mode == GameModes.Street)
+                UiKit.Size(UiKit.Cycler(list, "Formato", new[] { "3 x 3", "4 x 4", "5 x 5" }, Mathf.Clamp(_cfg.streetPlayers - 3, 0, 2), i =>
+                {
+                    _cfg.streetPlayers = 3 + i;
+                    _cfg.tacticsA = new Tactics();
+                    _cfg.tacticsB = new Tactics();
+                }), 60, 60);
             if (_cfg.mode != GameModes.Field)
+                UiKit.Size(UiKit.Cycler(list, "Local", VenueNames(_cfg.mode), _cfg.venue, i => { _cfg.venue = i; _refreshVenue?.Invoke(); }), 60, 60);
+            else
             {
-                var names = _cfg.mode == GameModes.Futsal ? VenueBuilder.FutsalNames : VenueBuilder.StreetNames;
-                UiKit.Size(UiKit.Cycler(list, "Local", names, _cfg.venue, i => { _cfg.venue = i; _refreshVenue?.Invoke(); }), 60, 60);
+                var sn = new List<string>();
+                foreach (var m in VenueBuilder.StadiumModels) sn.Add(m.name);
+                UiKit.Size(UiKit.Cycler(list, "Estádio", sn, _cfg.stadium, i => { _cfg.stadium = i; _refreshVenue?.Invoke(); }), 60, 60);
             }
             UiKit.Size(UiKit.Cycler(list, "Câmera", BroadcastCamera.Modes, Settings.Camera, i => Settings.Camera = i), 60, 60);
             UiKit.Size(UiKit.Cycler(list, "Cerimônia de abertura", new[] { "Mostrar", "Pular" }, _cfg.ceremony ? 0 : 1, i => _cfg.ceremony = i == 0), 60, 60);
@@ -622,10 +637,10 @@ namespace Craquez
             {
                 if (venueTex != null) Destroy(venueTex);
                 var home = Teams.Get(_cfg.teamA);
-                venueTex = MenuArt.Venue(_cfg.mode, _cfg.venue, home != null ? home.c1 : Theme.Accent);
+                venueTex = MenuArt.Venue(_cfg.mode, _cfg.mode == GameModes.Field ? _cfg.stadium : _cfg.venue, home != null ? home.c1 : Theme.Accent);
                 venueImg.texture = venueTex;
-                venueName.text = _cfg.mode == GameModes.Futsal ? VenueBuilder.FutsalNames[_cfg.venue % VenueBuilder.FutsalNames.Length]
-                    : _cfg.mode == GameModes.Street ? VenueBuilder.StreetNames[_cfg.venue % VenueBuilder.StreetNames.Length]
+                venueName.text = _cfg.mode != GameModes.Field ? VenueNames(_cfg.mode)[_cfg.venue % VenueNames(_cfg.mode).Length]
+                    : _cfg.stadium > 0 ? VenueBuilder.StadiumModels[_cfg.stadium].name
                     : (home != null && !string.IsNullOrEmpty(home.stadium.name) ? home.stadium.name : "Estádio do mandante");
             };
             _refreshVenue();

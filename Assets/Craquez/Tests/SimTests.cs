@@ -39,6 +39,7 @@ namespace Craquez.Tests
         [TestCase(GameModes.Field, 11)]
         [TestCase(GameModes.Futsal, 5)]
         [TestCase(GameModes.Street, 3)]
+        [TestCase(GameModes.Society, 7)]
         public void PlayersPerSide(string mode, int n)
         {
             var sim = NewMatch(mode);
@@ -48,6 +49,7 @@ namespace Craquez.Tests
         [TestCase(GameModes.Field)]
         [TestCase(GameModes.Futsal)]
         [TestCase(GameModes.Street)]
+        [TestCase(GameModes.Society)]
         public void FullMatchRunsToTheEnd(string mode)
         {
             var sim = NewMatch(mode);
@@ -55,6 +57,20 @@ namespace Craquez.Tests
             Assert.AreEqual(MatchState.Fulltime, sim.state);
             Assert.IsFalse(float.IsNaN(sim.ball.pos.x));
             Assert.Greater(sim.statsShots[0] + sim.statsShots[1], 0);
+        }
+
+        [Test] public void StreetSizes()
+        {
+            foreach (int n in GameModes.StreetSizes)
+            {
+                var sim = new MatchSim { streetPlayers = n };
+                sim.Setup(GameModes.Street, new TeamSetup { data = Teams.Get(0) }, new TeamSetup { data = Teams.Get(1) }, 5, 120f);
+                int c = 0;
+                foreach (var p in sim.players) if (p.team == 0) c++;
+                Assert.AreEqual(n, c, "rua " + n + "x" + n);
+                for (int i = 0; i < 60 * 60; i++) sim.Step(new InputFrame[2]);
+                Assert.IsFalse(float.IsNaN(sim.ball.pos.x));
+            }
         }
 
         [Test] public void Deterministic()

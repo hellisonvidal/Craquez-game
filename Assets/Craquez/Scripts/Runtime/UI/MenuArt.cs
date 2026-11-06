@@ -21,7 +21,13 @@ namespace Craquez.UI
             bool field = mode == GameModes.Field, futsal = mode == GameModes.Futsal;
             Color floor, floor2, surround;
             int kind;   // 0 grama, 1 madeira, 2 sintético, 3 asfalto, 4 tacos
-            if (field) { floor = new Color(0.2f, 0.5f, 0.16f); floor2 = new Color(0.24f, 0.58f, 0.19f); surround = new Color(0.16f, 0.34f, 0.12f); kind = 0; }
+            if (field)
+            {
+                floor = new Color(0.2f, 0.5f, 0.16f); floor2 = new Color(0.24f, 0.58f, 0.19f); kind = 0;
+                // estádios com pista de atletismo aparecem com o entorno vermelho
+                surround = variant > 0 && variant < VenueBuilder.StadiumModels.Length && VenueBuilder.StadiumModels[variant].track ? new Color(0.62f, 0.24f, 0.16f) : new Color(0.16f, 0.34f, 0.12f);
+            }
+            else if (mode == GameModes.Society) { floor = new Color(0.36f, 0.7f, 0.28f); floor2 = new Color(0.3f, 0.6f, 0.24f); surround = new Color(0.38f, 0.4f, 0.44f); kind = 0; }
             else if (futsal)
             {
                 var pp = VenueBuilder.FutsalPalette(variant);
@@ -44,7 +50,7 @@ namespace Craquez.UI
                     {
                         // fundo: arquibancada com torcida (campo/quadra) ou prédios e céu (rua)
                         float q = (v - horizon) / (1f - horizon);
-                        if (mode == GameModes.Street)
+                        if (mode == GameModes.Street || (mode == GameModes.Society && variant > 0))
                         {
                             float bh = 0.35f + 0.5f * Hash01(Mathf.FloorToInt(u * 9f), variant);
                             c = q < bh ? new Color(0.36f, 0.34f, 0.4f) * (0.8f + 0.2f * Hash01(Mathf.FloorToInt(u * 9f), 3)) : Color.Lerp(new Color(0.55f, 0.75f, 0.95f), new Color(0.3f, 0.5f, 0.85f), q);

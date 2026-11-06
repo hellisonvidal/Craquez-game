@@ -41,7 +41,8 @@ namespace Craquez
             Lighting(c.timeOfDay, s.mode.id, q);
             if (s.mode.id == GameModes.Futsal) venue = VenueBuilder.Futsal(s, home, away, kits[0], kits[1], c.venue, _night, q, transform);
             else if (s.mode.id == GameModes.Street) venue = VenueBuilder.Street(s, home, away, kits[0], kits[1], c.venue, _night, q, transform);
-            else venue = VenueBuilder.Stadium(s, home, away, kits[0], kits[1], _night, q, transform);
+            else if (s.mode.id == GameModes.Society) venue = VenueBuilder.Society(s, home, away, kits[0], kits[1], c.venue, _night, q, transform);
+            else venue = VenueBuilder.Stadium(s, home, away, kits[0], kits[1], _night, q, transform, c.stadium);
             // goleiros: uniforme de cor neutra que não confunde com nenhum dos dois
             var gk = new[] { KeeperKit(kits[0], kits[1], 0), KeeperKit(kits[1], kits[0], 1) };
             var parent = new GameObject("Atletas").transform;

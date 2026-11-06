@@ -24,8 +24,9 @@ namespace Craquez
         public static readonly string[] FutsalNames =
         {
             "Ginásio Municipal", "Arena Coberta", "Quadra do Clube", "Ginásio Universitário",
-            "Arena Neon", "Quadra da Escola", "Ginásio Olímpico", "Quadra Society Indoor", "Ginásio Antigo (tacos)",
+            "Arena Neon", "Quadra da Escola", "Ginásio Olímpico", "Ginásio Antigo (tacos)",
         };
+        public static readonly string[] SocietyNames = { "Society Indoor", "Arena Society", "Society do Bairro", "Society Premium" };
         public static readonly string[] StreetNames =
         {
             "Entre Prédios", "Morro", "Praia", "Terraço", "Gaiola", "Telhado", "Sob o Viaduto", "Praça",
@@ -392,6 +393,118 @@ namespace Craquez
             f.Object("Bandeirinhas", Gfx.Cutout(c, Gfx.Solid(Color.white), 0.1f), v.root, false);
         }
 
+        // ------------------------------------------------------------------ society
+        /// <summary>
+        /// Campos de society (grama sintética): um coberto (estrutura de ginásio) e três ao ar
+        /// livre com alambrado, refletores, arquibancadinha e bar do clube.
+        /// </summary>
+        public static Venue Society(MatchSim sim, TeamData home, TeamData away, Kit homeKit, Kit awayKit, int variant, bool night, int quality, Transform parent)
+        {
+            variant = Mathf.Abs(variant) % SocietyNames.Length;
+            float hl = sim.halfLen, hw = sim.halfW;
+            var grassTex = Gfx.Grass(512, Color.white, variant + 50);
+            var turf = Gfx.LitN(new Color(0.42f, 0.78f, 0.32f), grassTex, Gfx.GrassNormal, 0.25f, 0.5f);
+            var turf2 = Gfx.LitN(new Color(0.36f, 0.68f, 0.28f), grassTex, Gfx.GrassNormal, 0.25f, 0.5f);
+            if (variant == 0)
+            {
+                var vi = new Venue { root = new GameObject("Society").transform, name = SocietyNames[0] };
+                vi.root.SetParent(parent, false);
+                var sur = Gfx.Lit(new Color(0.2f, 0.36f, 0.2f), grassTex, 0.1f);
+                BuildFutsalHall(vi, sim, home, away, homeKit, awayKit, (new Color(0.42f, 0.78f, 0.32f), new Color(0.2f, 0.36f, 0.2f), 2), turf, sur, 7, night, quality);
+                return vi;
+            }
+            var v = new Venue { root = new GameObject("Society").transform, name = SocietyNames[variant] };
+            v.root.SetParent(parent, false);
+            v.pitchMat = turf;
+            v.pitchMat2 = turf2;
+            // gramado em faixas
+            var a = new MeshKit();
+            var b = new MeshKit();
+            float mx = hl + 2f, mz = hw + 2f;
+            int strips = 12;
+            float sw = mx * 2f / strips;
+            for (int i = 0; i < strips; i++)
+            {
+                float x0 = -mx + i * sw, x1 = x0 + sw;
+                (i % 2 == 0 ? a : b).Quad(new Vector3(x0, 0, -mz), new Vector3(x0, 0, mz), new Vector3(x1, 0, mz), new Vector3(x1, 0, -mz), new Vector2(x0 / 2f, -mz / 2f), new Vector2(x1 / 2f, mz / 2f));
+            }
+            a.Object("Grama sintética A", turf, v.root, false);
+            b.Object("Grama sintética B", turf2, v.root, false);
+            // entorno: piso emborrachado/concreto até longe
+            var ground = new MeshKit();
+            float gx = hl + 40f, gz = hw + 40f;
+            ground.Quad(new Vector3(-gx, -0.01f, -gz), new Vector3(-gx, -0.01f, gz), new Vector3(gx, -0.01f, gz), new Vector3(gx, -0.01f, -gz), new Vector2(0, 0), new Vector2(gx / 4f, gz / 4f));
+            var groundC = variant == 2 ? new Color(0.5f, 0.42f, 0.32f) : new Color(0.42f, 0.44f, 0.47f);
+            ground.Object("Entorno", Gfx.Lit(groundC, Gfx.Asphalt(256, Color.white, variant + 70, 0.2f), 0.2f), v.root, false);
+            Lines(v, sim, hl, hw);
+            Goals(v, sim, hl, true);
+            // alambrado: postes + tela (baixo do lado da câmera para não tapar o jogo)
+            var posts = new MeshKit();
+            var fence = new MeshKit();
+            float fx = hl + 3f, fz = hw + 3f;
+            void FenceSide(Vector3 p0, Vector3 p1, float h)
+            {
+                float len = (p1 - p0).magnitude;
+                int n = Mathf.Max(1, Mathf.RoundToInt(len / 3f));
+                for (int i = 0; i <= n; i++) posts.Cylinder(Vector3.Lerp(p0, p1, i / (float)n), Vector3.Lerp(p0, p1, i / (float)n) + Vector3.up * h, 0.05f, 6);
+                fence.Quad(p0, p0 + Vector3.up * h, p1 + Vector3.up * h, p1, new Vector2(0, 0), new Vector2(len / 0.6f, h / 0.6f));
+            }
+            FenceSide(new Vector3(-fx, 0, fz), new Vector3(fx, 0, fz), 5f);
+            FenceSide(new Vector3(fx, 0, fz), new Vector3(fx, 0, -fz), 6f);
+            FenceSide(new Vector3(-fx, 0, -fz), new Vector3(-fx, 0, fz), 6f);
+            FenceSide(new Vector3(fx, 0, -fz), new Vector3(-fx, 0, -fz), 1.2f);
+            posts.Object("Postes do alambrado", Gfx.Lit(new Color(0.55f, 0.58f, 0.6f), null, 0.5f, 0.6f), v.root, false);
+            fence.Object("Alambrado", Gfx.Transparent(new Color(0.75f, 0.78f, 0.8f, 0.85f), Gfx.Net(128, 18f, 1.6f)), v.root, false);
+            // refletores nas quinas
+            var poles = new MeshKit();
+            var lampMk = new MeshKit();
+            foreach (float sx in new[] { -1f, 1f })
+                foreach (float sz in new[] { -1f, 1f })
+                {
+                    var p = new Vector3((fx + 1f) * sx, 0, (fz + 1f) * sz);
+                    poles.Cylinder(p, p + Vector3.up * 12f, 0.14f, 8);
+                    lampMk.Box(p + Vector3.up * 12.2f - new Vector3(sx, 0, sz) * 0.4f, new Vector3(1.6f, 0.7f, 0.3f));
+                    if (night)
+                    {
+                        var lgo = new GameObject("Refletor");
+                        lgo.transform.SetParent(v.root, false);
+                        lgo.transform.position = p + Vector3.up * 12f;
+                        lgo.transform.LookAt(Vector3.zero);
+                        var l = lgo.AddComponent<Light>();
+                        l.type = LightType.Spot;
+                        l.spotAngle = 95f;
+                        l.range = 70f;
+                        l.intensity = 2.6f;
+                        l.color = new Color(1f, 0.97f, 0.9f);
+                        v.floodlights.Add(l);
+                    }
+                }
+            poles.Object("Postes de luz", Gfx.Lit(new Color(0.35f, 0.36f, 0.4f), null, 0.4f, 0.5f), v.root, true);
+            lampMk.Object("Refletores", Gfx.Emissive(Color.white, night ? new Color(4f, 4f, 3.6f) : new Color(0.3f, 0.3f, 0.3f)), v.root, false);
+            // arquibancadinha do lado oposto à câmera, com a galera
+            var steps = new MeshKit();
+            var ppl = new MeshKit();
+            for (int r = 0; r < 4; r++)
+            {
+                float z0 = fz + 1.2f + r * 0.8f, y0 = r * 0.42f;
+                steps.Box(new Vector3(0, y0 + 0.21f, z0 + 0.4f), new Vector3(hl * 1.2f, 0.42f, 0.8f), 2f);
+                ppl.Quad(new Vector3(-hl * 0.6f, y0 + 0.42f, z0 + 0.3f), new Vector3(-hl * 0.6f, y0 + 1.6f, z0 + 0.3f), new Vector3(hl * 0.6f, y0 + 1.6f, z0 + 0.3f), new Vector3(hl * 0.6f, y0 + 0.42f, z0 + 0.3f), new Vector2(0, 0), new Vector2(hl / 5f, 1));
+            }
+            steps.Object("Arquibancada", Gfx.Lit(new Color(0.62f, 0.63f, 0.66f), Gfx.Asphalt(256, Color.white, 81, 0.05f), 0.15f), v.root, quality >= 1);
+            var crowd = Gfx.CrowdPeople(1024, 64, homeKit.c1, homeKit.c2, awayKit.c1, variant * 23 + 9);
+            var cm = Gfx.Cutout(Color.white, crowd, 0.5f, 0.05f);
+            v.crowdMats.Add(cm);
+            ppl.Object("Galera", cm, v.root, false);
+            // bar do clube / vestiário atrás de um dos gols
+            var club = new MeshKit();
+            club.Box(new Vector3(fx + 8f, 1.6f, 0), new Vector3(6f, 3.2f, 12f), 2f);
+            club.Box(new Vector3(fx + 8f, 3.35f, 0), new Vector3(7f, 0.3f, 13f));
+            club.Object("Clube", Gfx.Character(variant == 3 ? new Color(0.15f, 0.18f, 0.25f) : new Color(0.85f, 0.75f, 0.55f), null, 0.3f), v.root, true);
+            v.tunnel = new Vector3(0, 0, -(hw + 2f));
+            v.standDist = 3f;
+            return v;
+        }
+
         // ------------------------------------------------------------------ futsal
         public static Venue Futsal(MatchSim sim, TeamData home, TeamData away, Kit homeKit, Kit awayKit, int variant, bool night, int quality, Transform parent)
         {
@@ -421,7 +534,6 @@ namespace Craquez
                 (new Color(0.1f, 0.14f, 0.3f), new Color(0.03f, 0.04f, 0.08f), 1),     // arena neon
                 (new Color(0.25f, 0.52f, 0.36f), new Color(0.55f, 0.5f, 0.45f), 1),    // quadra de escola
                 (new Color(0.9f, 0.72f, 0.48f), new Color(0.88f, 0.42f, 0.12f), 0),    // olímpico: madeira + laranja
-                (new Color(0.3f, 0.6f, 0.25f), new Color(0.2f, 0.35f, 0.18f), 2),      // society (grama sintética)
                 (new Color(1f, 0.95f, 0.9f), new Color(0.18f, 0.36f, 0.28f), 3),       // ginásio antigo: tacos + verde-escuro
             };
             return pal[Mathf.Abs(variant) % pal.Length];

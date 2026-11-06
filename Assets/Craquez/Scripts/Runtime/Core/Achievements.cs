@@ -30,6 +30,7 @@ namespace Craquez
             D("fm1", Tier.Bronze, "Estreia na quadra", "Jogue uma partida de futsal", "matches_futsal", 1),
             D("sm1", Tier.Bronze, "Pelada de rua", "Jogue uma partida na rua", "matches_street", 1),
             D("cm1", Tier.Bronze, "Gramado sagrado", "Jogue uma partida de futebol de campo", "matches_field", 1),
+            D("so1", Tier.Bronze, "Grama sintética", "Jogue uma partida de society", "matches_society", 1),
             D("n1", Tier.Bronze, "Vestindo a camisa", "Vença com uma seleção", "wins_national", 1),
             D("sk1", Tier.Bronze, "Primeiro drible", "Faça um drible (finta)", "skills", 1),
             D("tk1", Tier.Bronze, "Carrinho limpo", "Ganhe uma dividida", "tackles", 1),
@@ -52,6 +53,7 @@ namespace Craquez
             D("fw5", Tier.Prata, "Rei da quadra", "Vença 5 partidas de futsal", "wins_futsal", 5),
             D("sw5", Tier.Prata, "Dono da rua", "Vença 5 partidas na rua", "wins_street", 5),
             D("cw5", Tier.Prata, "Dono do campo", "Vença 5 partidas de futebol de campo", "wins_field", 5),
+            D("sow5", Tier.Prata, "Rei do society", "Vença 5 partidas de society", "wins_society", 5),
             D("n5", Tier.Prata, "Convocado", "Vença 5 partidas com seleções", "wins_national", 5),
             D("sk25", Tier.Prata, "Malabarista", "Faça 25 dribles", "skills", 25),
             D("tk50", Tier.Prata, "Cão de guarda", "Ganhe 50 divididas", "tackles", 50),
@@ -220,7 +222,7 @@ namespace Craquez
             if (changed) Notify();
         }
 
-        string ModeKey() => _cfg.mode == GameModes.Futsal ? "futsal" : _cfg.mode == GameModes.Street ? "street" : "field";
+        string ModeKey() => _cfg.mode == GameModes.Futsal ? "futsal" : _cfg.mode == GameModes.Street ? "street" : _cfg.mode == GameModes.Society ? "society" : "field";
 
         void Notify()
         {
