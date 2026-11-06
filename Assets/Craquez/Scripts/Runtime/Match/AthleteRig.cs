@@ -103,12 +103,15 @@ namespace Craquez
         /// Biotipo (0 = magro .. 1 = forte): escala os ossos só na espessura e compensa nos filhos.
         /// Chamar uma vez, logo depois de Init.
         /// </summary>
-        public void Physique(float build)
+        public void Physique(float build, float frame = 0.5f)
         {
             build = Mathf.Clamp01(build);
+            // ombros/caixa torácica: estreitos (0) .. largos (1), independente do porte
+            float fr = Mathf.Lerp(0.93f, 1.07f, Mathf.Clamp01(frame));
             foreach (var (name, slim, strong) in Shape)
             {
                 float k = Mathf.Lerp(slim, strong, build);
+                if (name == "spine_03" || name.StartsWith("clavicle")) k *= fr;
                 if (!bones.TryGetValue(name, out var b) || b.childCount == 0) continue;
                 // eixo do comprimento: o que aponta para o primeiro osso filho
                 Transform child = null;

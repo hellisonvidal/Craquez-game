@@ -10,7 +10,7 @@ namespace Craquez
     /// </summary>
     public class BroadcastCamera : MonoBehaviour
     {
-        public static readonly string[] Modes = { "TV", "TV Próxima", "Alta (tática)", "Atrás do Jogador", "Dinâmica", "Beira do Campo" };
+        public static readonly string[] Modes = { "TV", "TV Próxima", "Alta (tática)", "Atrás do Jogador", "Dinâmica", "Beira do Campo", "Atrás do Gol", "Drone", "Isométrica", "Transmissão Aberta" };
         public static readonly string[] Zooms = { "Bem aberto", "Aberto", "Normal", "Perto", "Bem perto" };
         /// <summary>Zoom: -2 (aberto) .. +2 (perto).</summary>
         public int zoom;
@@ -157,12 +157,47 @@ namespace Craquez
                 cam.fieldOfView = Mathf.Lerp(cam.fieldOfView, 52f, 1f - Mathf.Exp(-dt * 2f));
                 return;
             }
+            if (mode >= 6 && mode <= 8)
+            {
+                Vector3 p6, look6;
+                float fov6;
+                if (mode == 6)
+                {
+                    // atrás do gol que o time seguido defende, olhando o campo no sentido do ataque
+                    float dir = sim.TeamDir(followTeam);
+                    float behind = (field ? 16f : 8f) * zk;
+                    p6 = new Vector3(-dir * (hl + behind) + _focus.x * 0.35f, (field ? 11f : 6.5f) * zk, _focus.z * 0.6f);
+                    look6 = new Vector3(_focus.x, 0.5f, _focus.z);
+                    fov6 = field ? 46f : 50f;
+                }
+                else if (mode == 7)
+                {
+                    // drone: quase de cima, um pouco atrás, acompanha a bola de perto
+                    p6 = _focus + new Vector3(0f, (field ? 30f : 15f) * zk, -(field ? 9f : 5f) * zk);
+                    look6 = _focus;
+                    fov6 = 42f;
+                }
+                else
+                {
+                    // isométrica: diagonal de um canto, estilo jogo de estratégia
+                    float dd = (field ? 34f : 17f) * zk;
+                    p6 = _focus + new Vector3(-dd * 0.7f, dd * 0.8f, -dd * 0.7f);
+                    look6 = _focus;
+                    fov6 = 30f;
+                }
+                if (_shake > 0f) { _shake = Mathf.MoveTowards(_shake, 0f, dt * 2.5f); p6 += Random.insideUnitSphere * _shake * 0.25f; }
+                cam.transform.position = Vector3.Lerp(cam.transform.position, p6, 1f - Mathf.Exp(-dt * 5f));
+                cam.transform.rotation = Quaternion.Slerp(cam.transform.rotation, Quaternion.LookRotation(look6 - cam.transform.position), 1f - Mathf.Exp(-dt * 6f));
+                cam.fieldOfView = Mathf.Lerp(cam.fieldOfView, fov6, 1f - Mathf.Exp(-dt * 2f));
+                return;
+            }
             float height, back, fov;
             switch (mode)
             {
                 case 1: height = field ? 11f : 7f; back = field ? 28f : 15f; fov = 34f; break;
                 case 2: height = field ? 42f : 20f; back = field ? 36f : 18f; fov = 38f; break;
                 case 5: height = field ? 3.2f : 2.4f; back = field ? 14f : 6f; fov = 44f; break;
+                case 9: height = field ? 30f : 14f; back = field ? 58f : 24f; fov = 34f; break;   // transmissão aberta: o campo todo
                 default: height = field ? 18f : 10f; back = field ? 38f : 16f; fov = field ? 31f : 38f; break;
             }
             height *= zk;
