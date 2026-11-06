@@ -29,9 +29,15 @@ namespace Craquez
                 urp.renderScale = Application.isMobilePlatform ? (q >= 1 ? 1f : 0.8f) : 1f;   // resolução nativa da tela (só o "Leve" reduz)
                 urp.msaaSampleCount = 1;
                 urp.supportsHDR = q >= 1;
+                // celular: 1 cascata de sombra e poucas luzes extras por objeto (refletores à noite pesam)
+                bool mobile = Application.isMobilePlatform;
+                urp.shadowCascadeCount = mobile ? (q >= 2 ? 2 : 1) : (q >= 2 ? 4 : 2);
+                urp.maxAdditionalLightsCount = mobile ? (q >= 2 ? 4 : q == 1 ? 2 : 1) : 8;
             }
             QualitySettings.vSyncCount = 0;
-            Application.targetFrameRate = Application.isMobilePlatform ? (q == 0 ? 30 : 60) : 60;
+            // PC: acompanha a taxa do monitor (até 144); celular: 60 (30 no "Leve")
+            int hz = Mathf.RoundToInt((float)Screen.currentResolution.refreshRateRatio.value);
+            Application.targetFrameRate = Application.isMobilePlatform ? (q == 0 ? 30 : 60) : Mathf.Clamp(hz > 0 ? hz : 60, 60, 144);
         }
 
         /// <summary>Visual de transmissão: contraste, saturação leve, bloom nos refletores.</summary>

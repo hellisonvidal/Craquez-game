@@ -155,7 +155,9 @@ namespace Craquez
             var m = sim.mode;
             bool futsal = m.id == GameModes.Futsal;
             // traves com contorno (cel); no futsal, pintadas em faixas vermelhas e brancas como nos ginásios
-            var postMat = Gfx.Character(Color.white, null, 0.55f);
+            bool street = m.id == GameModes.Street;
+            // rua: trave de cano pintado de amarelo (gol de racha), sem a armação de ferro do estádio
+            var postMat = Gfx.Character(street ? new Color(0.98f, 0.78f, 0.12f) : Color.white, null, street ? 0.35f : 0.55f);
             var stripeMat = Gfx.Character(new Color(0.85f, 0.1f, 0.12f), null, 0.5f);
             var netTex = Gfx.Net(256, 32f, 3.2f);
             foreach (float s in new[] { -1f, 1f })
@@ -439,6 +441,7 @@ namespace Craquez
             // piso do ginásio até as paredes (antes acabava antes delas: vão preto na tela)
             var hallFloor = new MeshKit();
             hallFloor.Quad(new Vector3(-W, -0.01f, -D), new Vector3(-W, -0.01f, D), new Vector3(W, -0.01f, D), new Vector3(W, -0.01f, -D), new Vector2(0, 0), new Vector2(W / 4f, D / 4f));
+            FutsalExtras(v, hl, hw, W, D, H, homeKit, awayKit, wallLow, variant, quality);
             hallFloor.Object("Piso do ginásio", Gfx.Lit(new Color(0.42f, 0.43f, 0.46f), Gfx.Asphalt(256, Color.white, variant + 31, 0f), 0.3f), v.root, false);
             high.Object("Parede alta", wallHigh, v.root, false);
             var roof = new MeshKit();
@@ -515,6 +518,71 @@ namespace Craquez
             v.standDist = 3f;
         }
 
+        /// <summary>Ginásio completo: faixas no teto, arquibancadas atrás dos gols, bancos, tabelas de basquete e portões.</summary>
+        static void FutsalExtras(Venue v, float hl, float hw, float W, float D, float H, Kit home, Kit away, Material wallMat, int variant, int quality)
+        {
+            // faixas penduradas nas tesouras (cores dos dois times, alternadas)
+            var b1 = new MeshKit();
+            var b2 = new MeshKit();
+            int nb = 8;
+            for (int i = 0; i < nb; i++)
+            {
+                float x = -W * 0.7f + i * (W * 1.4f) / (nb - 1);
+                float z = D * 0.55f;
+                var mk = i % 2 == 0 ? b1 : b2;
+                mk.Quad(new Vector3(x - 1.1f, H - 7f, z), new Vector3(x - 1.1f, H - 2.6f, z), new Vector3(x + 1.1f, H - 2.6f, z), new Vector3(x + 1.1f, H - 7f, z));
+                mk.Quad(new Vector3(x + 1.1f, H - 7f, z), new Vector3(x + 1.1f, H - 2.6f, z), new Vector3(x - 1.1f, H - 2.6f, z), new Vector3(x - 1.1f, H - 7f, z));
+            }
+            b1.Object("Faixas (mandante)", Gfx.Character(home.c1, null, 0.1f), v.root, false);
+            b2.Object("Faixas (visitante)", Gfx.Character(away.c1, null, 0.1f), v.root, false);
+            // arquibancadinhas atrás dos gols (5 degraus) com torcida
+            var steps = new MeshKit();
+            var ppl = new MeshKit();
+            foreach (float sx in new[] { -1f, 1f })
+                for (int r = 0; r < 5; r++)
+                {
+                    float x0 = sx * (hl + 4.5f + r * 0.8f), y0 = 0.45f * r;
+                    steps.Box(new Vector3(x0 + sx * 0.4f, y0 + 0.22f, 0), new Vector3(0.8f, 0.45f, hw * 1.6f), 2f);
+                    var a0 = new Vector3(x0, y0 + 0.45f, -hw * 0.8f);
+                    var a1 = new Vector3(x0, y0 + 0.45f, hw * 0.8f);
+                    if (sx > 0) ppl.Quad(a0, a0 + Vector3.up * 1.2f, a1 + Vector3.up * 1.2f, a1, new Vector2(0, 0), new Vector2(hw / 4f, 1));
+                    else ppl.Quad(a1, a1 + Vector3.up * 1.2f, a0 + Vector3.up * 1.2f, a0, new Vector2(0, 0), new Vector2(hw / 4f, 1));
+                }
+            steps.Object("Arquibancada dos fundos", wallMat, v.root, quality >= 1);
+            var crowd = Gfx.CrowdPeople(1024, 64, home.c1, home.c2, away.c1, variant * 17 + 3);
+            var cm = Gfx.Cutout(Color.white, crowd, 0.5f, 0.05f);
+            v.crowdMats.Add(cm);
+            ppl.Object("Torcida dos fundos", cm, v.root, false);
+            // bancos de reservas do outro lado (cobertos, com cadeiras nas cores dos times)
+            var bench = new MeshKit();
+            var seatsA = new MeshKit();
+            var seatsB = new MeshKit();
+            foreach (float sx in new[] { -1f, 1f })
+            {
+                var c = new Vector3(sx * 6f, 0, hw + 3.2f);
+                bench.Box(c + new Vector3(0, 1.6f, 0.3f), new Vector3(5f, 0.08f, 1.4f));
+                bench.Box(c + new Vector3(0, 0.8f, 1.0f), new Vector3(5f, 1.6f, 0.08f));
+                for (int i = 0; i < 6; i++)
+                    (sx < 0 ? seatsA : seatsB).Box(c + new Vector3(-2.1f + i * 0.84f, 0.45f, 0.55f), new Vector3(0.5f, 0.45f, 0.5f));
+            }
+            bench.Object("Bancos", Gfx.Lit(new Color(0.75f, 0.78f, 0.82f), null, 0.6f, 0.3f), v.root, false);
+            seatsA.Object("Cadeiras (mandante)", Gfx.Character(home.c1, null, 0.4f), v.root, false);
+            seatsB.Object("Cadeiras (visitante)", Gfx.Character(away.c1, null, 0.4f), v.root, false);
+            // tabelas de basquete recolhidas nas paredes do fundo e portões
+            var hoop = new MeshKit();
+            var doors = new MeshKit();
+            foreach (float sx in new[] { -1f, 1f })
+            {
+                float x = sx * (W - 0.6f);
+                hoop.Box(new Vector3(x, 7.5f, 0), new Vector3(0.08f, 1.05f, 1.8f));
+                hoop.Cylinder(new Vector3(x, 6.4f, 0), new Vector3(x - sx * 1.2f, 6.4f, 0), 0.04f, 6);
+                doors.Box(new Vector3(x - sx * 0.05f, 1.6f, D * 0.5f), new Vector3(0.1f, 3.2f, 3.6f));
+                doors.Box(new Vector3(x - sx * 0.05f, 1.6f, -D * 0.5f), new Vector3(0.1f, 3.2f, 3.6f));
+            }
+            hoop.Object("Tabelas", Gfx.Character(Color.white, null, 0.5f), v.root, false);
+            doors.Object("Portões", Gfx.Lit(new Color(0.3f, 0.34f, 0.4f), null, 0.5f, 0.6f), v.root, false);
+        }
+
         /// <summary>Painéis da parede alta do ginásio com faixa de janelas.</summary>
         static Texture2D HallPanels(int seed)
         {
@@ -567,7 +635,8 @@ namespace Craquez
             Goals(v, sim, hl, true);
             // muretas (a bola bate e volta) e cenário
             var wallC = new[] { new Color(0.75f, 0.4f, 0.3f), new Color(0.85f, 0.75f, 0.55f), new Color(0.4f, 0.55f, 0.75f), new Color(0.7f, 0.7f, 0.72f) };
-            var wall = Gfx.Lit(wallC[variant % 4], Gfx.Asphalt(256, Color.white, variant + 40, 0.3f), 0.1f);
+            // mureta grafitada (cores do bairro por cima do reboco)
+            var wall = Gfx.Lit(Color.Lerp(wallC[variant % 4], Color.white, 0.55f), StreetProps.Graffiti(variant * 31 + 5), 0.1f);
             var w = new MeshKit();
             float wh = variant == 4 ? 4.5f : 1.0f, t = 0.25f;
             w.Box(new Vector3(0, wh / 2, hw + t / 2 + 0.05f), new Vector3(hl * 2 + 0.6f, wh, t), 2f);
@@ -642,6 +711,7 @@ namespace Craquez
                 }
             poles.Object("Postes", Gfx.Lit(new Color(0.3f, 0.3f, 0.32f), null, 0.4f, 0.5f), v.root, true);
             lamps.Object("Lâmpadas", lampM, v.root, false);
+            StreetProps.Build(v, hl, hw, variant, night, quality);
             v.tunnel = new Vector3(0, 0, -(hw + 2f));
             v.standDist = 2f;
             return v;
