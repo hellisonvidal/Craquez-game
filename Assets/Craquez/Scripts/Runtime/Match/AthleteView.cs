@@ -168,7 +168,14 @@ namespace Craquez
             // animação
             var v3 = W(p.vel);
             var lv = Quaternion.Euler(0, -_yaw, 0) * v3;
-            bool guard = p.shielding && !p.isKeeper && view.sim.ball.owner >= 0 && view.sim.players[view.sim.ball.owner].team != p.team;
+            // postura de marcação (agachado) só colado no adversário com a bola e de frente para ele
+            bool guard = false;
+            if (p.shielding && !p.isKeeper && view.sim.ball.owner >= 0)
+            {
+                var ow = view.sim.players[view.sim.ball.owner];
+                var toOw = ow.position - p.position;
+                guard = ow.team != p.team && toOw.magnitude < 2.6f && Vector2.Dot(toOw.normalized, p.facing) > 0.5f;
+            }
             float animSpeed = p.vel.magnitude, animFwd = lv.z;
             // girando parado: passinhos no lugar em vez de "patinar" sobre os pés
             float turnStep = Mathf.Clamp(Mathf.Abs(_yawRate) * 0.0065f, 0f, 1.3f);
@@ -216,8 +223,8 @@ namespace Craquez
             if (p.touchT > _lastTouchT + 0.08f && sim.ball.owner == p.id && sim.ball.z < 0.3f && (anim.CurrentAction == null || anim.ActionWeight < 0.3f))
             {
                 _touchAnim = 1f;
-                // a perna em balanço (pé mais alto) é a que toca
-                _touchLeg = rig.footL != null && rig.footR != null && rig.footL.position.y > rig.footR.position.y ? 0 : 1;
+                // toca a perna que está atrás (vindo em balanço para a frente), não a de apoio
+                _touchLeg = rig.footL != null && rig.footR != null && Vector3.Dot(rig.footL.position - rig.footR.position, transform.forward) < 0f ? 0 : 1;
             }
             _lastTouchT = p.touchT;
         }
@@ -236,8 +243,10 @@ namespace Craquez
             FeetFirm();
             if (_touchAnim > 0f)
             {
-                _touchAnim = Mathf.Max(0f, _touchAnim - dt / 0.24f);
-                float k = Mathf.Sin((1f - _touchAnim) * Mathf.PI);
+                // toque curto e "na hora": o pé chega na bola logo no início (pico ~0,05 s)
+                _touchAnim = Mathf.Max(0f, _touchAnim - dt / 0.2f);
+                float u = 1f - _touchAnim;
+                float k = u < 0.25f ? u / 0.25f : 1f - (u - 0.25f) / 0.75f;
                 string sfx = _touchLeg == 0 ? "_l" : "_r";
                 rig.bones.TryGetValue("thigh" + sfx, out var th);
                 rig.bones.TryGetValue("calf" + sfx, out var cf);

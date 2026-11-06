@@ -314,13 +314,14 @@ namespace Craquez
             var _w = _locoTarget;
             for (int i = 0; i < _w.Length; i++) _w[i] = 0f;
             float back = Mathf.Clamp01(-fwd / Mathf.Max(0.4f, speed));
-            float lateral = Mathf.Clamp01(Mathf.Abs(side) / Mathf.Max(0.4f, speed) - 0.35f) * 1.6f;
+            // passo lateral só quando anda quase de lado (e devagar); correndo, gira o corpo
+            float lateral = speed > 3.5f ? 0f : Mathf.Clamp01(Mathf.Abs(side) / Mathf.Max(0.4f, speed) - 0.35f) * 1.6f;
             if (speed < 0.25f)
             {
                 if (guard) _w[IJockey] = 1f;
                 else _w[IIdle] = 1f;
             }
-            else if (guard || lateral > 0.6f)
+            else if (guard || lateral > 0.85f)
             {
                 float k = Mathf.Clamp01(speed / 1.2f);
                 _w[IJockey] = k;

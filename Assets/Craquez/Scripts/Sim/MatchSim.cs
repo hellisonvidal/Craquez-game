@@ -1016,8 +1016,12 @@ namespace Craquez.Sim
         }
 
         // ------------------------------------------------------------ IA sem bola
+        // marcação: quem já está marcado neste passo (por time defensor)
+        readonly System.Collections.Generic.HashSet<int> _marked = new System.Collections.Generic.HashSet<int>();
+
         void AiAll(bool frozen)
         {
+            _marked.Clear();
             foreach (var p in players)
             {
                 bool human = ctrl[p.team].player == p.id;
@@ -1055,7 +1059,7 @@ namespace Craquez.Sim
             bool attacking = TeamHasBall(t);
             var target = FormationTarget(p, attacking);
             bool urgent = false;
-            if (!frozen && state == MatchState.Playing) target = SupportRun(p, target, attacking);
+            if (!frozen && state == MatchState.Playing) target = attacking ? SupportRun(p, target, attacking) : Mark(p, target);
             if (!frozen && state == MatchState.Playing)
             {
                 if (passReceiver == p.id && ball.owner < 0)
@@ -1153,6 +1157,36 @@ namespace Craquez.Sim
             return line * dir;
         }
 
+        /// <summary>
+        /// Consciência defensiva: cada um marca o atacante mais próximo da sua zona (que ainda
+        /// não tenha marcador), por dentro, entre ele e o gol. Na quadra e na rua a marcação é
+        /// mais individual; no campo, mistura marcação e posição.
+        /// </summary>
+        Vector2 Mark(SimPlayer p, Vector2 target)
+        {
+            if (p.isKeeper) return target;
+            bool field = mode.id == GameModes.Field;
+            float zone = field ? 13f : mode.id == GameModes.Futsal ? 8f : 6f;
+            var ownGoal = new Vector2(-halfLen * TeamDir(p.team), 0f);
+            SimPlayer best = null;
+            float bd = zone;
+            foreach (var o in players)
+            {
+                if (o.team == p.team || o.isKeeper || o.id == ball.owner || _marked.Contains(o.id)) continue;
+                float d = o.position.Dist(target);
+                if (d < bd) { bd = d; best = o; }
+            }
+            if (best == null) return target;
+            _marked.Add(best.id);
+            float gap = field ? 1.8f : 1.1f;
+            var mark = best.position + (ownGoal - best.position).Norm() * gap;
+            float k = field ? 0.55f : 0.8f;
+            var t = Vector2.Lerp(target, mark, k);
+            t.x = Mathf.Clamp(t.x, -halfLen + 0.5f, halfLen - 0.5f);
+            t.y = Mathf.Clamp(t.y, -halfW + 0.5f, halfW - 0.5f);
+            return t;
+        }
+
         /// <summary>Há companheiro livre bem mais adiante (para a CPU jogar para frente)?</summary>
         public bool HasForwardOption(SimPlayer p)
         {
@@ -1173,7 +1207,7 @@ namespace Craquez.Sim
         bool KeeperClaims(int t)
         {
             foreach (var k in players)
-                if (k.isKeeper && k.team == t && ball.pos.Dist(k.position) < 3f) return true;
+                if (k.isKeeper && k.team == t && (ball.pos.Dist(k.position) < 3.5f || k.dive > 0f || k.hold > 0f)) return true;
             return false;
         }
 
@@ -1466,6 +1500,22 @@ namespace Craquez.Sim
                     var b = players[j];
                     var d = b.position - a.position;
                     float l = d.magnitude;
+                    // goleiro em ação (defesa, mergulho, bola nas mãos): o companheiro não o atropela
+                    float need = minD;
+                    if (a.team == b.team && (a.isKeeper || b.isKeeper))
+                    {
+                        var gk = a.isKeeper ? a : b;
+                        if (gk.dive > 0f || gk.hold > 0f || ball.pos.Dist(gk.position) < 2.5f) need = 1.5f;
+                    }
+                    if (l < need && l > 0.0001f && need > minD)
+                    {
+                        var other = a.isKeeper ? b : a;
+                        var gk = a.isKeeper ? a : b;
+                        var away = (other.position - gk.position) / l;
+                        other.position = gk.position + away * need;
+                        other.vel -= away * Mathf.Min(0f, Vector2.Dot(other.vel, away));
+                        continue;
+                    }
                     if (l < minD && l > 0.0001f)
                     {
                         var push = d / l * (minD - l) * 0.5f;
@@ -1525,17 +1575,19 @@ namespace Craquez.Sim
                 SkillBall(o);
                 return;
             }
-            // condução em toques: em velocidade a bola é empurrada à frente e o atleta corre atrás dela
-            if (spd > 3.2f && !o.shielding && o.windup <= 0f && ball.z < 0.35f)
+            // condução em toques (do trote ao pique): a bola é tocada à frente e o atleta vai atrás dela
+            if (spd > 1.3f && !o.shielding && o.windup <= 0f && ball.z < 0.35f)
             {
                 var fwd = o.facing;
                 var perp = new Vector2(-fwd.y, fwd.x);
                 var rel = ball.pos - o.position;
                 float along = Vector2.Dot(rel, fwd), side = Vector2.Dot(rel, perp);
-                if (along < 0.3f + spd * 0.012f)
+                if (along < 0.26f + spd * 0.012f)
                 {
-                    // toque: a bola sai um pouco à frente (mais no pique e para quem tem menos controle)
-                    float lead = o.sprinting ? Mathf.Lerp(0.9f, 0.5f, o.control) : Mathf.Lerp(0.42f, 0.25f, o.control);
+                    // toque: a bola sai um pouco à frente (mais no pique e para quem tem menos controle;
+                    // andando/trotando fica colada no pé)
+                    float slow = Mathf.Clamp01((spd - 1.3f) / 3f);
+                    float lead = o.sprinting ? Mathf.Lerp(0.8f, 0.45f, o.control) : Mathf.Lerp(0.16f, 1f, slow) * Mathf.Lerp(0.4f, 0.24f, o.control);
                     float decel = mode.rollDecel + mode.groundDrag * spd * spd;
                     float extra = Mathf.Sqrt(2f * decel * lead);
                     ball.vel = fwd * (spd + extra) - perp * side * 4f;
@@ -1548,7 +1600,7 @@ namespace Craquez.Sim
                 else ball.vel -= perp * side * 5f * DT;   // entre os toques a bola rola solta (leve correção de rumo)
                 return;
             }
-            float ahead = 0.42f + spd * 0.07f + (o.sprinting ? 0.45f : 0f);
+            float ahead = 0.3f + spd * 0.05f;   // parado/andando: bola no pé
             if (o.shielding) ahead = 0.34f + spd * 0.03f;
             if (o.windup > 0f) ahead = 0.4f;
             var target = o.position + o.facing * ahead;
