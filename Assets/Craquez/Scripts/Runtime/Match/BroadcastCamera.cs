@@ -67,17 +67,17 @@ namespace Craquez
             }
         }
 
+        readonly Vector3[] _targets = new Vector3[4];
+
         void UpdateOccluders(Vector3 focus)
         {
             if (_occ.Count == 0) return;
             var c = cam.transform.position;
             float hw = sim.halfW;
             // alvos: o foco, um pouco antes/depois dele e a linha lateral mais próxima
-            var targets = new[]
-            {
-                focus + Vector3.up * 0.8f, focus + new Vector3(7f, 0.8f, 0f), focus + new Vector3(-7f, 0.8f, 0f),
-                new Vector3(focus.x, 0.5f, Mathf.Sign(c.z) * hw * 0.95f),
-            };
+            var targets = _targets;
+            targets[0] = focus + Vector3.up * 0.8f; targets[1] = focus + new Vector3(7f, 0.8f, 0f); targets[2] = focus + new Vector3(-7f, 0.8f, 0f);
+            targets[3] = new Vector3(focus.x, 0.5f, Mathf.Sign(c.z) * hw * 0.95f);
             for (int i = 0; i < _occ.Count; i++)
             {
                 var r = _occ[i];

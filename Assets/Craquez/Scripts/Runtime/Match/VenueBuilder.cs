@@ -153,20 +153,37 @@ namespace Craquez
         public static void Goals(Venue v, MatchSim sim, float hl, bool withNets)
         {
             var m = sim.mode;
-            var postMat = Gfx.Lit(Color.white, null, 0.65f);
-            var netTex = Gfx.Net(256, 14f, 1.6f);
+            bool futsal = m.id == GameModes.Futsal;
+            // traves com contorno (cel); no futsal, pintadas em faixas vermelhas e brancas como nos ginásios
+            var postMat = Gfx.Character(Color.white, null, 0.55f);
+            var stripeMat = Gfx.Character(new Color(0.85f, 0.1f, 0.12f), null, 0.5f);
+            var netTex = Gfx.Net(256, 32f, 3.2f);
             foreach (float s in new[] { -1f, 1f })
             {
                 var k = new MeshKit();
+                var ks = new MeshKit();
                 float gx = hl * s, gh = m.goalHeight, gw = m.goalWidth / 2, gd = m.goalDepth;
                 float r = m.id == GameModes.Field ? 0.06f : 0.045f;
-                k.Cylinder(new Vector3(gx, 0, -gw - r), new Vector3(gx, gh + r, -gw - r), r);
-                k.Cylinder(new Vector3(gx, 0, gw + r), new Vector3(gx, gh + r, gw + r), r);
-                k.Cylinder(new Vector3(gx, gh + r, -gw - 2 * r), new Vector3(gx, gh + r, gw + 2 * r), r);
-                // armação de trás
-                k.Cylinder(new Vector3(gx + s * gd, 0, -gw), new Vector3(gx + s * gd, gh * 0.75f, -gw), r * 0.5f);
-                k.Cylinder(new Vector3(gx + s * gd, 0, gw), new Vector3(gx + s * gd, gh * 0.75f, gw), r * 0.5f);
+                void Bar(Vector3 a0, Vector3 a1, float rad, bool striped)
+                {
+                    if (!striped) { k.Cylinder(a0, a1, rad, 16); return; }
+                    float len = (a1 - a0).magnitude;
+                    int n = Mathf.Max(1, Mathf.RoundToInt(len / 0.2f));
+                    for (int i = 0; i < n; i++)
+                        ((i & 1) == 0 ? k : ks).Cylinder(Vector3.Lerp(a0, a1, i / (float)n), Vector3.Lerp(a0, a1, (i + 1) / (float)n), rad, 16);
+                }
+                Bar(new Vector3(gx, 0, -gw - r), new Vector3(gx, gh + r, -gw - r), r, futsal);
+                Bar(new Vector3(gx, 0, gw + r), new Vector3(gx, gh + r, gw + r), r, futsal);
+                Bar(new Vector3(gx, gh + r, -gw - 2 * r), new Vector3(gx, gh + r, gw + 2 * r), r, futsal);
+                // armação de trás (ferro fino) e base no chão
+                float br = r * 0.45f;
+                k.Cylinder(new Vector3(gx + s * gd, 0.02f, -gw), new Vector3(gx + s * gd, 0.02f, gw), br, 8);
+                k.Cylinder(new Vector3(gx, 0.02f, -gw), new Vector3(gx + s * gd, 0.02f, -gw), br, 8);
+                k.Cylinder(new Vector3(gx, 0.02f, gw), new Vector3(gx + s * gd, 0.02f, gw), br, 8);
+                k.Cylinder(new Vector3(gx + s * gd, 0, -gw), new Vector3(gx + s * gd * 0.35f, gh, -gw), br, 8);
+                k.Cylinder(new Vector3(gx + s * gd, 0, gw), new Vector3(gx + s * gd * 0.35f, gh, gw), br, 8);
                 k.Object("Trave", postMat, v.root);
+                if (futsal) ks.Object("Trave (faixas)", stripeMat, v.root);
                 if (withNets)
                 {
                     var net = GoalNet.Create(v.root, gx, s, gw, gh, gd, netTex);
@@ -665,7 +682,7 @@ namespace Craquez
             var n = go.AddComponent<GoalNet>();
             n._side = side;
             var k = new MeshKit();
-            int nx = 10, ny = 6;
+            int nx = 16, ny = 8;
             float x0 = gx, x1 = gx + side * gd;
             // fundo (inclinado), teto e laterais em grade
             for (int i = 0; i < nx; i++)
@@ -674,14 +691,17 @@ namespace Craquez
                     float z0 = -gw + 2 * gw * i / nx, z1 = -gw + 2 * gw * (i + 1) / nx;
                     float y0 = gh * j / ny, y1 = gh * (j + 1) / ny;
                     float bx0 = Mathf.Lerp(x1, x0 + side * gd * 0.35f, y0 / gh), bx1 = Mathf.Lerp(x1, x0 + side * gd * 0.35f, y1 / gh);
-                    k.Quad(new Vector3(bx0, y0, z0), new Vector3(bx1, y1, z0), new Vector3(bx1, y1, z1), new Vector3(bx0, y0, z1),
-                        new Vector2(z0, y0) / 1.2f, new Vector2(z1, y1) / 1.2f);
+                    // a rede cede um pouco para trás no meio (caimento natural)
+                    float sg0 = Mathf.Sin(Mathf.PI * i / nx) * Mathf.Sin(Mathf.PI * y0 / gh) * 0.12f, sg1 = Mathf.Sin(Mathf.PI * (i + 1) / nx) * Mathf.Sin(Mathf.PI * y1 / gh) * 0.12f;
+                    float sg01 = Mathf.Sin(Mathf.PI * i / nx) * Mathf.Sin(Mathf.PI * y1 / gh) * 0.12f, sg10 = Mathf.Sin(Mathf.PI * (i + 1) / nx) * Mathf.Sin(Mathf.PI * y0 / gh) * 0.12f;
+                    k.Quad(new Vector3(bx0 + side * sg0, y0, z0), new Vector3(bx1 + side * sg01, y1, z0), new Vector3(bx1 + side * sg1, y1, z1), new Vector3(bx0 + side * sg10, y0, z1),
+                        new Vector2(z0, y0) / 0.9f, new Vector2(z1, y1) / 0.9f);
                 }
             for (int i = 0; i < nx; i++)
             {
                 float z0 = -gw + 2 * gw * i / nx, z1 = -gw + 2 * gw * (i + 1) / nx;
                 k.Quad(new Vector3(x0, gh, z0), new Vector3(x0 + side * gd * 0.35f, gh, z0), new Vector3(x0 + side * gd * 0.35f, gh, z1), new Vector3(x0, gh, z1),
-                    new Vector2(0, z0) / 1.2f, new Vector2(gd * 0.35f, z1) / 1.2f);
+                    new Vector2(0, z0) / 0.9f, new Vector2(gd * 0.35f, z1) / 0.9f);
             }
             foreach (float zs in new[] { -gw, gw })
                 for (int j = 0; j < ny; j++)
@@ -689,7 +709,7 @@ namespace Craquez
                     float y0 = gh * j / ny, y1 = gh * (j + 1) / ny;
                     float bx0 = Mathf.Lerp(x1, x0 + side * gd * 0.35f, y0 / gh), bx1 = Mathf.Lerp(x1, x0 + side * gd * 0.35f, y1 / gh);
                     k.Quad(new Vector3(x0, y0, zs), new Vector3(x0, y1, zs), new Vector3(bx1, y1, zs), new Vector3(bx0, y0, zs),
-                        new Vector2(0, y0) / 1.2f, new Vector2(gd, y1) / 1.2f);
+                        new Vector2(0, y0) / 0.9f, new Vector2(gd, y1) / 0.9f);
                 }
             n._mesh = k.Build("rede");
             n._mesh.MarkDynamic();
@@ -697,7 +717,8 @@ namespace Craquez
             n._cur = (Vector3[])n._base.Clone();
             go.AddComponent<MeshFilter>().sharedMesh = n._mesh;
             var mr = go.AddComponent<MeshRenderer>();
-            mr.sharedMaterial = Gfx.Cutout(Color.white, netTex, 0.3f, 0.1f);
+            // translúcida (não recortada): de longe vira um véu branco, como rede de verdade, sem sumir nem serrilhar
+            mr.sharedMaterial = Gfx.Transparent(new Color(1f, 1f, 1f, 0.95f), netTex);
             mr.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
             return n;
         }

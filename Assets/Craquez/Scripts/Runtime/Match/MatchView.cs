@@ -24,6 +24,7 @@ namespace Craquez
         Vector3 _ballPrev, _ballCur;
         Quaternion _ballRot = Quaternion.identity;
         float _crowdT, _crowdHype;
+        CrowdFx _crowd;
         AthleteView _referee;
         bool _night;
 
@@ -45,6 +46,7 @@ namespace Craquez
             var gk = new[] { KeeperKit(kits[0], kits[1], 0), KeeperKit(kits[1], kits[0], 1) };
             var parent = new GameObject("Atletas").transform;
             parent.SetParent(transform, false);
+            if (s.mode.id != GameModes.Street) _crowd = CrowdFx.Create(transform, s, venue, kits[0], kits[1], _night, q);
             AthleteFactory.IndoorShoes = c.mode == GameModes.Futsal;
             foreach (var p in s.players)
             {
@@ -251,12 +253,13 @@ namespace Craquez
             {
                 case "kick":
                     Sfx.Kick(e.power);
-                    if (e.kind == "shot") { _crowdHype = Mathf.Max(_crowdHype, 0.5f); bcam.Shake(0.15f); }
+                    if (e.kind == "shot") { _crowdHype = Mathf.Max(_crowdHype, 0.5f); bcam.Shake(0.15f); _crowd?.React("shot"); }
                     break;
                 case "header": Sfx.Touch(); break;
                 case "touch": case "block": Sfx.Touch(); break;
                 case "post": Sfx.Post(); Sfx.Ooh(); bcam.Shake(0.3f); break;
-                case "save": if (!e.ok) Sfx.Ooh(); Sfx.Touch(); break;
+                case "save": if (!e.ok) Sfx.Ooh(); Sfx.Touch(); if (e.ok) _crowd?.React("save"); break;
+                case "skill": _crowd?.React("skill"); break;
                 case "whistle":
                     if (e.kind == "fulltime") Sfx.WhistleEnd();
                     else if (e.kind == "halftime" || e.kind == "penalty") Sfx.WhistleLong();
@@ -277,6 +280,7 @@ namespace Craquez
                     Sfx.Net();
                     Sfx.Cheer();
                     GoalParty(e.team);
+                    _crowd?.React("goal");
                     _crowdHype = 1.6f;
                     bcam.Shake(0.6f);
                     foreach (var n in venue.nets)

@@ -469,9 +469,13 @@ namespace Craquez
             for (int y = 0; y < size; y++)
                 for (int x = 0; x < size; x++)
                 {
-                    float a = (x + y) % cell, b = (x - y + 4 * size) % cell;
-                    bool line = a < thick || b < thick;
-                    px[y * size + x] = line ? new Color32(245, 245, 245, 255) : new Color32(0, 0, 0, 0);
+                    // malha quadrada com fio de borda suave (anti-serrilhado) e nós um pouco mais grossos
+                    float a = x % cell, b = y % cell;
+                    float da = Mathf.Min(a, cell - a), db = Mathf.Min(b, cell - b);
+                    float cov = Mathf.Clamp01(thick * 0.5f + 0.5f - Mathf.Min(da, db));
+                    if (da < thick && db < thick) cov = 1f;
+                    byte al = (byte)(cov * 255);
+                    px[y * size + x] = new Color32(245, 245, 245, al);
                 }
             t.SetPixels32(px);
             t.Apply(true);

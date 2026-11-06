@@ -66,9 +66,8 @@ namespace Craquez
         public static float Abduction(AthleteRig rig, Transform root, int side, out float elev)
         {
             elev = 0f;
-            string sfx = side < 0 ? "_l" : "_r";
-            rig.bones.TryGetValue("upperarm" + sfx, out var up);
-            rig.bones.TryGetValue("lowerarm" + sfx, out var lo);
+            rig.bones.TryGetValue(side < 0 ? "upperarm_l" : "upperarm_r", out var up);
+            rig.bones.TryGetValue(side < 0 ? "lowerarm_l" : "lowerarm_r", out var lo);
             if (up == null || lo == null) return 0f;
             var arm = (lo.position - up.position).normalized;
             float s = Mathf.Sign(Vector3.Dot(up.position - (rig.spine != null ? rig.spine.position : root.position), root.right));
@@ -86,9 +85,8 @@ namespace Craquez
             var down = -root.up;
             for (int side = -1; side <= 1; side += 2)
             {
-                string sfx = side < 0 ? "_l" : "_r";
-                rig.bones.TryGetValue("upperarm" + sfx, out var up);
-                rig.bones.TryGetValue("lowerarm" + sfx, out var lo);
+                rig.bones.TryGetValue(side < 0 ? "upperarm_l" : "upperarm_r", out var up);
+                rig.bones.TryGetValue(side < 0 ? "lowerarm_l" : "lowerarm_r", out var lo);
                 if (up == null || lo == null) continue;
                 float s = Mathf.Sign(Vector3.Dot(up.position - (rig.spine != null ? rig.spine.position : root.position), right));
                 float abd = Abduction(rig, root, side, out _);
@@ -161,6 +159,8 @@ namespace Craquez
         static float[] _contact;   // fase (0..1) do apoio do pé esquerdo em cada clipe de locomoção
         static float[] _groundSpeed; // velocidade real dos pés no chão em cada clipe (m/s), medida na pose
         float _idleRate = 1f;
+        readonly float[] _sp4 = new float[4], _sp5 = new float[5];
+        static readonly int[] Ix4 = { IIdle, IWalk, IJog, IRun }, Ix5 = { IIdle, IWalk, IJog, IRun, ISprint };
 
         /// <summary>
         /// Acha, uma vez, em que ponto de cada ciclo o pé esquerdo toca o chão, para que
@@ -337,9 +337,11 @@ namespace Craquez
                 // parado -> andar -> trotar -> correr -> pique (por velocidade)
                 bool sprint = _locoP[ISprint].IsValid();
                 // limiares = velocidade natural de cada passada (medida nos pés), ligeiramente acima
-                float[] sp = sprint ? new[] { 0f, _locoSpeed[IWalk], _locoSpeed[IJog], _locoSpeed[IRun], _locoSpeed[ISprint] } : new[] { 0f, _locoSpeed[IWalk], _locoSpeed[IJog], _locoSpeed[IRun] };
+                var sp = sprint ? _sp5 : _sp4;
+                sp[0] = 0f; sp[1] = _locoSpeed[IWalk]; sp[2] = _locoSpeed[IJog]; sp[3] = _locoSpeed[IRun];
+                if (sprint) sp[4] = _locoSpeed[ISprint];
                 for (int k = 1; k < sp.Length; k++) sp[k] = Mathf.Max(sp[k] * 1.12f, sp[k - 1] + 0.6f);
-                int[] ix = sprint ? new[] { IIdle, IWalk, IJog, IRun, ISprint } : new[] { IIdle, IWalk, IJog, IRun };
+                var ix = sprint ? Ix5 : Ix4;
                 float s = Mathf.Min(speed, 10.5f);
                 int seg = 0;
                 while (seg < sp.Length - 2 && s >= sp[seg + 1]) seg++;

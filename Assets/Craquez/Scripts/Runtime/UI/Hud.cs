@@ -146,6 +146,8 @@ namespace Craquez.UI
         }
 
         public RectTransform Overlay => _overlay;
+        int _lastA = -1, _lastB = -1, _lastSecs = -1, _lastHalf = -1;
+        readonly int[] _lastCtrl = { -1, -1 };
         public System.Action onPause;
         GameObject _pauseBtn;
         public void ShowPauseButton(bool on) { if (_pauseBtn != null) _pauseBtn.SetActive(on); }
@@ -168,15 +170,22 @@ namespace Craquez.UI
         void Update()
         {
             if (_sim == null) return;
-            _scoreA.text = _sim.score[0].ToString();
-            _scoreB.text = _sim.score[1].ToString();
-            _clock.text = ClockText(_sim);
-            _half.text = _sim.half == 1 ? "1ºT" : "2ºT";
+            // textos só mudam quando o valor muda (sem gerar lixo de memória a cada quadro)
+            if (_sim.score[0] != _lastA) { _lastA = _sim.score[0]; _scoreA.text = _lastA.ToString(); }
+            if (_sim.score[1] != _lastB) { _lastB = _sim.score[1]; _scoreB.text = _lastB.ToString(); }
+            int secs = Mathf.FloorToInt(_sim.clock * 12f);   // (o relógio exibido corre mais rápido que o real)
+            if (secs != _lastSecs || _sim.half != _lastHalf)
+            {
+                _lastSecs = secs;
+                _lastHalf = _sim.half;
+                _clock.text = ClockText(_sim);
+                _half.text = _sim.half == 1 ? "1ºT" : "2ºT";
+            }
             for (int t = 0; t < 2; t++)
             {
                 if (!_pbox[t].gameObject.activeSelf) continue;
                 var p = _sim.Controlled(t);
-                _pname[t].text = p.number + "  " + p.name.ToUpperInvariant();
+                if (_lastCtrl[t] != p.id) { _lastCtrl[t] = p.id; _pname[t].text = p.number + "  " + p.name.ToUpperInvariant(); }
                 _stamina[t].fillAmount = p.stamina;
                 _stamina[t].color = Color.Lerp(Theme.Hot, Theme.Accent, p.stamina);
                 float ch = _sim.ChargeOf(t);

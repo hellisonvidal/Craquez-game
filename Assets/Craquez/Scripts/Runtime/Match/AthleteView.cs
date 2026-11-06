@@ -271,8 +271,11 @@ namespace Craquez
             rig.bones.TryGetValue("ball_l", out bl);
             rig.bones.TryGetValue("ball_r", out br);
             float lowest = float.MaxValue;
-            foreach (var t in new[] { bl, br }) if (t != null) lowest = Mathf.Min(lowest, t.position.y - 0.035f);
-            foreach (var t in new[] { rig.footL, rig.footR }) if (t != null) lowest = Mathf.Min(lowest, t.position.y - 0.085f);
+            // (sem arrays temporários: roda para cada atleta a cada quadro)
+            if (bl != null) lowest = Mathf.Min(lowest, bl.position.y - 0.035f);
+            if (br != null) lowest = Mathf.Min(lowest, br.position.y - 0.035f);
+            if (rig.footL != null) lowest = Mathf.Min(lowest, rig.footL.position.y - 0.085f);
+            if (rig.footR != null) lowest = Mathf.Min(lowest, rig.footR.position.y - 0.085f);
             if (lowest == float.MaxValue) return;
             float lift = transform.position.y;   // pulos/mergulhos intencionais
             float err = lowest - lift;
