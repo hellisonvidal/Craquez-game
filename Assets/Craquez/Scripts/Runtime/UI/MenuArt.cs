@@ -280,7 +280,7 @@ namespace Craquez.UI
             _t += Time.unscaledDeltaTime;
             float g = Mathf.Clamp01(_t / 1.2f);
             if (_grad) _grad.color = new Color(g, g, g, 1f);
-            if (_glow) _glow.color = new Color(0f, 0.9f, 0.62f, 0.22f * g * (0.8f + 0.2f * Mathf.Sin(_t * 1.5f)));
+            if (_glow) _glow.color = new Color(0.16f, 0.62f, 1f, 0.22f * g * (0.8f + 0.2f * Mathf.Sin(_t * 1.5f)));
             float l = Mathf.Clamp01((_t - 0.5f) / 1.0f);
             float e = 1f - Mathf.Pow(1f - l, 3f);
             if (_logo)

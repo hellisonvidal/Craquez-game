@@ -118,12 +118,21 @@ namespace Craquez
         {
             UiKit.Clear(_root);
             _pressText = null;
-            _bg.color = dark ? new Color(0.01f, 0.02f, 0.05f, 0.55f) : new Color(0, 0, 0, 0);
+            _bg.color = dark ? new Color(0.01f, 0.03f, 0.1f, 1f) : new Color(0, 0, 0, 0);
+            // fundo com a arte da capa escurecida (mesma identidade da abertura)
+            if (dark) CoverBackdrop(_root, 0.32f);
             var bg = UiKit.Image(_root, new Color(0, 0, 0, 0), null, "fundo");
             bg.rectTransform.Place(0, 0, 1, 1);
-            // degradê lateral (legibilidade sobre o jogo ao fundo)
-            var grad = UiKit.Image(_root, new Color(0.01f, 0.02f, 0.05f, 0.8f), Theme.Soft, "brilho");
+            var grad = UiKit.Image(_root, new Color(0.01f, 0.03f, 0.12f, 0.75f), Theme.Soft, "brilho");
             grad.rectTransform.Place(-0.6f, -0.6f, 0.7f, 1.6f);
+            if (dark)
+            {
+                // pinceladas da capa (vermelho e azul) atrás do título
+                var s1 = UiKit.Image(_root, new Color(Theme.Hot.r, Theme.Hot.g, Theme.Hot.b, 0.85f), null, "pincelada vermelha").rectTransform;
+                s1.At(0, 1, 760, 16, 70, -232); s1.localRotation = Quaternion.Euler(0, 0, 3f);
+                var s2 = UiKit.Image(_root, new Color(Theme.Accent.r, Theme.Accent.g, Theme.Accent.b, 0.85f), null, "pincelada azul").rectTransform;
+                s2.At(0, 1, 560, 10, 90, -252); s2.localRotation = Quaternion.Euler(0, 0, 3f);
+            }
             if (!dark) return _root;
             // barra superior: marca + controle detectado
             var top = UiKit.Image(_root, new Color(0.01f, 0.02f, 0.05f, 0.7f), null, "topo").rectTransform.Place(0, 1, 1, 1, 0, -64, 0, 0);
@@ -134,8 +143,10 @@ namespace Craquez
             var nav = back.navigation;
             nav.mode = Navigation.Mode.None;   // não rouba o foco do controle; Esc/B/voltar do Android também funcionam
             back.navigation = nav;
+            var logoIc = UiKit.Rect(top, "ícone").At(0, 0.5f, 54, 54, 222, 0).gameObject.AddComponent<RawImage>();
+            logoIc.texture = Resources.Load<Texture2D>("UI/craquez_logo");
             var brand = UiKit.Label(top, "CRAQUEZ", 38, Theme.HeadItalic, Color.white);
-            brand.rectTransform.Place(0, 0, 0.4f, 1, 230, 0, 0, 0);
+            brand.rectTransform.Place(0, 0, 0.4f, 1, 286, 0, 0, 0);
             var dev = UiKit.Label(top, "" + InputRouter.DeviceName(InputRouter.DefaultP1()) + "   •   feito com IA  •  gratuito", 22, Theme.BodyBold, Theme.TextDim, TextAnchor.MiddleRight);
             dev.rectTransform.Place(0.4f, 0, 1, 1, 0, 0, 40, 0);
             // barra de dicas
@@ -234,7 +245,7 @@ namespace Craquez
             const int w = 256, h = 144;
             _titleGrad = new Texture2D(w, h, TextureFormat.RGBA32, false) { wrapMode = TextureWrapMode.Clamp };
             var px = new Color32[w * h];
-            var c0 = new Color(0.01f, 0.03f, 0.08f); var c1 = new Color(0.02f, 0.18f, 0.26f); var c2 = new Color(0f, 0.55f, 0.4f);
+            var c0 = new Color(0.01f, 0.03f, 0.08f); var c1 = new Color(0.02f, 0.18f, 0.26f); var c2 = new Color(0.1f, 0.35f, 0.85f);
             for (int y = 0; y < h; y++)
                 for (int x = 0; x < w; x++)
                 {
@@ -255,13 +266,16 @@ namespace Craquez
             _bg.color = Color.black;
             var grad = UiKit.Rect(_root, "degradê").Place(0, 0, 1, 1).gameObject.AddComponent<RawImage>();
             grad.texture = TitleGradient();
-            var glow = UiKit.Image(_root, new Color(0f, 0.9f, 0.62f, 0.22f), Theme.Soft, "brilho").rectTransform.At(0.5f, 0.6f, 1500, 900);
+            var glow = UiKit.Image(_root, new Color(0.16f, 0.62f, 1f, 0.25f), Theme.Soft, "brilho").rectTransform.At(0.5f, 0.6f, 1500, 900);
             // capa do jogo (arte com a logo): preenche a tela inteira, cortando as sobras
             var logoBox = UiKit.Rect(_root, "capa").Place(0, 0, 1, 1);
-            var cover = UiKit.Rect(logoBox, "imagem").At(0.5f, 0.5f, 1920, 1280).gameObject.AddComponent<RawImage>();
+            // a capa aparece inteira (logo nunca cortada); as sobras laterais/verticais são a própria
+            // arte ampliada e escurecida, sem barras pretas
+            CoverBackdrop(logoBox, 0.45f);
+            var cover = UiKit.Rect(logoBox, "imagem").Place(0, 0, 1, 1).gameObject.AddComponent<RawImage>();
             cover.texture = Resources.Load<Texture2D>("UI/capa");
             var fit = cover.gameObject.AddComponent<AspectRatioFitter>();
-            fit.aspectMode = AspectRatioFitter.AspectMode.EnvelopeParent;
+            fit.aspectMode = AspectRatioFitter.AspectMode.FitInParent;
             fit.aspectRatio = 1.5f;
             if (cover.texture == null)
             {
@@ -271,9 +285,8 @@ namespace Craquez
             }
             // faixa escura embaixo para o "toque para iniciar" ler bem sobre a arte
             var shade = UiKit.Image(_root, new Color(0, 0, 0, 0.55f), Theme.Soft, "sombra").rectTransform.Place(-0.2f, -0.35f, 1.2f, 0.32f);
-            var sub = UiKit.Label(_root, "FUTEBOL  •  FUTSAL  •  RUA", 34, Theme.Head, Theme.Accent2, TextAnchor.MiddleCenter);
+            var sub = UiKit.Label(_root, "", 34, Theme.Head, Theme.Accent2, TextAnchor.MiddleCenter);
             sub.rectTransform.At(0.5f, 0.2f, 1400, 52);
-            UiKit.Shadow(sub, 3, 0.9f);
             _pressText = UiKit.Label(_root, Application.isMobilePlatform ? "TOQUE NA TELA PARA INICIAR" : "APERTE QUALQUER BOTÃO PARA INICIAR", 46, Theme.BodyBold, Color.white, TextAnchor.MiddleCenter);
             _pressText.rectTransform.At(0.5f, 0.1f, 1500, 72);
             UiKit.Shadow(_pressText, 3, 0.9f);
@@ -286,6 +299,22 @@ namespace Craquez
 
         float _titleShownAt;
 
+        /// <summary>Arte da capa cobrindo a área (cortando sobras), escurecida pelo fator dado.</summary>
+        static void CoverBackdrop(RectTransform parent, float bright)
+        {
+            var tex = Resources.Load<Texture2D>("UI/capa");
+            if (tex == null) return;
+            var holder = UiKit.Rect(parent, "capa (fundo)").Place(0, 0, 1, 1);
+            holder.gameObject.AddComponent<RectMask2D>();
+            var img = UiKit.Rect(holder, "img").Place(0, 0, 1, 1).gameObject.AddComponent<RawImage>();
+            img.texture = tex;
+            img.color = new Color(bright, bright, bright * 1.15f, 1f);
+            img.raycastTarget = false;
+            var f = img.gameObject.AddComponent<AspectRatioFitter>();
+            f.aspectMode = AspectRatioFitter.AspectMode.EnvelopeParent;
+            f.aspectRatio = 1.5f;
+        }
+
         // ------------------------------------------------------------ modos
         // modalidades (primeira tela) e, dentro de futebol/futsal, clubes x seleções
         struct Card { public string title, sub, desc; public MenuArt.Kind art; public System.Action go; }
@@ -297,7 +326,7 @@ namespace Craquez
         /// </summary>
         void ShowModes()
         {
-            if (_attract == null) StartAttract();
+            StopAttract();
             var root = Page();
             _back = ShowTitle;
             Title(root, "JOGAR", null);
@@ -320,7 +349,7 @@ namespace Craquez
                 for (int i = actions.Length - 1; i >= 0; i--)
                 {
                     var (label, go) = actions[i];
-                    var b = UiKit.Button(row.transform, label, go, 28, new Color(0.0f, 0.5f, 0.35f));
+                    var b = UiKit.Button(row.transform, label, go, 28, new Color(0.1f, 0.38f, 0.85f));
                     b.GetComponent<RectTransform>().At(1, 0.5f, 172, 70, x, 0);
                     x -= 184f;
                     if (i == 0 && first == null) first = b;   // CLUBES do futebol
@@ -492,7 +521,7 @@ namespace Craquez
             // setas grandes
             Button Arrow(float px, string txt, int d)
             {
-                var a = UiKit.Button(area, txt, () => { Step(d); UiKit.Select(b); }, 80, new Color(0.0f, 0.55f, 0.38f));
+                var a = UiKit.Button(area, txt, () => { Step(d); UiKit.Select(b); }, 80, new Color(0.85f, 0.14f, 0.18f));
                 a.GetComponent<RectTransform>().At(0.5f, 0.5f, 110, 110, px, 10);
                 var img = a.GetComponent<Image>();
                 img.sprite = Theme.Circle;
@@ -612,7 +641,7 @@ namespace Craquez
             ballC.GetComponent<RectTransform>().Place(0, 0, 1, 0, 150, 26, 22, -94);
             RefreshBall();
 
-            var go = UiKit.Button(root, "ESCOLHER TIMES  ›", ShowTeams, 40, new Color(0.0f, 0.55f, 0.38f));
+            var go = UiKit.Button(root, "ESCOLHER TIMES  ›", ShowTeams, 40, new Color(0.85f, 0.14f, 0.18f));
             go.GetComponent<RectTransform>().At(1, 0, 520, 100, -90, 90);
             var help = UiKit.Label(root, InputRouter.Help(InputRouter.DefaultP1()), 22, Theme.Body, Theme.TextDim);
             help.rectTransform.Place(0, 0, 0.6f, 0, 94, 76, 0, -150);
@@ -715,7 +744,7 @@ namespace Craquez
                 Refresh();
                 if (first == null) first = lgs.Count == 1 ? (Selectable)teamC : lgC;
             }
-            var play = UiKit.Button(root, "JOGAR  ›", StartMatch, 44, new Color(0.0f, 0.55f, 0.38f));
+            var play = UiKit.Button(root, "JOGAR  ›", StartMatch, 44, new Color(0.85f, 0.14f, 0.18f));
             play.GetComponent<RectTransform>().At(1, 0, 420, 100, -90, 70);
             UiKit.Select(first);
         }
@@ -824,7 +853,7 @@ namespace Craquez
                 });
                 if (firstRow == null) firstRow = b;
             }
-            var done = UiKit.Button(root, "Pronto", ShowTeams, 36, new Color(0.0f, 0.55f, 0.38f));
+            var done = UiKit.Button(root, "Pronto", ShowTeams, 36, new Color(0.85f, 0.14f, 0.18f));
             done.GetComponent<RectTransform>().At(1, 0, 300, 90, -90, 20);
             UiKit.Select(fc);
         }
