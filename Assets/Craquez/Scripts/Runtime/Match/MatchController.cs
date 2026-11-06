@@ -46,6 +46,7 @@ namespace Craquez
             // clima mexe na física da bola: chuva = mais rápida; neve = mais lenta
             string w = c.weather == "aleatorio" ? WeatherFx.Kinds[(int)(c.seed % 5)] : c.weather;
             sim.rollScale = RollFor(c.mode, w);
+            sim.startSwapped = c.swapSides;
             sim.Setup(c.mode, new TeamSetup { data = ta, tactics = c.tacticsA }, new TeamSetup { data = tb, tactics = c.tacticsB }, c.seed, c.SecondsPerHalf);
             view = new GameObject("Partida").AddComponent<MatchView>();
             view.transform.SetParent(transform, false);
@@ -209,6 +210,7 @@ namespace Craquez
             var ta = Teams.Get(cfg.teamA);
             var tb = Teams.Get(cfg.teamB);
             fresh.rollScale = sim.rollScale;
+            fresh.startSwapped = sim.startSwapped;
             fresh.Setup(cfg.mode, new TeamSetup { data = ta, tactics = cfg.tacticsA }, new TeamSetup { data = tb, tactics = cfg.tacticsB }, cfg.seed, cfg.SecondsPerHalf);
             for (int k = 0; k < sim.players.Count; k++)
             {

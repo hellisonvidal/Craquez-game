@@ -256,21 +256,27 @@ namespace Craquez
             var grad = UiKit.Rect(_root, "degradê").Place(0, 0, 1, 1).gameObject.AddComponent<RawImage>();
             grad.texture = TitleGradient();
             var glow = UiKit.Image(_root, new Color(0f, 0.9f, 0.62f, 0.22f), Theme.Soft, "brilho").rectTransform.At(0.5f, 0.6f, 1500, 900);
-            var logoBox = UiKit.Rect(_root, "logo").At(0.5f, 0.6f, 1600, 520);
-            var icon = UiKit.Rect(logoBox, "ícone").At(0.5f, 0.62f, 360, 360).gameObject.AddComponent<RawImage>();
-            icon.texture = Resources.Load<Texture2D>("UI/craquez_logo");
-            if (icon.texture == null) icon.enabled = false;
-            var shadow = UiKit.Label(logoBox, "CRAQUEZ", 200, Theme.HeadItalic, new Color(0, 0, 0, 0.5f), TextAnchor.MiddleCenter);
-            shadow.rectTransform.At(0.5f, 0.12f, 1600, 230, 8, -8);
-            var logo = UiKit.Label(logoBox, "CRAQUEZ", 200, Theme.HeadItalic, Color.white, TextAnchor.MiddleCenter);
-            logo.rectTransform.At(0.5f, 0.12f, 1600, 230);
-            var outl = logo.gameObject.AddComponent<Outline>();
-            outl.effectColor = Theme.Accent;
-            outl.effectDistance = new Vector2(3, -3);
-            var sub = UiKit.Label(_root, "FUTEBOL  •  FUTSAL  •  RUA", 36, Theme.Head, Theme.Accent2, TextAnchor.MiddleCenter);
-            sub.rectTransform.At(0.5f, 0.3f, 1400, 56);
+            // capa do jogo (arte com a logo): preenche a tela inteira, cortando as sobras
+            var logoBox = UiKit.Rect(_root, "capa").Place(0, 0, 1, 1);
+            var cover = UiKit.Rect(logoBox, "imagem").At(0.5f, 0.5f, 1920, 1280).gameObject.AddComponent<RawImage>();
+            cover.texture = Resources.Load<Texture2D>("UI/capa");
+            var fit = cover.gameObject.AddComponent<AspectRatioFitter>();
+            fit.aspectMode = AspectRatioFitter.AspectMode.EnvelopeParent;
+            fit.aspectRatio = 1.5f;
+            if (cover.texture == null)
+            {
+                cover.enabled = false;
+                var logo = UiKit.Label(logoBox, "CRAQUEZ", 200, Theme.HeadItalic, Color.white, TextAnchor.MiddleCenter);
+                logo.rectTransform.At(0.5f, 0.6f, 1600, 230);
+            }
+            // faixa escura embaixo para o "toque para iniciar" ler bem sobre a arte
+            var shade = UiKit.Image(_root, new Color(0, 0, 0, 0.55f), Theme.Soft, "sombra").rectTransform.Place(-0.2f, -0.35f, 1.2f, 0.32f);
+            var sub = UiKit.Label(_root, "FUTEBOL  •  FUTSAL  •  RUA", 34, Theme.Head, Theme.Accent2, TextAnchor.MiddleCenter);
+            sub.rectTransform.At(0.5f, 0.2f, 1400, 52);
+            UiKit.Shadow(sub, 3, 0.9f);
             _pressText = UiKit.Label(_root, Application.isMobilePlatform ? "TOQUE NA TELA PARA INICIAR" : "APERTE QUALQUER BOTÃO PARA INICIAR", 46, Theme.BodyBold, Color.white, TextAnchor.MiddleCenter);
-            _pressText.rectTransform.At(0.5f, 0.16f, 1500, 72);
+            _pressText.rectTransform.At(0.5f, 0.1f, 1500, 72);
+            UiKit.Shadow(_pressText, 3, 0.9f);
             var ver = UiKit.Label(_root, "v" + Application.version + "  •  feito 100% com IA  •  gratuito", 22, Theme.Body, Theme.TextDim, TextAnchor.LowerRight);
             ver.rectTransform.Place(0, 0, 1, 0, 0, 24, 30, -50);
             var fx = _root.gameObject.AddComponent<TitleFx>();
@@ -542,31 +548,32 @@ namespace Craquez
             _back = ShowModes;
             Title(root, (_cfg.mode == GameModes.Street ? "RUA" : (_cfg.national ? "SELEÇÕES" : "CLUBES")) + "  •  " + GameModes.DisplayName(_cfg.mode).ToUpperInvariant(), "Ajuste a partida e escolha os times");
             var list = UiKit.Rect(root, "lista").Place(0, 0, 0.55f, 1, 90, 150, 0, 250);
-            UiKit.VList(list, 8, 0, false);
+            UiKit.VList(list, 6, 0, false);
             int sideIdx = _cfg.sideB == Side.Player2 ? 1 : _cfg.sideA == Side.Cpu ? 2 : 0;
             var first = UiKit.Cycler(list, "Jogadores", SideOpts, sideIdx, i =>
             {
                 _cfg.sideA = i == 2 ? Side.Cpu : Side.Player1;
                 _cfg.sideB = i == 1 ? Side.Player2 : Side.Cpu;
             });
-            UiKit.Size(first, 68, 68);
+            UiKit.Size(first, 60, 60);
             if (_cfg.mode != GameModes.Futsal)
             {
-                UiKit.Size(UiKit.Cycler(list, "Clima", WeatherOpts, Mathf.Max(0, System.Array.IndexOf(WeatherIds, _cfg.weather)), i => _cfg.weather = WeatherIds[i]), 68, 68);
-                UiKit.Size(UiKit.Cycler(list, "Clima dinâmico", new[] { "Ligado", "Desligado" }, _cfg.dynamicWeather ? 0 : 1, i => _cfg.dynamicWeather = i == 0), 68, 68);
+                UiKit.Size(UiKit.Cycler(list, "Clima", WeatherOpts, Mathf.Max(0, System.Array.IndexOf(WeatherIds, _cfg.weather)), i => _cfg.weather = WeatherIds[i]), 60, 60);
+                UiKit.Size(UiKit.Cycler(list, "Clima dinâmico", new[] { "Ligado", "Desligado" }, _cfg.dynamicWeather ? 0 : 1, i => _cfg.dynamicWeather = i == 0), 60, 60);
             }
-            UiKit.Size(UiKit.Cycler(list, "Horário", TodOpts, Mathf.Max(0, System.Array.IndexOf(TodIds, _cfg.timeOfDay)), i => _cfg.timeOfDay = TodIds[i]), 68, 68);
-            UiKit.Size(UiKit.Cycler(list, "Dificuldade", DiffOpts, Mathf.Max(0, System.Array.IndexOf(DiffVals, _cfg.difficulty)), i => _cfg.difficulty = DiffVals[i]), 68, 68);
+            UiKit.Size(UiKit.Cycler(list, "Lado do campo", new[] { "Mandante ataca  ›", "‹  Mandante ataca" }, _cfg.swapSides ? 1 : 0, i => _cfg.swapSides = i == 1), 60, 60);
+            UiKit.Size(UiKit.Cycler(list, "Horário", TodOpts, Mathf.Max(0, System.Array.IndexOf(TodIds, _cfg.timeOfDay)), i => _cfg.timeOfDay = TodIds[i]), 60, 60);
+            UiKit.Size(UiKit.Cycler(list, "Dificuldade", DiffOpts, Mathf.Max(0, System.Array.IndexOf(DiffVals, _cfg.difficulty)), i => _cfg.difficulty = DiffVals[i]), 60, 60);
             var mins = new List<string>();
             foreach (var m in MinuteOpts) mins.Add(m + " minutos");
-            UiKit.Size(UiKit.Cycler(list, "Duração", mins, Mathf.Max(0, System.Array.IndexOf(MinuteOpts, _cfg.minutes)), i => _cfg.minutes = MinuteOpts[i]), 68, 68);
+            UiKit.Size(UiKit.Cycler(list, "Duração", mins, Mathf.Max(0, System.Array.IndexOf(MinuteOpts, _cfg.minutes)), i => _cfg.minutes = MinuteOpts[i]), 60, 60);
             if (_cfg.mode != GameModes.Field)
             {
                 var names = _cfg.mode == GameModes.Futsal ? VenueBuilder.FutsalNames : VenueBuilder.StreetNames;
-                UiKit.Size(UiKit.Cycler(list, "Local", names, _cfg.venue, i => { _cfg.venue = i; _refreshVenue?.Invoke(); }), 68, 68);
+                UiKit.Size(UiKit.Cycler(list, "Local", names, _cfg.venue, i => { _cfg.venue = i; _refreshVenue?.Invoke(); }), 60, 60);
             }
-            UiKit.Size(UiKit.Cycler(list, "Câmera", BroadcastCamera.Modes, Settings.Camera, i => Settings.Camera = i), 68, 68);
-            UiKit.Size(UiKit.Cycler(list, "Cerimônia de abertura", new[] { "Mostrar", "Pular" }, _cfg.ceremony ? 0 : 1, i => _cfg.ceremony = i == 0), 68, 68);
+            UiKit.Size(UiKit.Cycler(list, "Câmera", BroadcastCamera.Modes, Settings.Camera, i => Settings.Camera = i), 60, 60);
+            UiKit.Size(UiKit.Cycler(list, "Cerimônia de abertura", new[] { "Mostrar", "Pular" }, _cfg.ceremony ? 0 : 1, i => _cfg.ceremony = i == 0), 60, 60);
             // local da partida (imagem grande) e bola (pequena, parada)
             var card = UiKit.Panel(root).rectTransform.Place(0.57f, 0, 1, 1, 0, 200, 70, 250);
             UiKit.Label(card, "LOCAL", 28, Theme.Head, Theme.Accent, TextAnchor.MiddleLeft).rectTransform.Place(0, 1, 1, 1, 26, -56, 26, 14);

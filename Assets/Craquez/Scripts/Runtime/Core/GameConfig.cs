@@ -19,6 +19,7 @@ namespace Craquez
         public string weather = "sol";   // sol, nublado, chuva, tempestade, neve, aleatorio
         public string timeOfDay = "noite";  // dia, tarde, noite
         public bool dynamicWeather = true;
+        public bool swapSides;           // trocar os campos: o mandante começa atacando para a esquerda
         public int venue;                // futsal/rua: qual quadra/rua
         public uint seed = 1;
         public bool ceremony = true;

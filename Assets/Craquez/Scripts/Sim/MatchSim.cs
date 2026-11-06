@@ -77,6 +77,8 @@ namespace Craquez.Sim
         public int[] teamPress = { 1, 1 };
         /// <summary>Ajuste de rolagem por clima (chuva = bola mais rápida).</summary>
         public float rollScale = 1f;
+        /// <summary>Lados trocados no início (definir antes de Setup).</summary>
+        public bool startSwapped;
         /// <summary>Tick do último chute (tempo de reação do goleiro).</summary>
         public int lastShotTick = -1000;
 
@@ -225,6 +227,7 @@ namespace Craquez.Sim
         public float TeamDir(int t)
         {
             float d = t == 0 ? 1f : -1f;
+            if (startSwapped) d = -d;   // "trocar os campos": o mandante começa atacando para a esquerda
             return half == 1 ? d : -d;
         }
 
