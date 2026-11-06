@@ -34,8 +34,9 @@ namespace Craquez
             mode = Mathf.Clamp(m, 0, Modes.Length - 1);
             zoom = Settings.CameraZoom;
             _focus = Vector3.zero;
-            cam.nearClipPlane = 0.3f;
-            cam.farClipPlane = 900f;
+            // faixa de profundidade justa: menos "briga" de superfícies (pontos piscando) ao longe
+            cam.nearClipPlane = 0.5f;
+            cam.farClipPlane = 650f;
         }
 
         public void Shake(float amount) => _shake = Mathf.Max(_shake, amount);
@@ -58,7 +59,7 @@ namespace Craquez
                 if (r is ParticleSystemRenderer) continue;
                 var b = r.bounds;
                 bool floor = b.size.y < 0.6f && b.max.y < 0.8f;
-                if (floor || Mathf.Max(b.size.x, b.size.y, b.size.z) < 3f) continue;
+                if (floor || Mathf.Max(b.size.x, b.size.y, b.size.z) < 1.2f) continue;
                 // gols, redes e o que fica dentro do campo nunca somem
                 if (sim != null && Mathf.Abs(b.center.x) < sim.halfLen + 3.5f && Mathf.Abs(b.center.z) < sim.halfW + 1.5f && b.max.y < 6f) continue;
                 _occ.Add(r);
@@ -67,7 +68,7 @@ namespace Craquez
             }
         }
 
-        readonly Vector3[] _targets = new Vector3[4];
+        readonly Vector3[] _targets = new Vector3[7];
 
         void UpdateOccluders(Vector3 focus)
         {
@@ -78,6 +79,11 @@ namespace Craquez
             var targets = _targets;
             targets[0] = focus + Vector3.up * 0.8f; targets[1] = focus + new Vector3(7f, 0.8f, 0f); targets[2] = focus + new Vector3(-7f, 0.8f, 0f);
             targets[3] = new Vector3(focus.x, 0.5f, Mathf.Sign(c.z) * hw * 0.95f);
+            // cantos do campo do lado da câmera e o centro: nada pode tapar a área de jogo
+            float hl = sim.halfLen;
+            targets[4] = new Vector3(Mathf.Clamp(focus.x - 15f, -hl, hl), 0.5f, Mathf.Sign(c.z) * hw);
+            targets[5] = new Vector3(Mathf.Clamp(focus.x + 15f, -hl, hl), 0.5f, Mathf.Sign(c.z) * hw);
+            targets[6] = new Vector3(focus.x, 1.5f, 0f);
             for (int i = 0; i < _occ.Count; i++)
             {
                 var r = _occ[i];
@@ -91,6 +97,8 @@ namespace Craquez
                     if (len < 0.01f) continue;
                     if (b.Contains(c) || (b.IntersectRay(new Ray(c, d / len), out float hit) && hit < len - 0.5f)) { block = true; break; }
                 }
+                // colado na câmera (poste, mureta, alambrado) também some
+                if (!block && b.SqrDistance(c) < 16f) block = true;
                 if (block == _occHidden[i]) continue;
                 _occHidden[i] = block;
                 r.shadowCastingMode = block ? UnityEngine.Rendering.ShadowCastingMode.ShadowsOnly : _occMode[i];

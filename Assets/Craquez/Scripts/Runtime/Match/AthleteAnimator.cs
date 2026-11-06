@@ -79,7 +79,7 @@ namespace Craquez
         /// Braços naturais: a captura (retargeted) abre e ergue os braços demais. Limita a
         /// abertura lateral (~16°) e a elevação (~50°), preservando o balanço da corrida.
         /// </summary>
-        public static void Arms(AthleteRig rig, Transform root, PoseEdits pose, float w)
+        public static void Arms(AthleteRig rig, Transform root, PoseEdits pose, float w, float speed = 0f)
         {
             var right = root.right;
             var down = -root.up;
@@ -93,10 +93,12 @@ namespace Craquez
                 if (abd > 16f) pose.Rotate(up, Quaternion.AngleAxis(-(abd - 16f) * w * s, root.forward));   // (+ em torno da frente ergueria o braço direito)
                 var arm = (lo.position - up.position).normalized;
                 float elev = Vector3.Angle(arm, down);
-                if (elev > 50f)
+                // correndo forte o braço sobe mais (balanço natural da corrida); parado/andando, menos
+                float maxElev = Mathf.Lerp(50f, 78f, Mathf.Clamp01((speed - 3f) / 4f));
+                if (elev > maxElev)
                 {
                     var axis = Vector3.Cross(arm, down);
-                    if (axis.sqrMagnitude > 1e-6f) pose.Rotate(up, Quaternion.AngleAxis((elev - 50f) * w, axis.normalized));
+                    if (axis.sqrMagnitude > 1e-6f) pose.Rotate(up, Quaternion.AngleAxis((elev - maxElev) * w, axis.normalized));
                 }
             }
         }

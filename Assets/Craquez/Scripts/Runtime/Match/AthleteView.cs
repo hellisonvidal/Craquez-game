@@ -126,7 +126,8 @@ namespace Craquez
             _lean = Mathf.Lerp(_lean, Mathf.Clamp(-local.x * 0.6f + centri, -16f, 16f), 1f - Mathf.Exp(-dt * 6f));
             _pitch = Mathf.Lerp(_pitch, 0f, 1f - Mathf.Exp(-dt * 5f));
             // aceleração inclina o tronco (na coluna, em LateUpdate), não o corpo inteiro: pés firmes
-            _accLean = Mathf.Lerp(_accLean, Mathf.Clamp(local.z * 1.1f, -7f, 9f) + Mathf.Clamp01((spd - 6f) / 3f) * 4f, 1f - Mathf.Exp(-dt * 5f));
+            // tronco: inclina na arrancada e, em velocidade, fica um pouco à frente (como corredor de verdade)
+            _accLean = Mathf.Lerp(_accLean, Mathf.Clamp(local.z * 1.1f, -7f, 9f) + Mathf.Clamp01((spd - 3f) / 5f) * 7f, 1f - Mathf.Exp(-dt * 5f));
             float lift = 0f, roll = _lean, pitch = _pitch;
             if (_celebrate > 0f && p.vel.magnitude < 3f)
             {
@@ -265,7 +266,7 @@ namespace Craquez
         void ArmsDown()
         {
             if (_celebrate > 0f || (p.isKeeper && (p.dive > 0f || p.hold > 0f))) return;
-            PoseFix.Arms(rig, transform, _pose, 1f - (anim != null ? anim.ActionWeight * 0.5f : 0f));
+            PoseFix.Arms(rig, transform, _pose, 1f - (anim != null ? anim.ActionWeight * 0.5f : 0f), p.vel.magnitude);
         }
 
         float _ground;

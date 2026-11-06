@@ -61,7 +61,12 @@ half3 ToonLight(Light l, half3 n, half3 v, half3 albedo, half smooth, half shado
     half3 c = albedo * band * l.color;
     // brilho especular em faixa (couro, madeira molhada, bola)
     half3 h = SafeNormalize(l.direction + v);
-    half spec = smoothstep(0.985 - smooth * 0.03, 0.99 - smooth * 0.03, saturate(dot(n, h))) * smooth * lit;
+    // borda suavizada pelo tamanho do pixel (sem "pontos piscando" em piso com relevo) e
+    // desligada em superfícies foscas (grama, tecido)
+    half ndh = saturate(dot(n, h));
+    half t0 = 0.987 - smooth * 0.03;
+    half aa = max(fwidth(ndh) * 1.5, 0.004);
+    half spec = smoothstep(t0 - aa, t0 + aa, ndh) * smooth * lit * saturate((smooth - 0.35) / 0.3);
     c += spec * 0.45 * l.color;
     return c;
 }
