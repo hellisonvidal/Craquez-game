@@ -436,6 +436,10 @@ namespace Craquez
             Wall(new Vector3(W, 0, D), new Vector3(W, 0, -D));
             Wall(new Vector3(-W, 0, -D), new Vector3(-W, 0, D));
             low.Object("Parede", wallLow, v.root, false);
+            // piso do ginásio até as paredes (antes acabava antes delas: vão preto na tela)
+            var hallFloor = new MeshKit();
+            hallFloor.Quad(new Vector3(-W, -0.01f, -D), new Vector3(-W, -0.01f, D), new Vector3(W, -0.01f, D), new Vector3(W, -0.01f, -D), new Vector2(0, 0), new Vector2(W / 4f, D / 4f));
+            hallFloor.Object("Piso do ginásio", Gfx.Lit(new Color(0.42f, 0.43f, 0.46f), Gfx.Asphalt(256, Color.white, variant + 31, 0f), 0.3f), v.root, false);
             high.Object("Parede alta", wallHigh, v.root, false);
             var roof = new MeshKit();
             roof.Quad(new Vector3(-W, H, -D), new Vector3(W, H, -D), new Vector3(W, H, D), new Vector3(-W, H, D), new Vector2(0, 0), new Vector2(W / 3f, D / 3f));
