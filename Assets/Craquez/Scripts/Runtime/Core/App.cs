@@ -541,10 +541,9 @@ namespace Craquez
 
         void FixTeamsForMode()
         {
-            bool futsal = _cfg.mode == GameModes.Futsal;
-            var lgs = LeaguesFor(futsal, _cfg.national);
+            var lgs = LeaguesFor(_cfg.mode, _cfg.national);
             if (lgs.Count == 0) return;
-            bool ok(int t) { var l = Teams.Leagues[Teams.LeagueOf(t)]; return l.IsFutsal == futsal && l.IsNational == _cfg.national; }
+            bool ok(int t) => lgs.Contains(Teams.Leagues[Teams.LeagueOf(t)]);
             if (!ok(_cfg.teamA)) _cfg.teamA = lgs[0].first;
             if (!ok(_cfg.teamB)) _cfg.teamB = lgs[0].first + 1;
             _cfg.tacticsA = new Tactics();
@@ -553,11 +552,17 @@ namespace Craquez
             _cfg.kitB = -1;
         }
 
-        static List<League> LeaguesFor(bool futsal, bool national)
+        /// <summary>Ligas de cada modalidade: rua = times de rua; futsal = ligas/seleções de futsal; campo e society = de campo.</summary>
+        static List<League> LeaguesFor(string mode, bool national)
         {
             var l = new List<League>();
-            foreach (var lg in Teams.Leagues) if (lg.IsFutsal == futsal && lg.IsNational == national) l.Add(lg);
-            if (l.Count == 0) foreach (var lg in Teams.Leagues) if (lg.IsFutsal == futsal) l.Add(lg);
+            bool street = mode == GameModes.Street, futsal = mode == GameModes.Futsal;
+            foreach (var lg in Teams.Leagues)
+            {
+                if (street) { if (lg.IsStreet) l.Add(lg); continue; }
+                if (!lg.IsStreet && lg.IsFutsal == futsal && lg.IsNational == national) l.Add(lg);
+            }
+            if (l.Count == 0) foreach (var lg in Teams.Leagues) if (!lg.IsStreet && lg.IsFutsal == futsal) l.Add(lg);
             return l;
         }
 
@@ -655,7 +660,7 @@ namespace Craquez
             _back = ShowSetup;
             Title(root, _cfg.national ? "ESCOLHA DAS SELEÇÕES" : "ESCOLHA DOS TIMES", null);
             bool futsal = _cfg.mode == GameModes.Futsal;
-            var lgs = LeaguesFor(futsal, _cfg.national);
+            var lgs = LeaguesFor(_cfg.mode, _cfg.national);
             Selectable first = null;
             for (int side = 0; side < 2; side++)
             {
@@ -757,10 +762,12 @@ namespace Craquez
             var t = Teams.Get(side == 0 ? _cfg.teamA : _cfg.teamB);
             var tac = side == 0 ? _cfg.tacticsA : _cfg.tacticsB;
             Title(root, "TÁTICAS  •  " + t.name.ToUpperInvariant(), "Formação, estilo e escalação (selecione um titular e depois um reserva para trocar)");
-            var forms = new List<string>(GameModes.Formations(_cfg.mode).Keys);
-            if (string.IsNullOrEmpty(tac.formation)) tac.formation = forms[0];
+            var mode = GameModes.Get(_cfg.mode, _cfg.streetPlayers);
+            // só formações com o número certo de jogadores (rua 3x3/4x4/5x5)
+            var forms = new List<string>();
+            foreach (var kv in GameModes.Formations(_cfg.mode)) if (kv.Value.Length == mode.formation.Length) forms.Add(kv.Key);
+            if (string.IsNullOrEmpty(tac.formation) || !forms.Contains(tac.formation)) { tac.formation = forms[0]; tac.lineup = null; }
             var formation = GameModes.Formations(_cfg.mode)[tac.formation];
-            var mode = GameModes.Get(_cfg.mode);
             // escalação padrão (melhores por posição)
             if (tac.lineup == null || tac.lineup.Length != formation.Length)
             {

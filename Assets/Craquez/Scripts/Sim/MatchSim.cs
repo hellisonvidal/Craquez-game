@@ -79,6 +79,8 @@ namespace Craquez.Sim
         public float rollScale = 1f;
         /// <summary>Lados trocados no início (definir antes de Setup).</summary>
         public bool startSwapped;
+        /// <summary>Rua: jogadores por time (3, 4 ou 5; definir antes de Setup).</summary>
+        public int streetPlayers = 3;
         /// <summary>Tick do último chute (tempo de reação do goleiro).</summary>
         public int lastShotTick = -1000;
 
@@ -92,7 +94,7 @@ namespace Craquez.Sim
 
         public void Setup(string modeId, TeamSetup a, TeamSetup b, uint seed, float secondsPerHalf)
         {
-            mode = GameModes.Get(modeId);
+            mode = GameModes.Get(modeId, streetPlayers);
             mode.rollDecel *= rollScale;
             ball.radius = modeId == GameModes.Futsal ? 0.098f : 0.11f;   // futsal: bola tamanho 4
             halfLen = mode.length * 0.5f;
@@ -112,7 +114,7 @@ namespace Craquez.Sim
                 var roster = tm.data != null ? tm.data.roster : new List<RosterEntry>();
                 var used = new HashSet<int>();
                 var tac = tm.tactics ?? new Tactics();
-                var formation = forms.TryGetValue(tac.formation ?? "", out var f) ? f : mode.formation;
+                var formation = forms.TryGetValue(tac.formation ?? "", out var f) && f.Length == mode.formation.Length ? f : mode.formation;
                 teamMentality[t] = Mathf.Clamp(tac.mentality, 0, 2);
                 teamPress[t] = Mathf.Clamp(tac.press, 0, 2);
                 for (int i = 0; i < formation.Length; i++)
@@ -154,7 +156,7 @@ namespace Craquez.Sim
         public void SetRollScale(float s)
         {
             rollScale = s;
-            mode.rollDecel = GameModes.Get(mode.id).rollDecel * s;
+            mode.rollDecel = GameModes.Get(mode.id, streetPlayers).rollDecel * s;
         }
 
         /// <summary>Troca formação, mentalidade e pressão no meio do jogo (menu de pausa).</summary>
@@ -165,7 +167,7 @@ namespace Craquez.Sim
             teamMentality[t] = Mathf.Clamp(tac.mentality, 0, 2);
             teamPress[t] = Mathf.Clamp(tac.press, 0, 2);
             var forms = GameModes.Formations(mode.id);
-            if (!forms.TryGetValue(tac.formation ?? "", out var f)) return;
+            if (!forms.TryGetValue(tac.formation ?? "", out var f) || f.Length != mode.formation.Length) return;
             int i = 0;
             foreach (var p in players)
             {

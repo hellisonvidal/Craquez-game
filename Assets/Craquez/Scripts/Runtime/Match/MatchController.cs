@@ -47,6 +47,7 @@ namespace Craquez
             string w = c.weather == "aleatorio" ? WeatherFx.Kinds[(int)(c.seed % 5)] : c.weather;
             sim.rollScale = RollFor(c.mode, w);
             sim.startSwapped = c.swapSides;
+            sim.streetPlayers = c.streetPlayers;
             sim.Setup(c.mode, new TeamSetup { data = ta, tactics = c.tacticsA }, new TeamSetup { data = tb, tactics = c.tacticsB }, c.seed, c.SecondsPerHalf);
             view = new GameObject("Partida").AddComponent<MatchView>();
             view.transform.SetParent(transform, false);
@@ -211,6 +212,7 @@ namespace Craquez
             var tb = Teams.Get(cfg.teamB);
             fresh.rollScale = sim.rollScale;
             fresh.startSwapped = sim.startSwapped;
+            fresh.streetPlayers = sim.streetPlayers;
             fresh.Setup(cfg.mode, new TeamSetup { data = ta, tactics = cfg.tacticsA }, new TeamSetup { data = tb, tactics = cfg.tacticsB }, cfg.seed, cfg.SecondsPerHalf);
             for (int k = 0; k < sim.players.Count; k++)
             {

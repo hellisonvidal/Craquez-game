@@ -160,7 +160,7 @@ namespace Craquez.UI
 
         public static string ClockText(MatchSim sim)
         {
-            float perHalf = sim.mode.id == GameModes.Field ? 45f : sim.mode.id == GameModes.Futsal ? 20f : 10f;
+            float perHalf = sim.mode.id == GameModes.Field ? 45f : sim.mode.id == GameModes.Futsal ? 20f : sim.mode.id == GameModes.Society ? 25f : 10f;
             float m = Mathf.Min(sim.clock, sim.halfSeconds) / Mathf.Max(1f, sim.halfSeconds) * perHalf + (sim.half - 1) * perHalf;
             int mm = Mathf.FloorToInt(m);
             int ss = Mathf.FloorToInt((m - mm) * 60f);

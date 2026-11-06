@@ -32,15 +32,25 @@ namespace Craquez
         };
 
         // ------------------------------------------------------------------ campo
-        public static Venue Stadium(MatchSim sim, TeamData home, TeamData away, Kit homeKit, Kit awayKit, bool night, int quality, Transform parent)
+        /// <summary>Modelos de estádio (0 = o do mandante). cut: 0 listras, 1 listras largas, 2 xadrez, 3 xadrez miúdo.</summary>
+        public static readonly (string name, int tier, int cut, bool track)[] StadiumModels =
+        {
+            ("Estádio do mandante", 0, 0, false), ("Arena Moderna", 3, 0, false), ("Estádio Clássico", 3, 2, true), ("Estádio Municipal", 2, 1, false),
+            ("Estádio de Bairro", 1, 0, false), ("Caldeirão", 3, 3, false), ("Estádio Olímpico", 3, 1, true),
+        };
+
+        public static Venue Stadium(MatchSim sim, TeamData home, TeamData away, Kit homeKit, Kit awayKit, bool night, int quality, Transform parent, int model = 0)
         {
             var v = new Venue { root = new GameObject("Estadio").transform };
             v.root.SetParent(parent, false);
             float hl = sim.halfLen, hw = sim.halfW;
-            int tier = Mathf.Clamp(home.stadium.tier, 1, 3);
-            v.name = string.IsNullOrEmpty(home.stadium.name) ? "Estádio " + home.name : home.stadium.name;
+            model = Mathf.Clamp(model, 0, StadiumModels.Length - 1);
+            var sm = StadiumModels[model];
+            int tier = model == 0 ? Mathf.Clamp(home.stadium.tier, 1, 3) : sm.tier;
+            v.name = model > 0 ? sm.name : string.IsNullOrEmpty(home.stadium.name) ? "Estádio " + home.name : home.stadium.name;
             uint seed = (uint)home.name.GetHashCode();
-            Pitch(v, hl, hw, seed, quality);
+            Pitch(v, hl, hw, seed, quality, sm.cut);
+            if (sm.track) Track(v, hl, hw);
             Lines(v, sim, hl, hw);
             Goals(v, sim, hl, true);
             Boards(v, hl, hw, home, away);
@@ -64,7 +74,26 @@ namespace Craquez
             return (new Vector2(u0, v0 + 0.5f / texH), new Vector2(u0 + len / (texW / 8f * seat), v0 + 7.5f / texH));
         }
 
-        static void Pitch(Venue v, float hl, float hw, uint seed, int quality)
+        /// <summary>Pista de atletismo em volta do gramado (estádios clássico e olímpico).</summary>
+        static void Track(Venue v, float hl, float hw)
+        {
+            var t = new MeshKit();
+            var lanes = new MeshKit();
+            float i0x = hl + 6.2f, i0z = hw + 5.2f, w = 6f;
+            void Ring(float ax, float az, float bx, float bz, float y, MeshKit k)
+            {
+                k.Quad(new Vector3(-bx, y, -bz), new Vector3(-bx, y, -az), new Vector3(bx, y, -az), new Vector3(bx, y, -bz));
+                k.Quad(new Vector3(-bx, y, az), new Vector3(-bx, y, bz), new Vector3(bx, y, bz), new Vector3(bx, y, az));
+                k.Quad(new Vector3(-bx, y, -az), new Vector3(-bx, y, az), new Vector3(-ax, y, az), new Vector3(-ax, y, -az));
+                k.Quad(new Vector3(ax, y, -az), new Vector3(ax, y, az), new Vector3(bx, y, az), new Vector3(bx, y, -az));
+            }
+            Ring(i0x, i0z, i0x + w, i0z + w, 0.004f, t);
+            for (int i = 1; i < 6; i++) Ring(i0x + i * w / 6f - 0.03f, i0z + i * w / 6f - 0.03f, i0x + i * w / 6f + 0.03f, i0z + i * w / 6f + 0.03f, 0.008f, lanes);
+            t.Object("Pista de atletismo", Gfx.Lit(new Color(0.72f, 0.26f, 0.18f), Gfx.Asphalt(256, Color.white, 61, 0.2f), 0.15f), v.root, false);
+            lanes.Object("Raias", Gfx.Lit(new Color(0.95f, 0.95f, 0.95f), null, 0.1f), v.root, false);
+        }
+
+        static void Pitch(Venue v, float hl, float hw, uint seed, int quality, int cut = 0)
         {
             int ts = quality >= 2 ? 512 : 256;
             var grass = Gfx.Grass(ts, new Color(0.22f, 0.44f, 0.13f), (int)(seed % 997));
@@ -76,15 +105,18 @@ namespace Craquez
             var a = new MeshKit();
             var b = new MeshKit();
             float mx = hl + 6f, mz = hw + 5f;
-            int strips = 20;
-            float sw = mx * 2f / strips;
+            // desenho do corte da grama: listras, listras largas, xadrez ou xadrez miúdo
+            int strips = cut == 1 ? 12 : cut == 3 ? 28 : 20;
+            int rowsZ = cut >= 2 ? (cut == 3 ? 16 : 10) : 1;
+            float sw = mx * 2f / strips, sz = mz * 2f / rowsZ;
             for (int i = 0; i < strips; i++)
-            {
-                float x0 = -mx + i * sw, x1 = x0 + sw;
-                var mk = i % 2 == 0 ? a : b;
-                mk.Quad(new Vector3(x0, 0, -mz), new Vector3(x0, 0, mz), new Vector3(x1, 0, mz), new Vector3(x1, 0, -mz),
-                    new Vector2(x0 / 2.5f, -mz / 2.5f), new Vector2(x1 / 2.5f, mz / 2.5f));
-            }
+                for (int j = 0; j < rowsZ; j++)
+                {
+                    float x0 = -mx + i * sw, x1 = x0 + sw, z0 = -mz + j * sz, z1 = z0 + sz;
+                    var mk = (i + j) % 2 == 0 ? a : b;
+                    mk.Quad(new Vector3(x0, 0, z0), new Vector3(x0, 0, z1), new Vector3(x1, 0, z1), new Vector3(x1, 0, z0),
+                        new Vector2(x0 / 2.5f, z0 / 2.5f), new Vector2(x1 / 2.5f, z1 / 2.5f));
+                }
             var ga = a.Object("Gramado A", v.pitchMat, v.root, false);
             var gb = b.Object("Gramado B", v.pitchMat2, v.root, false);
             ga.GetComponent<MeshRenderer>().receiveShadows = true;

@@ -46,6 +46,7 @@ namespace Craquez.Sim
         public string id = "", name = "", sport = "football", country = "";
         public int first, count;
         public bool IsFutsal => sport.Contains("futsal");
+        public bool IsStreet => sport.Contains("street");
         public bool IsNational => sport.Contains("national");
     }
 
@@ -151,7 +152,49 @@ namespace Craquez.Sim
                 }
             }
             if (_flat.Count == 0) Fallback();
+            StreetCrews();
             ApplyOptionFile();
+        }
+
+        // times de rua: nomes de galera, cores fortes, elenco com atletas sorteados das ligas
+        static readonly (string name, string sh, string c1, string c2)[] Crews =
+        {
+            ("Bonde do Morro", "BDM", "#111827", "#facc15"), ("Cria da Praça", "CDP", "#16a34a", "#f8fafc"), ("Esquadrão da Laje", "EDL", "#dc2626", "#111827"),
+            ("Os Brabos da Vila", "OBV", "#7c3aed", "#facc15"), ("Rei do Asfalto", "RDA", "#0f172a", "#f97316"), ("Pivetes do Viaduto", "PDV", "#64748b", "#22d3ee"),
+            ("Resenha FC", "RES", "#f472b6", "#111827"), ("Tropa da Quebrada", "TDQ", "#1d4ed8", "#f8fafc"), ("Areia Fina", "ARF", "#fde68a", "#0369a1"),
+            ("Gaiola das Feras", "GDF", "#f59e0b", "#111827"), ("Varzeanos", "VAR", "#15803d", "#facc15"), ("Rolê Futebol Clube", "ROL", "#ef4444", "#f8fafc"),
+            ("Ginga de Rua", "GIN", "#0ea5e9", "#facc15"), ("Muleke Doido", "MUL", "#a3e635", "#111827"), ("Os Malandros", "MAL", "#111827", "#f8fafc"),
+            ("Terraço Esporte", "TER", "#6366f1", "#f97316"),
+        };
+
+        static void StreetCrews()
+        {
+            var pool = new List<RosterEntry>();
+            foreach (var t in _flat) foreach (var r in t.roster) pool.Add(r);
+            var lg = new League { id = "rua", name = "Times de Rua", sport = "street", country = "", first = _flat.Count };
+            var cmp = System.Globalization.CultureInfo.InvariantCulture.CompareInfo;
+            var crews = new List<(string name, string sh, string c1, string c2)>(Crews);
+            crews.Sort((a, b) => cmp.Compare(a.name, b.name, System.Globalization.CompareOptions.IgnoreNonSpace | System.Globalization.CompareOptions.IgnoreCase));
+            uint seed = 2166136261u;
+            foreach (var c in crews)
+            {
+                var t = new TeamData
+                {
+                    index = _flat.Count, name = c.name, shortName = c.sh, c1 = Col(c.c1), c2 = Col(c.c2),
+                    league = lg.name, leagueId = lg.id, rating = 0.62f + (seed % 23) / 100f,
+                };
+                t.kits = DefaultKits(t.c1, t.c2);
+                t.stadium = new Stadium { name = "Rua", tier = 1 };
+                for (int i = 0; i < 9 && pool.Count > 0; i++)
+                {
+                    seed = seed * 1664525u + 1013904223u;
+                    var src = pool[(int)(seed % (uint)pool.Count)];
+                    t.roster.Add(new RosterEntry { n = src.n, pos = i == 0 ? "DF" : i < 4 ? "MF" : "FW", nat = src.nat, num = i + 1 + (i > 6 ? 3 : 0), ovr = src.ovr, f = src.f, a = src.a, t = src.t });
+                }
+                _flat.Add(t);
+            }
+            lg.count = _flat.Count - lg.first;
+            _leagues.Add(lg);
         }
 
         static void Fallback()
