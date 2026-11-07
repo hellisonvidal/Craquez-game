@@ -8,7 +8,7 @@ namespace Craquez
     public class AthleteRig : MonoBehaviour
     {
         public Transform model;
-        public SkinnedMeshRenderer body;
+        public SkinnedMeshRenderer body, shirt, shorts;
         public Animator animator;
         public readonly Dictionary<string, Transform> bones = new Dictionary<string, Transform>();
         public Transform head, neck, spine, pelvis, footL, footR, handL, handR;
@@ -27,7 +27,6 @@ namespace Craquez
             var d = ball.position - foot.position;
             return Mathf.Atan2(d.y, new Vector2(d.x, d.z).magnitude) * Mathf.Rad2Deg;
         }
-        Transform _number, _numberFront;
 
         public void Init(Transform m)
         {
@@ -93,10 +92,11 @@ namespace Craquez
         // O modelo base já é encorpado: o "médio" afina um pouco; o forte fica perto do original.
         static readonly (string bone, float slim, float strong)[] Shape =
         {
-            ("spine_01", 0.84f, 0.96f), ("spine_02", 0.88f, 0.99f), ("spine_03", 0.92f, 1.02f),
-            ("clavicle_l", 0.95f, 1.01f), ("clavicle_r", 0.95f, 1.01f),
-            ("upperarm_l", 0.86f, 1.02f), ("upperarm_r", 0.86f, 1.02f), ("lowerarm_l", 0.9f, 1.01f), ("lowerarm_r", 0.9f, 1.01f),
-            ("thigh_l", 0.88f, 1.03f), ("thigh_r", 0.88f, 1.03f), ("calf_l", 0.9f, 1.02f), ("calf_r", 0.9f, 1.02f), ("neck_01", 0.92f, 1.01f),
+            // atleta: cintura fina, tórax em "V", coxas e panturrilhas fortes, pescoço firme
+            ("spine_01", 0.82f, 0.94f), ("spine_02", 0.88f, 0.99f), ("spine_03", 0.94f, 1.04f),
+            ("clavicle_l", 0.97f, 1.03f), ("clavicle_r", 0.97f, 1.03f),
+            ("upperarm_l", 0.88f, 1.03f), ("upperarm_r", 0.88f, 1.03f), ("lowerarm_l", 0.9f, 1.01f), ("lowerarm_r", 0.9f, 1.01f),
+            ("thigh_l", 0.92f, 1.06f), ("thigh_r", 0.92f, 1.06f), ("calf_l", 0.94f, 1.05f), ("calf_r", 0.94f, 1.05f), ("neck_01", 0.97f, 1.05f),
         };
 
         /// <summary>
@@ -107,7 +107,9 @@ namespace Craquez
         {
             build = Mathf.Clamp01(build);
             // ombros/caixa torácica: estreitos (0) .. largos (1), independente do porte
-            float fr = Mathf.Lerp(0.93f, 1.07f, Mathf.Clamp01(frame));
+            float fr = Mathf.Lerp(0.97f, 1.1f, Mathf.Clamp01(frame));
+            // cabeça um pouco menor (proporção real ~1:7,5 da altura; o modelo base tem cabeça grande)
+            if (head != null) head.localScale *= 0.95f;
             foreach (var (name, slim, strong) in Shape)
             {
                 float k = Mathf.Lerp(slim, strong, build);
@@ -136,46 +138,6 @@ namespace Craquez
                     c.localScale = Vector3.Scale(c.localScale, inv);
                 }
             }
-        }
-
-        /// <summary>Número nas costas (e pequeno no peito), acompanhando o tronco.</summary>
-        public void SetNumber(int n, Kit kit)
-        {
-            if (spine == null) return;
-            var col = kit.c1.grayscale > 0.55f ? new Color(0.06f, 0.07f, 0.1f) : Color.white;
-            if (Mathf.Abs(kit.c1.grayscale - kit.c2.grayscale) > 0.3f) col = kit.c2;
-            var mat = NumberMat(n, col);
-            _number = MakeQuad(mat, 0.24f, -1f, 0.04f, 0f);
-            _numberFront = MakeQuad(mat, 0.08f, 1f, 0.1f, -0.09f);
-        }
-
-        static readonly Dictionary<string, Material> _numMats = new Dictionary<string, Material>();
-
-        static Material NumberMat(int n, Color col)
-        {
-            string key = n + Teams.Hex(col);
-            if (_numMats.TryGetValue(key, out var m) && m != null) return m;
-            m = Gfx.Cutout(col, Glyphs.Number(n, 128), 0.5f, 0.2f);
-            _numMats[key] = m;
-            return m;
-        }
-
-        Transform MakeQuad(Material mat, float size, float side, float up, float lateral)
-        {
-            var go = GameObject.CreatePrimitive(PrimitiveType.Quad);
-            go.name = "numero";
-            Destroy(go.GetComponent<Collider>());
-            var mr = go.GetComponent<MeshRenderer>();
-            mr.sharedMaterial = mat;
-            mr.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
-            var fwd = transform.forward;
-            float depth = side < 0 ? 0.16f : 0.15f;   // por cima da camisa (peça com folga)
-            go.transform.localScale = new Vector3(size, size, 1f);
-            go.transform.position = spine.position + fwd * (side * depth) + Vector3.up * up + transform.right * lateral;
-            // o quad do Unity mostra a face para -Z local: aponta -Z para fora do corpo
-            go.transform.rotation = Quaternion.LookRotation(side < 0 ? fwd : -fwd, Vector3.up);
-            go.transform.SetParent(spine, true);
-            return go.transform;
         }
     }
 }

@@ -472,6 +472,13 @@ namespace Craquez
 
         void Update()
         {
+            // bola dentro do gol encostando na rede
+            if (sim != null && venue != null && Mathf.Abs(sim.ball.pos.x) > sim.halfLen - 0.05f)
+            {
+                var bw = new Vector3(sim.ball.pos.x, sim.ball.z + BallCatalog.Radius(sim.mode.id), sim.ball.pos.y);
+                var bv = new Vector3(sim.ball.vel.x, sim.ball.vz, sim.ball.vel.y);
+                foreach (var n in venue.nets) n.Touch(bw, bv, 0.35f);
+            }
             if (sim == null) return;
             // bola interpolada + rotação pelo rolamento
             var bp = Vector3.Lerp(_ballPrev, _ballCur, Alpha);

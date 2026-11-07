@@ -1103,8 +1103,7 @@ namespace Craquez
         Mesh _mesh;
         Vector3[] _base, _cur;
         float _side;
-        Vector3 _hit;
-        float _hitT;
+        float _hitT = 1f;   // (> 0: simula a rede desde o começo)
 
         public static GoalNet Create(Transform parent, float gx, float side, float gw, float gh, float gd, Texture2D netTex)
         {
@@ -1154,24 +1153,112 @@ namespace Craquez
             return n;
         }
 
+        // ---- tecido da rede: nós soldados (a malha repete vértices por quadrado), cada nó preso ao
+        // repouso por mola e aos vizinhos (a onda se espalha pela rede), amortecido; a armação
+        // (traves, travessão, chão) fica fixa.
+        int[] _node;                 // vértice -> nó
+        Vector3[] _rest, _disp, _vel;
+        int[][] _nbr;
+        bool[] _pinned;
+        float _awake;
+
+        void Weld()
+        {
+            var map = new System.Collections.Generic.Dictionary<Vector3Int, int>();
+            _node = new int[_base.Length];
+            var rest = new System.Collections.Generic.List<Vector3>();
+            for (int i = 0; i < _base.Length; i++)
+            {
+                var key = Vector3Int.RoundToInt(_base[i] * 200f);
+                if (!map.TryGetValue(key, out int n)) { n = rest.Count; map[key] = n; rest.Add(_base[i]); }
+                _node[i] = n;
+            }
+            _rest = rest.ToArray();
+            int N = _rest.Length;
+            _disp = new Vector3[N];
+            _vel = new Vector3[N];
+            var nb = new System.Collections.Generic.HashSet<int>[N];
+            for (int i = 0; i < N; i++) nb[i] = new System.Collections.Generic.HashSet<int>();
+            var tris = _mesh.triangles;
+            for (int t = 0; t + 2 < tris.Length; t += 3)
+                for (int k = 0; k < 3; k++)
+                {
+                    int a = _node[tris[t + k]], b = _node[tris[t + (k + 1) % 3]];
+                    if (a != b) { nb[a].Add(b); nb[b].Add(a); }
+                }
+            _nbr = new int[N][];
+            for (int i = 0; i < N; i++) { _nbr[i] = new int[nb[i].Count]; nb[i].CopyTo(_nbr[i]); }
+            // presos: chão e a armação da frente (linha do gol)
+            float frontX = _rest[0].x;
+            foreach (var r in _rest) frontX = _side > 0 ? Mathf.Min(frontX, r.x) : Mathf.Max(frontX, r.x);
+            _pinned = new bool[N];
+            for (int i = 0; i < N; i++) _pinned[i] = _rest[i].y < 0.02f || Mathf.Abs(_rest[i].x - frontX) < 0.02f;
+        }
+
+        /// <summary>Bola entrou: empurrão forte na direção do chute, que se espalha e volta balançando.</summary>
         public void Hit(Vector3 worldPoint, float strength)
         {
-            _hit = transform.InverseTransformPoint(worldPoint);
-            _hitT = Mathf.Clamp(strength / 25f, 0.3f, 1f);
+            if (_node == null) Weld();
+            var hit = transform.InverseTransformPoint(worldPoint);
+            float k = Mathf.Clamp(strength / 25f, 0.35f, 1.3f);
+            for (int i = 0; i < _rest.Length; i++)
+            {
+                if (_pinned[i]) continue;
+                float d2 = (_rest[i] - hit).sqrMagnitude;
+                float w = Mathf.Exp(-d2 * 1.6f);
+                _vel[i] += new Vector3(_side * 4.2f, -0.6f, (_rest[i].z - hit.z) * 0.8f) * (w * k);
+            }
+            _awake = 4f;
+        }
+
+        /// <summary>Bola encostando na rede (rolando ou parada dentro do gol): afunda o tecido em volta.</summary>
+        public void Touch(Vector3 worldPoint, Vector3 worldVel, float radius)
+        {
+            if (_node == null) Weld();
+            var p = transform.InverseTransformPoint(worldPoint);
+            var v = transform.InverseTransformVector(worldVel);
+            bool any = false;
+            for (int i = 0; i < _rest.Length; i++)
+            {
+                if (_pinned[i]) continue;
+                var q = _rest[i] + _disp[i];
+                float d = Vector3.Distance(q, p);
+                if (d > radius * 2.2f) continue;
+                float w = 1f - d / (radius * 2.2f);
+                _vel[i] += (v * 0.5f + new Vector3(_side, 0, 0) * 1.5f) * (w * Time.deltaTime * 10f);
+                any = true;
+            }
+            if (any) _awake = Mathf.Max(_awake, 2f);
         }
 
         void Update()
         {
-            if (_hitT <= 0f && _cur == null) return;
-            if (_hitT <= 0.001f) return;
-            _hitT = Mathf.MoveTowards(_hitT, 0f, Time.deltaTime * 0.9f);
-            float wob = Mathf.Sin(Time.time * 18f) * 0.25f + 0.75f;
-            for (int i = 0; i < _base.Length; i++)
-            {
-                float d = Vector3.Distance(_base[i], _hit);
-                float k = Mathf.Exp(-d * d * 0.8f) * _hitT * wob;
-                _cur[i] = _base[i] + new Vector3(_side * 0.55f * k, -0.1f * k, 0);
-            }
+            if (_node == null) { if (_hitT <= 0f) return; Weld(); }
+            float dt = Mathf.Min(Time.deltaTime, 1f / 30f);
+            // brisa leve sempre (a rede "respira"); depois de um gol, simulação completa
+            float breeze = Mathf.Sin(Time.time * 1.3f + transform.position.x) * 0.004f;
+            _awake = Mathf.Max(0f, _awake - dt);
+            int N = _rest.Length;
+            const float kRest = 38f, kNbr = 240f, damp = 5.5f;
+            int sub = 2;
+            float h = dt / sub;
+            for (int s = 0; s < sub; s++)
+                for (int i = 0; i < N; i++)
+                {
+                    if (_pinned[i]) { _disp[i] = Vector3.zero; _vel[i] = Vector3.zero; continue; }
+                    var avg = Vector3.zero;
+                    var nb = _nbr[i];
+                    for (int j = 0; j < nb.Length; j++) avg += _disp[nb[j]];
+                    if (nb.Length > 0) avg /= nb.Length;
+                    var acc = -_disp[i] * kRest + (avg - _disp[i]) * kNbr - _vel[i] * damp;
+                    acc.x += _side * breeze * 40f * Mathf.Clamp01(_rest[i].y);   // o vento empurra o fundo
+                    acc.y -= 0.6f;                                                // caimento do tecido
+                    _vel[i] += acc * h;
+                    _disp[i] += _vel[i] * h;
+                    // a rede não atravessa para dentro do gol além do pano original
+                    if (_disp[i].x * _side < -0.25f) { _disp[i].x = -0.25f * _side; _vel[i].x = 0f; }
+                }
+            for (int v = 0; v < _cur.Length; v++) _cur[v] = _base[v] + _disp[_node[v]];
             _mesh.vertices = _cur;
             _mesh.RecalculateBounds();
         }

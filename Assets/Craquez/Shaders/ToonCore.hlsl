@@ -13,6 +13,23 @@ half4 _ToonParams;         // x = limiar da faixa, y = suavidade da borda, z = f
 half4 _ToonOutlineColor;
 float4 _ToonOutline;       // x = espessura (m a 10 m), y = mín. (m), z = máx. (m)
 
+// tecido solto (camisa e calção; zero nos outros materiais — ver AthleteView.Cloth):
+// folga ao longo da normal, arrasto pelo movimento e tremulação, crescendo em direção à barra
+float _ClothInflate;       // folga (m)
+float4 _ClothBand;         // x = altura (y do mundo) onde o tecido começa a soltar, y = altura da barra
+float4 _ClothDrag;         // xyz = deslocamento da barra (m, mundo) pelo movimento
+float4 _ClothFlutter;      // x = amplitude (m), y = frequência, z = fase
+
+float3 ClothOffset(float3 posWS, float3 nWS)
+{
+    float span = max(0.02, _ClothBand.x - _ClothBand.y);
+    float mask = saturate((_ClothBand.x - posWS.y) / span);
+    float m2 = mask * mask;
+    float wave = sin(_Time.y * _ClothFlutter.y + _ClothFlutter.z + (posWS.x + posWS.z) * 9.0)
+               + 0.5 * sin(_Time.y * _ClothFlutter.y * 1.7 + posWS.y * 23.0);
+    return nWS * (_ClothInflate * (0.5 + 0.5 * mask) + wave * _ClothFlutter.x * m2) + _ClothDrag.xyz * m2;
+}
+
 struct ToonAttributes
 {
     float4 positionOS : POSITION;
@@ -39,9 +56,10 @@ ToonVaryings ToonVert(ToonAttributes v)
     UNITY_TRANSFER_INSTANCE_ID(v, o);
     UNITY_INITIALIZE_VERTEX_OUTPUT_STEREO(o);
     VertexPositionInputs p = GetVertexPositionInputs(v.positionOS.xyz);
-    o.positionCS = p.positionCS;
-    o.positionWS = p.positionWS;
     o.normalWS = TransformObjectToWorldNormal(v.normalOS);
+    float3 posWS = p.positionWS + ClothOffset(p.positionWS, SafeNormalize(o.normalWS));
+    o.positionCS = TransformWorldToHClip(posWS);
+    o.positionWS = posWS;
     o.uv = TRANSFORM_TEX(v.uv, _BaseMap);
     o.fog = ComputeFogFactor(p.positionCS.z);
     return o;
@@ -125,6 +143,7 @@ ToonVaryings OutlineVert(ToonAttributes v)
     UNITY_INITIALIZE_VERTEX_OUTPUT_STEREO(o);
     float3 posWS = TransformObjectToWorld(v.positionOS.xyz);
     float3 nWS = SafeNormalize(TransformObjectToWorldNormal(v.normalOS));
+    posWS += ClothOffset(posWS, nWS);
     float dist = length(GetCameraPositionWS() - posWS);
     float w = clamp(_ToonOutline.x * dist / 10.0, _ToonOutline.y, _ToonOutline.z);
     posWS += nWS * w;

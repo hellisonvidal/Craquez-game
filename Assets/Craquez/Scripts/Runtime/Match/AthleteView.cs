@@ -351,7 +351,13 @@ namespace Craquez
                 var toOw = ow.position - p.position;
                 guard = ow.team != p.team && toOw.magnitude < 2.6f && Vector2.Dot(toOw.normalized, p.facing) > 0.5f;
             }
-            float animSpeed = p.vel.magnitude, animFwd = lv.z;
+            // velocidade da passada suavizada, com arrancada/freada de gente (sem trocar de
+            // passada a cada passo da simulação nem "pular" de andar para correr)
+            float rawSpd = p.vel.magnitude;
+            float accLim = rawSpd > _animSpd ? 11f : 16f;
+            _animSpd = Mathf.MoveTowards(_animSpd, rawSpd, accLim * dt);
+            _animSpd = Mathf.Lerp(_animSpd, rawSpd, 1f - Mathf.Exp(-dt * 3f));
+            float animSpeed = _animSpd, animFwd = rawSpd > 0.01f ? lv.z * (_animSpd / rawSpd) : 0f;
             // girando parado: passinhos no lugar em vez de "patinar" sobre os pés
             float turnStep = Mathf.Clamp(Mathf.Abs(_yawRate) * 0.0065f, 0f, 1.3f);
             if (animSpeed < 1.2f && turnStep > 0.35f && !guard)
@@ -363,7 +369,7 @@ namespace Craquez
             Cuts(dt, spd);
             Touches();
             _pose.Restore();   // tira as correções do quadro anterior antes de avaliar a animação
-            anim?.Tick(dt, animSpeed, animFwd, lv.x, guard);
+            anim?.Tick(dt, animSpeed, animFwd, rawSpd > 0.01f ? lv.x * (_animSpd / rawSpd) : 0f, guard);
             if (!_diag && rig.head != null && p.id == 3)
             {
                 _diag = true;
@@ -372,6 +378,7 @@ namespace Craquez
             if (_celebrate > 0f) _celebrate -= dt;
         }
 
+        float _animSpd;
         readonly PoseEdits _pose = new PoseEdits();
         float _accLean, _cutCd, _touchAnim, _lastTouchT;
         Vector2 _refDir;
@@ -498,10 +505,64 @@ namespace Craquez
                 PointArm();
             }
             GroundFeet();
+            Cloth();
             if (p == null || rig == null || rig.head == null) return;
             HeadAndNeck();
             Arms();
             KeeperHold();
+        }
+
+        // ---------------------------------------------------------------- tecido solto
+        static readonly int IdInflate = Shader.PropertyToID("_ClothInflate"), IdBand = Shader.PropertyToID("_ClothBand"),
+            IdDrag = Shader.PropertyToID("_ClothDrag"), IdFlutter = Shader.PropertyToID("_ClothFlutter");
+        MaterialPropertyBlock _mpb;
+        Vector3 _clothPos, _clothVel, _clothDrag, _clothDragV;
+        float _clothPhase = -1f;
+
+        /// <summary>
+        /// Camisa e calção com folga e movimento: a barra fica para trás na arrancada, balança
+        /// nas mudanças de direção e tremula com a velocidade (mola amortecida, sem física cara).
+        /// </summary>
+        void Cloth()
+        {
+            if (rig == null || rig.pelvis == null || (rig.shirt == null && rig.shorts == null)) return;
+            float dt = Mathf.Max(1e-4f, Time.deltaTime);
+            if (_mpb == null) { _mpb = new MaterialPropertyBlock(); _clothPos = rig.pelvis.position; _clothPhase = (p != null ? p.id : 0) * 1.37f; }
+            var pos = rig.pelvis.position;
+            var vel = (pos - _clothPos) / dt;
+            _clothPos = pos;
+            if (vel.sqrMagnitude > 400f) vel = Vector3.zero;   // teleporte (replay, reposição)
+            var acc = (vel - _clothVel) / dt;
+            _clothVel = Vector3.Lerp(_clothVel, vel, 1f - Mathf.Exp(-dt * 12f));
+            // alvo: o tecido "fica para trás" do movimento e da aceleração
+            var target = -_clothVel * 0.0055f - Vector3.ClampMagnitude(acc, 40f) * 0.0011f;
+            target.y = Mathf.Clamp(target.y, -0.02f, 0.02f);
+            target = Vector3.ClampMagnitude(target, 0.06f);
+            // mola amortecida (passa um pouco do ponto e volta: o balanço)
+            _clothDragV += ((target - _clothDrag) * 140f - _clothDragV * 11f) * dt;
+            _clothDrag += _clothDragV * dt;
+            float spd = new Vector2(_clothVel.x, _clothVel.z).magnitude;
+            float flutAmp = 0.0025f + Mathf.Min(spd, 9f) * 0.0011f;
+            float freq = 9f + spd * 1.3f;
+            if (rig.shirt != null)
+            {
+                float top = (rig.spine != null ? rig.spine.position.y : pos.y + 0.4f) + 0.02f;
+                rig.shirt.GetPropertyBlock(_mpb);
+                _mpb.SetFloat(IdInflate, 0.011f);
+                _mpb.SetVector(IdBand, new Vector4(top, pos.y - 0.14f, 0, 0));
+                _mpb.SetVector(IdDrag, _clothDrag);
+                _mpb.SetVector(IdFlutter, new Vector4(flutAmp, freq, _clothPhase, 0));
+                rig.shirt.SetPropertyBlock(_mpb);
+            }
+            if (rig.shorts != null)
+            {
+                rig.shorts.GetPropertyBlock(_mpb);
+                _mpb.SetFloat(IdInflate, 0.008f);
+                _mpb.SetVector(IdBand, new Vector4(pos.y - 0.02f, pos.y - 0.34f, 0, 0));
+                _mpb.SetVector(IdDrag, _clothDrag * 0.55f);
+                _mpb.SetVector(IdFlutter, new Vector4(flutAmp * 0.7f, freq * 1.1f, _clothPhase + 1.7f, 0));
+                rig.shorts.SetPropertyBlock(_mpb);
+            }
         }
 
         float _holdW;

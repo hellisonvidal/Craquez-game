@@ -18,7 +18,7 @@ namespace Craquez
         static readonly Dictionary<Mesh, Info> _info = new Dictionary<Mesh, Info>();
 
         /// <summary>Eixos do modelo (descobertos no corpo): índice e sinal do "para cima" e do lateral.</summary>
-        public struct Axes { public int up, lat, dep; public float upSign; public float groundUp; }
+        public struct Axes { public int up, lat, dep; public float upSign, depSign; public float groundUp; }
 
         class Info
         {
@@ -29,7 +29,7 @@ namespace Craquez
             public Vector3 center;
         }
 
-        public static Axes AxesFrom(Mesh body, Mesh socks)
+        public static Axes AxesFrom(Mesh body, Mesh socks, Mesh boots = null)
         {
             var b = body.bounds;
             var e = b.size;
@@ -38,7 +38,11 @@ namespace Craquez
             int lat = e[o1] >= e[o2] ? o1 : o2;
             float sign = 1f;
             if (socks != null) sign = socks.bounds.center[up] < b.center[up] ? 1f : -1f;
-            return new Axes { up = up, lat = lat, dep = lat == o1 ? o2 : o1, upSign = sign, groundUp = sign > 0 ? b.min[up] : -b.max[up] };
+            int dep = lat == o1 ? o2 : o1;
+            // frente: a ponta da chuteira fica à frente do meião
+            float dsign = 1f;
+            if (boots != null && socks != null) dsign = boots.bounds.center[dep] >= socks.bounds.center[dep] ? 1f : -1f;
+            return new Axes { up = up, lat = lat, dep = dep, upSign = sign, depSign = dsign, groundUp = sign > 0 ? b.min[up] : -b.max[up] };
         }
 
         static Info Get(Mesh m)
@@ -79,24 +83,112 @@ namespace Craquez
             return info;
         }
 
-        public static Texture2D Paint(Mesh mesh, KitPart part, Kit kit, Axes ax, int size)
+        static readonly Dictionary<string, Color32[]> _basePx = new Dictionary<string, Color32[]>();
+
+        /// <summary>
+        /// Textura da peça. Na camisa, number &gt;= 0 pinta o número nas costas (grande) e no peito
+        /// (pequeno) direto no tecido: ele dobra e acompanha a camisa (antes era uma placa solta).
+        /// </summary>
+        public static Texture2D Paint(Mesh mesh, KitPart part, Kit kit, Axes ax, int size, int number = -1)
         {
-            string key = mesh.GetInstanceID() + ":" + part + Teams.Hex(kit.c1) + Teams.Hex(kit.c2) + Teams.Hex(kit.shorts) + Teams.Hex(kit.socks) + kit.pattern + (kit.sleeves.a > 0f ? Teams.Hex(kit.sleeves) : "") + (kit.trim.a > 0f ? Teams.Hex(kit.trim) : "") + ":" + size;
+            string baseKey = mesh.GetInstanceID() + ":" + part + Teams.Hex(kit.c1) + Teams.Hex(kit.c2) + Teams.Hex(kit.shorts) + Teams.Hex(kit.socks) + kit.pattern + (kit.sleeves.a > 0f ? Teams.Hex(kit.sleeves) : "") + (kit.trim.a > 0f ? Teams.Hex(kit.trim) : "") + ":" + size;
+            if (part != KitPart.Shirt) number = -1;
+            string key = baseKey + (number >= 0 ? "#" + number : "");
             if (_cache.TryGetValue(key, out var cached) && cached != null) return cached;
             var info = Get(mesh);
-            var px = new Color32[size * size];
-            var filled = new bool[size * size];
             float topUp = float.MinValue;
             foreach (var p in info.v) topUp = Mathf.Max(topUp, p[ax.up] * ax.upSign);
-            for (int i = 0; i + 2 < info.tris.Length; i += 3)
-                Raster(px, filled, size, info, info.tris[i], info.tris[i + 1], info.tris[i + 2],
-                    (p, trim) => ColorAt(part, kit, p, trim, ax, info.center, topUp));
-            Dilate(px, filled, size, 4);
+            if (!_basePx.TryGetValue(baseKey, out var basePx))
+            {
+                basePx = new Color32[size * size];
+                var filled = new bool[size * size];
+                for (int i = 0; i + 2 < info.tris.Length; i += 3)
+                    Raster(basePx, filled, size, info, info.tris[i], info.tris[i + 1], info.tris[i + 2],
+                        (p, trim) => ColorAt(part, kit, p, trim, ax, info.center, topUp));
+                Dilate(basePx, filled, size, 4);
+                _basePx[baseKey] = basePx;
+            }
+            var px = basePx;
+            if (number >= 0)
+            {
+                // só os triângulos perto das áreas do número são pintados de novo
+                px = (Color32[])basePx.Clone();
+                var fill2 = new bool[size * size];
+                var numCol = NumberColor(kit);
+                var edgeCol = Contrast(numCol, kit.c1);
+                for (int i = 0; i + 2 < info.tris.Length; i += 3)
+                {
+                    var c = (info.v[info.tris[i]] + info.v[info.tris[i + 1]] + info.v[info.tris[i + 2]]) / 3f;
+                    if (!NearNumber(c, ax, info.center, topUp)) continue;
+                    Raster(px, fill2, size, info, info.tris[i], info.tris[i + 1], info.tris[i + 2], (p, trim) =>
+                    {
+                        var col = ColorAt(part, kit, p, trim, ax, info.center, topUp);
+                        if (trim > 0.5f) return col;
+                        float aa = 1.2f / size * 3f;
+                        NumberUv(p, ax, info.center, topUp, out var uvB, out var uvF);
+                        float aB = NumberCover(number, uvB, aa, out float eB);
+                        float aF = NumberCover(number, uvF, aa * 2.5f, out float eF);
+                        col = Color.Lerp(col, edgeCol, Mathf.Max(eB, eF) * 0.9f);
+                        col = Color.Lerp(col, numCol, Mathf.Max(aB, aF));
+                        col.a = 1f;
+                        return col;
+                    });
+                }
+            }
             var t = new Texture2D(size, size, TextureFormat.RGBA32, true) { wrapMode = TextureWrapMode.Clamp, anisoLevel = 4 };
             t.SetPixels32(px);
             t.Apply(true, true);
             _cache[key] = t;
             return t;
+        }
+
+        public static Color NumberColor(Kit kit)
+        {
+            var col = kit.c1.grayscale > 0.55f ? new Color(0.06f, 0.07f, 0.1f) : Color.white;
+            if (Mathf.Abs(kit.c1.grayscale - kit.c2.grayscale) > 0.3f) col = kit.c2;
+            return col;
+        }
+
+        const float BackNum = 0.25f, FrontNum = 0.09f;   // tamanho (m) do número nas costas e no peito
+
+        static void Local(Vector3 p, Axes ax, Vector3 center, float topUp, out float right, out float down, out float fwd)
+        {
+            // direita do atleta = up x frente (regra da Unity)
+            var U = Vector3.zero; U[ax.up] = ax.upSign;
+            var F = Vector3.zero; F[ax.dep] = ax.depSign;
+            var R = Vector3.Cross(U, F);
+            var d = p - center;
+            right = Vector3.Dot(d, R);
+            fwd = Vector3.Dot(d, F);
+            down = topUp - p[ax.up] * ax.upSign;
+        }
+
+        static bool NearNumber(Vector3 p, Axes ax, Vector3 center, float topUp)
+        {
+            Local(p, ax, center, topUp, out float r, out float dn, out float f);
+            bool back = f < 0f && Mathf.Abs(r) < BackNum * 0.75f && dn > 0.04f && dn < 0.16f + BackNum * 1.2f;
+            bool front = f > 0f && r > -0.2f && r < 0.02f && dn > 0.06f && dn < 0.3f;
+            return back || front;
+        }
+
+        /// <summary>Coordenadas do ponto dentro do quadro do número das costas e do peito (fora = negativo).</summary>
+        static void NumberUv(Vector3 p, Axes ax, Vector3 center, float topUp, out Vector2 back, out Vector2 front)
+        {
+            Local(p, ax, center, topUp, out float r, out float dn, out float f);
+            back = new Vector2(-1, -1); front = new Vector2(-1, -1);
+            // costas: visto de trás, a direita do atleta fica à direita de quem olha
+            if (f < -0.02f) back = new Vector2(0.5f + r / BackNum, 1f - (dn - 0.1f) / BackNum);
+            // peito, do lado esquerdo do atleta: visto de frente, a direita dele fica à esquerda de quem olha
+            if (f > 0.02f) front = new Vector2(0.5f - (r + 0.095f) / FrontNum, 1f - (dn - 0.13f) / FrontNum);
+        }
+
+        static float NumberCover(int n, Vector2 uv, float aa, out float edge)
+        {
+            edge = 0f;
+            if (uv.x < -0.1f || uv.x > 1.1f || uv.y < -0.1f || uv.y > 1.1f) return 0f;
+            float a = Glyphs.NumberAlpha(n, uv.x, uv.y, aa);
+            edge = Glyphs.NumberAlpha(n, uv.x, uv.y, aa, 0.022f) * (1f - a);
+            return a;
         }
 
         static Color ColorAt(KitPart part, Kit k, Vector3 p, float trim, Axes ax, Vector3 center, float topUp)

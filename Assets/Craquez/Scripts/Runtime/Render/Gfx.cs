@@ -653,6 +653,37 @@ namespace Craquez
             return t;
         }
 
+        /// <summary>
+        /// Cobertura (0..1) do número no ponto (u, v) do quadrado unitário (v para cima), sem
+        /// textura: o mesmo traçado de Number, para pintar direto na camisa. aa = largura do
+        /// pixel em unidades do quadrado; grow = engrossa o traço (contorno).
+        /// </summary>
+        public static float NumberAlpha(int n, float u, float v, float aa, float grow = 0f)
+        {
+            string s = Mathf.Clamp(n, 0, 99).ToString();
+            float digitW = 2f, gap = 1.1f, thick = 0.62f;
+            float totalW = s.Length * digitW + (s.Length - 1) * gap;
+            float scale = 0.78f / Mathf.Max(4f + thick, totalW + thick);
+            float ox = (1f - totalW * scale) * 0.5f, oy = (1f - 4f * scale) * 0.5f;
+            var p = new Vector2(u, v);
+            float best = 99f;
+            for (int i = 0; i < s.Length; i++)
+            {
+                var st = Strokes[s[i]];
+                float dx0 = ox + i * (digitW + gap) * scale;
+                for (int k = 0; k + 3 < st.Length; k += 4)
+                {
+                    var a = new Vector2(dx0 + st[k] * scale, oy + st[k + 1] * scale);
+                    var b = new Vector2(dx0 + st[k + 2] * scale, oy + st[k + 3] * scale);
+                    var ab = b - a;
+                    float tt = Mathf.Clamp01(Vector2.Dot(p - a, ab) / Mathf.Max(1e-7f, ab.sqrMagnitude));
+                    best = Mathf.Min(best, Vector2.Distance(p, a + ab * tt));
+                }
+            }
+            float r = thick * scale * 0.5f + grow;
+            return Mathf.Clamp01((r - best) / Mathf.Max(1e-5f, aa) + 0.5f);
+        }
+
         /// <summary>Matriz [x, y] (y para cima) do texto em altura h pixels.</summary>
         public static bool[,] Render(string text, int h)
         {

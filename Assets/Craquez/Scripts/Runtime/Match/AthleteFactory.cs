@@ -129,13 +129,14 @@ namespace Craquez
         public static void Dress(AthleteRig rig, Look look, Kit kit, int number, int quality)
         {
             var smrs = rig.GetComponentsInChildren<SkinnedMeshRenderer>(true);
-            Mesh bodyMesh = null, socksMesh = null;
+            Mesh bodyMesh = null, socksMesh = null, bootsMesh = null;
             foreach (var r in smrs)
             {
                 if (r.name == "Body") bodyMesh = r.sharedMesh;
                 if (r.name == "Socks") socksMesh = r.sharedMesh;
+                if (r.name == "Boots") bootsMesh = r.sharedMesh;
             }
-            var axes = bodyMesh != null ? KitPainter.AxesFrom(bodyMesh, socksMesh) : default;
+            var axes = bodyMesh != null ? KitPainter.AxesFrom(bodyMesh, socksMesh, bootsMesh) : default;
             int tex = quality >= 2 ? 1024 : 512;
             foreach (var smr in smrs)
             {
@@ -161,8 +162,12 @@ namespace Craquez
                     case "Socks":
                     {
                         var part = n == "Shirt" ? KitPart.Shirt : n == "Shorts" ? KitPart.Shorts : KitPart.Socks;
-                        var kt = KitPainter.Paint(smr.sharedMesh, part, kit, axes, part == KitPart.Socks ? tex / 2 : tex);
+                        // a camisa leva o número pintado (uma textura por atleta; no Ultra em 1024)
+                        int size = part == KitPart.Socks ? tex / 2 : part == KitPart.Shirt ? (quality >= 3 ? 1024 : 512) : tex;
+                        var kt = KitPainter.Paint(smr.sharedMesh, part, kit, axes, size, part == KitPart.Shirt ? number : -1);
                         // tecido dos dois lados (vê-se o avesso pela gola e pelas mangas)
+                        if (part == KitPart.Shirt) rig.shirt = smr;
+                        else if (part == KitPart.Shorts) rig.shorts = smr;
                         smr.sharedMaterial = Shared("kit:" + kt.GetInstanceID(), () => Gfx.Character(Color.white, kt, part == KitPart.Shirt ? 0.34f : 0.26f, true));
                         break;
                     }
@@ -202,7 +207,7 @@ namespace Craquez
                         break;
                 }
             }
-            rig.SetNumber(number, kit);
+            // (o número agora vem pintado na camisa)
         }
 
         static readonly string[] FaceKeys =
