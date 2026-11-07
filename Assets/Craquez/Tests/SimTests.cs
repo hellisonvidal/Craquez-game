@@ -195,6 +195,38 @@ namespace Craquez.Tests
             }
         }
 
+        [TestCase(GameModes.Field, 6.5f)]
+        [TestCase(GameModes.Futsal, 3.2f)]
+        public void PlayersKeepSpacing(string mode, float minNeighbor)
+        {
+            // ninguém amontoado: distância média até o companheiro mais próximo durante o jogo
+            var sim = NewMatch(mode, 3);
+            var a = new CpuBrain(0, 0.7f);
+            var b = new CpuBrain(1, 0.7f);
+            double sum = 0; int n = 0;
+            for (int i = 0; i < 60 * 90; i++)
+            {
+                sim.Step(new[] { a.MakeInput(sim), b.MakeInput(sim) });
+                if (sim.state != MatchState.Playing || i % 15 != 0) continue;
+                foreach (var p in sim.players)
+                {
+                    if (p.isKeeper) continue;
+                    float best = 999f;
+                    foreach (var q in sim.players) if (q != p && q.team == p.team && !q.isKeeper) best = Mathf.Min(best, q.position.Dist(p.position));
+                    sum += best; n++;
+                }
+            }
+            Assert.Greater(sum / n, minNeighbor);
+        }
+
+        [Test] public void PlayersHaveDistinctPersonalities()
+        {
+            var sim = NewMatch(GameModes.Field, 9);
+            float minW = 1f, maxW = 0f;
+            foreach (var p in sim.players) { minW = Mathf.Min(minW, p.work); maxW = Mathf.Max(maxW, p.work); }
+            Assert.Greater(maxW - minW, 0.2f);
+        }
+
         [Test] public void JsonRoundTrip()
         {
             var o = MiniJson.Parse("{\"a\": [1, 2.5, \"x\\n\"], \"b\": {\"c\": true, \"d\": null}}");

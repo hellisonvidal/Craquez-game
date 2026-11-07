@@ -59,6 +59,11 @@ namespace Craquez.Sim
         public float down, downTotal;
         public Vector2 fallDir;
         public int fallKind;
+        /// <summary>Personalidade (0..1): disposição, ousadia, disciplina tática; leitura de jogo (s entre decisões).</summary>
+        public float work = 0.5f, flair = 0.5f, discipline = 0.6f, think = 0.35f, thinkT;
+        /// <summary>IA: decisão atual (aiGoal), alvo suavizado (aiTarget) e deslocamento pessoal na formação.</summary>
+        public Vector2 aiGoal, aiTarget, lane;
+        public bool aiAttacking;
 
         public bool Has(Trait t) => (traits & t) != 0;
         public float TopSpeed() => Mathf.Lerp(6.4f, 8.8f, pace);

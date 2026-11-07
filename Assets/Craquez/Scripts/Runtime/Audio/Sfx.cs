@@ -101,6 +101,8 @@ namespace Craquez
         /// <summary>Batucada da torcida (0..1).</summary>
         public static void Drums(float v) { if (_i != null) _i._drumTarget = v; }
         public static void Ooh() => Play(_i?._ooh, 0.7f, 0.9f + Random.value * 0.2f);
+        /// <summary>Aplauso/vibração curta da torcida (desarme, drible, boa defesa).</summary>
+        public static void Applause(float v = 0.4f) => Play(_i?._cheer, Mathf.Clamp01(v), 1.05f + Random.value * 0.1f);
 
         /// <summary>Volume da torcida (0 = silêncio, menu) e canto organizado.</summary>
         public static void Crowd(float level, float chant)

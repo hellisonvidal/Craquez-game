@@ -163,6 +163,8 @@ namespace Craquez
                 case "shot": _hype = Mathf.Max(_hype, 0.6f); _flashes.Emit(40); break;
                 case "save": _hype = Mathf.Max(_hype, 0.5f); Sfx.Ooh(); break;
                 case "skill": _hype = Mathf.Max(_hype, 0.35f); break;
+                case "foul": _hype = Mathf.Max(_hype, 0.25f); break;
+                case "silence": _hype = 0f; _flashes.Emit(30); break;   // gol do visitante: arquibancada parada
             }
         }
 

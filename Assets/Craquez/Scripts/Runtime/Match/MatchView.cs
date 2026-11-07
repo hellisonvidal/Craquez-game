@@ -23,7 +23,7 @@ namespace Craquez
         Transform _ball, _ballShadow, _marker0, _marker1;
         Vector3 _ballPrev, _ballCur;
         Quaternion _ballRot = Quaternion.identity;
-        float _crowdT, _crowdHype;
+        float _crowdT, _crowdHype, _silence;
         CrowdFx _crowd;
         AthleteView _referee;
         bool _night;
@@ -258,9 +258,33 @@ namespace Craquez
                     break;
                 case "header": Sfx.Touch(); break;
                 case "touch": case "block": Sfx.Touch(); break;
-                case "post": Sfx.Post(); Sfx.Ooh(); bcam.Shake(0.3f); break;
-                case "save": if (!e.ok) Sfx.Ooh(); Sfx.Touch(); if (e.ok) _crowd?.React("save"); break;
-                case "skill": _crowd?.React("skill"); break;
+                case "post": Sfx.Post(); Sfx.Ooh(); bcam.Shake(0.3f); _crowdHype = Mathf.Max(_crowdHype, 0.9f); _crowd?.React("shot"); break;
+                case "save":
+                    if (!e.ok) Sfx.Ooh();
+                    Sfx.Touch();
+                    if (e.ok) _crowd?.React("save");
+                    if (e.team == 0) Sfx.Applause(0.35f);   // torcida da casa aplaude o goleiro dela
+                    break;
+                case "skill":
+                    _crowd?.React("skill");
+                    if (e.team == 0) { Sfx.Applause(0.22f); _crowdHype = Mathf.Max(_crowdHype, 0.45f); }
+                    break;
+                case "fooled":
+                    if (e.team == 1) Sfx.Applause(0.3f);    // drible do time da casa deixou o visitante no chão
+                    break;
+                case "tackle":
+                case "steal":
+                    if (e.team == 0 && (e.type == "steal" || e.ok)) { Sfx.Applause(0.25f); _crowdHype = Mathf.Max(_crowdHype, 0.3f); }
+                    break;
+                case "out":
+                    // chute que passou perto: "uuuh" da arquibancada
+                    if (sim.tick - sim.lastShotTick < 120 && Mathf.Abs(sim.ball.pos.x) > sim.halfLen - 1f && Mathf.Abs(sim.ball.pos.y) < sim.goalHalf + 3f)
+                    {
+                        Sfx.Ooh();
+                        _crowdHype = Mathf.Max(_crowdHype, 0.8f);
+                        _crowd?.React("shot");
+                    }
+                    break;
                 case "whistle":
                     if (e.kind == "fulltime") Sfx.WhistleEnd();
                     else if (e.kind == "halftime" || e.kind == "penalty") Sfx.WhistleLong();
@@ -289,10 +313,13 @@ namespace Craquez
                     break;
                 case "goal":
                     Sfx.Net();
-                    Sfx.Cheer();
+                    // gol do mandante: o estádio explode; do visitante: só o setor visitante comemora
+                    bool homeGoal = e.team == 0;
+                    if (homeGoal) Sfx.Cheer(); else Sfx.Applause(0.45f);
                     GoalParty(e.team);
-                    _crowd?.React("goal");
-                    _crowdHype = 1.6f;
+                    _crowd?.React(homeGoal ? "goal" : "silence");
+                    _crowdHype = homeGoal ? 1.6f : 0f;
+                    _silence = homeGoal ? 0f : 6f;
                     bcam.Shake(0.6f);
                     foreach (var n in venue.nets)
                         n.Hit(new Vector3(sim.ball.pos.x, sim.ball.z + 0.3f, sim.ball.pos.y), sim.ball.Speed + 10f);
@@ -395,15 +422,22 @@ namespace Craquez
             // torcida pulsando (mais forte em ataque perigoso e no gol)
             _crowdT += Time.deltaTime;
             float danger = Mathf.Clamp01((Mathf.Abs(sim.ball.pos.x) - sim.halfLen * 0.6f) / (sim.halfLen * 0.4f));
-            _crowdHype = Mathf.MoveTowards(_crowdHype, danger * 0.5f, Time.deltaTime * 0.3f);
+            // de que lado é o perigo: ataque do mandante empolga; do visitante, a torcida fica tensa
+            bool homeAttack = sim.ball.pos.x * sim.TeamDir(0) > 0f;
+            float want = homeAttack ? danger * 0.7f : danger * 0.15f;
+            if (_silence > 0f) { _silence -= Time.deltaTime; want = 0f; }
+            _crowdHype = Mathf.MoveTowards(_crowdHype, want, Time.deltaTime * 0.3f);
             float bounce = Mathf.Abs(Mathf.Sin(_crowdT * (6f + _crowdHype * 6f))) * (0.002f + _crowdHype * 0.006f);
             foreach (var m in venue.crowdMats)
             {
                 m.mainTextureOffset = new Vector2(0, bounce);
                 if (m.HasProperty("_BaseMap")) m.SetTextureOffset("_BaseMap", new Vector2(0, bounce));
             }
-            Sfx.Crowd((sim.mode.id == GameModes.Field ? 0.5f : 0.28f) + _crowdHype * 0.3f, sim.mode.id == GameModes.Field ? 0.22f + danger * 0.1f : 0f);
-            Sfx.Drums(sim.mode.id == GameModes.Street ? 0f : 0.12f + _crowdHype * 0.25f);
+            float quiet = _silence > 0f ? 0.55f : 1f;
+            float tense = !homeAttack ? danger * 0.12f : 0f;   // murmúrio quando o visitante ameaça
+            Sfx.Crowd(((sim.mode.id == GameModes.Field ? 0.5f : 0.28f) + _crowdHype * 0.3f + tense) * quiet,
+                sim.mode.id == GameModes.Field ? (0.22f + (homeAttack ? danger * 0.18f : -danger * 0.1f)) * quiet : 0f);
+            Sfx.Drums(sim.mode.id == GameModes.Street ? 0f : (0.12f + _crowdHype * 0.3f) * quiet);
             foreach (var m in venue.ledMats)
             {
                 var o = new Vector2(Time.time * 0.015f, 0);
