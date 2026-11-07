@@ -65,6 +65,7 @@ namespace Craquez
             cam.transform.position = pos;
             cam.transform.rotation = Quaternion.LookRotation(look - pos);
             cam.fieldOfView = fov;
+            _baseFov = fov;
         }
 
         // ---------------------------------------------------------------- paredes na frente
@@ -139,8 +140,25 @@ namespace Craquez
                 _sceneT -= Time.deltaTime;
                 if (_sceneT <= 0f) { cinematic = _sceneWasCine; SnapToBall(); }
             }
+            // o enquadramento é pensado em 16:9; em telas mais estreitas (4:3, 16:10, retrato)
+            // abre o campo de visão vertical para mostrar a mesma largura de campo
+            if (_baseFov <= 0f) _baseFov = cam.fieldOfView;
+            cam.fieldOfView = _baseFov;
             Move();
+            _baseFov = cam.fieldOfView;
+            cam.fieldOfView = FitAspect(_baseFov, cam.aspect);
             UpdateOccluders(cinematic ? cineLook : _focus);
+        }
+
+        float _baseFov;
+
+        /// <summary>FOV vertical que mantém a largura vista em 16:9 (telas mais largas ficam como estão).</summary>
+        public static float FitAspect(float fov16x9, float aspect)
+        {
+            const float A = 16f / 9f;
+            if (aspect <= 0.01f || aspect >= A) return fov16x9;
+            float t = Mathf.Tan(fov16x9 * 0.5f * Mathf.Deg2Rad) * A / aspect;
+            return Mathf.Min(80f, 2f * Mathf.Atan(t) * Mathf.Rad2Deg);
         }
 
         void Move()

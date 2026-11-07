@@ -94,30 +94,58 @@ namespace Craquez
             }
             var native = Screen.currentResolution;
             int w = native.width, h = native.height;
-            var res = Screen.resolutions;
-            int ri = Settings.Resolution;
-            if (ri >= 0 && ri < res.Length) { w = res[ri].width; h = res[ri].height; }
+            bool chosen = ParseWH(Settings.ResolutionWH, out int cw, out int ch);
+            if (chosen) { w = cw; h = ch; }
             var mode = Settings.Display == 1 ? FullScreenMode.ExclusiveFullScreen : Settings.Display == 2 ? FullScreenMode.Windowed : FullScreenMode.FullScreenWindow;
-            if (mode == FullScreenMode.Windowed && ri < 0) { w = Mathf.RoundToInt(native.width * 0.8f); h = Mathf.RoundToInt(native.height * 0.8f); }
+            if (mode == FullScreenMode.Windowed && !chosen) { w = Mathf.RoundToInt(native.width * 0.8f); h = Mathf.RoundToInt(native.height * 0.8f); }
             Screen.SetResolution(w, h, mode);
         }
 
-        /// <summary>Resoluções do monitor sem repetição (a primeira opção é a nativa).</summary>
-        static List<string> ResolutionNames(out List<int> idx)
+        static bool ParseWH(string s, out int w, out int h)
+        {
+            w = h = 0;
+            if (string.IsNullOrEmpty(s)) return false;
+            var p = s.Split('x');
+            return p.Length == 2 && int.TryParse(p[0], out w) && int.TryParse(p[1], out h) && w >= 640 && h >= 480;
+        }
+
+        /// <summary>
+        /// Resoluções: as do monitor e as comuns (16:9, 16:10, 4:3, 21:9), sem passar do tamanho do
+        /// monitor, da maior para a menor. A primeira opção é a nativa.
+        /// </summary>
+        static List<string> ResolutionNames(out List<string> keys)
         {
             var names = new List<string> { "Nativa" };
-            idx = new List<int> { -1 };
-            var seen = new HashSet<string>();
-            var res = Screen.resolutions;
-            for (int i = res.Length - 1; i >= 0; i--)
+            keys = new List<string> { "" };
+            var native = Screen.currentResolution;
+            int mw = Mathf.Max(native.width, 1280), mh = Mathf.Max(native.height, 720);
+            var all = new List<(int w, int h)>();
+            foreach (var r in Screen.resolutions) all.Add((r.width, r.height));
+            int[,] common =
             {
-                string n = res[i].width + " x " + res[i].height;
-                if (!seen.Add(n) || res[i].height < 600) continue;
-                names.Add(n);
-                idx.Add(i);
+                { 3840, 2160 }, { 3440, 1440 }, { 2560, 1600 }, { 2560, 1440 }, { 2560, 1080 }, { 1920, 1200 }, { 1920, 1080 },
+                { 1680, 1050 }, { 1600, 900 }, { 1440, 900 }, { 1366, 768 }, { 1280, 1024 }, { 1280, 800 }, { 1280, 720 }, { 1024, 768 },
+            };
+            for (int i = 0; i < common.GetLength(0); i++) all.Add((common[i, 0], common[i, 1]));
+            all.Sort((a, b) => (b.w * b.h).CompareTo(a.w * a.h));
+            var seen = new HashSet<string>();
+            foreach (var (w, h) in all)
+            {
+                if (w > mw || h > mh || h < 600) continue;
+                string k = w + "x" + h;
+                if (!seen.Add(k)) continue;
+                int g = Gcd(w, h);
+                string ar = (w / g) + ":" + (h / g);
+                if (ar == "8:5") ar = "16:10";
+                else if (ar == "43:18" || ar == "64:27" || ar == "12:5") ar = "21:9";
+                else if (ar == "683:384") ar = "16:9";
+                names.Add(w + " x " + h + "  (" + ar + ")");
+                keys.Add(k);
             }
             return names;
         }
+
+        static int Gcd(int a, int b) { while (b != 0) { int t = a % b; a = b; b = t; } return Mathf.Max(1, a); }
 
         void OnApplicationFocus(bool focus)
         {
@@ -1196,7 +1224,7 @@ namespace Craquez
             void Cancel()
             {
                 bool screen = PlayerPrefs.GetInt("gfx_display", 0) != (_optSnap.TryGetValue("gfx_display", out var dv) ? (int)dv : 0)
-                              || PlayerPrefs.GetInt("gfx_res", -1) != (_optSnap.TryGetValue("gfx_res", out var rv) ? (int)rv : -1);
+                              || PlayerPrefs.GetString("gfx_res_wh", "") != (_optSnap.TryGetValue("gfx_res_wh", out var rv) ? (string)rv : "");
                 Settings.Restore(_optSnap);
                 _cfg.quickRestarts = Settings.QuickRestarts;
                 Apply();
@@ -1249,8 +1277,8 @@ namespace Craquez
             if (!Application.isMobilePlatform)
             {
                 UiKit.Size(UiKit.Cycler(gfx, "Modo de tela", Settings.DisplayNames, Settings.Display, i => { Settings.Display = i; GoFullscreen(); }), 50, 50);
-                var rn = ResolutionNames(out var ri);
-                UiKit.Size(UiKit.Cycler(gfx, "Resolução", rn, Mathf.Max(0, ri.IndexOf(Settings.Resolution)), i => { Settings.Resolution = ri[i]; GoFullscreen(); }), 50, 50);
+                var rn = ResolutionNames(out var rk);
+                UiKit.Size(UiKit.Cycler(gfx, "Resolução", rn, Mathf.Max(0, rk.IndexOf(Settings.ResolutionWH)), i => { Settings.ResolutionWH = rk[i]; GoFullscreen(); }), 50, 50);
                 UiKit.Size(UiKit.Cycler(gfx, "Sincronia vertical", Settings.VSyncNames, Settings.VSync, i => { Settings.VSync = i; Apply(); }), 50, 50);
             }
             UiKit.Size(UiKit.Cycler(gfx, "Limite de quadros", Settings.FpsNames, Settings.FpsCap, i => { Settings.FpsCap = i; Apply(); }), 50, 50);

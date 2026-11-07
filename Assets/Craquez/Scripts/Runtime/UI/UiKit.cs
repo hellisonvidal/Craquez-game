@@ -106,6 +106,29 @@ namespace Craquez.UI
     }
 
     /// <summary>Fábrica de elementos de interface uGUI.</summary>
+    /// <summary>
+    /// Mantém a escala da interface certa em qualquer resolução e formato: telas mais largas que
+    /// 16:9 escalam pela altura, mais estreitas (4:3, 16:10, janelas redimensionadas) pela largura —
+    /// reavaliado sempre que o tamanho da tela muda.
+    /// </summary>
+    public class AspectMatch : MonoBehaviour
+    {
+        CanvasScaler _s;
+        int _w, _h;
+
+        void Awake() => _s = GetComponent<CanvasScaler>();
+
+        void Update()
+        {
+            if (_s == null || (Screen.width == _w && Screen.height == _h)) return;
+            _w = Screen.width;
+            _h = Screen.height;
+            float a = _h > 0 ? _w / (float)_h : 16f / 9f;
+            // transição suave entre os dois modos perto de 16:9 (sem "salto" de tamanho)
+            _s.matchWidthOrHeight = Mathf.Clamp01((a - 1.6f) / (1.78f - 1.6f));
+        }
+    }
+
     public static class UiKit
     {
         public static Canvas Canvas(string name, int order, Transform parent = null)
@@ -120,6 +143,7 @@ namespace Craquez.UI
             s.referenceResolution = new Vector2(1920, 1080);
             // telas mais largas que 16:9 (celulares 19,5:9 / 20:9): escala pela altura e usa a largura extra
             s.matchWidthOrHeight = Screen.height > 0 && Screen.width / (float)Screen.height >= 1.77f ? 1f : 0f;   // tablets 4:3/16:10: pela largura
+            go.AddComponent<AspectMatch>();
             return c;
         }
 

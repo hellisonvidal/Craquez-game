@@ -116,6 +116,7 @@ namespace Craquez
         // ---- salvar / cancelar (tela de opções) ----
         static readonly string[] IntKeys = { "quality", "vibration", "camera_v2", "camera_zoom", "quick_restarts", "gfx_scale", "gfx_fps", "gfx_vsync", "gfx_aa", "gfx_shadows", "gfx_tex", "gfx_display", "gfx_res", "music" };
         static readonly string[] FloatKeys = { "volume", "music_volume" };
+        static readonly string[] StringKeys = { "gfx_res_wh" };
 
         /// <summary>Foto das preferências ao abrir as opções (para o "Cancelar").</summary>
         public static Dictionary<string, object> Snapshot()
@@ -123,6 +124,7 @@ namespace Craquez
             var d = new Dictionary<string, object>();
             foreach (var k in IntKeys) if (PlayerPrefs.HasKey(k)) d[k] = PlayerPrefs.GetInt(k);
             foreach (var k in FloatKeys) if (PlayerPrefs.HasKey(k)) d[k] = PlayerPrefs.GetFloat(k);
+            foreach (var k in StringKeys) if (PlayerPrefs.HasKey(k)) d[k] = PlayerPrefs.GetString(k);
             return d;
         }
 
@@ -131,6 +133,7 @@ namespace Craquez
         {
             foreach (var k in IntKeys) { if (d.TryGetValue(k, out var v)) PlayerPrefs.SetInt(k, (int)v); else PlayerPrefs.DeleteKey(k); }
             foreach (var k in FloatKeys) { if (d.TryGetValue(k, out var v)) PlayerPrefs.SetFloat(k, (float)v); else PlayerPrefs.DeleteKey(k); }
+            foreach (var k in StringKeys) { if (d.TryGetValue(k, out var v)) PlayerPrefs.SetString(k, (string)v); else PlayerPrefs.DeleteKey(k); }
             PlayerPrefs.Save();
             AudioListener.volume = Volume;
         }
@@ -172,6 +175,8 @@ namespace Craquez
 
         /// <summary>Índice em Screen.resolutions (-1 = nativa do monitor).</summary>
         public static int Resolution { get => I("gfx_res", -1); set => I("gfx_res", value, true); }
+        /// <summary>Resolução escolhida como "LxA" (vazio = nativa).</summary>
+        public static string ResolutionWH { get => PlayerPrefs.GetString("gfx_res_wh", ""); set { PlayerPrefs.SetString("gfx_res_wh", value); } }
 
         /// <summary>Qualidade usada para os detalhes do cenário (texturas): a predefinição ou o ajuste avançado.</summary>
         public static int DetailLevel => Textures > 0 ? Textures - 1 + (Textures == 3 && !Application.isMobilePlatform ? 1 : 0) : Quality;
