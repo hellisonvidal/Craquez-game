@@ -3,8 +3,9 @@ using UnityEngine;
 namespace Craquez
 {
     /// <summary>
-    /// Sons gerados por código (sem arquivos de áudio): apito, chute, rede,
-    /// trave, interface e torcida (ambiente em loop + explosão de gol + "uuh").
+    /// Sons: apito, chute, rede, trave e interface gerados por código; torcida com gravações
+    /// reais (Resources/Audio, licenças livres — ver CREDITS.md) em duas camadas de ambiente,
+    /// gol, aplauso, vaia e grito, com os sintetizados de reserva; trilha sonora dos menus.
     /// </summary>
     public class Sfx : MonoBehaviour
     {
@@ -12,7 +13,9 @@ namespace Craquez
         const int Rate = 44100;
         AudioSource[] _pool;
         int _next;
-        AudioSource _crowd, _chant;
+        AudioSource _crowd, _chant, _crowd2, _music;
+        AudioClip _applause, _hurray;
+        float _musicTarget;
         AudioClip _boo, _drums;
         AudioSource _drumSrc;
         float _drumTarget;
@@ -48,11 +51,14 @@ namespace Craquez
             _whistleEnd = Whistle3(rng);
             _net = Noise(0.5f, 0.35f, 900f, rng, decay: 6f);
             _post = Metal(rng);
-            _crowdLoop = CrowdLoop(rng, 6f, 0.5f);
+            AudioClip R(string n) => Resources.Load<AudioClip>("Audio/" + n);
+            _crowdLoop = R("crowd_loop") ?? CrowdLoop(rng, 6f, 0.5f);
             _chantLoop = Chant(rng);
-            _cheer = Swell(3.5f, rng);
+            _cheer = R("cheer") ?? Swell(3.5f, rng);
             _ooh = Ooh(rng);
-            _boo = Boo(rng);
+            _boo = R("boo") ?? Boo(rng);
+            _applause = R("applause") ?? _cheer;
+            _hurray = R("hurray");
             _drums = Drums(rng);
             _drumSrc = gameObject.AddComponent<AudioSource>();
             _drumSrc.clip = _drums;
@@ -69,6 +75,35 @@ namespace Craquez
             _chant.loop = true;
             _chant.volume = 0f;
             _chant.Play();
+            // segunda camada (outra multidão): o ambiente não soa como um loop repetido
+            var c2 = R("crowd_loop2");
+            if (c2 != null)
+            {
+                _crowd2 = gameObject.AddComponent<AudioSource>();
+                _crowd2.clip = c2;
+                _crowd2.loop = true;
+                _crowd2.volume = 0f;
+                _crowd2.Play();
+                _crowd2.time = c2.length * 0.37f;
+            }
+            if (_crowdLoop.length > 10f) _crowd.time = Random.value * _crowdLoop.length * 0.8f;
+            var theme = R("menu_theme");
+            if (theme != null)
+            {
+                _music = gameObject.AddComponent<AudioSource>();
+                _music.clip = theme;
+                _music.loop = true;
+                _music.volume = 0f;
+                _music.ignoreListenerPause = true;
+            }
+        }
+
+        /// <summary>Trilha sonora dos menus (liga/desliga com fade).</summary>
+        public static void MenuMusic(bool on)
+        {
+            if (_i == null || _i._music == null) return;
+            _i._musicTarget = on && Settings.Music ? Mathf.Clamp01(Settings.MusicVolume) : 0f;
+            if (_i._musicTarget > 0f && !_i._music.isPlaying) _i._music.Play();
         }
 
         void Update()
@@ -76,6 +111,12 @@ namespace Craquez
             _crowd.volume = Mathf.MoveTowards(_crowd.volume, _crowdTarget, Time.unscaledDeltaTime * 0.4f);
             _chant.volume = Mathf.MoveTowards(_chant.volume, _chantTarget, Time.unscaledDeltaTime * 0.2f);
             _drumSrc.volume = Mathf.MoveTowards(_drumSrc.volume, _drumTarget, Time.unscaledDeltaTime * 0.3f);
+            if (_crowd2 != null) _crowd2.volume = Mathf.MoveTowards(_crowd2.volume, _crowdTarget * 0.55f, Time.unscaledDeltaTime * 0.3f);
+            if (_music != null)
+            {
+                _music.volume = Mathf.MoveTowards(_music.volume, _musicTarget, Time.unscaledDeltaTime * 0.5f);
+                if (_music.volume <= 0f && _musicTarget <= 0f && _music.isPlaying) _music.Pause();
+            }
         }
 
         static void Play(AudioClip c, float vol = 1f, float pitch = 1f)
@@ -101,6 +142,10 @@ namespace Craquez
         /// <summary>Batucada da torcida (0..1).</summary>
         public static void Drums(float v) { if (_i != null) _i._drumTarget = v; }
         public static void Ooh() => Play(_i?._ooh, 0.7f, 0.9f + Random.value * 0.2f);
+        /// <summary>Aplauso/vibração curta da torcida (desarme, drible, boa defesa).</summary>
+        public static void Applause(float v = 0.4f) => Play(_i?._applause, Mathf.Clamp01(v * 1.3f), 0.97f + Random.value * 0.08f);
+        /// <summary>Grito curto da torcida (drible, lance bonito).</summary>
+        public static void Hurray(float v = 0.4f) { if (_i?._hurray != null) Play(_i._hurray, v, 0.95f + Random.value * 0.1f); else Applause(v); }
 
         /// <summary>Volume da torcida (0 = silêncio, menu) e canto organizado.</summary>
         public static void Crowd(float level, float chant)

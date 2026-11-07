@@ -80,7 +80,7 @@ jobs:
             targetPlatform: Android
           - name: Windows
             targetPlatform: StandaloneWindows64
-          - name: Linux (screenshots)
+          - name: Linux
             targetPlatform: StandaloneLinux64
     steps:
       - uses: jlumbroso/free-disk-space@v1.3.1
@@ -111,6 +111,39 @@ jobs:
           name: Craquez-${{ matrix.name }}
           path: build/${{ matrix.targetPlatform }}
           retention-days: 14
+      # instalador do Windows (NSIS) com o ícone do jogo
+      - name: Instalador do Windows
+        if: matrix.targetPlatform == 'StandaloneWindows64'
+        run: |
+          sudo apt-get update -qq && sudo apt-get install -y -qq nsis > /dev/null
+          sudo chown -R "$USER" build
+          cd tools/installer
+          makensis -V2 -DSRC="$GITHUB_WORKSPACE/build/StandaloneWindows64" -DOUT="$GITHUB_WORKSPACE/Craquez-Setup.exe" -DVER="1.0.${{ github.run_number }}" craquez.nsi
+          ls -la "$GITHUB_WORKSPACE/Craquez-Setup.exe"
+      - uses: actions/upload-artifact@v4
+        if: matrix.targetPlatform == 'StandaloneWindows64'
+        with:
+          name: Craquez-Windows-Instalador
+          path: Craquez-Setup.exe
+          retention-days: 14
+      # Linux: pacote .tar.gz (mantém a permissão de execução) com atalho .desktop e ícone
+      - name: Pacote Linux
+        if: matrix.targetPlatform == 'StandaloneLinux64'
+        run: |
+          sudo chown -R "$USER" build
+          D=build/StandaloneLinux64
+          chmod +x "$D/Craquez" || chmod +x "$D/Craquez.x86_64" || true
+          cp tools/installer/linux/craquez.desktop tools/installer/linux/instalar.sh "$D/"
+          chmod +x "$D/instalar.sh"
+          cp Assets/Craquez/Resources/UI/craquez_logo.png "$D/craquez.png"
+          tar czf Craquez-Linux.tar.gz -C build --transform 's,^StandaloneLinux64,Craquez,' StandaloneLinux64
+          ls -la Craquez-Linux.tar.gz
+      - uses: actions/upload-artifact@v4
+        if: matrix.targetPlatform == 'StandaloneLinux64'
+        with:
+          name: Craquez-Linux
+          path: Craquez-Linux.tar.gz
+          retention-days: 14
       # roda o jogo (renderização por software) e tira screenshots de todas as telas e modos
       - name: Screenshots
         if: matrix.targetPlatform == 'StandaloneLinux64'
@@ -133,3 +166,53 @@ jobs:
           name: Craquez-screenshots
           path: shots
           retention-days: 14
+
+  # versão: com "[publicar]" na mensagem do commit (ou uma tag v*), cria a tag v<versão do projeto>
+  # e publica a Release com o APK, o .exe (zip + instalador) e o Linux
+  release:
+    name: Publicar versão
+    needs: [build]
+    if: startsWith(github.ref, 'refs/tags/v') || (github.event_name == 'push' && contains(github.event.head_commit.message, '[publicar]'))
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: art
+      - uses: actions/checkout@v4
+        with:
+          sparse-checkout: docs
+          path: src
+      - uses: actions/checkout@v4
+        with:
+          sparse-checkout: ProjectSettings
+          path: ver
+      - name: Preparar arquivos
+        id: ver
+        run: |
+          V=$(grep -m1 "bundleVersion:" ver/ProjectSettings/ProjectSettings.asset | awk '{print $2}')
+          TAG="v$V"
+          [ "${GITHUB_REF_TYPE}" = "tag" ] && TAG="${GITHUB_REF_NAME}"
+          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
+          GITHUB_REF_NAME="$TAG"
+          mkdir -p out && cp src/docs/RELEASE_NOTES.md out/NOTAS.md
+          ls -R art | head -50
+          mkdir -p out
+          find art/Craquez-Android -name "*.apk" -exec cp {} out/Craquez-${GITHUB_REF_NAME}.apk \;
+          (cd art/Craquez-Windows && zip -qr "$GITHUB_WORKSPACE/out/Craquez-${GITHUB_REF_NAME}-Windows.zip" .)
+          cp art/Craquez-Windows-Instalador/Craquez-Setup.exe "out/Craquez-${GITHUB_REF_NAME}-Instalador-Windows.exe"
+          cp art/Craquez-Linux/Craquez-Linux.tar.gz "out/Craquez-${GITHUB_REF_NAME}-Linux.tar.gz"
+          ls -la out
+      - uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.ver.outputs.tag }}
+          target_commitish: ${{ github.sha }}
+          name: Craquez ${{ steps.ver.outputs.tag }}
+          body_path: ${{ github.workspace }}/out/NOTAS.md
+          files: |
+            out/*.apk
+            out/*.zip
+            out/*.exe
+            out/*.tar.gz
+          fail_on_unmatched_files: false

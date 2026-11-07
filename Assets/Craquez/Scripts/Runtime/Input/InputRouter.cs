@@ -169,6 +169,23 @@ namespace Craquez
             return "A passe  •  B chute  •  X alto/cruzamento  •  Y enfiada  •  RT correr\nLB trocar  •  LT proteger/conter  •  RB colocado  •  Analógico direito: dribles";
         }
 
+        /// <summary>Opções da cobrança de falta (o chute direto só aparece perto do gol).</summary>
+        public static string SetPieceHelp(DeviceKind d, bool shot)
+        {
+            string pass, cross, kick, curl;
+            if (d == DeviceKind.Touch) { pass = "PASSE"; cross = "ALTO"; kick = "CHUTE"; curl = "COLOCADO"; }
+            else if (d == DeviceKind.Keyboard1) { pass = "J"; cross = "L"; kick = "K"; curl = "U + K"; }
+            else if (d == DeviceKind.Keyboard2) { pass = "Num1"; cross = "Num3"; kick = "Num2"; curl = "Num9 + Num2"; }
+            else
+            {
+                bool ps = IsPlayStation(Pad(d == DeviceKind.Gamepad1 ? 0 : 1));
+                pass = ps ? "Cruz" : "A"; cross = ps ? "Quadrado" : "X"; kick = ps ? "Bola" : "B"; curl = ps ? "R1 + Bola" : "RB + B";
+            }
+            string s = "FALTA   •   mire com o analógico   •   " + pass + " passe   •   " + cross + " cruzar na área";
+            if (shot) s += "   •   " + kick + " chute direto (segure p/ força)   •   " + curl + " colocado";
+            return s;
+        }
+
         public static void Rumble(DeviceKind d, float low, float high, float seconds, MonoBehaviour host)
         {
             if (!Settings.Vibration) return;

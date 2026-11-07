@@ -32,6 +32,78 @@ namespace Craquez
         }
     }
 
+    /// <summary>Correções de pose por cima da captura (testáveis sem a partida).</summary>
+    public static class PoseFix
+    {
+        /// <summary>
+        /// Pés firmes: a captura deixa o pé "pendurado" (ponta caída). No chão, o pé fica
+        /// plano; no ar, a ponta não cai mais que ~30° do natural (chutes podem esticar mais).
+        /// </summary>
+        public static void Feet(AthleteRig rig, Transform root, PoseEdits pose, float act)
+        {
+            float rest = rig.footPitchRest;
+            float ground = root.position.y;
+            for (int side = 0; side < 2; side++)
+            {
+                var foot = side == 0 ? rig.footL : rig.footR;
+                rig.bones.TryGetValue(side == 0 ? "ball_l" : "ball_r", out var toe);
+                if (foot == null || toe == null) continue;
+                float pitch = AthleteRig.FootPitch(foot, toe);
+                float h = Mathf.Min(foot.position.y, toe.position.y + 0.05f) - ground;
+                float stance = 1f - Mathf.Clamp01((h - 0.1f) / 0.12f);   // 1 = apoiado
+                float lo = rest - Mathf.Lerp(30f, 55f, act), hi = rest + 25f;
+                float target = Mathf.Lerp(Mathf.Clamp(pitch, lo, hi), rest + 2f, stance * (1f - act * 0.7f));
+                float delta = target - pitch;
+                if (Mathf.Abs(delta) < 0.5f) continue;
+                var fwd = toe.position - foot.position;
+                var axis = Vector3.Cross(fwd, Vector3.up);
+                if (axis.sqrMagnitude < 1e-6f) continue;
+                pose.Rotate(foot, Quaternion.AngleAxis(delta, axis.normalized));   // + levanta a ponta
+            }
+        }
+
+        /// <summary>Abertura lateral do braço (graus) no referencial do atleta.</summary>
+        public static float Abduction(AthleteRig rig, Transform root, int side, out float elev)
+        {
+            elev = 0f;
+            rig.bones.TryGetValue(side < 0 ? "upperarm_l" : "upperarm_r", out var up);
+            rig.bones.TryGetValue(side < 0 ? "lowerarm_l" : "lowerarm_r", out var lo);
+            if (up == null || lo == null) return 0f;
+            var arm = (lo.position - up.position).normalized;
+            float s = Mathf.Sign(Vector3.Dot(up.position - (rig.spine != null ? rig.spine.position : root.position), root.right));
+            elev = Vector3.Angle(arm, -root.up);
+            return Mathf.Atan2(Vector3.Dot(arm, root.right) * s, Vector3.Dot(arm, -root.up)) * Mathf.Rad2Deg;
+        }
+
+        /// <summary>
+        /// Braços naturais: a captura (retargeted) abre e ergue os braços demais. Limita a
+        /// abertura lateral (~16°) e a elevação (~50°), preservando o balanço da corrida.
+        /// </summary>
+        public static void Arms(AthleteRig rig, Transform root, PoseEdits pose, float w, float speed = 0f)
+        {
+            var right = root.right;
+            var down = -root.up;
+            for (int side = -1; side <= 1; side += 2)
+            {
+                rig.bones.TryGetValue(side < 0 ? "upperarm_l" : "upperarm_r", out var up);
+                rig.bones.TryGetValue(side < 0 ? "lowerarm_l" : "lowerarm_r", out var lo);
+                if (up == null || lo == null) continue;
+                float s = Mathf.Sign(Vector3.Dot(up.position - (rig.spine != null ? rig.spine.position : root.position), right));
+                float abd = Abduction(rig, root, side, out _);
+                if (abd > 16f) pose.Rotate(up, Quaternion.AngleAxis(-(abd - 16f) * w * s, root.forward));   // (+ em torno da frente ergueria o braço direito)
+                var arm = (lo.position - up.position).normalized;
+                float elev = Vector3.Angle(arm, down);
+                // correndo forte o braço sobe mais (balanço natural da corrida); parado/andando, menos
+                float maxElev = Mathf.Lerp(50f, 78f, Mathf.Clamp01((speed - 3f) / 4f));
+                if (elev > maxElev)
+                {
+                    var axis = Vector3.Cross(arm, down);
+                    if (axis.sqrMagnitude > 1e-6f) pose.Rotate(up, Quaternion.AngleAxis((elev - maxElev) * w, axis.normalized));
+                }
+            }
+        }
+    }
+
     /// <summary>
     /// Mistura as animações de captura de movimento (CMU, transferidas para o
     /// esqueleto dos atletas) pelo Playables API:
@@ -89,6 +161,8 @@ namespace Craquez
         static float[] _contact;   // fase (0..1) do apoio do pé esquerdo em cada clipe de locomoção
         static float[] _groundSpeed; // velocidade real dos pés no chão em cada clipe (m/s), medida na pose
         float _idleRate = 1f;
+        readonly float[] _sp4 = new float[4], _sp5 = new float[5];
+        static readonly int[] Ix4 = { IIdle, IWalk, IJog, IRun }, Ix5 = { IIdle, IWalk, IJog, IRun, ISprint };
 
         /// <summary>
         /// Acha, uma vez, em que ponto de cada ciclo o pé esquerdo toca o chão, para que
@@ -99,11 +173,12 @@ namespace Craquez
             _contact = new float[Loco.Length];
             _groundSpeed = new float[Loco.Length];
             var go = animator.gameObject;
-            Transform fl = null, fr = null;
+            Transform fl = null, fr = null, pel = null;
             foreach (var t in go.GetComponentsInChildren<Transform>(true))
             {
                 if (t.name == "foot_l") fl = t;
                 else if (t.name == "foot_r") fr = t;
+                else if (t.name == "pelvis") pel = t;
             }
             if (fl == null || fr == null) return;
             for (int i = 0; i < Loco.Length; i++)
@@ -122,6 +197,8 @@ namespace Craquez
                     float t = len * k / N;
                     ci.clip.SampleAnimation(go, t);
                     var o = rigRoot != null ? rigRoot.transform.position : go.transform.position;
+                    // quadril preso na horizontal, como no jogo (PinHips): mede a passada "no lugar"
+                    if (pel != null) { var ph = pel.position; o.x = ph.x; o.z = ph.z; }
                     lp[k] = fl.position - o;
                     rp[k] = fr.position - o;
                     // apoio do pé esquerdo: pé esquerdo mais baixo e mais à frente que o direito
@@ -185,6 +262,8 @@ namespace Craquez
                 _locoSpeed[i] = Mathf.Max(0.01f, ms > 0.6f && ms < 11f ? ms : ci.speed);
                 _graph.Connect(_locoP[i], 0, _loco, i);
             }
+            // o pique tem de ser mais rápido que a corrida (a medida do clipe de pique é curta)
+            _locoSpeed[ISprint] = Mathf.Max(_locoSpeed[ISprint], _locoSpeed[IRun] * 1.4f);
             _graph.Connect(_loco, 0, _top, 0);
             _top.SetInputWeight(0, 1f);
             output.SetSourcePlayable(_top);
@@ -237,13 +316,14 @@ namespace Craquez
             var _w = _locoTarget;
             for (int i = 0; i < _w.Length; i++) _w[i] = 0f;
             float back = Mathf.Clamp01(-fwd / Mathf.Max(0.4f, speed));
-            float lateral = Mathf.Clamp01(Mathf.Abs(side) / Mathf.Max(0.4f, speed) - 0.35f) * 1.6f;
+            // passo lateral só quando anda quase de lado (e devagar); correndo, gira o corpo
+            float lateral = speed > 3.5f ? 0f : Mathf.Clamp01(Mathf.Abs(side) / Mathf.Max(0.4f, speed) - 0.35f) * 1.6f;
             if (speed < 0.25f)
             {
                 if (guard) _w[IJockey] = 1f;
                 else _w[IIdle] = 1f;
             }
-            else if (guard || lateral > 0.6f)
+            else if (guard || lateral > 0.85f)
             {
                 float k = Mathf.Clamp01(speed / 1.2f);
                 _w[IJockey] = k;
@@ -260,9 +340,11 @@ namespace Craquez
                 // parado -> andar -> trotar -> correr -> pique (por velocidade)
                 bool sprint = _locoP[ISprint].IsValid();
                 // limiares = velocidade natural de cada passada (medida nos pés), ligeiramente acima
-                float[] sp = sprint ? new[] { 0f, _locoSpeed[IWalk], _locoSpeed[IJog], _locoSpeed[IRun], _locoSpeed[ISprint] } : new[] { 0f, _locoSpeed[IWalk], _locoSpeed[IJog], _locoSpeed[IRun] };
+                var sp = sprint ? _sp5 : _sp4;
+                sp[0] = 0f; sp[1] = _locoSpeed[IWalk]; sp[2] = _locoSpeed[IJog]; sp[3] = _locoSpeed[IRun];
+                if (sprint) sp[4] = _locoSpeed[ISprint];
                 for (int k = 1; k < sp.Length; k++) sp[k] = Mathf.Max(sp[k] * 1.12f, sp[k - 1] + 0.6f);
-                int[] ix = sprint ? new[] { IIdle, IWalk, IJog, IRun, ISprint } : new[] { IIdle, IWalk, IJog, IRun };
+                var ix = sprint ? Ix5 : Ix4;
                 float s = Mathf.Min(speed, 10.5f);
                 int seg = 0;
                 while (seg < sp.Length - 2 && s >= sp[seg + 1]) seg++;

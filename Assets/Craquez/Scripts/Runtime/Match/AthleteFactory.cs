@@ -12,6 +12,8 @@ namespace Craquez
     public static class AthleteFactory
     {
         public static readonly string[] Bases = { "afro", "latino", "europeu", "asiatico" };
+        /// <summary>Futsal: tênis de quadra no lugar das chuteiras (vale para os atletas criados em seguida).</summary>
+        public static bool IndoorShoes;
         static readonly Dictionary<string, GameObject> _models = new Dictionary<string, GameObject>();
         static readonly Dictionary<string, Texture2D> _tex = new Dictionary<string, Texture2D>();
         static readonly Dictionary<string, Material> _mats = new Dictionary<string, Material>();
@@ -63,6 +65,8 @@ namespace Craquez
             public int hair;
             public Color hairColor, skinTint;
             public float scale;
+            public float build;   // 0 magro .. 1 forte
+            public float frame;   // 0 ombros estreitos .. 1 largos
             public float[] face;
             public int boots;
         }
@@ -73,7 +77,8 @@ namespace Craquez
             var f = p.face ?? new float[0];
             float F(int i, float d) => i < f.Length ? f[i] : d;
             uint h = (uint)(p.name.GetHashCode() ^ (salt * 7919));
-            float R(int k) => ((h >> (k * 3)) & 0xFF) / 255f;
+            uint h2 = (h ^ 0x9E3779B9u) * 2654435761u;
+            float R(int k) => (k < 8 ? (h >> (k * 3)) & 0xFF : (h2 >> ((k - 8) * 6)) & 0xFF) / 255f;   // k >= 8: segundo hash (bits suficientes)
             int skin = Mathf.RoundToInt(F(0, R(1) * 5f));
             string b = skin >= 4 ? "afro" : skin == 3 ? (R(2) > 0.5f ? "afro" : "latino") : skin == 2 ? "latino" : (R(3) < 0.18f ? "asiatico" : "europeu");
             if (p.nat == "JP" || p.nat == "KR" || p.nat == "CN") b = "asiatico";
@@ -87,7 +92,11 @@ namespace Craquez
             return new Look
             {
                 baseName = b, hair = Mathf.Clamp(hair, 0, Hairs.Length - 1), hairColor = HairColors[Mathf.Clamp(hc, 0, HairColors.Length - 1)],
-                skinTint = tint, scale = Mathf.Lerp(0.95f, 1.05f, F(5, R(6) * 4f) / 4f), face = f,
+                // altura: do baixinho (1,68 m) ao grandalhão (1,93 m), mais gente perto da média
+                skinTint = tint, scale = Mathf.Lerp(0.93f, 1.07f, Mathf.Clamp01(F(5, R(6) * 4f) / 4f * 0.5f + (R(8) + R(9)) * 0.25f)), face = f,
+                frame = Mathf.Clamp01(R(10) * 0.7f + F(5, 2f) / 4f * 0.3f),
+                // maioria magro/médio; só alguns fortes (porte do banco + sorteio por nome)
+                build = Mathf.Clamp01(Mathf.Pow(Mathf.Clamp01(F(5, R(6) * 4f) / 4f * 0.6f + R(7) * 0.4f), 1.6f)),
                 boots = (int)((h >> 5) % (uint)BootPainter.Designs.Length),
             };
         }
@@ -111,6 +120,7 @@ namespace Craquez
             inst.name = "model";
             var rig = root.AddComponent<AthleteRig>();
             rig.Init(inst.transform);
+            rig.Physique(look.build, look.frame);
             inst.transform.localScale = Vector3.one * look.scale;
             Dress(rig, look, p.isKeeper ? keeperKit : kit, p.number, quality);
             return rig;
@@ -159,7 +169,8 @@ namespace Craquez
                     case "Boots":
                     {
                         int d = look.boots;
-                        smr.sharedMaterial = Shared("boots:" + d, () => Gfx.Character(Color.white, BootPainter.Paint(d), 0.62f));
+                        bool indoor = IndoorShoes;
+                        smr.sharedMaterial = Shared("boots:" + d + (indoor ? "f" : ""), () => Gfx.Character(Color.white, BootPainter.Paint(d, indoor), indoor ? 0.35f : 0.62f));
                         break;
                     }
                     default:

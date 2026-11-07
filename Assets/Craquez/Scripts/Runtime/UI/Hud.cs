@@ -107,7 +107,16 @@ namespace Craquez.UI
             _goalSub = UiKit.Label(_goalBox, "", 44, Theme.Head, Theme.Text, TextAnchor.MiddleCenter);
             _goalSub.rectTransform.Place(0, 0.12f, 1, 0.38f);
             _goalCg.alpha = 0;
+            // pausa sempre visível (toque, mouse; controle/teclado usam Start/Esc)
+            var pause = UiKit.Button(root, "II", () => onPause?.Invoke(), 34, new Color(0.02f, 0.03f, 0.07f, 0.85f));
+            pause.GetComponent<RectTransform>().At(1, 1, 96, 72, -30, -30);
+            var pnav = pause.navigation; pnav.mode = Navigation.Mode.None; pause.navigation = pnav;
+            _pauseBtn = pause.gameObject;
             _overlay = UiKit.Rect(root, "overlay").Place(0, 0, 1, 1);
+            _cut = UiKit.Image(root, Color.black, null, "corte");
+            _cut.rectTransform.Place(0, 0, 1, 1);
+            _cut.raycastTarget = false;
+            _cut.color = new Color(0, 0, 0, 0);
         }
 
         void Chip(RectTransform sb, Kit k, float x)
@@ -137,10 +146,21 @@ namespace Craquez.UI
         }
 
         public RectTransform Overlay => _overlay;
+        int _lastA = -1, _lastB = -1, _lastSecs = -1, _lastHalf = -1;
+        readonly int[] _lastCtrl = { -1, -1 };
+        public System.Action onPause;
+        GameObject _pauseBtn;
+        public void ShowPauseButton(bool on) { if (_pauseBtn != null) _pauseBtn.SetActive(on); }
+
+        Image _cut;
+        float _cutT;
+
+        /// <summary>Corte de cena (reinícios): tela escura que clareia em ~0,5 s.</summary>
+        public void Cut() => _cutT = 0.55f;
 
         public static string ClockText(MatchSim sim)
         {
-            float perHalf = sim.mode.id == GameModes.Field ? 45f : sim.mode.id == GameModes.Futsal ? 20f : 10f;
+            float perHalf = sim.mode.id == GameModes.Field ? 45f : sim.mode.id == GameModes.Futsal ? 20f : sim.mode.id == GameModes.Society ? 25f : 10f;
             float m = Mathf.Min(sim.clock, sim.halfSeconds) / Mathf.Max(1f, sim.halfSeconds) * perHalf + (sim.half - 1) * perHalf;
             int mm = Mathf.FloorToInt(m);
             int ss = Mathf.FloorToInt((m - mm) * 60f);
@@ -150,15 +170,22 @@ namespace Craquez.UI
         void Update()
         {
             if (_sim == null) return;
-            _scoreA.text = _sim.score[0].ToString();
-            _scoreB.text = _sim.score[1].ToString();
-            _clock.text = ClockText(_sim);
-            _half.text = _sim.half == 1 ? "1ºT" : "2ºT";
+            // textos só mudam quando o valor muda (sem gerar lixo de memória a cada quadro)
+            if (_sim.score[0] != _lastA) { _lastA = _sim.score[0]; _scoreA.text = _lastA.ToString(); }
+            if (_sim.score[1] != _lastB) { _lastB = _sim.score[1]; _scoreB.text = _lastB.ToString(); }
+            int secs = Mathf.FloorToInt(_sim.clock * 12f);   // (o relógio exibido corre mais rápido que o real)
+            if (secs != _lastSecs || _sim.half != _lastHalf)
+            {
+                _lastSecs = secs;
+                _lastHalf = _sim.half;
+                _clock.text = ClockText(_sim);
+                _half.text = _sim.half == 1 ? "1ºT" : "2ºT";
+            }
             for (int t = 0; t < 2; t++)
             {
                 if (!_pbox[t].gameObject.activeSelf) continue;
                 var p = _sim.Controlled(t);
-                _pname[t].text = p.number + "  " + p.name.ToUpperInvariant();
+                if (_lastCtrl[t] != p.id) { _lastCtrl[t] = p.id; _pname[t].text = p.number + "  " + p.name.ToUpperInvariant(); }
                 _stamina[t].fillAmount = p.stamina;
                 _stamina[t].color = Color.Lerp(Theme.Hot, Theme.Accent, p.stamina);
                 float ch = _sim.ChargeOf(t);
@@ -166,13 +193,39 @@ namespace Craquez.UI
                 _power[t].fillAmount = ch;
                 _power[t].color = Color.Lerp(Theme.Accent2, Theme.Hot, Mathf.Clamp01((ch - 0.7f) / 0.3f));
             }
+            SetPieceHint();
             _toastT -= Time.unscaledDeltaTime;
             _toastCg.alpha = Mathf.Clamp01(_toastT * 3f);
             _goalT -= Time.unscaledDeltaTime;
             _goalCg.alpha = Mathf.Clamp01(_goalT * 2f) * Mathf.Clamp01((3.2f - _goalT) * 4f);
             _goalBox.localScale = Vector3.one * (1f + Mathf.Clamp01(_goalT - 2.7f) * 0.6f);
+            if (_cutT > 0f || _cut.color.a > 0f)
+            {
+                _cutT -= Time.unscaledDeltaTime;
+                _cut.color = new Color(0, 0, 0, Mathf.Clamp01(_cutT / 0.4f));
+            }
         }
 
         public void SetWeather(string s) => _weather.text = s;
+
+        /// <summary>Quem é humano (e com que controle): para mostrar as opções da cobrança de falta.</summary>
+        public DeviceKind[] devices = new DeviceKind[2];
+        public bool[] human = new bool[2];
+        Text _setPiece;
+        int _setPieceShown = -1;
+
+        void SetPieceHint()
+        {
+            if (_setPiece == null)
+            {
+                _setPiece = UiKit.Label(_overlay != null ? _overlay : (RectTransform)transform, "", 26, Theme.BodyBold, Color.white, TextAnchor.MiddleCenter);
+                _setPiece.rectTransform.Place(0, 0, 1, 0, 40, 150, 40, -200);
+                UiKit.Shadow(_setPiece, 3, 0.9f);
+            }
+            int want = _sim.setPiece && _sim.setPieceTeam >= 0 && human[_sim.setPieceTeam] && _sim.ball.owner == _sim.setPieceTaker ? (_sim.setPieceShot ? 1 : 0) : -1;
+            if (want == _setPieceShown) return;
+            _setPieceShown = want;
+            _setPiece.text = want < 0 ? "" : InputRouter.SetPieceHelp(devices[_sim.setPieceTeam], want == 1);
+        }
     }
 }

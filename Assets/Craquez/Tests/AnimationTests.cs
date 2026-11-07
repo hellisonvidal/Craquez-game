@@ -61,10 +61,11 @@ namespace Craquez.Tests
                 var anim = new AthleteAnimator(r.animator, "D", 3);
                 float minA = 999f, maxA = -999f, drift = 0f;
                 var pelvis = B(r, "pelvis");
-                var p0 = pelvis.position;
+                var p0 = g.transform.TransformPoint(r.pelvisRest);
                 for (int f = 0; f < 90; f++)
                 {
                     anim.Tick(1f / 60f, 5f, 5f, 0f, false);
+                    r.PinHips(0f);
                     var d = B(r, "calf_l").position - thigh.position;
                     float a = Vector3.SignedAngle(Vector3.down, d, g.transform.right);
                     minA = Mathf.Min(minA, a);
@@ -77,9 +78,106 @@ namespace Craquez.Tests
                 Debug.Log($"[anim-diag] coxa: SampleAnimation varia {sampled:F1}°; pelo grafo a coxa oscila {maxA - minA:F1}° ({minA:F0}..{maxA:F0}); quadril sai do lugar até {drift:F2} m");
                 Assert.Greater(hit, binds.Length / 2, "curvas do clipe não encontram os ossos do modelo");
                 Assert.Greater(maxA - minA, 20f, "a corrida não move as pernas");
-                Assert.Less(drift, 0.35f, "o clipe de corrida desloca o quadril (deveria correr no lugar)");
+                Assert.Less(drift, 0.05f, "quadril não ficou preso na horizontal");
             }
             finally { Object.DestroyImmediate(g); }
+        }
+
+        /// <summary>Medidas de cada clipe no referencial do atleta (quadril, rumo do quadril e dos pés).</summary>
+        [Test]
+        public void MedidasDosClipes()
+        {
+            var (g, r) = Make("M");
+            try
+            {
+                var root = g.transform;
+                var host = r.animator.gameObject;
+                var pel = B(r, "pelvis");
+                var tl = B(r, "thigh_l");
+                var tr = B(r, "thigh_r");
+                Vector3 L(Vector3 w) => root.InverseTransformPoint(w);
+                float Yaw(Vector3 d) => Mathf.Atan2(d.x, d.z) * Mathf.Rad2Deg;
+                var restP = L(pel.position);
+                float restHip = Yaw(Quaternion.Euler(0, -90, 0) * (L(tr.position) - L(tl.position)));
+                Debug.Log($"[clip] repouso: quadril em ({restP.x:F2},{restP.y:F2},{restP.z:F2}); rumo do quadril {restHip:F0}°");
+                foreach (var kv in AthleteAnimator.Clips)
+                {
+                    var c = kv.Value.clip;
+                    const int N = 24;
+                    Vector3 mn = Vector3.one * 99f, mx = -Vector3.one * 99f, sum = Vector3.zero;
+                    float hipSum = 0f, footSum = 0f, hipMin = 999f, hipMax = -999f;
+                    for (int k = 0; k < N; k++)
+                    {
+                        c.SampleAnimation(host, c.length * k / N);
+                        var pp = L(pel.position);
+                        mn = Vector3.Min(mn, pp); mx = Vector3.Max(mx, pp); sum += pp;
+                        float hy = Yaw(Quaternion.Euler(0, -90, 0) * (L(tr.position) - L(tl.position)));
+                        hipSum += hy; hipMin = Mathf.Min(hipMin, hy); hipMax = Mathf.Max(hipMax, hy);
+                        foreach (var sfx in new[] { "_l", "_r" })
+                        {
+                            var d = L(B(r, "ball" + sfx).position) - L(B(r, "foot" + sfx).position);
+                            footSum += Yaw(new Vector3(d.x, 0, d.z));
+                        }
+                    }
+                    var avg = sum / N;
+                    Debug.Log($"[clip] {kv.Key,-10} {c.length:F2}s quadril médio ({avg.x:F2},{avg.y:F2},{avg.z:F2}) x[{mn.x:F2},{mx.x:F2}] z[{mn.z:F2},{mx.z:F2}] y[{mn.y:F2},{mx.y:F2}]; rumo quadril {hipSum / N:F0}° [{hipMin:F0},{hipMax:F0}]; pés {footSum / (2 * N):F0}°");
+                }
+            }
+            finally { Object.DestroyImmediate(g); }
+        }
+
+        /// <summary>Corpo atlético não deforma: cabeça na altura certa, mãos e pés simétricos.</summary>
+        [Test]
+        public void CorpoProporcional()
+        {
+            var (g, r) = Make("P");
+            r.Physique(0.4f);
+            try
+            {
+                var root = g.transform;
+                float head = B(r, "head").position.y - root.position.y;
+                float handL = Vector3.Distance(B(r, "upperarm_l").position, B(r, "hand_l").position);
+                float handR = Vector3.Distance(B(r, "upperarm_r").position, B(r, "hand_r").position);
+                float legL = Vector3.Distance(B(r, "thigh_l").position, B(r, "foot_l").position);
+                float legR = Vector3.Distance(B(r, "thigh_r").position, B(r, "foot_r").position);
+                var s1 = B(r, "spine_01").lossyScale;
+                Debug.Log($"[corpo] cabeça {head:F2} m; braços {handL:F2}/{handR:F2}; pernas {legL:F2}/{legR:F2}; escala cintura {s1}");
+                Assert.That(head, Is.InRange(1.45f, 1.95f));
+                Assert.Less(Mathf.Abs(handL - handR), 0.02f);
+                Assert.Less(Mathf.Abs(legL - legR), 0.02f);
+                Assert.That(handL, Is.InRange(0.45f, 0.7f));
+            }
+            finally { Object.DestroyImmediate(g); }
+        }
+
+        /// <summary>Braços não abrem/erguem demais e o pé não fica pendurado depois das correções.</summary>
+        [Test]
+        public void BracosEPesNaturais()
+        {
+            var (g, r) = Make("Q");
+            var anim = new AthleteAnimator(r.animator, "Q", 5);
+            var pose = new PoseEdits();
+            float maxAbdBefore = 0f, maxAbdAfter = 0f, minPitchBefore = 999f, minPitchAfter = 999f;
+            try
+            {
+                foreach (var (spd, guard) in new[] { (5f, false), (1.2f, true), (0f, false), (7.5f, false) })
+                    for (int f = 0; f < 120; f++)
+                    {
+                        pose.Restore();
+                        anim.Tick(1f / 60f, spd, guard ? 0f : spd, guard ? spd : 0f, guard);
+                        r.PinHips(0f);
+                        for (int sd = -1; sd <= 1; sd += 2) maxAbdBefore = Mathf.Max(maxAbdBefore, PoseFix.Abduction(r, g.transform, sd, out _));
+                        foreach (var (ft, tb) in new[] { (r.footL, B(r, "ball_l")), (r.footR, B(r, "ball_r")) }) minPitchBefore = Mathf.Min(minPitchBefore, AthleteRig.FootPitch(ft, tb) - r.footPitchRest);
+                        PoseFix.Arms(r, g.transform, pose, 1f);
+                        PoseFix.Feet(r, g.transform, pose, 0f);
+                        for (int sd = -1; sd <= 1; sd += 2) maxAbdAfter = Mathf.Max(maxAbdAfter, PoseFix.Abduction(r, g.transform, sd, out _));
+                        foreach (var (ft, tb) in new[] { (r.footL, B(r, "ball_l")), (r.footR, B(r, "ball_r")) }) minPitchAfter = Mathf.Min(minPitchAfter, AthleteRig.FootPitch(ft, tb) - r.footPitchRest);
+                    }
+                Debug.Log($"[pose] abertura máx. do braço: {maxAbdBefore:F0}° -> {maxAbdAfter:F0}°; ponta do pé (rel. repouso) mín.: {minPitchBefore:F0}° -> {minPitchAfter:F0}°");
+                Assert.Less(maxAbdAfter, 26f, "braços ainda abertos");
+                Assert.Greater(minPitchAfter, -38f, "pé ainda pendurado");
+            }
+            finally { anim.Destroy(); Object.DestroyImmediate(g); }
         }
 
         [Test]

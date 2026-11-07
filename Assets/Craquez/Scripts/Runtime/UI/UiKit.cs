@@ -9,12 +9,13 @@ namespace Craquez.UI
     /// <summary>Paleta e tipografia da interface (visual de transmissão esportiva).</summary>
     public static class Theme
     {
-        public static readonly Color Bg = new Color(0.03f, 0.05f, 0.1f, 0.92f);
-        public static readonly Color Panel = new Color(0.06f, 0.09f, 0.16f, 0.88f);
-        public static readonly Color PanelLight = new Color(0.12f, 0.16f, 0.26f, 0.9f);
-        public static readonly Color Accent = new Color(0.0f, 0.9f, 0.62f);       // verde neon
-        public static readonly Color Accent2 = new Color(0.98f, 0.8f, 0.15f);     // dourado
-        public static readonly Color Hot = new Color(1f, 0.25f, 0.35f);
+        // paleta da capa: azul elétrico, vermelho e amarelo sobre azul-marinho
+        public static readonly Color Bg = new Color(0.02f, 0.04f, 0.12f, 0.92f);
+        public static readonly Color Panel = new Color(0.03f, 0.07f, 0.2f, 0.86f);
+        public static readonly Color PanelLight = new Color(0.07f, 0.14f, 0.34f, 0.9f);
+        public static readonly Color Accent = new Color(0.16f, 0.62f, 1f);        // azul elétrico
+        public static readonly Color Accent2 = new Color(1f, 0.82f, 0.15f);       // amarelo
+        public static readonly Color Hot = new Color(0.95f, 0.16f, 0.2f);         // vermelho
         public static readonly Color Text = new Color(0.95f, 0.97f, 1f);
         public static readonly Color TextDim = new Color(0.65f, 0.72f, 0.82f);
 
@@ -286,6 +287,8 @@ namespace Craquez.UI
     public class Cycler : Selectable, ISubmitHandler, IPointerClickHandler
     {
         public Text caption, value;
+        readonly List<Image> _chips = new List<Image>();
+        readonly List<Text> _glyphs = new List<Text>();
         IList<string> _options;
         Action<int> _onChange;
         public int Index { get; private set; }
@@ -307,7 +310,7 @@ namespace Craquez.UI
 
         void Arrow(string glyph, float x0, float x1)
         {
-            var chip = UiKit.Image(transform, new Color(0f, 0.9f, 0.62f, 0.22f), Theme.Circle, "seta " + glyph);
+            var chip = UiKit.Image(transform, new Color(0.16f, 0.62f, 1f, 0.25f), Theme.Circle, "seta " + glyph);
             chip.raycastTarget = false;
             var rt = chip.rectTransform;
             rt.anchorMin = new Vector2(x0, 0.5f);
@@ -318,6 +321,15 @@ namespace Craquez.UI
             var l = UiKit.Label(chip.transform, glyph, 46, Theme.Head, Theme.Accent, TextAnchor.MiddleCenter);
             l.rectTransform.Place(0, 0, 1, 1, 0, 4, 0, 0);
             l.raycastTarget = false;
+            _chips.Add(chip);
+            _glyphs.Add(l);
+        }
+
+        /// <summary>Selecionado, o fundo fica verde: as setas viram botões escuros com seta branca.</summary>
+        void ArrowLook(bool selected)
+        {
+            foreach (var c in _chips) c.color = selected ? new Color(0.02f, 0.05f, 0.1f, 0.9f) : new Color(0.16f, 0.62f, 1f, 0.25f);
+            foreach (var g in _glyphs) g.color = selected ? Color.white : Theme.Accent;
         }
 
         public void SetOptions(IList<string> options, int index)
@@ -363,6 +375,7 @@ namespace Craquez.UI
             base.OnSelect(e);
             if (caption) caption.color = new Color(0.02f, 0.05f, 0.1f);
             if (value) value.color = new Color(0.02f, 0.05f, 0.1f);
+            ArrowLook(true);
             Sfx.Move();
         }
 
@@ -371,6 +384,7 @@ namespace Craquez.UI
             base.OnDeselect(e);
             if (caption) caption.color = Theme.TextDim;
             if (value) value.color = Theme.Text;
+            ArrowLook(false);
         }
     }
 }

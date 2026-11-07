@@ -217,20 +217,36 @@ namespace Craquez
         }
 
         /// <summary>Grama: folhas finas + variação de tom (textura repetível de ~2 m).</summary>
+        /// <summary>
+        /// Grama (repetível): folhas finas no sentido do corte (v), tufos, variação de tom entre
+        /// verde-amarelado e verde-azulado, pontas claras e sombras de solo entre as folhas.
+        /// Pouca variação de baixa frequência (o mosaico não aparece de longe).
+        /// </summary>
         public static Texture2D Grass(int size, Color baseC, int seed)
         {
             var t = Tex(size, size);
+            t.anisoLevel = 8;
             var px = new Color32[size * size];
+            var warm = new Color(1.07f, 1.03f, 0.8f);
+            var cool = new Color(0.9f, 1f, 1.1f);
             for (int y = 0; y < size; y++)
                 for (int x = 0; x < size; x++)
                 {
                     float u = x / (float)size, v = y / (float)size;
-                    float n = Fbm(u * 8, v * 8, 8, seed, 4);
-                    float blades = Hash(x, y, seed + 3);
-                    float streak = VNoise(u * 64, v * 6, 64, seed + 9);
-                    float k = 0.82f + n * 0.28f + (blades - 0.5f) * 0.18f + (streak - 0.5f) * 0.1f;
-                    var c = baseC * k;
-                    c.a = 1;
+                    float low = Fbm(u * 4, v * 4, 4, seed, 3) - 0.5f;
+                    float clump = VNoise(u * 24, v * 24, 24, seed + 3) - 0.5f;
+                    // folhas: ruído alongado no sentido do corte + leve inclinação
+                    float blade = VNoise(u * 180 + v * 9f, v * 26, 180, seed + 5);
+                    float blade2 = VNoise(u * 300 - v * 14f, v * 40, 300, seed + 7);
+                    float fine = Hash(x, y, seed + 13) - 0.5f;
+                    float hue = VNoise(u * 36, v * 36, 36, seed + 11);
+                    float k = 0.9f + low * 0.1f + clump * 0.16f + (blade - 0.5f) * 0.26f + (blade2 - 0.5f) * 0.14f + fine * 0.08f;
+                    var tint = Color.Lerp(warm, cool, hue);
+                    // pontas das folhas (claras, um pouco amareladas) e sombras de solo
+                    if (blade > 0.78f && blade2 > 0.55f) { k *= 1.1f; tint = Color.Lerp(tint, warm, 0.5f); }
+                    float gap = Hash(x, y, seed + 29);
+                    if (gap > 0.965f && blade < 0.4f) k *= 0.62f;
+                    var c = new Color(baseC.r * tint.r * k, baseC.g * tint.g * k, baseC.b * tint.b * k, 1f);
                     px[y * size + x] = c;
                 }
             t.SetPixels32(px);
@@ -256,6 +272,37 @@ namespace Craquez
                     float gap = Mathf.Abs(v * boards - bi - 0.5f) > 0.48f ? 0.55f : 1f;
                     float joint = Mathf.Abs(((u + Hash(bi, 3, seed)) * 2f) % 1f) < 0.004f ? 0.6f : 1f;
                     var c = baseC * (tone * (0.85f + rings * 0.15f + grain * 0.1f) * gap * joint);
+                    c.a = 1;
+                    px[y * size + x] = c;
+                }
+            t.SetPixels32(px);
+            t.Apply(true);
+            return t;
+        }
+
+        /// <summary>Tacos de madeira em espinha de peixe (ginásio antigo): cada taco com tom e veio próprios, verniz gasto.</summary>
+        public static Texture2D Parquet(int size, int seed)
+        {
+            var t = Tex(size, size);
+            var px = new Color32[size * size];
+            const int N = 8;          // tacos por lado da textura (comprimento)
+            for (int y = 0; y < size; y++)
+                for (int x = 0; x < size; x++)
+                {
+                    float u = x / (float)size * N, v = y / (float)size * N;
+                    // espinha de peixe: faixas diagonais alternando a direção do taco
+                    float a = u + v, b = u - v;
+                    int band = Mathf.FloorToInt(b * 2f);
+                    bool even = (band & 1) == 0;
+                    float along = even ? a : -a + 100f;
+                    int ti = Mathf.FloorToInt(along * 2f);
+                    float fu = along * 2f - ti, fv = b * 2f - band;
+                    float tone = 0.78f + Hash(ti + band * 131, band, seed) * 0.3f;
+                    float grain = Fbm(fu * 2f + ti, fv * 14f, 16, seed + ti, 3);
+                    float edge = (fu < 0.03f || fu > 0.97f || fv < 0.04f || fv > 0.96f) ? 0.62f : 1f;
+                    var wood = Color.Lerp(new Color(0.62f, 0.38f, 0.2f), new Color(0.86f, 0.62f, 0.36f), tone - 0.6f);
+                    float wearN = Fbm(x / (float)size * 3f, y / (float)size * 3f, 3, seed + 5, 3);
+                    var c = wood * (0.86f + grain * 0.2f) * edge * (0.9f + wearN * 0.15f);
                     c.a = 1;
                     px[y * size + x] = c;
                 }
@@ -438,9 +485,13 @@ namespace Craquez
             for (int y = 0; y < size; y++)
                 for (int x = 0; x < size; x++)
                 {
-                    float a = (x + y) % cell, b = (x - y + 4 * size) % cell;
-                    bool line = a < thick || b < thick;
-                    px[y * size + x] = line ? new Color32(245, 245, 245, 255) : new Color32(0, 0, 0, 0);
+                    // malha quadrada com fio de borda suave (anti-serrilhado) e nós um pouco mais grossos
+                    float a = x % cell, b = y % cell;
+                    float da = Mathf.Min(a, cell - a), db = Mathf.Min(b, cell - b);
+                    float cov = Mathf.Clamp01(thick * 0.5f + 0.5f - Mathf.Min(da, db));
+                    if (da < thick && db < thick) cov = 1f;
+                    byte al = (byte)(cov * 255);
+                    px[y * size + x] = new Color32(245, 245, 245, al);
                 }
             t.SetPixels32(px);
             t.Apply(true);

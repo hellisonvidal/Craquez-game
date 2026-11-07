@@ -18,7 +18,12 @@ namespace Craquez
         public void Quad(Vector3 a, Vector3 b, Vector3 c, Vector3 d, Vector2 uv0, Vector2 uv1)
         {
             int i = _v.Count;
-            var n = Vector3.Cross(b - a, d - a).normalized;
+            // quads degenerados (a == b no centro de um disco) davam normal zero: o ponto ficava
+            // acinzentado e cintilava (pontos brilhosos das marcas do pênalti e do centro)
+            var n = Vector3.Cross(b - a, d - a);
+            if (n.sqrMagnitude < 1e-12f) n = Vector3.Cross(d - c, b - c);   // mesmo sentido, pelo vértice c
+            if (n.sqrMagnitude < 1e-12f) n = Vector3.Cross(a - d, c - d);
+            n = n.sqrMagnitude < 1e-12f ? Vector3.up : n.normalized;
             _v.Add(a); _v.Add(b); _v.Add(c); _v.Add(d);
             for (int k = 0; k < 4; k++) { _n.Add(n); _c.Add(color); }
             _uv.Add(new Vector2(uv0.x, uv0.y)); _uv.Add(new Vector2(uv1.x, uv0.y));

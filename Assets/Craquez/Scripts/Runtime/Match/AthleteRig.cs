@@ -16,6 +16,17 @@ namespace Craquez
         public Quaternion modelFix = Quaternion.identity;
         /// <summary>Rotações locais de repouso do pescoço e da cabeça.</summary>
         public Quaternion headRest = Quaternion.identity, neckRest = Quaternion.identity;
+        /// <summary>Posição de repouso do quadril no referencial do atleta (para "correr no lugar").</summary>
+        public Vector3 pelvisRest;
+        /// <summary>Inclinação do pé (tornozelo -> ponta) em repouso, em graus (negativo = ponta para baixo).</summary>
+        public float footPitchRest;
+
+        public static float FootPitch(Transform foot, Transform ball)
+        {
+            if (foot == null || ball == null) return 0f;
+            var d = ball.position - foot.position;
+            return Mathf.Atan2(d.y, new Vector2(d.x, d.z).magnitude) * Mathf.Rad2Deg;
+        }
         Transform _number, _numberFront;
 
         public void Init(Transform m)
@@ -52,6 +63,8 @@ namespace Craquez
                     m.localRotation = modelFix * m.localRotation;
                 }
             }
+            if (pelvis != null) pelvisRest = transform.InverseTransformPoint(pelvis.position);
+            footPitchRest = FootPitch(footL, B("ball_l"));
             // pés no chão
             if (footL != null)
             {
@@ -59,6 +72,69 @@ namespace Craquez
                 foreach (var t in new[] { footL, footR, ballL, B("ball_r") })
                     if (t != null) minY = Mathf.Min(minY, t.position.y);
                 if (minY < 0.3f && minY > -0.3f) m.localPosition += Vector3.up * (0.035f - (minY - transform.position.y));
+            }
+        }
+
+        /// <summary>
+        /// Os clipes de captura trazem parte do deslocamento no quadril (a corrida anda ~1 m
+        /// e volta a cada ciclo: pés "patinando"). Prende o quadril na horizontal; a
+        /// simulação é quem desloca o atleta. keep = fração do movimento do clipe mantida.
+        /// </summary>
+        public void PinHips(float keep)
+        {
+            if (pelvis == null) return;
+            var lp = transform.InverseTransformPoint(pelvis.position);
+            lp.x = Mathf.Lerp(pelvisRest.x, lp.x, keep);
+            lp.z = Mathf.Lerp(pelvisRest.z, lp.z, keep);
+            pelvis.position = transform.TransformPoint(lp);
+        }
+
+        // espessura (largura/profundidade) de cada osso para o biotipo: (osso, magro, forte).
+        // O modelo base já é encorpado: o "médio" afina um pouco; o forte fica perto do original.
+        static readonly (string bone, float slim, float strong)[] Shape =
+        {
+            ("spine_01", 0.84f, 0.96f), ("spine_02", 0.88f, 0.99f), ("spine_03", 0.92f, 1.02f),
+            ("clavicle_l", 0.95f, 1.01f), ("clavicle_r", 0.95f, 1.01f),
+            ("upperarm_l", 0.86f, 1.02f), ("upperarm_r", 0.86f, 1.02f), ("lowerarm_l", 0.9f, 1.01f), ("lowerarm_r", 0.9f, 1.01f),
+            ("thigh_l", 0.88f, 1.03f), ("thigh_r", 0.88f, 1.03f), ("calf_l", 0.9f, 1.02f), ("calf_r", 0.9f, 1.02f), ("neck_01", 0.92f, 1.01f),
+        };
+
+        /// <summary>
+        /// Biotipo (0 = magro .. 1 = forte): escala os ossos só na espessura e compensa nos filhos.
+        /// Chamar uma vez, logo depois de Init.
+        /// </summary>
+        public void Physique(float build, float frame = 0.5f)
+        {
+            build = Mathf.Clamp01(build);
+            // ombros/caixa torácica: estreitos (0) .. largos (1), independente do porte
+            float fr = Mathf.Lerp(0.93f, 1.07f, Mathf.Clamp01(frame));
+            foreach (var (name, slim, strong) in Shape)
+            {
+                float k = Mathf.Lerp(slim, strong, build);
+                if (name == "spine_03" || name.StartsWith("clavicle")) k *= fr;
+                if (!bones.TryGetValue(name, out var b) || b.childCount == 0) continue;
+                // eixo do comprimento: o que aponta para o primeiro osso filho
+                Transform child = null;
+                foreach (Transform c in b) if (c.GetComponent<Renderer>() == null) { child = c; break; }
+                if (child == null) continue;
+                var dir = b.InverseTransformDirection(child.position - b.position).normalized;
+                int len = Mathf.Abs(dir.x) > Mathf.Abs(dir.y) ? (Mathf.Abs(dir.x) > Mathf.Abs(dir.z) ? 0 : 2) : (Mathf.Abs(dir.y) > Mathf.Abs(dir.z) ? 1 : 2);
+                var sc = Vector3.one * k;
+                sc[len] = 1f;
+                b.localScale = Vector3.Scale(b.localScale, sc);
+                // filhos: desfaz a escala do pai no referencial de cada filho
+                foreach (Transform c in b)
+                {
+                    var inv = Vector3.one;
+                    for (int i = 0; i < 3; i++)
+                    {
+                        var axisInParent = c.localRotation * (i == 0 ? Vector3.right : i == 1 ? Vector3.up : Vector3.forward);
+                        float f = Mathf.Abs(axisInParent.x) * sc.x + Mathf.Abs(axisInParent.y) * sc.y + Mathf.Abs(axisInParent.z) * sc.z;
+                        float w = Mathf.Abs(axisInParent.x) + Mathf.Abs(axisInParent.y) + Mathf.Abs(axisInParent.z);
+                        inv[i] = w / Mathf.Max(0.01f, f);
+                    }
+                    c.localScale = Vector3.Scale(c.localScale, inv);
+                }
             }
         }
 

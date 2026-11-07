@@ -81,7 +81,7 @@ namespace Craquez
 
         public static Texture2D Paint(Mesh mesh, KitPart part, Kit kit, Axes ax, int size)
         {
-            string key = mesh.GetInstanceID() + ":" + part + Teams.Hex(kit.c1) + Teams.Hex(kit.c2) + Teams.Hex(kit.shorts) + Teams.Hex(kit.socks) + kit.pattern + ":" + size;
+            string key = mesh.GetInstanceID() + ":" + part + Teams.Hex(kit.c1) + Teams.Hex(kit.c2) + Teams.Hex(kit.shorts) + Teams.Hex(kit.socks) + kit.pattern + (kit.sleeves.a > 0f ? Teams.Hex(kit.sleeves) : "") + (kit.trim.a > 0f ? Teams.Hex(kit.trim) : "") + ":" + size;
             if (_cache.TryGetValue(key, out var cached) && cached != null) return cached;
             var info = Get(mesh);
             var px = new Color32[size * size];
@@ -106,23 +106,10 @@ namespace Craquez
             Color c;
             if (part == KitPart.Shirt)
             {
-                c = k.c1;
-                switch (k.pattern)
-                {
-                    case 1: if (Mathf.Repeat(x / 0.17f + 0.25f, 1f) < 0.5f) c = k.c2; break;                  // listras (~8,5 cm)
-                    case 2: if (Mathf.Repeat(h / 0.15f, 1f) < 0.5f) c = k.c2; break;                         // aros
-                    case 3: if (Mathf.Abs(x * 0.95f - (h - 0.28f)) < 0.085f) c = k.c2; break;                // faixa diagonal (ombro -> quadril)
-                    case 4: if (x > 0f) c = k.c2; break;                                                     // metades
-                    case 5: if (Mathf.Repeat(x / 0.07f, 1f) < 0.14f) c = k.c2; break;                         // riscas finas
-                    case 6: if (h > 0.14f && h < 0.25f && Mathf.Abs(x) < 0.3f) c = k.c2; break;               // faixa no peito
-                    case 7:                                                                                  // faixa vertical central
-                        if (Mathf.Abs(x) < 0.075f) c = k.c2;
-                        else if (Mathf.Abs(x) < 0.09f) c = Color.white;
-                        break;
-                }
-                // ombros e laterais com painel de contraste discreto
-                if (Mathf.Abs(x) > 0.17f && Mathf.Abs(x) < 0.21f && h > 0.05f) c = Color.Lerp(c, Contrast(k.c1, k.c2), 0.55f);
-                if (trim > 0.5f) c = Contrast(k.c1, k.c2);
+                c = ShirtColor(k, x, h);
+                // mangas de outra cor (ex.: corpo vermelho e mangas brancas): fora do tronco, na altura dos ombros
+                if (k.sleeves.a > 0f && Mathf.Abs(x) > 0.2f && h < 0.36f) c = k.sleeves;
+                if (trim > 0.5f) c = k.trim.a > 0f ? k.trim : Contrast(k.c1, k.c2);
             }
             else if (part == KitPart.Shorts)
             {
@@ -141,6 +128,31 @@ namespace Craquez
             c *= 0.97f + knit;
             c.a = 1f;
             return c;
+        }
+
+        /// <summary>Cor da camisa num ponto: x = metros do meio do corpo, h = metros abaixo do ombro.</summary>
+        public static Color ShirtColor(Kit k, float x, float h)
+        {
+            {
+                Color c = k.c1;
+                switch (k.pattern)
+                {
+                    case 1: if (Mathf.Repeat(x / 0.17f + 0.25f, 1f) < 0.5f) c = k.c2; break;                  // listras (~8,5 cm)
+                    case 2: if (Mathf.Repeat(h / 0.15f, 1f) < 0.5f) c = k.c2; break;                         // aros
+                    case 3: if (Mathf.Abs(x * 0.95f - (h - 0.28f)) < 0.085f) c = k.c2; break;                // faixa diagonal (ombro -> quadril)
+                    case 4: if (x > 0f) c = k.c2; break;                                                     // metades
+                    case 5: if (Mathf.Repeat(x / 0.07f, 1f) < 0.14f) c = k.c2; break;                         // riscas finas
+                    case 6: if (h > 0.14f && h < 0.25f && Mathf.Abs(x) < 0.3f) c = k.c2; break;               // faixa no peito
+                    case 8: if ((Mathf.FloorToInt(x / 0.075f + 100f) + Mathf.FloorToInt(h / 0.075f)) % 2 == 0) c = k.c2; break;   // xadrez
+                    case 7:                                                                                  // faixa vertical central
+                        if (Mathf.Abs(x) < 0.075f) c = k.c2;
+                        else if (Mathf.Abs(x) < 0.09f) c = Color.white;
+                        break;
+                }
+                // ombros e laterais com painel de contraste discreto
+                if (Mathf.Abs(x) > 0.17f && Mathf.Abs(x) < 0.21f && h > 0.05f) c = Color.Lerp(c, Contrast(k.c1, k.c2), 0.55f);
+                return c;
+            }
         }
 
         public static Color Contrast(Color a, Color b)
@@ -242,10 +254,14 @@ namespace Craquez
 
         static readonly Dictionary<int, Texture2D> _cache = new Dictionary<int, Texture2D>();
 
-        public static Texture2D Paint(int index, int size = 256)
+        public static Texture2D Paint(int index, int size = 256) => Paint(index, false, size);
+
+        /// <summary>futsal = tênis de quadra: sola de borracha lisa e alta (goma/branca), biqueira de camurça, sem travas.</summary>
+        public static Texture2D Paint(int index, bool futsal, int size = 256)
         {
             index = ((index % Designs.Length) + Designs.Length) % Designs.Length;
-            if (_cache.TryGetValue(index, out var t) && t != null) return t;
+            int key = index + (futsal ? 1000 : 0);
+            if (_cache.TryGetValue(key, out var t) && t != null) return t;
             var d = Designs[index];
             t = new Texture2D(size, size, TextureFormat.RGBA32, true) { wrapMode = TextureWrapMode.Clamp, anisoLevel = 4 };
             var px = new Color32[size * size];
@@ -253,12 +269,36 @@ namespace Craquez
                 for (int x = 0; x < size; x++)
                 {
                     float u = (x + 0.5f) / size, v = (y + 0.5f) / size;
-                    px[y * size + x] = Shade(d, u, v);
+                    px[y * size + x] = futsal ? ShadeFutsal(d, u, v, index) : Shade(d, u, v);
                 }
             t.SetPixels32(px);
             t.Apply(true, true);
-            _cache[index] = t;
+            _cache[key] = t;
             return t;
+        }
+
+        static Color ShadeFutsal(Design d, float u, float v, int index)
+        {
+            float side = Mathf.Abs(v - 0.5f) * 2f;
+            var gum = index % 2 == 0 ? new Color(0.62f, 0.42f, 0.24f) : new Color(0.93f, 0.93f, 0.9f);
+            if (side > 0.74f)
+            {
+                // sola de borracha lisa, alta, com friso
+                var c0 = gum * (Mathf.Abs(side - 0.8f) < 0.015f ? 0.75f : 1f);
+                c0.a = 1f;
+                return c0;
+            }
+            Color c = d.baseC;
+            // biqueira e calcanhar de camurça (tom do detalhe, textura aveludada)
+            if (u > 0.78f || u < 0.12f) c = Color.Lerp(d.accent, d.baseC, 0.35f) * (0.92f + 0.08f * Gfx.VNoise(u * 90f, v * 90f, 90, 2));
+            // faixa lateral
+            if (side > 0.42f && side < 0.6f && u > 0.25f && u < 0.75f && Mathf.Abs(Mathf.Repeat(u * 5f, 1f) - 0.5f) < 0.3f) c = d.accent;
+            // cadarço
+            if (side < 0.12f && u > 0.36f && u < 0.74f && Mathf.Repeat(u * 40f, 1f) < 0.35f) c = Color.Lerp(c, Color.white, 0.7f);
+            if (u < 0.06f) c *= 0.82f;
+            c *= 0.9f + 0.1f * (1f - side);
+            c.a = 1f;
+            return c;
         }
 
         static Color Shade(Design d, float u, float v)

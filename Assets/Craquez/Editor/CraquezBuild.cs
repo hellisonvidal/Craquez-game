@@ -18,12 +18,14 @@ namespace Craquez.EditorTools
         const string MatDir = "Assets/Craquez/Resources/Materials";
         public int callbackOrder => -100;
 
-        public void OnPreprocessBuild(BuildReport report) => PrepareAssets();
+        // o CI (GameCI) usa o próprio script de build: as configurações do jogo (tela cheia,
+        // orientação, ícones, materiais) entram aqui, antes de qualquer build
+        public void OnPreprocessBuild(BuildReport report) => Common();
 
         [InitializeOnLoadMethod]
         static void OnLoad()
         {
-            // Linux (só usado nas screenshots do CI): Vulkan + OpenGL, para rodar com lavapipe
+            // Linux: Vulkan (padrão) + OpenGL de reserva (placas antigas e as screenshots do CI)
             try
             {
                 var want = new[] { UnityEngine.Rendering.GraphicsDeviceType.Vulkan, UnityEngine.Rendering.GraphicsDeviceType.OpenGLCore };
@@ -41,6 +43,43 @@ namespace Craquez.EditorTools
                 try { if (!File.Exists(MatDir + "/ToonOutline.mat")) PrepareAssets(); }
                 catch (Exception e) { Debug.LogWarning("Craquez: materiais não gerados ainda: " + e.Message); }
             };
+        }
+
+        const string IconDir = "Assets/Craquez/Icons/";
+
+        /// <summary>Ícone original (bola-globo com órbita) no APK (normal, redondo e adaptativo) e no .exe.</summary>
+        static void Icons()
+        {
+            Texture2D L(string n)
+            {
+                var path = IconDir + n + ".png";
+                if (AssetImporter.GetAtPath(path) is TextureImporter ti && (ti.textureCompression != TextureImporterCompression.Uncompressed || ti.mipmapEnabled))
+                {
+                    ti.textureCompression = TextureImporterCompression.Uncompressed;
+                    ti.mipmapEnabled = false;
+                    ti.npotScale = TextureImporterNPOTScale.None;
+                    ti.SaveAndReimport();
+                }
+                return AssetDatabase.LoadAssetAtPath<Texture2D>(path);
+            }
+            var full = L("craquez_icon");
+            var fg = L("craquez_icon_fg");
+            var bg = L("craquez_icon_bg");
+            if (full == null) { Debug.LogWarning("Ícone não encontrado em " + IconDir); return; }
+            PlayerSettings.SetIcons(NamedBuildTarget.Unknown, new[] { full }, IconKind.Any);
+            PlayerSettings.SetIcons(NamedBuildTarget.Standalone, new[] { full }, IconKind.Any);
+            // Android: todos os tipos (legado, redondo e adaptativo com frente/fundo separados)
+            foreach (var kind in PlayerSettings.GetSupportedIconKinds(NamedBuildTarget.Android))
+            {
+                var icons = PlayerSettings.GetPlatformIcons(NamedBuildTarget.Android, kind);
+                foreach (var ic in icons)
+                {
+                    if (ic.maxLayerCount >= 2 && fg != null && bg != null) ic.SetTextures(bg, fg);
+                    else ic.SetTexture(full);
+                }
+                PlayerSettings.SetPlatformIcons(NamedBuildTarget.Android, kind, icons);
+            }
+            Debug.Log("[build] ícones aplicados");
         }
 
         [MenuItem("Craquez/Gerar materiais")]
@@ -171,6 +210,7 @@ namespace Craquez.EditorTools
             PlayerSettings.allowedAutorotateToLandscapeLeft = true;
             PlayerSettings.allowedAutorotateToLandscapeRight = true;
             PlayerSettings.colorSpace = ColorSpace.Linear;
+            Icons();
             // sempre em tela cheia
             PlayerSettings.fullScreenMode = FullScreenMode.FullScreenWindow;
             PlayerSettings.defaultIsNativeResolution = true;
@@ -225,6 +265,14 @@ namespace Craquez.EditorTools
         {
             Common();
             Run(BuildTarget.StandaloneWindows64, BuildTargetGroup.Standalone, Out("Builds/Windows/Craquez.exe"));
+        }
+
+        /// <summary>Linux x86-64 (Vulkan, com OpenGL de reserva). Saída: Builds/Linux/Craquez.x86_64.</summary>
+        [MenuItem("Craquez/Build Linux")]
+        public static void BuildLinux()
+        {
+            Common();
+            Run(BuildTarget.StandaloneLinux64, BuildTargetGroup.Standalone, Out("Builds/Linux/Craquez.x86_64"));
         }
     }
 }

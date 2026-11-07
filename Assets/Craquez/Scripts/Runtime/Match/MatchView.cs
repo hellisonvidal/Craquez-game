@@ -23,7 +23,8 @@ namespace Craquez
         Transform _ball, _ballShadow, _marker0, _marker1;
         Vector3 _ballPrev, _ballCur;
         Quaternion _ballRot = Quaternion.identity;
-        float _crowdT, _crowdHype;
+        float _crowdT, _crowdHype, _silence;
+        CrowdFx _crowd;
         AthleteView _referee;
         bool _night;
 
@@ -40,11 +41,14 @@ namespace Craquez
             Lighting(c.timeOfDay, s.mode.id, q);
             if (s.mode.id == GameModes.Futsal) venue = VenueBuilder.Futsal(s, home, away, kits[0], kits[1], c.venue, _night, q, transform);
             else if (s.mode.id == GameModes.Street) venue = VenueBuilder.Street(s, home, away, kits[0], kits[1], c.venue, _night, q, transform);
-            else venue = VenueBuilder.Stadium(s, home, away, kits[0], kits[1], _night, q, transform);
+            else if (s.mode.id == GameModes.Society) venue = VenueBuilder.Society(s, home, away, kits[0], kits[1], c.venue, _night, q, transform);
+            else venue = VenueBuilder.Stadium(s, home, away, kits[0], kits[1], _night, q, transform, c.stadium);
             // goleiros: uniforme de cor neutra que não confunde com nenhum dos dois
             var gk = new[] { KeeperKit(kits[0], kits[1], 0), KeeperKit(kits[1], kits[0], 1) };
             var parent = new GameObject("Atletas").transform;
             parent.SetParent(transform, false);
+            if (s.mode.id != GameModes.Street) _crowd = CrowdFx.Create(transform, s, venue, kits[0], kits[1], _night, q, c.teamA, c.teamB);
+            AthleteFactory.IndoorShoes = c.mode == GameModes.Futsal;
             foreach (var p in s.players)
             {
                 var rig = AthleteFactory.Create(p, kits[p.team], gk[p.team], parent, q, (p.team == 0 ? c.tacticsA : c.tacticsB).boots);
@@ -56,8 +60,10 @@ namespace Craquez
             BuildBall(q);
             _marker0 = Marker(new Color(0.1f, 0.85f, 1f));
             _marker1 = Marker(new Color(1f, 0.55f, 0.1f));
-            bcam = cam.gameObject.GetComponent<BroadcastCamera>() ?? cam.gameObject.AddComponent<BroadcastCamera>();
+            bcam = cam.gameObject.GetComponent<BroadcastCamera>();
+            if (bcam == null) bcam = cam.gameObject.AddComponent<BroadcastCamera>();
             bcam.Setup(cam, s, Settings.Camera);
+            bcam.SetOccluders(venue.root);
             bcam.SnapToBall();
             weather = gameObject.AddComponent<WeatherFx>();
             string wk = c.weather == "aleatorio" ? WeatherFx.Kinds[(int)(c.seed % 5)] : c.weather;
@@ -159,12 +165,13 @@ namespace Craquez
 
         void BuildBall(int q)
         {
-            var go = GameObject.CreatePrimitive(PrimitiveType.Sphere);
-            go.name = "Bola";
-            Destroy(go.GetComponent<Collider>());
+            // esfera lisa (64 x 32) com o mesmo mapeamento da textura dos gomos
+            var go = new GameObject("Bola");
+            go.AddComponent<MeshFilter>().sharedMesh = BallCatalog.Mesh();
+            var mr = go.AddComponent<MeshRenderer>();
             go.transform.SetParent(transform, false);
-            go.transform.localScale = Vector3.one * 0.22f;
-            go.GetComponent<MeshRenderer>().sharedMaterial = Gfx.Character(Color.white, BallCatalog.Texture(cfg.ball, q >= 2 ? 1024 : 512), 0.6f);
+            go.transform.localScale = Vector3.one * sim.ball.radius * 2f;
+            mr.sharedMaterial = Gfx.Character(Color.white, BallCatalog.Texture(cfg.ball, q >= 2 ? 1024 : 512), 0.7f);
             _ball = go.transform;
             var sh = GameObject.CreatePrimitive(PrimitiveType.Quad);
             sh.name = "Sombra da bola";
@@ -202,19 +209,91 @@ namespace Craquez
             _referee = av;
         }
 
-        /// <summary>Árbitro: acompanha o lance de longe (não interfere na simulação).</summary>
+        Vector2 _refTarget;
+        int _refThink;
+
+        /// <summary>
+        /// Árbitro (só visual, não interfere na simulação): sistema diagonal — fica na diagonal
+        /// do campo, a 12-18 m do lance, com o jogo entre ele e o assistente; sai das linhas de
+        /// passe, corre até a falta apontando a direção da cobrança e volta ao meio após o gol.
+        /// </summary>
         void RefereeStep()
         {
             if (_referee == null) return;
             var p = _referee.p;
-            var target = sim.ball.pos + new Vector2(-sim.TeamDir(0) * 8f, sim.ball.pos.y > 0 ? -10f : 10f);
-            target.y = Mathf.Clamp(target.y, -sim.halfW * 0.8f, sim.halfW * 0.8f);
-            var to = target - p.position;
-            var want = to.magnitude > 3f ? to.normalized * Mathf.Min(6.5f, to.magnitude) : Vector2.zero;
-            p.vel = Vector2.MoveTowards(p.vel, want, 8f * MatchSim.DT);
+            float hl = sim.halfLen, hw = sim.halfW;
+            var ball = sim.ball.pos + sim.ball.vel * 0.5f;
+            Vector2 target;
+            float urgency = 0f;
+            _referee.point = Vector3.zero;
+            if (sim.state == MatchState.Goal || sim.state == MatchState.Kickoff || sim.state == MatchState.Halftime)
+                target = new Vector2(-sim.TeamDir(sim.kickoffTeam) * 3f, -sim.mode.centerR - 2f);
+            else if (sim.state == MatchState.Foul && sim.foulVictim >= 0)
+            {
+                // corre até o lance e aponta para onde vai a falta
+                var v = sim.players[sim.foulVictim].position;
+                target = v + new Vector2(0f, v.y > 0 ? -4f : 4f);
+                urgency = 1f;
+                if (p.position.Dist(v) < 9f) _referee.point = AthleteView.W(new Vector2(sim.TeamDir(sim.foulTeam), 0f));
+            }
+            else if (sim.setPiece)
+            {
+                // na cobrança: perto da barreira, fora da linha do chute
+                var goal = new Vector2(hl * sim.TeamDir(sim.setPieceTeam), 0f);
+                var mid = Vector2.Lerp(sim.setPieceSpot, goal, 0.35f);
+                target = mid + new Vector2(0f, sim.setPieceSpot.y > 0 ? -7f : 7f);
+            }
+            else
+            {
+                // diagonal do canto (-hl,-hw) ao (hl,hw): projeção da bola na diagonal, puxada para o lado do lance
+                var diag = new Vector2(hl, hw).normalized;
+                float along = Vector2.Dot(ball, diag);
+                var onDiag = diag * along;
+                target = Vector2.Lerp(onDiag, ball, 0.35f);
+                var toBall = ball - target;
+                float d = toBall.magnitude;
+                float want = 14f + Mathf.Clamp01(sim.ball.Speed / 15f) * 4f;
+                if (d > 0.1f && d < want) target = ball - toBall / d * want;
+                else if (d > want + 6f) target = ball - toBall / d * (want + 6f);
+                urgency = Mathf.Clamp01((p.position.Dist(target) - 10f) / 15f);
+            }
+            // fora das linhas de passe e de cima dos jogadores
+            if (--_refThink <= 0)
+            {
+                _refThink = 20;
+                _refTarget = target;
+                foreach (var q in sim.players)
+                {
+                    var dq = _refTarget - q.position;
+                    if (dq.magnitude < 3f) _refTarget += dq.normalized * (3f - dq.magnitude);
+                }
+                if (sim.ball.owner >= 0)
+                {
+                    var own = sim.players[sim.ball.owner];
+                    foreach (var q in sim.players)
+                    {
+                        if (q.team != own.team || q == own) continue;
+                        var c = V2.ClosestOnSegment(_refTarget, own.position, q.position);
+                        if (c.Dist(_refTarget) < 1.6f) _refTarget += (_refTarget - c).Norm() * 2.2f;
+                    }
+                }
+            }
+            else _refTarget = Vector2.Lerp(_refTarget, target, 0.02f);
+            _refTarget.x = Mathf.Clamp(_refTarget.x, -hl + 2f, hl - 2f);
+            _refTarget.y = Mathf.Clamp(_refTarget.y, -hw + 1.5f, hw - 1.5f);
+            // corrida de atleta: acelera e freia aos poucos, trota no geral, pica quando o lance foge
+            var to = _refTarget - p.position;
+            float dist = to.magnitude;
+            float top = Mathf.Lerp(4.2f, 7.2f, urgency);
+            var wantV = dist > 0.6f ? to / dist * Mathf.Min(top, dist * 1.2f) : Vector2.zero;
+            float acc = wantV.magnitude < p.vel.magnitude ? 7f : 4.5f;
+            p.vel = Vector2.MoveTowards(p.vel, wantV, acc * MatchSim.DT);
             p.position += p.vel * MatchSim.DT;
+            // olha para a bola (corre de lado/de costas quando perto, como um juiz de verdade)
             var tb = sim.ball.pos - p.position;
-            if (tb.sqrMagnitude > 0.01f) p.facing = Vector2.Lerp(p.facing, tb.normalized, 0.08f).normalized;
+            var face = p.vel.magnitude > 5.5f ? p.vel.normalized : tb.normalized;
+            if (face.sqrMagnitude > 0.01f) p.facing = V2.RotateToward(p.facing, face, 6f * MatchSim.DT).Norm();
+            p.faceBall = true;
             _referee.OnTick();
         }
 
@@ -235,6 +314,12 @@ namespace Craquez
             bcam.SnapToBall();
         }
 
+        /// <summary>Bola desenhada (o goleiro a põe nas mãos ao segurá-la).</summary>
+        public Transform BallVisual => _ball;
+
+        /// <summary>Corte de cena nos reinícios (o HUD escurece a tela).</summary>
+        public System.Action onCut;
+
         void OnEvent(SimEvent e)
         {
             if (e.id >= 0 && e.id < athletes.Count) athletes[e.id].OnEvent(e);
@@ -242,27 +327,72 @@ namespace Craquez
             {
                 case "kick":
                     Sfx.Kick(e.power);
-                    if (e.kind == "shot") { _crowdHype = Mathf.Max(_crowdHype, 0.5f); bcam.Shake(0.15f); }
+                    if (e.kind == "shot") { _crowdHype = Mathf.Max(_crowdHype, 0.5f); bcam.Shake(0.15f); _crowd?.React("shot"); }
                     break;
                 case "header": Sfx.Touch(); break;
                 case "touch": case "block": Sfx.Touch(); break;
-                case "post": Sfx.Post(); Sfx.Ooh(); bcam.Shake(0.3f); break;
-                case "save": if (!e.ok) Sfx.Ooh(); Sfx.Touch(); break;
+                case "post": Sfx.Post(); Sfx.Ooh(); bcam.Shake(0.3f); _crowdHype = Mathf.Max(_crowdHype, 0.9f); _crowd?.React("shot"); break;
+                case "save":
+                    if (!e.ok) Sfx.Ooh();
+                    Sfx.Touch();
+                    if (e.ok) _crowd?.React("save");
+                    if (e.team == 0) Sfx.Applause(0.35f);   // torcida da casa aplaude o goleiro dela
+                    break;
+                case "skill":
+                    _crowd?.React("skill");
+                    if (e.team == 0) { Sfx.Hurray(0.3f); _crowdHype = Mathf.Max(_crowdHype, 0.45f); }
+                    break;
+                case "fooled":
+                    if (e.team == 1) Sfx.Applause(0.3f);    // drible do time da casa deixou o visitante no chão
+                    break;
+                case "tackle":
+                case "steal":
+                    if (e.team == 0 && (e.type == "steal" || e.ok)) { Sfx.Applause(0.25f); _crowdHype = Mathf.Max(_crowdHype, 0.3f); }
+                    break;
+                case "out":
+                    // chute que passou perto: "uuuh" da arquibancada
+                    if (sim.tick - sim.lastShotTick < 120 && Mathf.Abs(sim.ball.pos.x) > sim.halfLen - 1f && Mathf.Abs(sim.ball.pos.y) < sim.goalHalf + 3f)
+                    {
+                        Sfx.Ooh();
+                        _crowdHype = Mathf.Max(_crowdHype, 0.8f);
+                        _crowd?.React("shot");
+                    }
+                    break;
                 case "whistle":
                     if (e.kind == "fulltime") Sfx.WhistleEnd();
                     else if (e.kind == "halftime" || e.kind == "penalty") Sfx.WhistleLong();
                     else if (e.kind != "throwin" && e.kind != "goalkick" && e.kind != "corner") Sfx.Whistle();
+                    if (e.kind == "goalkick" || e.kind == "corner" || ((e.kind == "freekick" || e.kind == "offside") && sim.restartScene))
+                    {
+                        // corte: a tela escurece, todos aparecem já posicionados para o reinício
+                        SnapAll();
+                        onCut?.Invoke();
+                        if (e.kind == "freekick" && sim.wallIds.Count > 0 && !bcam.cinematic)
+                        {
+                            // cena da cobrança: atrás da bola, barreira e gol ao fundo
+                            var b = new Vector3(sim.ball.pos.x, 0f, sim.ball.pos.y);
+                            var g = new Vector3(sim.halfLen * sim.TeamDir(e.team), 1.2f, 0f);
+                            var back = (b - new Vector3(g.x, 0f, g.z)).normalized;
+                            bcam.Scene(b + back * 7.5f + Vector3.up * 2.6f, Vector3.Lerp(b, g, 0.55f), sim.stateTimer * 0.9f);
+                        }
+                    }
                     break;
                 case "foul":
                     Sfx.Whistle();
                     if (e.team == 1) Sfx.Boo();   // torcida da casa vaia falta do visitante
-                    foreach (var a in athletes) if (a.p.team != e.team && a.p.stun > 0.8f) a.OnVictimFoul();
+                    else Sfx.Ooh();
+                    _crowd?.React("foul");
+                    bcam.Shake(0.12f);
                     break;
                 case "goal":
                     Sfx.Net();
-                    Sfx.Cheer();
+                    // gol do mandante: o estádio explode; do visitante: só o setor visitante comemora
+                    bool homeGoal = e.team == 0;
+                    if (homeGoal) Sfx.Cheer(); else Sfx.Applause(0.45f);
                     GoalParty(e.team);
-                    _crowdHype = 1.6f;
+                    _crowd?.React(homeGoal ? "goal" : "silence");
+                    _crowdHype = homeGoal ? 1.6f : 0f;
+                    _silence = homeGoal ? 0f : 6f;
                     bcam.Shake(0.6f);
                     foreach (var n in venue.nets)
                         n.Hit(new Vector3(sim.ball.pos.x, sim.ball.z + 0.3f, sim.ball.pos.y), sim.ball.Speed + 10f);
@@ -346,10 +476,12 @@ namespace Craquez
             {
                 var d = bp - _ball.position;
                 d.y = 0;
-                if (d.sqrMagnitude > 1e-6f)
+                // nas mãos do goleiro a bola não gira (ele a reposiciona em LateUpdate)
+                bool held = sim.ball.owner >= 0 && sim.players[sim.ball.owner].isKeeper && sim.players[sim.ball.owner].hold > 0f;
+                if (!held && d.sqrMagnitude > 1e-6f && d.magnitude < 1.5f)
                 {
                     var axis = Vector3.Cross(Vector3.up, d.normalized);
-                    _ballRot = Quaternion.AngleAxis(d.magnitude / 0.11f * Mathf.Rad2Deg, axis) * _ballRot;
+                    _ballRot = Quaternion.AngleAxis(d.magnitude / sim.ball.radius * Mathf.Rad2Deg, axis) * _ballRot;
                 }
                 _ball.position = bp;
                 _ball.rotation = _ballRot;
@@ -363,15 +495,22 @@ namespace Craquez
             // torcida pulsando (mais forte em ataque perigoso e no gol)
             _crowdT += Time.deltaTime;
             float danger = Mathf.Clamp01((Mathf.Abs(sim.ball.pos.x) - sim.halfLen * 0.6f) / (sim.halfLen * 0.4f));
-            _crowdHype = Mathf.MoveTowards(_crowdHype, danger * 0.5f, Time.deltaTime * 0.3f);
+            // de que lado é o perigo: ataque do mandante empolga; do visitante, a torcida fica tensa
+            bool homeAttack = sim.ball.pos.x * sim.TeamDir(0) > 0f;
+            float want = homeAttack ? danger * 0.7f : danger * 0.15f;
+            if (_silence > 0f) { _silence -= Time.deltaTime; want = 0f; }
+            _crowdHype = Mathf.MoveTowards(_crowdHype, want, Time.deltaTime * 0.3f);
             float bounce = Mathf.Abs(Mathf.Sin(_crowdT * (6f + _crowdHype * 6f))) * (0.002f + _crowdHype * 0.006f);
             foreach (var m in venue.crowdMats)
             {
                 m.mainTextureOffset = new Vector2(0, bounce);
                 if (m.HasProperty("_BaseMap")) m.SetTextureOffset("_BaseMap", new Vector2(0, bounce));
             }
-            Sfx.Crowd((sim.mode.id == GameModes.Field ? 0.5f : 0.28f) + _crowdHype * 0.3f, sim.mode.id == GameModes.Field ? 0.22f + danger * 0.1f : 0f);
-            Sfx.Drums(sim.mode.id == GameModes.Street ? 0f : 0.12f + _crowdHype * 0.25f);
+            float quiet = _silence > 0f ? 0.55f : 1f;
+            float tense = !homeAttack ? danger * 0.12f : 0f;   // murmúrio quando o visitante ameaça
+            Sfx.Crowd(((sim.mode.id == GameModes.Field ? 0.5f : 0.28f) + _crowdHype * 0.3f + tense) * quiet,
+                sim.mode.id == GameModes.Field ? (0.22f + (homeAttack ? danger * 0.18f : -danger * 0.1f)) * quiet : 0f);
+            Sfx.Drums(sim.mode.id == GameModes.Street ? 0f : (0.12f + _crowdHype * 0.3f) * quiet);
             foreach (var m in venue.ledMats)
             {
                 var o = new Vector2(Time.time * 0.015f, 0);

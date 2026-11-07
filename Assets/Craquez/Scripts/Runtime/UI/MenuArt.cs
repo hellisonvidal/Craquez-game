@@ -10,6 +10,112 @@ namespace Craquez.UI
     {
         public enum Kind { FieldClubs, FieldNations, FutsalClubs, FutsalNations, Street }
 
+        /// <summary>
+        /// Prévia do local da partida: a quadra/campo em perspectiva com as linhas, o piso
+        /// certo (grama listrada, madeira, tacos, sintético, asfalto) e o entorno (arquibancada ou prédios).
+        /// </summary>
+        public static Texture2D Venue(string mode, int variant, Color home, int w = 640, int h = 360)
+        {
+            var t = new Texture2D(w, h, TextureFormat.RGBA32, true) { wrapMode = TextureWrapMode.Clamp };
+            var px = new Color32[w * h];
+            bool field = mode == GameModes.Field, futsal = mode == GameModes.Futsal;
+            Color floor, floor2, surround;
+            int kind;   // 0 grama, 1 madeira, 2 sintético, 3 asfalto, 4 tacos
+            if (field)
+            {
+                floor = new Color(0.2f, 0.5f, 0.16f); floor2 = new Color(0.24f, 0.58f, 0.19f); kind = 0;
+                // estádios com pista de atletismo aparecem com o entorno vermelho
+                surround = variant > 0 && variant < VenueBuilder.StadiumModels.Length && VenueBuilder.StadiumModels[variant].track ? new Color(0.62f, 0.24f, 0.16f) : new Color(0.16f, 0.34f, 0.12f);
+            }
+            else if (mode == GameModes.Society) { floor = new Color(0.36f, 0.7f, 0.28f); floor2 = new Color(0.3f, 0.6f, 0.24f); surround = new Color(0.38f, 0.4f, 0.44f); kind = 0; }
+            else if (futsal)
+            {
+                var pp = VenueBuilder.FutsalPalette(variant);
+                floor = pp.kind == 3 ? new Color(0.78f, 0.52f, 0.28f) : pp.court; floor2 = floor * 0.94f; surround = pp.surround;
+                kind = pp.kind == 0 ? 1 : pp.kind == 2 ? 0 : pp.kind == 3 ? 4 : 2;
+            }
+            else
+            {
+                Color[] st = { new Color(0.32f, 0.33f, 0.36f), new Color(0.45f, 0.36f, 0.28f), new Color(0.86f, 0.78f, 0.58f), new Color(0.3f, 0.3f, 0.34f),
+                               new Color(0.25f, 0.27f, 0.3f), new Color(0.5f, 0.24f, 0.2f), new Color(0.28f, 0.28f, 0.3f), new Color(0.4f, 0.42f, 0.38f) };
+                floor = st[Mathf.Abs(variant) % st.Length]; floor2 = floor * 0.95f; surround = floor * 0.7f; kind = 3;
+            }
+            float horizon = 0.62f;   // linha onde o piso começa (de baixo para cima)
+            for (int y = 0; y < h; y++)
+                for (int x = 0; x < w; x++)
+                {
+                    float u = (x + 0.5f) / w, v = (y + 0.5f) / h;
+                    Color c;
+                    if (v > horizon)
+                    {
+                        // fundo: arquibancada com torcida (campo/quadra) ou prédios e céu (rua)
+                        float q = (v - horizon) / (1f - horizon);
+                        if (mode == GameModes.Street || (mode == GameModes.Society && variant > 0))
+                        {
+                            float bh = 0.35f + 0.5f * Hash01(Mathf.FloorToInt(u * 9f), variant);
+                            c = q < bh ? new Color(0.36f, 0.34f, 0.4f) * (0.8f + 0.2f * Hash01(Mathf.FloorToInt(u * 9f), 3)) : Color.Lerp(new Color(0.55f, 0.75f, 0.95f), new Color(0.3f, 0.5f, 0.85f), q);
+                            if (q < bh && Mathf.Repeat(u * 60f, 1f) < 0.4f && Mathf.Repeat(q * 18f, 1f) < 0.45f) c = Color.Lerp(c, new Color(1f, 0.9f, 0.6f), 0.5f);
+                        }
+                        else
+                        {
+                            var stand = Color.Lerp(new Color(0.16f, 0.18f, 0.24f), new Color(0.08f, 0.09f, 0.13f), q);
+                            float row = Mathf.Repeat(q * 14f, 1f), seat = Mathf.Repeat(u * 90f, 1f);
+                            if (row < 0.55f && seat < 0.6f && q < 0.85f)
+                            {
+                                float r = Hash01(Mathf.FloorToInt(u * 90f), Mathf.FloorToInt(q * 14f) + 7);
+                                stand = r < 0.45f ? home : r < 0.7f ? Color.white * 0.85f : Color.Lerp(stand, new Color(0.5f, 0.45f, 0.4f), 0.6f);
+                            }
+                            c = stand;
+                            if (q > 0.88f) c = futsal ? new Color(0.3f, 0.32f, 0.36f) : new Color(0.05f, 0.07f, 0.12f);
+                        }
+                    }
+                    else
+                    {
+                        // piso em perspectiva: z (profundidade) 0 perto .. 1 longe
+                        float z = v / horizon;
+                        float depth = 1f / Mathf.Lerp(1f, 3.2f, z);
+                        float pu = (u - 0.5f) / depth * 0.62f + 0.5f;   // 0..1 dentro da quadra
+                        float pz = Mathf.InverseLerp(0.12f, 0.96f, z);
+                        bool inside = pu > 0.04f && pu < 0.96f && pz > 0f && pz < 1f;
+                        c = inside ? floor : surround;
+                        if (inside)
+                        {
+                            if (kind == 0 && Mathf.Repeat(pu * 10f, 1f) < 0.5f) c = floor2;
+                            if (kind == 1) c *= 0.9f + 0.1f * Mathf.Sin(pz * 160f) * Mathf.Sin(pu * 7f);
+                            if (kind == 4) c *= (Mathf.Repeat((pu * 30f + pz * 30f), 1f) < 0.5f) == (Mathf.Repeat((pu * 30f - pz * 30f), 1f) < 0.5f) ? 1f : 0.85f;
+                            if (kind == 3) c *= 0.92f + 0.08f * Hash01(x / 3, y / 3);
+                            // linhas: contorno, meio, círculo e áreas
+                            float lw = 0.006f / depth;
+                            bool line = pu - 0.04f < lw || 0.96f - pu < lw * 1.2f || pz < lw * 2f || 1f - pz < lw * 2f || Mathf.Abs(pu - 0.5f) < lw;
+                            float cx = (pu - 0.5f) * 2.2f, cz = (pz - 0.5f) * 1.2f;
+                            if (Mathf.Abs(Mathf.Sqrt(cx * cx + cz * cz) - 0.2f) < lw * 1.6f) line = true;
+                            foreach (float s in new[] { 0.04f, 0.96f })
+                            {
+                                float dx = Mathf.Abs(pu - s);
+                                float bw = field ? 0.15f : 0.11f;
+                                if ((Mathf.Abs(dx - bw) < lw && pz > 0.2f && pz < 0.8f) || (dx < bw && (Mathf.Abs(pz - 0.2f) < lw * 2f || Mathf.Abs(pz - 0.8f) < lw * 2f))) line = true;
+                            }
+                            if (line) c = Color.Lerp(c, Color.white, 0.92f);
+                        }
+                    }
+                    // vinheta suave
+                    float vg = 1f - 0.35f * Mathf.Pow(Vector2.Distance(new Vector2(u, v), new Vector2(0.5f, 0.45f)) * 1.3f, 2f);
+                    c *= vg;
+                    c.a = 1f;
+                    px[y * w + x] = c;
+                }
+            t.SetPixels32(px);
+            t.Apply(true);
+            return t;
+        }
+
+        static float Hash01(int a, int b)
+        {
+            uint h = (uint)(a * 374761393 + b * 668265263);
+            h = (h ^ (h >> 13)) * 1274126177u;
+            return (h & 0xFFFF) / 65535f;
+        }
+
         public static Texture2D Tile(Kind k, int w = 384, int h = 432)
         {
             var t = new Texture2D(w, h, TextureFormat.RGBA32, true) { wrapMode = TextureWrapMode.Clamp };
@@ -157,6 +263,39 @@ namespace Craquez.UI
             float s = Mathf.Lerp(transform.localScale.x, _target, 1f - Mathf.Exp(-Time.unscaledDeltaTime * 14f));
             transform.localScale = new Vector3(s, s, 1f);
             if (glow && glow.enabled) glow.color = new Color(Theme.Accent.r, Theme.Accent.g, Theme.Accent.b, 0.55f + 0.35f * Mathf.Sin(Time.unscaledTime * 5f));
+        }
+    }
+
+    /// <summary>Abertura do título: o degradê clareia, a logo cresce e o "toque para iniciar" pulsa.</summary>
+    public class TitleFx : MonoBehaviour
+    {
+        RawImage _grad;
+        Image _glow;
+        RectTransform _logo;
+        Graphic _sub, _press;
+        float _t;
+
+        public void Setup(RawImage grad, Image glow, RectTransform logo, Graphic sub, Graphic press)
+        {
+            _grad = grad; _glow = glow; _logo = logo; _sub = sub; _press = press;
+            Update();
+        }
+
+        void Update()
+        {
+            _t += Time.unscaledDeltaTime;
+            float g = Mathf.Clamp01(_t / 1.2f);
+            if (_grad) _grad.color = new Color(g, g, g, 1f);
+            if (_glow) _glow.color = new Color(0.16f, 0.62f, 1f, 0.22f * g * (0.8f + 0.2f * Mathf.Sin(_t * 1.5f)));
+            float l = Mathf.Clamp01((_t - 0.5f) / 1.0f);
+            float e = 1f - Mathf.Pow(1f - l, 3f);
+            if (_logo)
+            {
+                _logo.localScale = Vector3.one * Mathf.Lerp(1.12f, 1f, e);   // a capa "assenta" na tela
+                foreach (var gr in _logo.GetComponentsInChildren<Graphic>()) { var c = gr.color; c.a = gr is Text t && t.color.r < 0.1f ? 0.5f * e : e; gr.color = c; }
+            }
+            if (_sub) { var c = _sub.color; c.a = Mathf.Clamp01((_t - 1.3f) / 0.6f); _sub.color = c; }
+            if (_press && _t < 1.8f) { var c = _press.color; c.a = 0f; _press.color = c; }
         }
     }
 

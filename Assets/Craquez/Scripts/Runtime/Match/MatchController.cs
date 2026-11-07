@@ -33,6 +33,7 @@ namespace Craquez
         readonly GoalShow _show = new GoalShow();
         int _showTeam = -1, _showScorer = -1;
         GameObject _pauseMenu, _endMenu, _lineup;
+        MatchTracker _tracker;
         Camera _cam;
 
         public void Begin(MatchConfig c, Camera cam)
@@ -44,24 +45,41 @@ namespace Craquez
             sim = new MatchSim();
             // clima mexe na física da bola: chuva = mais rápida; neve = mais lenta
             string w = c.weather == "aleatorio" ? WeatherFx.Kinds[(int)(c.seed % 5)] : c.weather;
-            sim.rollScale = c.mode == GameModes.Futsal ? 1f : w == "chuva" ? 0.85f : w == "tempestade" ? 0.8f : w == "neve" ? 1.35f : 1f;
+            sim.rollScale = RollFor(c.mode, w);
+            sim.startSwapped = c.swapSides;
+            sim.streetPlayers = c.streetPlayers;
+            sim.quickRestarts = c.quickRestarts;
             sim.Setup(c.mode, new TeamSetup { data = ta, tactics = c.tacticsA }, new TeamSetup { data = tb, tactics = c.tacticsB }, c.seed, c.SecondsPerHalf);
             view = new GameObject("Partida").AddComponent<MatchView>();
             view.transform.SetParent(transform, false);
             view.sides = new[] { c.sideA, c.sideB };
             view.Build(sim, c, cam);
-            view.weather.onChange = msg => hud?.Toast(msg);
+            view.weather.onChange = msg =>
+            {
+                hud?.Toast(msg, 2.6f);
+                hud?.SetWeather(view.venue.name + "  •  " + view.weather.Label);
+                sim.SetRollScale(RollFor(cfg.mode, view.weather.kind));
+            };
             view.bcam.followTeam = c.sideA == Side.Cpu && c.sideB != Side.Cpu ? 1 : 0;
             hud = new GameObject("HUD").AddComponent<Hud>();
             hud.transform.SetParent(transform, false);
             hud.Build(sim, c, view.kits);
             hud.SetWeather(view.venue.name + "  •  " + view.weather.Label);
+            view.onCut = () => { if (!attract) hud.Cut(); };
+            hud.onPause = () => { if (_phase == Phase.Playing || _phase == Phase.Goal) Pause(); };
+            if (!attract)
+            {
+                _tracker = new MatchTracker(c);
+                _tracker.onUnlock = d => hud.Toast("CONQUISTA: " + d.name.ToUpperInvariant(), 3.2f);
+            }
             var sides = new[] { c.sideA, c.sideB };
             var p1 = InputRouter.DefaultP1();
             for (int t = 0; t < 2; t++)
             {
                 if (sides[t] == Side.Cpu) _cpu[t] = new CpuBrain(t, c.difficulty);
                 _dev[t] = sides[t] == Side.Player2 ? InputRouter.DefaultP2(p1) : p1;
+                hud.devices[t] = _dev[t];
+                hud.human[t] = sides[t] != Side.Cpu;
             }
             if (attract)
             {
@@ -77,6 +95,9 @@ namespace Craquez
             if (c.ceremony) StartCeremony();
             else { _phase = Phase.Playing; Sfx.Whistle(); }
         }
+
+        static float RollFor(string mode, string w) =>
+            mode == GameModes.Futsal ? 1f : w == "chuva" ? 0.85f : w == "tempestade" ? 0.8f : w == "neve" ? 1.35f : 1f;
 
         // ------------------------------------------------------------- cerimônia
         void StartCeremony()
@@ -193,6 +214,8 @@ namespace Craquez
             var ta = Teams.Get(cfg.teamA);
             var tb = Teams.Get(cfg.teamB);
             fresh.rollScale = sim.rollScale;
+            fresh.startSwapped = sim.startSwapped;
+            fresh.streetPlayers = sim.streetPlayers;
             fresh.Setup(cfg.mode, new TeamSetup { data = ta, tactics = cfg.tacticsA }, new TeamSetup { data = tb, tactics = cfg.tacticsB }, cfg.seed, cfg.SecondsPerHalf);
             for (int k = 0; k < sim.players.Count; k++)
             {
@@ -293,6 +316,7 @@ namespace Craquez
         {
             foreach (var e in sim.events)
             {
+                _tracker?.OnEvent(e, sim);
                 switch (e.type)
                 {
                     case "goal":
@@ -339,23 +363,76 @@ namespace Craquez
         {
             _phase = Phase.Paused;
             Time.timeScale = 0f;
+            // os controles de toque ficam numa camada acima do HUD: escondidos, os botões do menu respondem
+            if (_touch) _touch.gameObject.SetActive(false);
+            hud.ShowPauseButton(false);
+            PausePage(0);
+        }
+
+        /// <summary>Menu de pausa: 0 = principal, 1 = configurações gerais, 2 = equipes (táticas).</summary>
+        void PausePage(int page)
+        {
+            if (_pauseMenu != null) Destroy(_pauseMenu);
             var root = hud.Overlay;
             var dim = UiKit.Image(root, new Color(0, 0, 0, 0.6f), null, "pausa");
             dim.rectTransform.Place(0, 0, 1, 1);
             _pauseMenu = dim.gameObject;
-            var panel = UiKit.Panel(dim.transform).rectTransform.At(0.5f, 0.5f, 760, 900);
-            UiKit.Label(panel, "PAUSA", 64, Theme.HeadItalic, Theme.Accent, TextAnchor.MiddleCenter).rectTransform.Place(0, 1, 1, 1, 0, -110, 0, 20);
-            var list = UiKit.Rect(panel, "lista").Place(0, 0, 1, 1, 60, 240, 60, 130);
-            UiKit.VList(list, 14, 0, false);
-            var first = UiKit.Button(list, "Continuar", Resume);
-            UiKit.Size(first, 70, 70);
-            UiKit.Size(UiKit.Cycler(list, "Câmera", BroadcastCamera.Modes, view.bcam.mode, i => { view.bcam.mode = i; Settings.Camera = i; }), 70, 70);
-            UiKit.Size(UiKit.Cycler(list, "Zoom", BroadcastCamera.Zooms, view.bcam.zoom + 2, i => { view.bcam.zoom = i - 2; Settings.CameraZoom = i - 2; }), 70, 70);
-            UiKit.Size(UiKit.Button(list, "Reiniciar partida", () => { Resume(); onRestart?.Invoke(cfg); }), 70, 70);
-            UiKit.Size(UiKit.Button(list, "Sair para o menu", () => { Resume(); onExit?.Invoke(); }), 70, 70);
-            var dev = _cpu[0] == null ? _dev[0] : _dev[1];
-            var help = UiKit.Label(panel, InputRouter.Help(dev), 22, Theme.Body, Theme.TextDim, TextAnchor.MiddleCenter);
-            help.rectTransform.Place(0, 0, 1, 0, 30, 30, 30, -200);
+            var panel = UiKit.Panel(dim.transform).rectTransform.At(0.5f, 0.5f, 860, 900);
+            string title = page == 0 ? "PAUSA" : page == 1 ? "CONFIGURAÇÕES" : "EQUIPES";
+            UiKit.Label(panel, title, 60, Theme.HeadItalic, Theme.Accent, TextAnchor.MiddleCenter).rectTransform.Place(0, 1, 1, 1, 0, -110, 0, 20);
+            var list = UiKit.Rect(panel, "lista").Place(0, 0, 1, 1, 50, 120, 50, 130);
+            UiKit.VList(list, 12, 0, false);
+            Selectable first;
+            if (page == 0)
+            {
+                first = UiKit.Button(list, "Continuar", Resume);
+                UiKit.Size(first, 76, 76);
+                UiKit.Size(UiKit.Button(list, "Configurações gerais", () => PausePage(1)), 76, 76);
+                UiKit.Size(UiKit.Button(list, "Equipes e táticas", () => PausePage(2)), 76, 76);
+                UiKit.Size(UiKit.Button(list, "Reiniciar partida", () => { Resume(); onRestart?.Invoke(cfg); }), 76, 76);
+                UiKit.Size(UiKit.Button(list, "Menu principal", () => { Resume(); onExit?.Invoke(); }), 76, 76);
+                var dev = _cpu[0] == null ? _dev[0] : _dev[1];
+                var help = UiKit.Label(panel, InputRouter.Help(dev), 22, Theme.Body, Theme.TextDim, TextAnchor.MiddleCenter);
+                help.rectTransform.Place(0, 0, 1, 0, 30, 20, 30, -110);
+            }
+            else if (page == 1)
+            {
+                first = UiKit.Cycler(list, "Câmera", BroadcastCamera.Modes, view.bcam.mode, i => { view.bcam.mode = i; Settings.Camera = i; });
+                UiKit.Size(first, 72, 72);
+                UiKit.Size(UiKit.Cycler(list, "Zoom", BroadcastCamera.Zooms, view.bcam.zoom + 2, i => { view.bcam.zoom = i - 2; Settings.CameraZoom = i - 2; }), 72, 72);
+                UiKit.Size(UiKit.Cycler(list, "Gráficos", Settings.QualityNames, Settings.Quality, i => { Settings.Quality = i; UrpSetup.Quality(i); UrpSetup.Camera(_cam, i); }), 72, 72);
+                var vols = new List<string>();
+                for (int i = 0; i <= 10; i++) vols.Add(i * 10 + "%");
+                UiKit.Size(UiKit.Cycler(list, "Volume", vols, Mathf.RoundToInt(Settings.Volume * 10), i => Settings.Volume = i / 10f), 72, 72);
+                UiKit.Size(UiKit.Cycler(list, "Vibração", new[] { "Ligada", "Desligada" }, Settings.Vibration ? 0 : 1, i => Settings.Vibration = i == 0), 72, 72);
+                if (cfg.mode != GameModes.Futsal)
+                    UiKit.Size(UiKit.Cycler(list, "Clima dinâmico", new[] { "Ligado", "Desligado" }, view.weather.dynamic ? 0 : 1, i => view.weather.dynamic = i == 0), 72, 72);
+                UiKit.Size(UiKit.Button(list, "‹  Voltar", () => PausePage(0)), 72, 72);
+            }
+            else
+            {
+                first = null;
+                var forms = new List<string>(GameModes.Formations(cfg.mode).Keys);
+                for (int t = 0; t < 2; t++)
+                {
+                    if (_cpu[t] != null) continue;
+                    int team = t;
+                    var tac = team == 0 ? cfg.tacticsA : cfg.tacticsB;
+                    if (tac == null) tac = new Tactics();
+                    var td = Teams.Get(team == 0 ? cfg.teamA : cfg.teamB);
+                    var head = UiKit.Label(list, td.name.ToUpperInvariant(), 32, Theme.HeadItalic, view.kits[team].c1.grayscale < 0.12f ? Theme.Text : view.kits[team].c1, TextAnchor.MiddleLeft);
+                    UiKit.Size(head, 44, 44);
+                    int fi = Mathf.Max(0, forms.IndexOf(string.IsNullOrEmpty(tac.formation) ? sim.mode.id == GameModes.Field ? "4-4-2" : forms[0] : tac.formation));
+                    var fc = UiKit.Cycler(list, "Formação", forms, fi, i => { tac.formation = forms[i]; tac.lineup = null; sim.ApplyTactics(team, tac); });
+                    UiKit.Size(fc, 72, 72);
+                    if (first == null) first = fc;
+                    UiKit.Size(UiKit.Cycler(list, "Mentalidade", new[] { "Defensiva", "Equilibrada", "Ofensiva" }, tac.mentality, i => { tac.mentality = i; sim.ApplyTactics(team, tac); }), 72, 72);
+                    UiKit.Size(UiKit.Cycler(list, "Pressão", new[] { "Baixa", "Média", "Alta" }, tac.press, i => { tac.press = i; sim.ApplyTactics(team, tac); }), 72, 72);
+                }
+                var back = UiKit.Button(list, "‹  Voltar", () => PausePage(0));
+                UiKit.Size(back, 72, 72);
+                if (first == null) first = back;
+            }
             UiKit.Select(first);
         }
 
@@ -364,12 +441,16 @@ namespace Craquez
             if (_pauseMenu != null) Destroy(_pauseMenu);
             Time.timeScale = 1f;
             _phase = Phase.Playing;
+            if (_touch) _touch.gameObject.SetActive(true);
+            hud.ShowPauseButton(true);
             for (int t = 0; t < 2; t++) _prevPause[t] = InputFrame.Pause;
         }
 
         void ShowEnd()
         {
             _phase = Phase.Ended;
+            if (_touch) _touch.gameObject.SetActive(false);
+            hud.ShowPauseButton(false);
             var ta = Teams.Get(cfg.teamA);
             var tb = Teams.Get(cfg.teamB);
             var root = hud.Overlay;
@@ -388,6 +469,16 @@ namespace Craquez
             UiKit.Button(row, "Menu principal", () => onExit?.Invoke());
             UiKit.Select(again);
             Sfx.Crowd(0.3f, 0f);
+            // conquistas desta partida
+            var got = _tracker != null ? _tracker.Finish(sim, view.weather.kind) : null;
+            _tracker = null;
+            if (got != null && got.Count > 0)
+            {
+                var names = new List<string>();
+                foreach (var d in got) names.Add(d.name);
+                UiKit.Label(panel, "Conquistas: " + string.Join("  •  ", names), 26, Theme.BodyBold, Theme.Accent2, TextAnchor.MiddleCenter)
+                    .rectTransform.Place(0, 1, 1, 1, 30, -330, 30, 270);
+            }
         }
 
         void OnDestroy()

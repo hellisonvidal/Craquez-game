@@ -49,9 +49,7 @@ namespace Craquez
             Btn(root, "CORRER", InputFrame.Sprint, new Vector2(cx - 300, cy - 130), 130, new Color(0.35f, 0.38f, 0.45f));
             Btn(root, "PROTEGER", InputFrame.Shield, new Vector2(cx - 300, cy + 20), 105, new Color(0.35f, 0.38f, 0.45f));
             Btn(root, "TROCAR", InputFrame.Switch, new Vector2(cx - 150, cy + 245), 95, new Color(0.35f, 0.38f, 0.45f));
-            var pause = UiKit.Button(root, "II", () => TouchState.buttons |= InputFrame.Pause, 34);
-            pause.GetComponent<RectTransform>().At(1, 1, 90, 70, -30, -30);
-            pause.gameObject.AddComponent<PulseRelease>();
+            // (o botão de pausa fica no HUD, visível em todas as partidas)
         }
 
         static void Btn(RectTransform root, string label, int bit, Vector2 pos, float size, Color c)
