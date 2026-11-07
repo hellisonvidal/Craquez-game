@@ -88,6 +88,9 @@ namespace Craquez
 
         static readonly Dictionary<long, Texture2D> _cache = new Dictionary<long, Texture2D>();
 
+        /// <summary>Esquece as texturas geradas (o option file pode ter recolorido as bolas).</summary>
+        public static void ClearCache() => _cache.Clear();
+
         /// <summary>Textura equiretangular (2:1) da bola (mesmo mapeamento da esfera de BallMesh).</summary>
         public static Texture2D Texture(int i, int w = 512)
         {

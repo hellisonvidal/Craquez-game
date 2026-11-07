@@ -1,5 +1,6 @@
 // Prévia em PNG (sem a engine) das bolas e das artes dos menus.
-// uso: dotnet preview.dll PASTA   (gera bolas.png e arte_*.png)
+// uso: dotnet preview.dll PASTA [arte]                    -> bolas.png (+ arte_*.png)
+//      dotnet preview.dll PASTA optionfile LEAGUES.json   -> option_file.json completo (copie para option_file/)
 using System; using System.IO; using System.IO.Compression; using UnityEngine;
 public static class P {
   static void Png(string path, Color32[] px, int w, int h) {
@@ -39,6 +40,12 @@ public static class P {
   }
   public static void Main(string[] a) {
     string dir = a[0]; Directory.CreateDirectory(dir);
+    if (a.Length > 2 && a[1] == "optionfile") {
+      Craquez.Sim.Teams.SourceOverride = File.ReadAllText(a[2]);
+      File.WriteAllText(Path.Combine(dir, "option_file.json"), Craquez.OptionFile.Json());
+      Console.WriteLine("option file gravado");
+      return;
+    }
     int n = Craquez.BallCatalog.All.Length, cell = 200, cols = 8, rows = (n + cols - 1) / cols;
     int W = cols * cell, H = rows * cell; var sheet = new Color32[W * H];
     for (int i = 0; i < sheet.Length; i++) sheet[i] = new Color32(40, 46, 58, 255);

@@ -8,6 +8,24 @@ Jogo de futebol feito 100% com inteligência artificial, **gratuito**. Android, 
 - **Linux**: `Craquez-v2.1.0-Linux.tar.gz` → extraia e rode `./Craquez` (ou `./instalar.sh` para o atalho no menu)
 
 ### Novidades
+- **Ícone novo**: o jogador da capa fazendo uma bicicleta, com a bola e o estádio iluminado.
+- **Pontos de luz corrigidos**: pixels inválidos não explodem mais no brilho (bloom limitado), e o
+  reflexo especular só aparece em materiais bem lisos.
+- **Chuva sem artefatos**: o emissor das gotas não gira mais com a câmera, e o gramado molhado fica
+  mais escuro, sem a mancha de brilho que andava em volta do campo.
+- **Modos**: a tela mostra só as modalidades; clubes ou seleções vêm na tela seguinte.
+- **Sortear** times e local; prévia do uniforme sem as chuteiras.
+- **Sem avisos de texto durante o jogo**.
+- **Atletas**: número pintado na camisa (dobra com o tecido); camisa e calção com folga e movimento
+  (balançam na arrancada e nas curvas); proporções mais atléticas; passada suavizada.
+- **Redes** com tecido de molas: o balanço se espalha e a rede afunda onde a bola encosta.
+- **Física**: lateral **com as mãos** no futebol de campo (com os pés nos outros modos); condução com
+  a bola ao lado do pé e toque de corte na mudança de direção; espalmada que reflete na mão do
+  goleiro (por cima do travessão nas bolas altas); choque de corpo por impulso.
+- **Locais**: mais 6 ruas (beco, conjunto, estacionamento, campinho de terra, porto e vila colorida)
+  e mais 5 ginásios de futsal.
+- **Option file completo** no repositório e nos pacotes de PC (`option_file/`): times, elencos,
+  estádios, bolas, chuteiras e locais.
 - **Tela inicial em tela cheia**: a capa cobre a tela inteira em qualquer formato (16:9 sem corte
   nem laterais borradas; celulares e tablets sem faixas) e se reajusta se a janela mudar; vídeo de
   abertura refeito a partir da capa nova.

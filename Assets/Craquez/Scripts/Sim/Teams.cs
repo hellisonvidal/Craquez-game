@@ -81,6 +81,8 @@ namespace Craquez.Sim
         public static string OptionDir { get; private set; } = "";
         /// <summary>Texto do banco (para testes fora do Unity).</summary>
         public static string SourceOverride;
+        /// <summary>O option_file.json lido (para as seções de bolas, chuteiras e locais, aplicadas pelo jogo).</summary>
+        public static object OptionDoc { get; private set; }
 
         public static IReadOnlyList<League> Leagues { get { Ensure(); return _leagues; } }
         public static int Count { get { Ensure(); return _flat.Count; } }
@@ -333,6 +335,7 @@ namespace Craquez.Sim
         static void ApplyOptionFile()
         {
             OverrideCount = 0;
+            OptionDoc = null;
             _crests.Clear();
             if (SourceOverride != null) return;
             foreach (var dir in OptionDirs())
@@ -343,6 +346,7 @@ namespace Craquez.Sim
                 object doc;
                 try { doc = MiniJson.Parse(File.ReadAllText(path)); }
                 catch (System.Exception e) { Debug.LogWarning("option_file.json inválido: " + e.Message); return; }
+                OptionDoc = doc;
                 var teams = MiniJson.D(doc, "teams");
                 if (teams == null) return;
                 for (int i = 0; i < _flat.Count; i++)
@@ -375,6 +379,7 @@ namespace Craquez.Sim
                         if (pd.ContainsKey("num")) e.num = MiniJson.I(pl, "num");
                         if (pd.ContainsKey("pos")) e.pos = MiniJson.S(pl, "pos");
                         if (pd.ContainsKey("nat")) e.nat = MiniJson.S(pl, "nat");
+                        if (pd.ContainsKey("ovr")) e.ovr = Mathf.Clamp(MiniJson.I(pl, "ovr"), 30, 99);
                     }
                     string crest = MiniJson.S(o, "crest", "");
                     if (crest != "" && File.Exists(Path.Combine(dir, crest)))
@@ -388,12 +393,20 @@ namespace Craquez.Sim
             }
         }
 
-        /// <summary>Grava um modelo com todos os times para o usuário editar. Retorna o caminho.</summary>
-        public static string ExportOptionTemplate()
+        /// <summary>
+        /// Documento completo do option file: todos os times (nome, sigla, uniformes, estádio,
+        /// elenco) + as seções extras do jogo (bolas, chuteiras, locais).
+        /// </summary>
+        public static Dictionary<string, object> OptionDocument(Dictionary<string, object> extras = null)
         {
             Ensure();
-            string dir = Path.Combine(Application.persistentDataPath, "option_file");
-            Directory.CreateDirectory(Path.Combine(dir, "crests"));
+            var leagues = new List<object>();
+            foreach (var lg in _leagues)
+            {
+                var ids = new List<object>();
+                for (int i = 0; i < lg.count; i++) ids.Add(_flat[lg.first + i].Key);
+                leagues.Add(new Dictionary<string, object> { ["id"] = lg.id, ["name"] = lg.name, ["teams"] = ids });
+            }
             var teams = new Dictionary<string, object>();
             foreach (var t in _flat)
             {
@@ -409,22 +422,43 @@ namespace Craquez.Sim
                     });
                 var players = new List<object>();
                 for (int i = 0; i < t.roster.Count; i++)
-                    players.Add(new Dictionary<string, object> { ["index"] = i, ["n"] = t.roster[i].n, ["num"] = t.roster[i].num, ["pos"] = t.roster[i].pos });
+                {
+                    var r = t.roster[i];
+                    players.Add(new Dictionary<string, object>
+                    {
+                        ["index"] = i, ["n"] = r.n, ["num"] = r.num, ["pos"] = r.pos, ["nat"] = r.nat, ["ovr"] = r.ovr,
+                        ["traits"] = new List<object>(r.t),
+                    });
+                }
                 teams[t.Key] = new Dictionary<string, object>
                 {
                     ["name"] = t.name, ["short"] = t.shortName, ["kits"] = kits,
-                    ["stadium"] = new Dictionary<string, object> { ["name"] = t.stadium.name, ["cap"] = t.stadium.cap },
+                    ["stadium"] = new Dictionary<string, object> { ["name"] = t.stadium.name, ["cap"] = t.stadium.cap, ["tier"] = t.stadium.tier },
                     ["crest"] = "crests/" + t.Key.Replace("/", "_") + ".png", ["players"] = players,
                 };
             }
             var doc = new Dictionary<string, object>
             {
-                ["formato"] = "craquez-option-file-1",
-                ["ajuda"] = "Edite os valores e salve como option_file.json nesta pasta. Escudos: PNG quadrado em crests/. Apague os times que não quiser alterar.",
+                ["formato"] = "craquez-option-file-2",
+                ["ajuda"] = "Option file do Craquez com tudo o que há no jogo. Edite e salve como option_file.json na pasta option_file " +
+                            "(ao lado do executável no PC, ou na pasta de dados do app). Times: nome, sigla, uniformes (cores #RRGGBB e padrão), " +
+                            "estádio e elenco (nome, número, posição, nacionalidade, geral 30-99). Escudos: PNG quadrado em crests/ com o nome indicado. " +
+                            "bolas/chuteiras: nome e cores de cada modelo (o jogo vem com modelos originais; aqui você pode renomear e recolorir). " +
+                            "locais: nomes dos estádios, ginásios, campos de society e ruas. Apague o que não quiser alterar.",
+                ["ligas"] = leagues,
                 ["teams"] = teams,
             };
+            if (extras != null) foreach (var kv in extras) doc[kv.Key] = kv.Value;
+            return doc;
+        }
+
+        /// <summary>Grava um modelo com tudo para o usuário editar. Retorna o caminho.</summary>
+        public static string ExportOptionTemplate(Dictionary<string, object> extras = null)
+        {
+            string dir = Path.Combine(Application.persistentDataPath, "option_file");
+            Directory.CreateDirectory(Path.Combine(dir, "crests"));
             string path = Path.Combine(dir, "option_file_modelo.json");
-            File.WriteAllText(path, MiniJson.Write(doc));
+            File.WriteAllText(path, MiniJson.Write(OptionDocument(extras)));
             return path;
         }
     }

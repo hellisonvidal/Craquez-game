@@ -45,6 +45,7 @@ namespace Craquez
             if (!ShotTour.Requested()) GoFullscreen();   // (o servidor gráfico virtual do CI não suporta trocar de modo)
             Screen.sleepTimeout = SleepTimeout.NeverSleep;
             Sfx.Init();
+            OptionFile.Apply();   // bolas, chuteiras e nomes dos locais do option file (os times o banco já aplica)
             UrpSetup.Quality(Settings.Quality);
             Gfx.ToonLook(false);
             var cgo = new GameObject("Câmera");
@@ -1081,8 +1082,8 @@ namespace Craquez
             void St() => status.text = "OPTION FILE  •  times alterados: " + Teams.OverrideCount + "\n" +
                                        System.IO.Path.Combine(Application.persistentDataPath, "option_file");
             St();
-            UiKit.Size(UiKit.Button(list, "Exportar modelo do option file", () => { status.text = "Modelo gravado em:\n" + Teams.ExportOptionTemplate(); }, 26), 50, 50);
-            UiKit.Size(UiKit.Button(list, "Recarregar option file", () => { Teams.Reload(); St(); }, 26), 50, 50);
+            UiKit.Size(UiKit.Button(list, "Exportar modelo do option file", () => { status.text = "Modelo gravado em:\n" + OptionFile.Export(); }, 26), 50, 50);
+            UiKit.Size(UiKit.Button(list, "Recarregar option file", () => { Teams.Reload(); OptionFile.Apply(); BallCatalog.ClearCache(); St(); }, 26), 50, 50);
             // coluna 2: gráficos (no PC, tudo ajustável; no celular, o essencial)
             var gfx = UiKit.Rect(root, "gráficos").Place(0.5f, 0, 1, 1, 16, 190, 90, 274);
             UiKit.VList(gfx, 6, 0, false);
