@@ -48,6 +48,7 @@ namespace Craquez
             sim.rollScale = RollFor(c.mode, w);
             sim.startSwapped = c.swapSides;
             sim.streetPlayers = c.streetPlayers;
+            sim.quickRestarts = c.quickRestarts;
             sim.Setup(c.mode, new TeamSetup { data = ta, tactics = c.tacticsA }, new TeamSetup { data = tb, tactics = c.tacticsB }, c.seed, c.SecondsPerHalf);
             view = new GameObject("Partida").AddComponent<MatchView>();
             view.transform.SetParent(transform, false);
@@ -397,7 +398,7 @@ namespace Craquez
                 first = UiKit.Cycler(list, "Câmera", BroadcastCamera.Modes, view.bcam.mode, i => { view.bcam.mode = i; Settings.Camera = i; });
                 UiKit.Size(first, 72, 72);
                 UiKit.Size(UiKit.Cycler(list, "Zoom", BroadcastCamera.Zooms, view.bcam.zoom + 2, i => { view.bcam.zoom = i - 2; Settings.CameraZoom = i - 2; }), 72, 72);
-                UiKit.Size(UiKit.Cycler(list, "Gráficos", Settings.QualityNames, Settings.Quality, i => { Settings.Quality = i; UrpSetup.Quality(i); }), 72, 72);
+                UiKit.Size(UiKit.Cycler(list, "Gráficos", Settings.QualityNames, Settings.Quality, i => { Settings.Quality = i; UrpSetup.Quality(i); UrpSetup.Camera(_cam, i); }), 72, 72);
                 var vols = new List<string>();
                 for (int i = 0; i <= 10; i++) vols.Add(i * 10 + "%");
                 UiKit.Size(UiKit.Cycler(list, "Volume", vols, Mathf.RoundToInt(Settings.Volume * 10), i => Settings.Volume = i / 10f), 72, 72);

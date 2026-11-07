@@ -50,6 +50,13 @@ namespace Craquez.Sim
                     _cooldown = 20;
                 }
             }
+            if (sim.kickoffPass && sim.ball.owner == p.id && p.id == sim.kickoffKicker)
+            {
+                // saída de bola: toque para o companheiro depois de um instante
+                if (sim.kickoffMate >= 0 && sim.players[sim.kickoffMate].position.Dist(sim.kickoffMateSpot) < 0.8f && Noise(sim, 21) < 0.06f)
+                    f.buttons |= InputFrame.Pass;
+                return f;
+            }
             if (sim.ball.owner == p.id)
             {
                 var goal = new Vector2(sim.halfLen * dir, 0f);

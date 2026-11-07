@@ -55,6 +55,10 @@ namespace Craquez.Sim
         public float skillT, skillSide = 1f, skillCd, burst, offBalance, touchT;
         public Vector2 skillDir = Vector2.right;
         public bool faceBall, shielding;
+        /// <summary>No chão após falta: segundos restantes, total, direção da pancada e tipo de queda (0 frente, 1 costas, 2 lado).</summary>
+        public float down, downTotal;
+        public Vector2 fallDir;
+        public int fallKind;
 
         public bool Has(Trait t) => (traits & t) != 0;
         public float TopSpeed() => Mathf.Lerp(6.4f, 8.8f, pace);

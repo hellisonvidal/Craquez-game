@@ -68,22 +68,48 @@ namespace Craquez
             if (ShotTour.Requested()) gameObject.AddComponent<ShotTour>().Run(this);
         }
 
-        /// <summary>Sempre em tela cheia: janela sem bordas na resolução nativa (PC) e modo imersivo (Android).</summary>
-        static void GoFullscreen()
+        /// <summary>
+        /// Tela: celular sempre em modo imersivo; PC em tela cheia sem bordas na resolução nativa
+        /// (padrão), tela cheia exclusiva ou janela, na resolução escolhida nas opções.
+        /// </summary>
+        public static void GoFullscreen()
         {
             if (Application.isMobilePlatform)
             {
                 Screen.fullScreen = true;
                 return;
             }
-            var r = Screen.currentResolution;
-            Screen.SetResolution(r.width, r.height, FullScreenMode.FullScreenWindow);
+            var native = Screen.currentResolution;
+            int w = native.width, h = native.height;
+            var res = Screen.resolutions;
+            int ri = Settings.Resolution;
+            if (ri >= 0 && ri < res.Length) { w = res[ri].width; h = res[ri].height; }
+            var mode = Settings.Display == 1 ? FullScreenMode.ExclusiveFullScreen : Settings.Display == 2 ? FullScreenMode.Windowed : FullScreenMode.FullScreenWindow;
+            if (mode == FullScreenMode.Windowed && ri < 0) { w = Mathf.RoundToInt(native.width * 0.8f); h = Mathf.RoundToInt(native.height * 0.8f); }
+            Screen.SetResolution(w, h, mode);
+        }
+
+        /// <summary>Resoluções do monitor sem repetição (a primeira opção é a nativa).</summary>
+        static List<string> ResolutionNames(out List<int> idx)
+        {
+            var names = new List<string> { "Nativa" };
+            idx = new List<int> { -1 };
+            var seen = new HashSet<string>();
+            var res = Screen.resolutions;
+            for (int i = res.Length - 1; i >= 0; i--)
+            {
+                string n = res[i].width + " x " + res[i].height;
+                if (!seen.Add(n) || res[i].height < 600) continue;
+                names.Add(n);
+                idx.Add(i);
+            }
+            return names;
         }
 
         void OnApplicationFocus(bool focus)
         {
             // Android: ao voltar de outro app as barras do sistema reaparecem
-            if (focus && !Screen.fullScreen && ShotTour.Dir == null) GoFullscreen();
+            if (focus && Application.isMobilePlatform && !Screen.fullScreen && ShotTour.Dir == null) GoFullscreen();
         }
 
         void Update()
@@ -114,8 +140,17 @@ namespace Craquez
             }
         }
 
+        GameObject _cover;
+
+        void ClearCover()
+        {
+            if (_cover != null) Destroy(_cover);
+            _cover = null;
+        }
+
         RectTransform Page(bool dark = true)
         {
+            ClearCover();
             UiKit.Clear(_root);
             _pressText = null;
             _bg.color = dark ? new Color(0.01f, 0.03f, 0.1f, 1f) : new Color(0, 0, 0, 0);
@@ -211,6 +246,7 @@ namespace Craquez
 
         void ShowIntro()
         {
+            ClearCover();
             UiKit.Clear(_root);
             _pressText = null;
             _back = null;
@@ -264,19 +300,28 @@ namespace Craquez
             UiKit.Clear(_root);
             _back = null;
             _bg.color = Color.black;
-            var grad = UiKit.Rect(_root, "degradê").Place(0, 0, 1, 1).gameObject.AddComponent<RawImage>();
+            ClearCover();
+            // capa em tela cheia de verdade: de borda a borda (inclusive sob o entalhe da câmera,
+            // fora da área segura). Em telas largas usa a versão panorâmica da arte (laterais
+            // estendidas), que cobre a tela cortando só as sobras; a logo nunca é cortada.
+            var full = UiKit.Rect(_bg.transform, "capa (tela cheia)").Place(0, 0, 1, 1);
+            _cover = full.gameObject;
+            full.gameObject.AddComponent<RectMask2D>();
+            var grad = UiKit.Rect(full, "degradê").Place(0, 0, 1, 1).gameObject.AddComponent<RawImage>();
             grad.texture = TitleGradient();
+            grad.raycastTarget = false;
             var glow = UiKit.Image(_root, new Color(0.16f, 0.62f, 1f, 0.25f), Theme.Soft, "brilho").rectTransform.At(0.5f, 0.6f, 1500, 900);
-            // capa do jogo (arte com a logo): preenche a tela inteira, cortando as sobras
-            var logoBox = UiKit.Rect(_root, "capa").Place(0, 0, 1, 1);
-            // a capa aparece inteira (logo nunca cortada); as sobras laterais/verticais são a própria
-            // arte ampliada e escurecida, sem barras pretas
-            CoverBackdrop(logoBox, 0.45f);
+            var logoBox = UiKit.Rect(full, "capa").Place(0, 0, 1, 1);
+            float aspect = Screen.width / (float)Mathf.Max(1, Screen.height);
+            var wide = Resources.Load<Texture2D>("UI/capa_wide");
+            bool useWide = wide != null && aspect >= 1.6f;
+            if (!useWide) CoverBackdrop(logoBox, 0.45f);
             var cover = UiKit.Rect(logoBox, "imagem").Place(0, 0, 1, 1).gameObject.AddComponent<RawImage>();
-            cover.texture = Resources.Load<Texture2D>("UI/capa");
+            cover.raycastTarget = false;
+            cover.texture = useWide ? wide : Resources.Load<Texture2D>("UI/capa");
             var fit = cover.gameObject.AddComponent<AspectRatioFitter>();
-            fit.aspectMode = AspectRatioFitter.AspectMode.FitInParent;
-            fit.aspectRatio = 1.5f;
+            fit.aspectMode = useWide ? AspectRatioFitter.AspectMode.EnvelopeParent : AspectRatioFitter.AspectMode.FitInParent;
+            fit.aspectRatio = useWide ? wide.width / (float)wide.height : 1.5f;
             if (cover.texture == null)
             {
                 cover.enabled = false;
@@ -363,14 +408,72 @@ namespace Craquez
                 new (string, System.Action)[] { ("CLUBES", () => Choose(GameModes.Society, false)), ("SELEÇÕES", () => Choose(GameModes.Society, true)) });
             Row("RUA", "3x3, 4x4 ou 5x5  •  times de rua  •  8 ruas", MenuArt.Kind.Street,
                 new (string, System.Action)[] { ("JOGAR", () => Choose(GameModes.Street, false)) });
-            var opt = UiKit.Button(left, "OPÇÕES", ShowOptions, 30);
-            UiKit.Size(opt, 76, 76);
-            AchievementsPanel(UiKit.Rect(root, "conquistas").Place(0.52f, 0, 1, 1, 10, 120, 90, 230));
+            // linha de baixo: opções e conquistas (abre o menu de conquistas)
+            var bottom = UiKit.Rect(left, "opções e conquistas");
+            UiKit.Size(bottom, 76, 76);
+            var opt = UiKit.Button(bottom, "OPÇÕES", ShowOptions, 30);
+            opt.GetComponent<RectTransform>().Place(0, 0, 0.49f, 1);
+            var ach = UiKit.Button(bottom, "CONQUISTAS  " + Achievements.DoneCount + "/" + Achievements.All.Length, ShowAchievements, 30, new Color(0.55f, 0.38f, 0.06f));
+            ach.GetComponent<RectTransform>().Place(0.51f, 0, 1, 1);
+            AchievementsSummary(UiKit.Rect(root, "conquistas").Place(0.52f, 0, 1, 1, 10, 120, 90, 230));
             UiKit.Select(first);
         }
 
+        /// <summary>Resumo à direita da tela de modos: progresso, medalhas por nível e as mais próximas.</summary>
+        void AchievementsSummary(RectTransform area)
+        {
+            var panel = UiKit.Panel(area).rectTransform.Place(0, 0, 1, 1);
+            int done = Achievements.DoneCount, total = Achievements.All.Length;
+            UiKit.Label(panel, "CONQUISTAS", 34, Theme.HeadItalic, Theme.Accent, TextAnchor.MiddleLeft).rectTransform.Place(0, 1, 1, 1, 26, -62, 26, 12);
+            UiKit.Label(panel, done + " / " + total, 30, Theme.Head, Color.white, TextAnchor.MiddleRight).rectTransform.Place(0, 1, 1, 1, 26, -62, 26, 12);
+            var barBg = UiKit.Image(panel, new Color(1, 1, 1, 0.1f), Theme.RoundSmall, "barra").rectTransform.Place(0, 1, 1, 1, 26, -84, 26, 70);
+            UiKit.Image(barBg, Theme.Accent, Theme.RoundSmall, "progresso").rectTransform.Place(0, 0, Mathf.Max(0.02f, done / (float)total), 1);
+            var list = new List<Achievements.Def>();
+            foreach (var d in Achievements.All) if (!Achievements.Done(d)) list.Add(d);
+            list.Sort((x, y) => (Achievements.Progress(y) / (float)y.target).CompareTo(Achievements.Progress(x) / (float)x.target));
+            UiKit.Label(panel, "QUASE LÁ", 24, Theme.Head, Theme.TextDim).rectTransform.Place(0, 1, 1, 1, 26, -134, 26, 100);
+            for (int i = 0; i < Mathf.Min(4, list.Count); i++)
+            {
+                var d = list[i];
+                var item = UiKit.Image(panel, new Color(0.1f, 0.13f, 0.2f, 0.85f), Theme.RoundSmall, "conquista").rectTransform.Place(0, 1, 1, 1, 18, -146 - (i + 1) * 92, 18, 146 + i * 92 + 8);
+                var tc = Achievements.TierColor(d.tier);
+                UiKit.Image(item, new Color(tc.r, tc.g, tc.b, 0.6f), Theme.Circle, "medalha").rectTransform.At(0, 0.5f, 48, 48, 16, 0);
+                UiKit.Label(item, d.name, 26, Theme.Head, Theme.Text).rectTransform.Place(0, 0.45f, 1, 1, 80, 0, 110, 4);
+                UiKit.Label(item, d.desc, 19, Theme.Body, Theme.TextDim).rectTransform.Place(0, 0, 1, 0.5f, 80, 6, 110, 0);
+                UiKit.Label(item, Achievements.Progress(d) + "/" + d.target, 24, Theme.Head, Theme.TextDim, TextAnchor.MiddleRight).rectTransform.Place(0, 0, 1, 1, 0, 0, 16, 0);
+            }
+            UiKit.Label(panel, "Aperte CONQUISTAS para ver todas", 22, Theme.BodyBold, Theme.TextDim, TextAnchor.MiddleCenter).rectTransform.Place(0, 0, 1, 0, 20, 14, 20, -50);
+        }
+
+        /// <summary>Menu de conquistas: todas, com filtro por nível, progresso e medalhas.</summary>
+        void ShowAchievements() => ShowAchievements(-1);
+
+        void ShowAchievements(int tier)
+        {
+            var root = Page();
+            _back = ShowModes;
+            Title(root, "CONQUISTAS", Achievements.DoneCount + " de " + Achievements.All.Length + " desbloqueadas");
+            // filtros: todas / bronze / prata / ouro / platina
+            var tabs = UiKit.Rect(root, "filtros").Place(0, 1, 0.45f, 1, 90, -330, 0, 270);
+            string[] names = { "TODAS", "BRONZE", "PRATA", "OURO", "PLATINA" };
+            Button sel = null;
+            for (int i = 0; i < names.Length; i++)
+            {
+                int ti = i - 1;
+                int got = 0, all = 0;
+                foreach (var d in Achievements.All) if (ti < 0 || (int)d.tier == ti) { all++; if (Achievements.Done(d)) got++; }
+                var col = ti < 0 ? new Color(0.1f, 0.38f, 0.85f) : Achievements.TierColor((Achievements.Tier)ti) * 0.7f;
+                col.a = 1f;
+                var b = UiKit.Button(tabs, names[i] + "  " + got + "/" + all, () => ShowAchievements(ti), 22, tier == ti ? col : new Color(0.1f, 0.13f, 0.2f));
+                b.GetComponent<RectTransform>().Place(i / 5f, 0, (i + 1) / 5f, 1, 4, 0, 4, 0);
+                if (tier == ti) sel = b;
+            }
+            AchievementsPanel(UiKit.Rect(root, "lista").Place(0, 0, 1, 1, 90, 120, 90, 340), tier);
+            UiKit.Select(sel);
+        }
+
         /// <summary>Lista rolável das conquistas (as em andamento primeiro).</summary>
-        void AchievementsPanel(RectTransform area)
+        void AchievementsPanel(RectTransform area, int tier = -1)
         {
             var panel = UiKit.Panel(area).rectTransform.Place(0, 0, 1, 1);
             int done = Achievements.DoneCount, total = Achievements.All.Length;
@@ -392,7 +495,8 @@ namespace Craquez
             content.gameObject.AddComponent<ContentSizeFitter>().verticalFit = ContentSizeFitter.FitMode.PreferredSize;
             var sr = view.gameObject.AddComponent<ScrollRect>();
             sr.content = content; sr.horizontal = false; sr.movementType = ScrollRect.MovementType.Clamped; sr.scrollSensitivity = 40f;
-            var list = new List<Achievements.Def>(Achievements.All);
+            var list = new List<Achievements.Def>();
+            foreach (var d in Achievements.All) if (tier < 0 || (int)d.tier == tier) list.Add(d);
             list.Sort((x, y) =>
             {
                 bool dx = Achievements.Done(x), dy = Achievements.Done(y);
@@ -622,6 +726,7 @@ namespace Craquez
                 UiKit.Size(UiKit.Cycler(list, "Estádio", sn, _cfg.stadium, i => { _cfg.stadium = i; _refreshVenue?.Invoke(); }), 60, 60);
             }
             UiKit.Size(UiKit.Cycler(list, "Câmera", BroadcastCamera.Modes, Settings.Camera, i => Settings.Camera = i), 60, 60);
+            UiKit.Size(UiKit.Cycler(list, "Faltas", new[] { "Cena antes da cobrança", "Cobrança rápida" }, _cfg.quickRestarts ? 1 : 0, i => { _cfg.quickRestarts = i == 1; Settings.QuickRestarts = i == 1; }), 60, 60);
             UiKit.Size(UiKit.Cycler(list, "Cerimônia de abertura", new[] { "Mostrar", "Pular" }, _cfg.ceremony ? 0 : 1, i => _cfg.ceremony = i == 0), 60, 60);
             // local da partida (imagem grande) e bola (pequena, parada)
             var card = UiKit.Panel(root).rectTransform.Place(0.57f, 0, 1, 1, 0, 200, 70, 250);
@@ -886,24 +991,44 @@ namespace Craquez
             var root = Page();
             _back = ShowModes;
             Title(root, "OPÇÕES", null);
-            var list = UiKit.Rect(root, "lista").Place(0, 0, 0.55f, 1, 90, 200, 0, 260);
-            UiKit.VList(list, 12, 0, false);
-            var first = UiKit.Cycler(list, "Gráficos", Settings.QualityNames, Settings.Quality, i => { Settings.Quality = i; UrpSetup.Quality(i); });
-            UiKit.Size(first, 72, 72);
+            void Apply() { UrpSetup.Quality(Settings.Quality); UrpSetup.Camera(cam, Settings.Quality); }
+            // coluna 1: jogo e som
+            var list = UiKit.Rect(root, "geral").Place(0, 0, 0.48f, 1, 90, 150, 10, 250);
+            UiKit.VList(list, 8, 0, false);
+            UiKit.Label(list, "JOGO", 26, Theme.Head, Theme.Accent).gameObject.AddComponent<LayoutElement>().minHeight = 34;
             var vols = new List<string>();
             for (int i = 0; i <= 10; i++) vols.Add(i * 10 + "%");
-            UiKit.Size(UiKit.Cycler(list, "Volume", vols, Mathf.RoundToInt(Settings.Volume * 10), i => Settings.Volume = i / 10f), 72, 72);
-            UiKit.Size(UiKit.Cycler(list, "Vibração", new[] { "Ligada", "Desligada" }, Settings.Vibration ? 0 : 1, i => Settings.Vibration = i == 0), 72, 72);
-            UiKit.Size(UiKit.Cycler(list, "Câmera", BroadcastCamera.Modes, Settings.Camera, i => Settings.Camera = i), 72, 72);
-            UiKit.Size(UiKit.Cycler(list, "Zoom da câmera", BroadcastCamera.Zooms, Settings.CameraZoom + 2, i => Settings.CameraZoom = i - 2), 72, 72);
-            var status = UiKit.Label(root, "", 24, Theme.Body, Theme.TextDim);
-            status.rectTransform.Place(0.58f, 0.2f, 1, 0.8f, 0, 0, 90, 0);
-            void St() => status.text = "OPTION FILE\n\nUse nomes, uniformes, estádios e escudos reais por sua conta.\n" +
-                                       "Pasta: " + System.IO.Path.Combine(Application.persistentDataPath, "option_file") +
-                                       "\n\nTimes alterados: " + Teams.OverrideCount;
+            var first = UiKit.Cycler(list, "Volume", vols, Mathf.RoundToInt(Settings.Volume * 10), i => Settings.Volume = i / 10f);
+            UiKit.Size(first, 58, 58);
+            if (Application.isMobilePlatform)
+                UiKit.Size(UiKit.Cycler(list, "Vibração", new[] { "Ligada", "Desligada" }, Settings.Vibration ? 0 : 1, i => Settings.Vibration = i == 0), 58, 58);
+            UiKit.Size(UiKit.Cycler(list, "Câmera", BroadcastCamera.Modes, Settings.Camera, i => Settings.Camera = i), 58, 58);
+            UiKit.Size(UiKit.Cycler(list, "Zoom da câmera", BroadcastCamera.Zooms, Settings.CameraZoom + 2, i => Settings.CameraZoom = i - 2), 58, 58);
+            UiKit.Size(UiKit.Cycler(list, "Faltas", new[] { "Cena antes da cobrança", "Cobrança rápida" }, Settings.QuickRestarts ? 1 : 0, i => { Settings.QuickRestarts = i == 1; _cfg.quickRestarts = i == 1; }), 58, 58);
+            var status = UiKit.Label(list, "", 20, Theme.Body, Theme.TextDim);
+            status.gameObject.AddComponent<LayoutElement>().minHeight = 92;
+            void St() => status.text = "OPTION FILE  •  times alterados: " + Teams.OverrideCount + "\n" +
+                                       System.IO.Path.Combine(Application.persistentDataPath, "option_file");
             St();
-            UiKit.Size(UiKit.Button(list, "Exportar modelo do option file", () => { status.text = "Modelo gravado em:\n" + Teams.ExportOptionTemplate(); }), 72, 72);
-            UiKit.Size(UiKit.Button(list, "Recarregar option file", () => { Teams.Reload(); St(); }), 72, 72);
+            UiKit.Size(UiKit.Button(list, "Exportar modelo do option file", () => { status.text = "Modelo gravado em:\n" + Teams.ExportOptionTemplate(); }, 26), 58, 58);
+            UiKit.Size(UiKit.Button(list, "Recarregar option file", () => { Teams.Reload(); St(); }, 26), 58, 58);
+            // coluna 2: gráficos (no PC, tudo ajustável; no celular, o essencial)
+            var gfx = UiKit.Rect(root, "gráficos").Place(0.5f, 0, 1, 1, 10, 150, 90, 250);
+            UiKit.VList(gfx, 8, 0, false);
+            UiKit.Label(gfx, "GRÁFICOS", 26, Theme.Head, Theme.Accent).gameObject.AddComponent<LayoutElement>().minHeight = 34;
+            UiKit.Size(UiKit.Cycler(gfx, "Predefinição", Settings.QualityNames, Mathf.Min(Settings.Quality, Settings.QualityNames.Length - 1), i => { Settings.Quality = i; Apply(); }), 58, 58);
+            if (!Application.isMobilePlatform)
+            {
+                UiKit.Size(UiKit.Cycler(gfx, "Modo de tela", Settings.DisplayNames, Settings.Display, i => { Settings.Display = i; GoFullscreen(); }), 58, 58);
+                var rn = ResolutionNames(out var ri);
+                UiKit.Size(UiKit.Cycler(gfx, "Resolução", rn, Mathf.Max(0, ri.IndexOf(Settings.Resolution)), i => { Settings.Resolution = ri[i]; GoFullscreen(); }), 58, 58);
+                UiKit.Size(UiKit.Cycler(gfx, "Sincronia vertical", Settings.VSyncNames, Settings.VSync, i => { Settings.VSync = i; Apply(); }), 58, 58);
+            }
+            UiKit.Size(UiKit.Cycler(gfx, "Limite de quadros", Settings.FpsNames, Settings.FpsCap, i => { Settings.FpsCap = i; Apply(); }), 58, 58);
+            UiKit.Size(UiKit.Cycler(gfx, "Escala de render", Settings.RenderScaleNames, Settings.RenderScale, i => { Settings.RenderScale = i; Apply(); }), 58, 58);
+            UiKit.Size(UiKit.Cycler(gfx, "Antisserrilhado", Settings.AaNames, Settings.Antialias, i => { Settings.Antialias = i; Apply(); }), 58, 58);
+            UiKit.Size(UiKit.Cycler(gfx, "Sombras", Settings.ShadowNames, Settings.Shadows, i => { Settings.Shadows = i; Apply(); }), 58, 58);
+            UiKit.Size(UiKit.Cycler(gfx, "Texturas", Settings.TextureNames, Settings.Textures, i => { Settings.Textures = i; Apply(); }), 58, 58);
             UiKit.Select(first);
         }
 

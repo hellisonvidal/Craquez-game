@@ -217,20 +217,36 @@ namespace Craquez
         }
 
         /// <summary>Grama: folhas finas + variação de tom (textura repetível de ~2 m).</summary>
+        /// <summary>
+        /// Grama (repetível): folhas finas no sentido do corte (v), tufos, variação de tom entre
+        /// verde-amarelado e verde-azulado, pontas claras e sombras de solo entre as folhas.
+        /// Pouca variação de baixa frequência (o mosaico não aparece de longe).
+        /// </summary>
         public static Texture2D Grass(int size, Color baseC, int seed)
         {
             var t = Tex(size, size);
+            t.anisoLevel = 8;
             var px = new Color32[size * size];
+            var warm = new Color(1.07f, 1.03f, 0.8f);
+            var cool = new Color(0.9f, 1f, 1.1f);
             for (int y = 0; y < size; y++)
                 for (int x = 0; x < size; x++)
                 {
                     float u = x / (float)size, v = y / (float)size;
-                    float n = Fbm(u * 8, v * 8, 8, seed, 4);
-                    float blades = Hash(x, y, seed + 3);
-                    float streak = VNoise(u * 64, v * 6, 64, seed + 9);
-                    float k = 0.82f + n * 0.28f + (blades - 0.5f) * 0.18f + (streak - 0.5f) * 0.1f;
-                    var c = baseC * k;
-                    c.a = 1;
+                    float low = Fbm(u * 4, v * 4, 4, seed, 3) - 0.5f;
+                    float clump = VNoise(u * 24, v * 24, 24, seed + 3) - 0.5f;
+                    // folhas: ruído alongado no sentido do corte + leve inclinação
+                    float blade = VNoise(u * 180 + v * 9f, v * 26, 180, seed + 5);
+                    float blade2 = VNoise(u * 300 - v * 14f, v * 40, 300, seed + 7);
+                    float fine = Hash(x, y, seed + 13) - 0.5f;
+                    float hue = VNoise(u * 36, v * 36, 36, seed + 11);
+                    float k = 0.9f + low * 0.1f + clump * 0.16f + (blade - 0.5f) * 0.26f + (blade2 - 0.5f) * 0.14f + fine * 0.08f;
+                    var tint = Color.Lerp(warm, cool, hue);
+                    // pontas das folhas (claras, um pouco amareladas) e sombras de solo
+                    if (blade > 0.78f && blade2 > 0.55f) { k *= 1.1f; tint = Color.Lerp(tint, warm, 0.5f); }
+                    float gap = Hash(x, y, seed + 29);
+                    if (gap > 0.965f && blade < 0.4f) k *= 0.62f;
+                    var c = new Color(baseC.r * tint.r * k, baseC.g * tint.g * k, baseC.b * tint.b * k, 1f);
                     px[y * size + x] = c;
                 }
             t.SetPixels32(px);

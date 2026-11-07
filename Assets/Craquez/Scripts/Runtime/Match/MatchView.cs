@@ -265,17 +265,27 @@ namespace Craquez
                     if (e.kind == "fulltime") Sfx.WhistleEnd();
                     else if (e.kind == "halftime" || e.kind == "penalty") Sfx.WhistleLong();
                     else if (e.kind != "throwin" && e.kind != "goalkick" && e.kind != "corner") Sfx.Whistle();
-                    if (e.kind == "goalkick" || e.kind == "corner")
+                    if (e.kind == "goalkick" || e.kind == "corner" || ((e.kind == "freekick" || e.kind == "offside") && sim.restartScene))
                     {
                         // corte: a tela escurece, todos aparecem já posicionados para o reinício
                         SnapAll();
                         onCut?.Invoke();
+                        if (e.kind == "freekick" && sim.wallIds.Count > 0 && !bcam.cinematic)
+                        {
+                            // cena da cobrança: atrás da bola, barreira e gol ao fundo
+                            var b = new Vector3(sim.ball.pos.x, 0f, sim.ball.pos.y);
+                            var g = new Vector3(sim.halfLen * sim.TeamDir(e.team), 1.2f, 0f);
+                            var back = (b - new Vector3(g.x, 0f, g.z)).normalized;
+                            bcam.Scene(b + back * 7.5f + Vector3.up * 2.6f, Vector3.Lerp(b, g, 0.55f), sim.stateTimer * 0.9f);
+                        }
                     }
                     break;
                 case "foul":
                     Sfx.Whistle();
                     if (e.team == 1) Sfx.Boo();   // torcida da casa vaia falta do visitante
-                    foreach (var a in athletes) if (a.p.team != e.team && a.p.stun > 0.8f) a.OnVictimFoul();
+                    else Sfx.Ooh();
+                    _crowd?.React("foul");
+                    bcam.Shake(0.12f);
                     break;
                 case "goal":
                     Sfx.Net();

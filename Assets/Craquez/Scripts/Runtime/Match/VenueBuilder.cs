@@ -96,8 +96,10 @@ namespace Craquez
 
         static void Pitch(Venue v, float hl, float hw, uint seed, int quality, int cut = 0)
         {
-            int ts = quality >= 2 ? 512 : 256;
-            var grass = Gfx.Grass(ts, new Color(0.22f, 0.44f, 0.13f), (int)(seed % 997));
+            int dq = Mathf.Max(quality, Settings.DetailLevel);
+            int ts = dq >= 3 ? 1024 : dq >= 1 ? 512 : 256;
+            // verde de gramado de TV (menos "limão": o pós-processamento já satura)
+            var grass = Gfx.Grass(ts, new Color(0.2f, 0.4f, 0.13f), (int)(seed % 997));
             // faixas de corte: duas tonalidades alternadas (contraste de gramado de TV)
             v.pitchMat = Gfx.LitN(new Color(1.0f, 1.0f, 1.0f), grass, Gfx.GrassNormal, 0.2f, 0.7f);
             v.pitchMat2 = Gfx.LitN(new Color(0.84f, 0.9f, 0.8f), grass, Gfx.GrassNormal, 0.2f, 0.7f);
@@ -110,14 +112,22 @@ namespace Craquez
             int strips = cut == 1 ? 12 : cut == 3 ? 28 : 20;
             int rowsZ = cut >= 2 ? (cut == 3 ? 16 : 10) : 1;
             float sw = mx * 2f / strips, sz = mz * 2f / rowsZ;
+            // cada faixa é dividida em placas de ~8 m com deslocamento de UV próprio: a textura
+            // não se repete em grade (sem "azulejo" visível de longe)
+            int sub = Mathf.Max(1, Mathf.CeilToInt(sz / 8f));
+            float cz = sz / sub;
             for (int i = 0; i < strips; i++)
                 for (int j = 0; j < rowsZ; j++)
-                {
-                    float x0 = -mx + i * sw, x1 = x0 + sw, z0 = -mz + j * sz, z1 = z0 + sz;
-                    var mk = (i + j) % 2 == 0 ? a : b;
-                    mk.Quad(new Vector3(x0, 0, z0), new Vector3(x0, 0, z1), new Vector3(x1, 0, z1), new Vector3(x1, 0, z0),
-                        new Vector2(x0 / 2.5f, z0 / 2.5f), new Vector2(x1 / 2.5f, z1 / 2.5f));
-                }
+                    for (int q = 0; q < sub; q++)
+                    {
+                        float x0 = -mx + i * sw, x1 = x0 + sw, z0 = -mz + j * sz + q * cz, z1 = z0 + cz;
+                        var mk = (i + j) % 2 == 0 ? a : b;
+                        uint h = (uint)(i * 73856093) ^ (uint)((j * sub + q) * 19349663) ^ seed;
+                        h = (h ^ (h >> 13)) * 1274126177u;
+                        var off = new Vector2((h & 0xFF) / 255f * 7f, ((h >> 8) & 0xFF) / 255f * 7f);
+                        mk.Quad(new Vector3(x0, 0, z0), new Vector3(x0, 0, z1), new Vector3(x1, 0, z1), new Vector3(x1, 0, z0),
+                            new Vector2(x0 / 2.5f, z0 / 2.5f) + off, new Vector2(x1 / 2.5f, z1 / 2.5f) + off);
+                    }
             var ga = a.Object("Gramado A", v.pitchMat, v.root, false);
             var gb = b.Object("Gramado B", v.pitchMat2, v.root, false);
             ga.GetComponent<MeshRenderer>().receiveShadows = true;

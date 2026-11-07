@@ -28,6 +28,7 @@ namespace Craquez
         public bool national;            // seleções em vez de clubes
         public int ball;                 // BallCatalog
         public int boots = -1;           // -1 = cada atleta com a sua; senão modelo único
+        public bool quickRestarts = Settings.QuickRestarts;   // faltas: cobrança rápida ou cena antes da cobrança
 
         public float SecondsPerHalf => minutes * 60f * 0.5f;
     }
@@ -66,20 +67,63 @@ namespace Craquez
             set { PlayerPrefs.SetInt("camera_zoom", value); PlayerPrefs.Save(); }
         }
 
+        /// <summary>Faltas/impedimentos: cobrança rápida (true) ou cena curta com barreira (false).</summary>
+        public static bool QuickRestarts
+        {
+            get => PlayerPrefs.GetInt("quick_restarts", 0) == 1;
+            set { PlayerPrefs.SetInt("quick_restarts", value ? 1 : 0); PlayerPrefs.Save(); }
+        }
+
         public static bool SeenIntro
         {
             get => PlayerPrefs.GetInt("seen_intro", 0) == 1;
             set { PlayerPrefs.SetInt("seen_intro", value ? 1 : 0); PlayerPrefs.Save(); }
         }
 
-        /// <summary>0 = leve, 1 = equilibrado, 2 = alto.</summary>
+        /// <summary>0 = leve, 1 = equilibrado, 2 = alto, 3 = ultra (só PC).</summary>
         public static int DefaultQuality()
         {
             if (Application.isMobilePlatform)
                 return SystemInfo.systemMemorySize >= 3800 ? 1 : 0;
+            if (SystemInfo.graphicsMemorySize >= 6000 && SystemInfo.processorCount >= 6) return 3;
             return SystemInfo.graphicsMemorySize >= 3000 ? 2 : 1;
         }
 
-        public static readonly string[] QualityNames = { "Leve", "Equilibrado", "Alto" };
+        static readonly string[] _qualityPc = { "Leve", "Equilibrado", "Alto", "Ultra" };
+        static readonly string[] _qualityMobile = { "Leve", "Equilibrado", "Alto" };
+        public static string[] QualityNames => Application.isMobilePlatform ? _qualityMobile : _qualityPc;
+
+        static int I(string k, int d) => PlayerPrefs.GetInt(k, d);
+        static void I(string k, int v, bool _) { PlayerPrefs.SetInt(k, v); PlayerPrefs.Save(); }
+
+        // ---- gráficos avançados (0 = automático: segue a predefinição) ----
+        public static readonly string[] RenderScaleNames = { "Automática", "50%", "67%", "75%", "85%", "100%", "125%", "150%" };
+        public static readonly float[] RenderScaleValues = { 0f, 0.5f, 0.67f, 0.75f, 0.85f, 1f, 1.25f, 1.5f };
+        public static int RenderScale { get => I("gfx_scale", 0); set => I("gfx_scale", value, true); }
+
+        public static readonly string[] FpsNames = { "Automático", "30", "60", "90", "120", "144", "165", "240", "Sem limite" };
+        public static readonly int[] FpsValues = { 0, 30, 60, 90, 120, 144, 165, 240, -1 };
+        public static int FpsCap { get => I("gfx_fps", 0); set => I("gfx_fps", value, true); }
+
+        public static readonly string[] VSyncNames = { "Desligada", "Ligada" };
+        public static int VSync { get => I("gfx_vsync", 0); set => I("gfx_vsync", value, true); }
+
+        public static readonly string[] AaNames = { "Automático", "Desligado", "FXAA", "SMAA", "SMAA alto", "MSAA 2x", "MSAA 4x", "MSAA 8x" };
+        public static int Antialias { get => I("gfx_aa", 0); set => I("gfx_aa", value, true); }
+
+        public static readonly string[] ShadowNames = { "Automáticas", "Desligadas", "Baixas", "Médias", "Altas", "Muito altas" };
+        public static int Shadows { get => I("gfx_shadows", 0); set => I("gfx_shadows", value, true); }
+
+        public static readonly string[] TextureNames = { "Automáticas", "Baixas", "Médias", "Altas" };
+        public static int Textures { get => I("gfx_tex", 0); set => I("gfx_tex", value, true); }
+
+        public static readonly string[] DisplayNames = { "Tela cheia (sem bordas)", "Tela cheia exclusiva", "Janela" };
+        public static int Display { get => I("gfx_display", 0); set => I("gfx_display", value, true); }
+
+        /// <summary>Índice em Screen.resolutions (-1 = nativa do monitor).</summary>
+        public static int Resolution { get => I("gfx_res", -1); set => I("gfx_res", value, true); }
+
+        /// <summary>Qualidade usada para os detalhes do cenário (texturas): a predefinição ou o ajuste avançado.</summary>
+        public static int DetailLevel => Textures > 0 ? Textures - 1 + (Textures == 3 && !Application.isMobilePlatform ? 1 : 0) : Quality;
     }
 }

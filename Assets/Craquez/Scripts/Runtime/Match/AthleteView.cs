@@ -12,7 +12,7 @@ namespace Craquez
         public MatchView view;
         Vector3 _prev, _cur;
         float _yawRate;
-        float _yaw, _lean, _pitch, _hop, _hopT, _celebrate, _fall, _diveSide, _slideT;
+        float _yaw, _lean, _pitch, _hop, _hopT, _celebrate, _diveSide, _slideT;
         Vector2 _lastVel;
         bool _diag;
         Transform _marker;
@@ -97,7 +97,165 @@ namespace Craquez
             }
         }
 
-        public void OnVictimFoul() => _fall = 1.1f;
+        /// <summary>(compatibilidade) a queda agora vem da simulação: SimPlayer.down.</summary>
+        public void OnVictimFoul() { }
+
+        // ------------------------------------------------------------ queda (falta)
+        const float FallStumble = 0.16f, FallDrop = 0.42f, FallRise = 0.75f;
+        float _fallW, _fallSide = 1f;
+        int _fallPhase;   // 0 em pé, 1 tropeço, 2 caindo, 3 no chão, 4 levantando
+
+        /// <summary>Fase e progresso da queda a partir do tempo no chão da simulação.</summary>
+        float FallState(out int phase)
+        {
+            phase = 0;
+            if (p.down <= 0f || p.downTotal <= 0f) return 0f;
+            float t = p.downTotal - p.down;
+            float rise = Mathf.Min(FallRise, p.downTotal * 0.35f);
+            if (t < FallStumble) { phase = 1; return t / FallStumble; }
+            if (t < FallStumble + FallDrop) { phase = 2; return (t - FallStumble) / FallDrop; }
+            if (p.down > rise) { phase = 3; return (t - FallStumble - FallDrop) / Mathf.Max(0.01f, p.downTotal - rise - FallStumble - FallDrop); }
+            phase = 4;
+            return 1f - p.down / rise;
+        }
+
+        static float Smooth(float x) { x = Mathf.Clamp01(x); return x * x * (3f - 2f * x); }
+
+        /// <summary>
+        /// Corpo inteiro na queda: tropeça (tronco à frente/atrás), desaba girando sobre os pés,
+        /// rola de lado no chão e levanta apoiando um joelho. Retorna (pitch, roll, lift).
+        /// </summary>
+        Vector3 FallBody(float pitch, float roll, float lift)
+        {
+            float u = FallState(out _fallPhase);
+            if (_fallPhase == 0) return new Vector3(pitch, roll, lift);
+            float fwd = p.fallKind == 0 ? -1f : 1f;   // pancada de frente cai de costas; por trás ou de lado, de frente
+            if (_fallPhase == 1 && u < 0.05f) _fallSide = (p.id % 2 == 0) ? 1f : -1f;
+            float lying = 86f * fwd;
+            float sideRoll = p.fallKind == 2 ? 25f * _fallSide : 0f;
+            switch (_fallPhase)
+            {
+                case 1:
+                    pitch = Mathf.Lerp(pitch, 24f * fwd, Smooth(u));
+                    roll += sideRoll * u * 0.5f;
+                    break;
+                case 2:
+                {
+                    // queda acelerada (gravidade) com pequeno quique no impacto
+                    float k = u * u;
+                    pitch = Mathf.Lerp(24f * fwd, lying, k);
+                    roll += sideRoll * (0.5f + 0.5f * k);
+                    lift = Mathf.Lerp(0f, 0.16f, k) + (u > 0.85f ? Mathf.Sin((u - 0.85f) / 0.15f * Mathf.PI) * 0.05f : 0f);
+                    break;
+                }
+                case 3:
+                {
+                    // no chão: vira de lado segurando a perna e se contorce
+                    float turn = Smooth(u * 3f);
+                    float writhe = Mathf.Sin(Time.time * 5.5f + p.id) * 6f * (1f - u * 0.6f);
+                    pitch = lying;
+                    roll += _fallSide * Mathf.Lerp(sideRoll * _fallSide, 62f, turn) + writhe;
+                    lift = 0.16f + turn * 0.06f;
+                    break;
+                }
+                case 4:
+                {
+                    // levanta: volta de bruços, apoia um joelho e fica de pé
+                    float k = Smooth(u);
+                    pitch = Mathf.Lerp(lying, 0f, k);
+                    roll += _fallSide * Mathf.Lerp(62f, 0f, Smooth(u * 2f));
+                    lift = Mathf.Lerp(0.22f, 0f, k);
+                    break;
+                }
+            }
+            return new Vector3(pitch, roll, lift);
+        }
+
+        /// <summary>Pernas e braços na queda (por cima da animação).</summary>
+        void FallLimbs()
+        {
+            if (_fallPhase == 0) { _fallW = Mathf.MoveTowards(_fallW, 0f, Time.deltaTime * 4f); if (_fallW <= 0f) return; }
+            else _fallW = Mathf.MoveTowards(_fallW, 1f, Time.deltaTime * 8f);
+            float u = FallState(out int ph);
+            var right = transform.right;
+            float fwd = p.fallKind == 0 ? -1f : 1f;
+            // pernas: joelhos dobram no tropeço, encolhem no chão (perna "machucada") e apoiam ao levantar
+            float hurtThigh = 0f, hurtCalf = 0f, otherThigh = 0f, otherCalf = 0f;
+            switch (ph)
+            {
+                case 1: otherThigh = hurtThigh = -18f * u; otherCalf = hurtCalf = 30f * u; break;
+                case 2: hurtThigh = -25f; hurtCalf = 45f; otherThigh = -10f; otherCalf = 25f; break;
+                case 3:
+                {
+                    float k = Smooth(u * 3f);
+                    float pump = Mathf.Sin(Time.time * 4f + p.id) * 10f;
+                    hurtThigh = Mathf.Lerp(-25f, -75f, k) + pump; hurtCalf = Mathf.Lerp(45f, 110f, k);
+                    otherThigh = Mathf.Lerp(-10f, -30f, k); otherCalf = Mathf.Lerp(25f, 50f, k);
+                    break;
+                }
+                case 4:
+                {
+                    float kneel = Mathf.Sin(Mathf.Clamp01(u) * Mathf.PI);
+                    hurtThigh = -85f * kneel; hurtCalf = 115f * kneel;
+                    otherThigh = -40f * kneel; otherCalf = 30f * kneel;
+                    break;
+                }
+            }
+            string hurt = _fallSide > 0 ? "_r" : "_l", other = _fallSide > 0 ? "_l" : "_r";
+            void Leg(string sfx, float thigh, float calf)
+            {
+                rig.bones.TryGetValue("thigh" + sfx, out var th);
+                rig.bones.TryGetValue("calf" + sfx, out var cf);
+                _pose.Rotate(th, Quaternion.AngleAxis(thigh * _fallW, right));
+                _pose.Rotate(cf, Quaternion.AngleAxis(calf * _fallW, right));
+            }
+            Leg(hurt, hurtThigh, hurtCalf);
+            Leg(other, otherThigh, otherCalf);
+            // tronco curva um pouco no chão (encolhido)
+            if (ph == 3 && rig.spine != null) _pose.Rotate(rig.spine, Quaternion.AngleAxis(18f * _fallW, right));
+            // braços: amortecem a queda (à frente ou atrás) e, no chão, uma mão vai à perna
+            Transform knee = null;
+            rig.bones.TryGetValue("calf" + hurt, out knee);
+            for (int side = -1; side <= 1; side += 2)
+            {
+                string sfx = side < 0 ? "_l" : "_r";
+                rig.bones.TryGetValue("upperarm" + sfx, out var up);
+                rig.bones.TryGetValue("lowerarm" + sfx, out var lo);
+                rig.bones.TryGetValue("hand" + sfx, out var hd);
+                if (up == null || lo == null || hd == null) continue;
+                float s = Mathf.Sign(Vector3.Dot(up.position - (rig.spine != null ? rig.spine.position : transform.position), right));
+                Vector3 dir;
+                if (ph == 3 && knee != null && sfx == hurt) dir = (knee.position - up.position).normalized;   // segura a perna
+                else if (ph >= 3) dir = (transform.up * 0.3f + right * s * 0.8f - transform.forward * 0.4f * fwd).normalized;   // braço apoiado no chão
+                else if (fwd > 0f) dir = (transform.forward * 0.9f + transform.up * 0.35f + right * s * 0.35f).normalized;  // mãos à frente
+                else dir = (-transform.forward * 0.7f - transform.up * 0.4f + right * s * 0.6f).normalized;             // mãos atrás
+                var cur = lo.position - up.position;
+                _pose.Rotate(up, Quaternion.Slerp(Quaternion.identity, Quaternion.FromToRotation(cur, dir), _fallW * 0.85f));
+                var cur2 = hd.position - lo.position;
+                _pose.Rotate(lo, Quaternion.Slerp(Quaternion.identity, Quaternion.FromToRotation(cur2, dir), _fallW * 0.6f));
+            }
+        }
+
+        float _protest;
+
+        /// <summary>Quem fez a falta reclama: braços abertos, palmas para cima.</summary>
+        void Protest()
+        {
+            var sim = view.sim;
+            bool want = sim.state == MatchState.Foul && sim.foulOffender == p.id && p.down <= 0f && p.slide <= 0f;
+            _protest = Mathf.MoveTowards(_protest, want ? 1f : 0f, Time.deltaTime * 3f);
+            if (_protest <= 0.001f) return;
+            for (int side = -1; side <= 1; side += 2)
+            {
+                string sfx = side < 0 ? "_l" : "_r";
+                rig.bones.TryGetValue("upperarm" + sfx, out var up);
+                rig.bones.TryGetValue("lowerarm" + sfx, out var lo);
+                if (up == null || lo == null) continue;
+                float s = Mathf.Sign(Vector3.Dot(up.position - (rig.spine != null ? rig.spine.position : transform.position), transform.right));
+                var dir = (transform.right * s * 0.9f + transform.forward * 0.5f + Vector3.up * (0.1f + 0.15f * Mathf.Sin(Time.time * 6f))).normalized;
+                _pose.Rotate(up, Quaternion.Slerp(Quaternion.identity, Quaternion.FromToRotation(lo.position - up.position, dir), _protest * 0.8f));
+            }
+        }
 
         /// <summary>Comemoração: pulinhos e braços para cima por alguns segundos.</summary>
         public void Celebrate(float seconds) => _celebrate = Mathf.Max(_celebrate, seconds);
@@ -154,11 +312,10 @@ namespace Craquez
                 roll = _diveSide * Mathf.Lerp(0f, 78f, Mathf.Clamp01(u * 3f));
                 lift = Mathf.Sin(Mathf.Clamp01(u * 1.6f) * Mathf.PI) * 0.6f + 0.25f * Mathf.Clamp01(u * 3f);
             }
-            else if (p.stun > 0.5f && _fall > 0f)
+            else if (p.down > 0f)
             {
-                _fall -= dt;
-                pitch = Mathf.Lerp(pitch, 75f, Mathf.Clamp01((1.1f - _fall) * 4f));
-                lift = 0.15f * Mathf.Clamp01((1.1f - _fall) * 4f);
+                var fb = FallBody(pitch, roll, lift);
+                pitch = fb.x; roll = fb.y; lift = fb.z;
             }
             else if (p.offBalance > 0f)
             {
@@ -185,6 +342,7 @@ namespace Craquez
                 animSpeed = Mathf.Max(animSpeed, turnStep);
                 animFwd = Mathf.Max(animFwd, animSpeed * 0.8f);
             }
+            if (p.down > 0f) { animSpeed = 0f; animFwd = 0f; guard = false; }   // caído: sem passada
             Cuts(dt, spd);
             Touches();
             _pose.Restore();   // tira as correções do quadro anterior antes de avaliar a animação
@@ -209,7 +367,7 @@ namespace Craquez
             var dir = spd > 0.5f ? p.vel / spd : _refDir;
             if (_refDir == Vector2.zero) _refDir = dir;
             float ang = Vector2.SignedAngle(_refDir, dir);   // + = anti-horário visto de cima (esquerda)
-            if (spd > 3.6f && Mathf.Abs(ang) > 70f && _cutCd <= 0f && (anim.CurrentAction == null || anim.ActionWeight < 0.2f) && p.slide <= 0f && !p.isKeeper)
+            if (spd > 3.6f && p.down <= 0f && Mathf.Abs(ang) > 70f && _cutCd <= 0f && (anim.CurrentAction == null || anim.ActionWeight < 0.2f) && p.slide <= 0f && !p.isKeeper)
             {
                 anim.Play(ang > 0f ? "CutL" : "CutR", 0.28f, 0.5f, 1.4f, 0.1f);
                 _cutCd = 0.9f;
@@ -259,13 +417,13 @@ namespace Craquez
 
         void FeetFirm()
         {
-            if (p.slide > 0f || (p.isKeeper && p.dive > 0f)) return;
+            if (p.slide > 0f || (p.isKeeper && p.dive > 0f) || p.down > 0f) return;
             PoseFix.Feet(rig, transform, _pose, anim != null ? anim.ActionWeight : 0f);
         }
 
         void ArmsDown()
         {
-            if (_celebrate > 0f || (p.isKeeper && (p.dive > 0f || p.hold > 0f))) return;
+            if (_celebrate > 0f || (p.isKeeper && (p.dive > 0f || p.hold > 0f)) || p.down > 0f) return;
             PoseFix.Arms(rig, transform, _pose, 1f - (anim != null ? anim.ActionWeight * 0.5f : 0f), p.vel.magnitude);
         }
 
@@ -291,7 +449,7 @@ namespace Craquez
             float err = lowest - lift;
             // suaviza para não tremer, mas corrige rápido
             _ground = Mathf.Lerp(_ground, err, 1f - Mathf.Exp(-Time.deltaTime * 18f));
-            if (p.slide <= 0f && !(p.isKeeper && p.dive > 0f) && p.stun < 0.5f)
+            if (p.slide <= 0f && !(p.isKeeper && p.dive > 0f) && p.stun < 0.5f && p.down <= 0f)
                 rig.model.position -= Vector3.up * _ground;
             // sombra de contato
             if (_shadow == null)
@@ -318,6 +476,8 @@ namespace Craquez
                 // ações (cortes, fintas, giro) mantêm um pouco do balanço do quadril; locomoção, nada
                 rig.PinHips(anim != null ? anim.ActionWeight * 0.25f : 0f);
                 BodyLayer();
+                FallLimbs();
+                Protest();
             }
             GroundFeet();
             if (p == null || rig == null || rig.head == null) return;

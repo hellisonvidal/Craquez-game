@@ -124,9 +124,75 @@ namespace Craquez.Tests
             for (int i = 0; i < 70; i++) sim.Step(new InputFrame[2]);
             var p = sim.Controlled(0);
             Assume.That(sim.ball.owner == p.id);
+            // longe da saída de bola (no círculo central só vale o passe)
+            p.position = new Vector2(sim.TeamDir(0) * 12f, 3f);
+            sim.ball.pos = p.position + p.facing * 0.35f;
+            sim.Step(new InputFrame[2]);
             var perp = new Vector2(-p.facing.y, p.facing.x);
             sim.Step(new[] { new InputFrame { rstick = perp }, default });
             Assert.AreNotEqual(Skill.None, p.skill);
+        }
+
+        [TestCase(GameModes.Field)]
+        [TestCase(GameModes.Futsal)]
+        [TestCase(GameModes.Society)]
+        public void KickoffStartsWithPassToMate(string mode)
+        {
+            var sim = NewMatch(mode);
+            for (int i = 0; i < 70; i++) sim.Step(new InputFrame[2]);
+            var p = sim.Controlled(0);
+            Assume.That(sim.ball.owner == p.id && sim.kickoffPass);
+            var start = p.position;
+            // tenta sair conduzindo e chutando: não anda com a bola; o chute vira toque para o companheiro
+            for (int i = 0; i < 30; i++) sim.Step(new[] { new InputFrame { move = new Vector2(sim.TeamDir(0), 0), buttons = InputFrame.Sprint }, default });
+            Assert.Less(p.position.Dist(start), 0.2f, "batedor saiu conduzindo");
+            Assert.AreEqual(p.id, sim.ball.owner);
+            sim.Step(new[] { new InputFrame { buttons = InputFrame.Shoot }, default });
+            Assert.AreEqual(-1, sim.ball.owner);
+            Assert.AreEqual(sim.kickoffMate, sim.passReceiver);
+            Assert.Less(sim.ball.Speed, 12f, "saída virou chute");
+            int got = -1;
+            for (int i = 0; i < 120 && got < 0; i++) { sim.Step(new InputFrame[2]); if (sim.ball.owner >= 0) got = sim.ball.owner; }
+            Assert.AreEqual(sim.kickoffMate, got, "companheiro não recebeu a saída");
+        }
+
+        [Test] public void CpuKickoffPassesQuickly()
+        {
+            var sim = NewMatch(GameModes.Field);
+            var b = new CpuBrain(0, 0.7f);
+            for (int i = 0; i < 60 * 4 && sim.kickoffPass; i++) sim.Step(new[] { b.MakeInput(sim), default });
+            Assert.IsFalse(sim.kickoffPass, "CPU não fez a saída");
+        }
+
+        [TestCase(false)]
+        [TestCase(true)]
+        public void FoulKnocksVictimDownThenFreeKickWithWall(bool quick)
+        {
+            var sim = NewMatch(GameModes.Field);
+            sim.quickRestarts = quick;
+            for (int i = 0; i < 70; i++) sim.Step(new InputFrame[2]);
+            float dir = sim.TeamDir(0);
+            SimPlayer victim = null, offender = null;
+            foreach (var p in sim.players) if (!p.isKeeper && p.team == 0 && victim == null) victim = p;
+            foreach (var p in sim.players) if (!p.isKeeper && p.team == 1 && offender == null) offender = p;
+            victim.position = new Vector2(dir * (sim.halfLen - 24f), 4f);
+            offender.position = victim.position - new Vector2(dir, 0) * 0.6f;
+            offender.vel = new Vector2(dir * 6f, 0);
+            sim.ball.pos = victim.position + new Vector2(dir * 0.4f, 0);
+            sim.ball.owner = victim.id;
+            sim.Foul(offender, victim);
+            Assert.AreEqual(MatchState.Foul, sim.state);
+            Assert.Greater(victim.down, 0.9f);
+            var spot = sim.foulSpot;
+            for (int i = 0; i < 60 * 4 && sim.state == MatchState.Foul; i++) sim.Step(new InputFrame[2]);
+            Assert.AreEqual(MatchState.Restart, sim.state);
+            Assert.Less(sim.ball.pos.Dist(spot), 0.01f, "cobrança fora do lugar da falta");
+            if (quick) Assert.AreEqual(0, sim.wallIds.Count);
+            else
+            {
+                Assert.GreaterOrEqual(sim.wallIds.Count, 3, "sem barreira");
+                foreach (int id in sim.wallIds) Assert.AreEqual(sim.mode.restartDist, sim.players[id].position.Dist(spot), 0.8f);
+            }
         }
 
         [Test] public void JsonRoundTrip()

@@ -41,6 +41,23 @@ namespace Craquez
 
         public void Shake(float amount) => _shake = Mathf.Max(_shake, amount);
 
+        float _sceneT;
+        bool _sceneWasCine;
+
+        /// <summary>Plano curto (cobrança de falta): atrás da bola, olhando para o gol; depois volta ao normal.</summary>
+        public void Scene(Vector3 pos, Vector3 look, float seconds, float fov = 34f)
+        {
+            if (_sceneT <= 0f) _sceneWasCine = cinematic;
+            _sceneT = seconds;
+            cinematic = true;
+            cinePos = pos;
+            cineLook = look;
+            cineFov = fov;
+            cam.transform.position = pos;
+            cam.transform.rotation = Quaternion.LookRotation(look - pos);
+            cam.fieldOfView = fov;
+        }
+
         // ---------------------------------------------------------------- paredes na frente
         readonly System.Collections.Generic.List<Renderer> _occ = new System.Collections.Generic.List<Renderer>();
         readonly System.Collections.Generic.List<UnityEngine.Rendering.ShadowCastingMode> _occMode = new System.Collections.Generic.List<UnityEngine.Rendering.ShadowCastingMode>();
@@ -108,6 +125,11 @@ namespace Craquez
         void LateUpdate()
         {
             if (sim == null || cam == null) return;
+            if (_sceneT > 0f)
+            {
+                _sceneT -= Time.deltaTime;
+                if (_sceneT <= 0f) { cinematic = _sceneWasCine; SnapToBall(); }
+            }
             Move();
             UpdateOccluders(cinematic ? cineLook : _focus);
         }
