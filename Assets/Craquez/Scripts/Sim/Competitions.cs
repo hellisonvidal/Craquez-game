@@ -15,6 +15,7 @@ namespace Craquez.Sim
         public string[] leagues;         // clubes: ligas de onde saem os times (vazio = todas)
         public string[] continents;      // seleções: continentes (vazio = todos)
         public int trophy;               // desenho do troféu (TrophyArt)
+        public string category = "Torneios";   // grupo na lista (torneios, ligas, copas nacionais)
         public Color c1, c2;             // metal e detalhe do troféu
     }
 
@@ -49,7 +50,7 @@ namespace Craquez.Sim
 
         static readonly Color Gold = new Color(0.98f, 0.78f, 0.25f), Silver = new Color(0.86f, 0.88f, 0.92f), Bronze = new Color(0.82f, 0.52f, 0.3f);
 
-        public static readonly CompDef[] All =
+        static readonly CompDef[] Fixed =
         {
             D("copa_mundo", "Copa do Mundo Craquez", "As 16 melhores seleções: grupos e mata-mata", GameModes.Field, true, CompFormat.GroupsKnockout, 16, null, null, 0, Gold, new Color(0.1f, 0.55f, 0.3f)),
             D("copa_america", "Copa das Américas", "Seleções das Américas: 2 grupos e semifinais", GameModes.Field, true, CompFormat.GroupsKnockout, 8, null, new[] { "América do Sul", "América do Norte e Central" }, 1, Silver, new Color(0.15f, 0.35f, 0.75f)),
@@ -67,6 +68,87 @@ namespace Craquez.Sim
             D("copa_society", "Copa Society Craquez", "8 clubes no society, mata-mata", GameModes.Society, false, CompFormat.Knockout, 8, new[] { "bra" }, null, 13, Bronze, new Color(0.2f, 0.65f, 0.3f)),
             D("torneio_rua", "Torneio de Rua Craquez", "8 times na rua, mata-mata", GameModes.Street, false, CompFormat.Knockout, 8, null, null, 14, Silver, new Color(0.95f, 0.75f, 0.1f)),
         };
+
+        static CompDef[] _all;
+
+        /// <summary>
+        /// Todas as competições: os 15 torneios e, para cada liga do jogo, o campeonato (pontos
+        /// corridos) e a copa nacional do país (mata-mata).
+        /// </summary>
+        public static CompDef[] All
+        {
+            get
+            {
+                if (_all != null) return _all;
+                var l = new List<CompDef>(Fixed);
+                var cups = new List<CompDef>();
+                var cupCountries = new HashSet<string>();
+                int k = 0;
+                foreach (var lg in Teams.Leagues)
+                {
+                    if (lg.IsNational || lg.IsStreet || lg.count < 4) continue;
+                    bool futsal = lg.IsFutsal;
+                    string mode = futsal ? GameModes.Futsal : GameModes.Field;
+                    var c2 = Palette[k % Palette.Length];
+                    // campeonato da liga (Série A e Liga Nacional de Futsal já existem nos torneios)
+                    if (lg.id != "bra" && lg.id != "fbr")
+                    {
+                        var d = D("liga_" + lg.id, lg.name, "Campeonato em pontos corridos com os " + lg.count + " times", mode, false, CompFormat.League, lg.count, new[] { lg.id }, null, (k * 7 + 3) % 15, k % 2 == 0 ? Gold : Silver, c2);
+                        d.category = futsal ? "Ligas de futsal" : "Ligas";
+                        l.Add(d);
+                    }
+                    // copa nacional do país (todas as divisões do país juntas)
+                    string key = (futsal ? "f" : "") + lg.country;
+                    if (!cupCountries.Add(key) || lg.country == "BR" && !futsal) { k++; continue; }
+                    var same = new List<string>();
+                    int total = 0;
+                    foreach (var o in Teams.Leagues)
+                        if (!o.IsNational && !o.IsStreet && o.IsFutsal == futsal && o.country == lg.country) { same.Add(o.id); total += o.count; }
+                    int size = total >= 16 ? 16 : total >= 8 ? 8 : 4;
+                    var cup = D("copa_" + key.ToLowerInvariant(), CupName(lg.country, futsal), "Mata-mata com " + size + " times do país", mode, false, CompFormat.Knockout, size, same.ToArray(), null, (k * 11 + 6) % 15, k % 2 == 0 ? Silver : Gold, c2);
+                    cup.category = futsal ? "Copas de futsal" : "Copas nacionais";
+                    cups.Add(cup);
+                    k++;
+                }
+                l.AddRange(cups);
+                return _all = l.ToArray();
+            }
+        }
+
+        /// <summary>Recria a lista (o option file pode ter mudado nomes das ligas).</summary>
+        public static void Refresh() => _all = null;
+
+        static readonly Color[] Palette =
+        {
+            new Color(0.75f, 0.12f, 0.15f), new Color(0.1f, 0.3f, 0.7f), new Color(0.1f, 0.55f, 0.3f), new Color(0.55f, 0.2f, 0.65f),
+            new Color(0.9f, 0.5f, 0.1f), new Color(0.1f, 0.55f, 0.65f), new Color(0.2f, 0.2f, 0.24f), new Color(0.85f, 0.7f, 0.15f),
+        };
+
+        static string CupName(string country, bool futsal)
+        {
+            string c;
+            switch (country)
+            {
+                case "IT": c = "Copa da Itália"; break;
+                case "EN": c = "Copa da Inglaterra"; break;
+                case "ES": c = "Copa da Espanha"; break;
+                case "FR": c = "Copa da França"; break;
+                case "US": c = "Copa dos Estados Unidos"; break;
+                case "AR": c = "Copa da Argentina"; break;
+                case "UY": c = "Copa do Uruguai"; break;
+                case "PE": c = "Copa do Peru"; break;
+                case "CL": c = "Copa do Chile"; break;
+                case "EC": c = "Copa do Equador"; break;
+                case "SA": c = "Copa da Arábia Saudita"; break;
+                case "NL": c = "Copa da Holanda"; break;
+                case "PT": c = "Taça de Portugal"; break;
+                case "RU": c = "Copa da Rússia"; break;
+                case "UA": c = "Copa da Ucrânia"; break;
+                case "BR": c = "Copa do Brasil"; break;
+                default: c = "Copa " + country; break;
+            }
+            return futsal ? c + " de Futsal" : c;
+        }
 
         public static CompDef Find(string id)
         {

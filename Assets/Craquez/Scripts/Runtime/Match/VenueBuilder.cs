@@ -404,7 +404,8 @@ namespace Craquez
                     else
                     {
                         k.Disc(new Vector3(gx - s * m.penaltyDist, 0, 0), 0.2f, 12);
-                        k.Disc(new Vector3(gx - s * 10f, 0, 0), 0.2f, 12);
+                        // segunda marca (10 m) só no futsal — no society ficava colada na do pênalti (9 m)
+                        if (m.id == GameModes.Futsal) k.Disc(new Vector3(gx - s * 10f, 0, 0), 0.2f, 12);
                     }
                 }
             }

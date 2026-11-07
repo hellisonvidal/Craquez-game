@@ -46,7 +46,8 @@ namespace Craquez
             Screen.sleepTimeout = SleepTimeout.NeverSleep;
             Sfx.Init();
             Teams.CustomOptionFile = PlayerPrefs.GetString(OptionKey, "");
-            if (Teams.CustomOptionFile != "") Teams.Reload();
+            Teams.OptionFileDisabled = PlayerPrefs.GetInt(OptionOffKey, 0) == 1;
+            if (Teams.CustomOptionFile != "" || Teams.OptionFileDisabled) Teams.Reload();
             OptionFile.Apply();   // bolas, chuteiras e nomes dos locais do option file (os times o banco já aplica)
             UrpSetup.Quality(Settings.Quality);
             Gfx.ToonLook(false);
@@ -553,12 +554,31 @@ namespace Craquez
             return btn;
         }
 
-        /// <summary>Tela de modos: só a modalidade (quatro cartões); clubes ou seleções vêm depois.</summary>
+        /// <summary>Menu principal: Jogar, Competições, Mural de Troféus e Configurações.</summary>
         void ShowModes()
         {
             StopAttract();
-            var root = Page("JOGAR");
+            var root = Page("MENU");
             _back = ShowTitle;
+            Title(root, "CRAQUEZ", "O que vamos jogar hoje?");
+            var grid = UiKit.Rect(root, "menu").Place(0, 0, 1, 1, 90, 186, 90, 200);
+            UiKit.HList(grid, 30).childForceExpandHeight = true;
+            var wc = Competitions.All[0];
+            int titles = Trophies().Count;
+            var play = BigCard(grid, "JOGAR", "AMISTOSO", "Campo, futsal, society e rua", ModeArt(MenuArt.Kind.Field), 512f / 560f, new Color(0.13f, 0.77f, 0.37f), ShowPlay);
+            BigCard(grid, "COMPETIÇÕES", Competitions.All.Length + " COMPETIÇÕES", "Ligas, copas e torneios de seleções", TrophyArt.Texture(wc.trophy, wc.c1, wc.c2, 512), 1f, new Color(0.98f, 0.7f, 0.15f), ShowCompetitions);
+            var lc = Competitions.All[4];
+            BigCard(grid, "MURAL DE TROFÉUS", titles + (titles == 1 ? " TÍTULO" : " TÍTULOS"), "As suas conquistas", TrophyArt.Texture(lc.trophy, lc.c1, lc.c2, 512, titles == 0), 1f, new Color(0.85f, 0.55f, 0.2f), ShowTrophyWall);
+            BigCard(grid, "CONFIGURAÇÕES", "OPÇÕES", "Som, câmera, gráficos e option file", ModeArt(MenuArt.Kind.Futsal), 512f / 560f, new Color(0.35f, 0.5f, 0.9f), ShowOptions);
+            UiKit.Select(play);
+        }
+
+        /// <summary>Jogar (amistoso): só a modalidade (quatro cartões); clubes ou seleções vêm depois.</summary>
+        void ShowPlay()
+        {
+            StopAttract();
+            var root = Page("JOGAR");
+            _back = ShowModes;
             Title(root, "JOGAR", "Escolha a modalidade");
             var grid = UiKit.Rect(root, "modalidades").Place(0, 0, 1, 1, 90, 186, 90, 272);
             UiKit.HList(grid, 30).childForceExpandHeight = true;
@@ -567,12 +587,6 @@ namespace Craquez
             _modeButtons[GameModes.Futsal] = BigCard(grid, "FUTSAL", "5 x 5", "Quadra  •  " + VenueBuilder.FutsalNames.Length + " ginásios", ModeArt(MenuArt.Kind.Futsal), 512f / 560f, new Color(0.96f, 0.62f, 0.04f), () => ShowKind(GameModes.Futsal));
             _modeButtons[GameModes.Society] = BigCard(grid, "SOCIETY", "7 x 7", "Grama sintética  •  " + VenueBuilder.SocietyNames.Length + " campos", ModeArt(MenuArt.Kind.Society), 512f / 560f, new Color(0.02f, 0.71f, 0.83f), () => ShowKind(GameModes.Society));
             _modeButtons[GameModes.Street] = BigCard(grid, "RUA", "3 A 5 POR LADO", "Times de rua  •  " + VenueBuilder.StreetNames.Length + " ruas", ModeArt(MenuArt.Kind.Street), 512f / 560f, new Color(0.93f, 0.28f, 0.6f), () => { _lastMode = GameModes.Street; Choose(GameModes.Street, false); });
-            // competições, mural de troféus e opções
-            var bar = UiKit.Rect(root, "atalhos").At(0.5f, 0, 1240, 80, 0, 92);
-            UiKit.HList(bar, 30);
-            UiKit.Button(bar, "COMPETIÇÕES", ShowCompetitions, 30, new Color(0.62f, 0.42f, 0.06f));
-            UiKit.Button(bar, "MURAL DE TROFÉUS", ShowTrophyWall, 30, new Color(0.3f, 0.22f, 0.1f));
-            UiKit.Button(bar, "⚙  OPÇÕES", ShowOptions, 30, new Color(0.1f, 0.14f, 0.25f));
             UiKit.Select(_lastMode != null && _modeButtons.TryGetValue(_lastMode, out var lb) && lb != null ? lb : first);
         }
 
@@ -585,7 +599,7 @@ namespace Craquez
             _lastMode = mode;
             _cfg.mode = mode;
             var root = Page("JOGAR  ›  " + GameModes.DisplayName(mode).ToUpperInvariant());
-            _back = ShowModes;
+            _back = ShowPlay;
             Title(root, GameModes.DisplayName(mode).ToUpperInvariant(), "Clubes ou seleções?");
             var grid = UiKit.Rect(root, "tipo").Place(0.18f, 0, 0.82f, 1, 0, 186, 0, 200);
             UiKit.HList(grid, 40).childForceExpandHeight = true;
@@ -604,41 +618,18 @@ namespace Craquez
 
         static readonly Dictionary<string, Texture2D> _kindArt = new Dictionary<string, Texture2D>();
 
-        /// <summary>Arte dos cartões clubes/seleções: escudos (ou bandeiras) dos primeiros times sobre a ilustração do modo.</summary>
+        /// <summary>
+        /// Arte dos cartões clubes/seleções (sem bandeiras nem escudos): clubes com a ilustração da
+        /// modalidade; seleções com o desenho de um estádio/ginásio de jogo de seleção.
+        /// </summary>
         Texture KindArt(string mode, bool national)
         {
             string key = mode + national;
             if (_kindArt.TryGetValue(key, out var t) && t != null) return t;
             var kind = mode == GameModes.Futsal ? MenuArt.Kind.Futsal : mode == GameModes.Society ? MenuArt.Kind.Society : MenuArt.Kind.Field;
-            var bg = ModeArt(kind);
-            const int W = 640, H = 480;
-            var rt = RenderTexture.GetTemporary(W, H, 0, RenderTextureFormat.ARGB32);
-            var prev = RenderTexture.active;
-            RenderTexture.active = rt;
-            GL.PushMatrix();
-            GL.LoadPixelMatrix(0, W, H, 0);
-            GL.Clear(true, true, Color.black);
-            // fundo: a ilustração do modo, escurecida
-            Graphics.DrawTexture(new Rect(0, -H * 0.1f, W, W * 560f / 512f), bg, new Rect(0, 0, 1, 1), 0, 0, 0, 0, new Color(0.28f, 0.3f, 0.38f, 1f));
-            // seis bandeiras em duas fileiras (só nas seleções)
-            var lgs = LeaguesFor(mode, national);
-            var ids = new List<int>();
-            foreach (var l in lgs) for (int i = 0; i < l.count && ids.Count < 6; i++) { ids.Add(l.first + i); if (!national) break; }
-            if (!national) foreach (var l in lgs) for (int i = 1; i < l.count && ids.Count < 6; i++) ids.Add(l.first + i);
-            for (int i = 0; i < ids.Count; i++)
-            {
-                float cx = W * (0.2f + 0.3f * (i % 3)), cy = H * (i < 3 ? 0.3f : 0.66f);
-                // seleções: bandeiras dos países; clubes: só a ilustração (sem escudos)
-                if (!national) break;
-                var flag = Crest.CountryTex(Teams.Get(ids[i]).iso);
-                if (flag != null) Graphics.DrawTexture(new Rect(cx - 82, cy - 55, 164, 110), flag);
-            }
-            GL.PopMatrix();
-            var tex = new Texture2D(W, H, TextureFormat.RGBA32, false);
-            tex.ReadPixels(new Rect(0, 0, W, H), 0, 0);
-            tex.Apply();
-            RenderTexture.active = prev;
-            RenderTexture.ReleaseTemporary(rt);
+            Texture2D tex;
+            if (!national) tex = ModeArt(kind) as Texture2D;
+            else tex = MenuArt.Venue(mode, mode == GameModes.Field ? 6 : mode == GameModes.Futsal ? 6 : 1, Theme.Hot, 640, 480);
             _kindArt[key] = tex;
             return tex;
         }
@@ -708,7 +699,7 @@ namespace Craquez
         void ShowSetup()
         {
             var root = Page(Crumb());
-            _back = () => { if (_cfg.mode == GameModes.Street) ShowModes(); else ShowKind(_cfg.mode); };
+            _back = () => { if (_cfg.mode == GameModes.Street) ShowPlay(); else ShowKind(_cfg.mode); };
             Title(root, (_cfg.mode == GameModes.Street ? "RUA" : (_cfg.national ? "SELEÇÕES" : "CLUBES")) + "  •  " + GameModes.DisplayName(_cfg.mode).ToUpperInvariant(), "Ajuste a partida e escolha os times");
             var listBg = UiKit.Panel(root).rectTransform.Place(0, 0, 0.55f, 1, 74, 140, 0, 262);
             UiKit.Label(listBg, "PARTIDA", 24, Theme.Head, Theme.Accent).rectTransform.Place(0, 1, 1, 1, 24, -40, 24, 8);
@@ -856,16 +847,8 @@ namespace Craquez
                 var col = UiKit.Panel(root).rectTransform.Place(s == 0 ? 0 : 0.5f, 0, s == 0 ? 0.5f : 1, 1, s == 0 ? 90 : 30, 200, s == 0 ? 30 : 90, 200);
                 var head = UiKit.Label(col, s == 0 ? "CASA" : "VISITANTE", 34, Theme.Head, Theme.Accent, TextAnchor.MiddleLeft);
                 head.rectTransform.Place(0, 1, 1, 1, 30, -60, 30, 10);
-                // seleções: a bandeira do país; clubes: sem escudo
-                Image flag = null;
+                // sem escudos nem bandeiras: só o nome e as informações
                 float tx = 30f;
-                if (_cfg.national)
-                {
-                    flag = UiKit.Image(col, Color.white, null, "bandeira");
-                    flag.rectTransform.At(0, 1, 170, 128, 30, -86);
-                    flag.preserveAspect = true;
-                    tx = 220f;
-                }
                 var name = UiKit.Label(col, "", 46, Theme.HeadItalic, Theme.Text);
                 name.rectTransform.Place(0, 1, 1, 1, tx, -150, 250, 70);
                 var info = UiKit.Label(col, "", 22, Theme.Body, Theme.TextDim);
@@ -885,7 +868,6 @@ namespace Craquez
                 void Refresh()
                 {
                     var t = Teams.Get(Team());
-                    if (flag != null) { flag.sprite = Crest.Country(t.iso); flag.enabled = flag.sprite != null; }
                     name.text = t.name;
                     int ovr = 0;
                     foreach (var r in t.roster) ovr += r.ovr;
@@ -1077,12 +1059,14 @@ namespace Craquez
         }
 
         // ------------------------------------------------------------ option file: navegador de pastas
-        const string OptionKey = "option_file_path";
+        const string OptionKey = "option_file_path", OptionOffKey = "option_file_off";
 
         static void ReloadOptionFile()
         {
             Teams.CustomOptionFile = PlayerPrefs.GetString(OptionKey, "");
+            Teams.OptionFileDisabled = PlayerPrefs.GetInt(OptionOffKey, 0) == 1;
             Teams.Reload();
+            Competitions.Refresh();
             OptionFile.Apply();
             BallCatalog.ClearCache();
         }
@@ -1138,7 +1122,14 @@ namespace Craquez
                 var lbl = b.GetComponentInChildren<Text>();
                 lbl.font = Theme.Body;
                 lbl.alignment = TextAnchor.MiddleLeft;
-                UiKit.Size(b, 58, 58);
+                // texto dentro do botão, com margem (caminhos longos quebram/cortam à direita)
+                lbl.rectTransform.Place(0, 0, 1, 1, 26, 4, 26, 4);
+                lbl.horizontalOverflow = HorizontalWrapMode.Wrap;
+                lbl.verticalOverflow = VerticalWrapMode.Truncate;
+                lbl.resizeTextForBestFit = true;
+                lbl.resizeTextMinSize = 16;
+                lbl.resizeTextMaxSize = 26;
+                UiKit.Size(b, 62, 62);
                 if (first == null) first = b;
             }
             if (dir == null)
@@ -1168,6 +1159,7 @@ namespace Craquez
                 System.Array.Sort(dirs, System.StringComparer.OrdinalIgnoreCase);
                 System.Array.Sort(files, System.StringComparer.OrdinalIgnoreCase);
                 // arquivos primeiro (é o que se procura), depois as pastas (sem as ocultas)
+                files = System.Array.FindAll(files, Teams.LooksLikeOptionFile);   // só os compatíveis
                 foreach (var f in files)
                 {
                     string ff = f;
@@ -1183,7 +1175,7 @@ namespace Craquez
                     Row("<color=#f5c518>›</color>  " + name + "/", Theme.PanelLight, () => ShowBrowse(dd));
                 }
                 if (err != null) UiKit.Size(UiKit.Label(content, err, 24, Theme.Body, Theme.Hot), 50, 50);
-                else if (files.Length == 0 && dirs.Length == 0) UiKit.Size(UiKit.Label(content, "Pasta vazia", 24, Theme.Body, Theme.TextDim), 50, 50);
+                else if (files.Length == 0) UiKit.Size(UiKit.Label(content, "Nenhum option file nesta pasta" + (dirs.Length > 0 ? " (veja as subpastas)" : ""), 24, Theme.Body, Theme.TextDim), 50, 50);
             }
             foreach (var t in content.GetComponentsInChildren<Text>()) t.supportRichText = true;
             UiKit.Select(first);
@@ -1197,13 +1189,16 @@ namespace Craquez
         void LoadOptionFile(string path)
         {
             string prev = PlayerPrefs.GetString(OptionKey, "");
+            int prevOff = PlayerPrefs.GetInt(OptionOffKey, 0);
             PlayerPrefs.SetString(OptionKey, path);
+            PlayerPrefs.SetInt(OptionOffKey, 0);
             PlayerPrefs.Save();
             ReloadOptionFile();
             if (Teams.OptionDoc == null || Teams.OptionFilePath != path)
             {
                 // arquivo inválido: volta ao anterior e avisa
                 if (prev == "") PlayerPrefs.DeleteKey(OptionKey); else PlayerPrefs.SetString(OptionKey, prev);
+                PlayerPrefs.SetInt(OptionOffKey, prevOff);
                 ReloadOptionFile();
                 var r = Page("OPÇÕES  ›  OPTION FILE");
                 _back = () => ShowBrowse(System.IO.Path.GetDirectoryName(path));
@@ -1272,7 +1267,15 @@ namespace Craquez
                                        (Teams.OptionFilePath != "" ? Teams.OptionFilePath : "nenhum carregado");
             St();
             UiKit.Size(UiKit.Button(list, "Carregar option file…", () => ShowBrowse(null), 26), 50, 50);
-            UiKit.Size(UiKit.Button(list, "Recarregar option file", () => { ReloadOptionFile(); St(); }, 26), 50, 50);
+            UiKit.Size(UiKit.Button(list, "Remover option file", () =>
+            {
+                // volta aos dados originais do jogo (até carregar outro arquivo)
+                PlayerPrefs.DeleteKey(OptionKey);
+                PlayerPrefs.SetInt(OptionOffKey, 1);
+                PlayerPrefs.Save();
+                ReloadOptionFile();
+                St();
+            }, 26, new Color(0.4f, 0.12f, 0.15f)), 50, 50);
             // coluna 2: gráficos (no PC, tudo ajustável; no celular, o essencial)
             var gfx = UiKit.Rect(root, "gráficos").Place(0.5f, 0, 1, 1, 16, 190, 90, 274);
             UiKit.VList(gfx, 6, 0, false);
@@ -1310,13 +1313,13 @@ namespace Craquez
             var go = new GameObject("Partida");
             go.transform.SetParent(transform, false);
             _match = go.AddComponent<MatchController>();
-            _match.onExit = () => { EndMatch(); ShowModes(); };
+            _match.onExit = () => { EndMatch(); ShowPlay(); };
             _match.onRestart = c => { EndMatch(); StartMatch(); };
             _match.Begin(_cfg, cam);
         }
 
         // ------------------------------------------------------------ roteiro de screenshots (CI)
-        public void Tour_Modes() => ShowModes();
+        public void Tour_Modes() => ShowPlay();
         public void Tour_Options() => ShowOptions();
         public void Tour_Setup(string mode, bool national)
         {

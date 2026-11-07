@@ -354,8 +354,28 @@ namespace Craquez.Sim
         /// <summary>O arquivo que foi lido (vazio se nenhum).</summary>
         public static string OptionFilePath { get; private set; } = "";
 
+        /// <summary>Option file removido pelo usuário: o jogo usa só os dados originais.</summary>
+        public static bool OptionFileDisabled;
+
+        /// <summary>O arquivo parece um option file do Craquez (lê só o começo).</summary>
+        public static bool LooksLikeOptionFile(string path)
+        {
+            try
+            {
+                using (var r = new StreamReader(path))
+                {
+                    var buf = new char[8192];
+                    int n = r.Read(buf, 0, buf.Length);
+                    var head = new string(buf, 0, n);
+                    return head.TrimStart().StartsWith("{") && (head.Contains("craquez-option-file") || head.Contains("\"teams\"") || head.Contains("\"bolas\"") || head.Contains("\"locais\""));
+                }
+            }
+            catch { return false; }
+        }
+
         static IEnumerable<string> OptionFiles()
         {
+            if (OptionFileDisabled) yield break;
             if (!string.IsNullOrEmpty(CustomOptionFile)) yield return CustomOptionFile;
             foreach (var dir in OptionDirs()) yield return Path.Combine(dir, "option_file.json");
         }

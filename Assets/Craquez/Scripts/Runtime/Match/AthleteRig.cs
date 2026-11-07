@@ -92,12 +92,11 @@ namespace Craquez
         // O modelo base já é encorpado: o "médio" afina um pouco; o forte fica perto do original.
         static readonly (string bone, float slim, float strong)[] Shape =
         {
-            // atleta: cintura fina, tórax em "V", coxas e panturrilhas fortes, pescoço firme
-            ("spine_01", 0.8f, 0.92f), ("spine_02", 0.87f, 0.98f), ("spine_03", 0.95f, 1.06f),
-            ("clavicle_l", 0.97f, 1.03f), ("clavicle_r", 0.97f, 1.03f),
-            ("upperarm_l", 0.88f, 1.03f), ("upperarm_r", 0.88f, 1.03f), ("lowerarm_l", 0.9f, 1.01f), ("lowerarm_r", 0.9f, 1.01f),
-            ("thigh_l", 0.94f, 1.08f), ("thigh_r", 0.94f, 1.08f), ("calf_l", 0.95f, 1.07f), ("calf_r", 0.95f, 1.07f), ("neck_01", 0.96f, 1.06f),
-            ("pelvis", 0.94f, 1.0f),
+            // só o tronco e o pescoço: os ossos que dobram (coxa, canela, braço, antebraço) não são
+            // escalados — com escala desigual, o joelho e o cotovelo entortavam ao dobrar (pernas
+            // "para dentro"); a perna fica com a forma original do modelo
+            ("spine_01", 0.84f, 0.95f), ("spine_02", 0.9f, 1.0f), ("spine_03", 0.95f, 1.05f),
+            ("clavicle_l", 0.98f, 1.03f), ("clavicle_r", 0.98f, 1.03f), ("neck_01", 0.97f, 1.05f),
         };
 
         /// <summary>

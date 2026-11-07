@@ -8,6 +8,17 @@ Jogo de futebol feito 100% com inteligência artificial, **gratuito**. Android, 
 - **Linux**: `Craquez-v2.1.0-Linux.tar.gz` → extraia e rode `./Craquez` (ou `./instalar.sh` para o atalho no menu)
 
 ### Novidades
+- **Menu principal** em quatro cartões: Jogar, Competições, Mural de Troféus e Configurações.
+- **Mais competições**: além dos 15 torneios, cada liga do jogo é um campeonato em pontos corridos
+  e cada país tem a sua copa nacional em mata-mata (campo e futsal), cada uma com o seu troféu.
+- **Pernas corrigidas**: os ossos que dobram (coxa, canela, braço) não são mais deformados pelo
+  biotipo — antes os joelhos entortavam para dentro ao dobrar.
+- **Espaço entre companheiros**: quem não está com a bola desvia de quem está perto (e abre mais
+  espaço para quem conduz ou é controlado pelo jogador); nada de trombadas no mesmo time.
+- **Option file**: o navegador mostra só os arquivos compatíveis, com o texto dentro da margem;
+  "Remover option file" volta aos dados originais do jogo.
+- **Sem bandeiras** nas telas de escolha (clubes/seleções e times): ilustrações de estádio.
+- **Society**: a marca dos 10 m (só do futsal) aparecia colada na marca do pênalti.
 - **Modo Competições**: 15 torneios — Copa do Mundo, Copa das Américas, Eurocopa, Copa
   Afro-Asiática, Liga dos Campeões, Libertadores, Brasileirão (pontos corridos), Copa do Brasil,
   Sul-Americana, Mundial de Clubes, Supercopa, Copa do Mundo e Liga de Futsal, Copa Society e Torneio
@@ -25,8 +36,7 @@ Jogo de futebol feito 100% com inteligência artificial, **gratuito**. Android, 
 - **Física revista**: o quique da bola perde velocidade conforme a força do impacto (rasante quase
   não freia); o atleta arranca forte e perde aceleração perto da velocidade máxima, freia de forma
   realista e faz curvas mais abertas em velocidade.
-- **Seleções** com a bandeira do país e divididas por continente; **sem escudos** na escolha dos
-  times.
+- **Seleções** divididas por continente; **sem escudos** na escolha dos times.
 - **Rua sem muretas nas linhas de fundo**: a bola sai e vira tiro de meta ou escanteio.
 - **Option file**: "Carregar option file…" abre um navegador de pastas (Downloads, Documentos,
   unidades, a pasta do jogo) para escolher qualquer .json; a opção de exportar saiu.

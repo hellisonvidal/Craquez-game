@@ -78,7 +78,7 @@ namespace Craquez
         {
             var root = Page("COMPETIÇÕES");
             _back = ShowModes;
-            Title(root, "COMPETIÇÕES", "15 torneios com troféus para o seu mural");
+            Title(root, "COMPETIÇÕES", Competitions.All.Length + " competições: torneios, ligas e copas nacionais, cada uma com o seu troféu");
             _run ??= LoadRun();
             var listBg = UiKit.Panel(root).rectTransform.Place(0, 0, 1, 1, 90, 200, 90, 250);
             var content = Scroll(listBg, 10f);
@@ -92,9 +92,15 @@ namespace Craquez
                 UiKit.Size(b, 74, 74);
                 first = b;
             }
+            string cat = null;
             foreach (var d in Competitions.All)
             {
                 var dd = d;
+                if (d.category != cat)
+                {
+                    cat = d.category;
+                    UiKit.Size(UiKit.Label(content, cat.ToUpperInvariant(), 30, Theme.Head, Theme.Accent), 48, 48);
+                }
                 int count = won.FindAll(t => t.id == d.id).Count;
                 var b = UiKit.Button(content, "", () => ShowCompTeam(dd), 26, Theme.PanelLight);
                 UiKit.Size(b, 112, 112);
@@ -143,16 +149,8 @@ namespace Craquez
                 var lbl = b.GetComponentInChildren<Text>();
                 lbl.supportRichText = true;
                 lbl.alignment = TextAnchor.MiddleLeft;
-                lbl.rectTransform.Place(0, 0, 1, 1, d.national ? 90 : 24, 0, 24, 0);
+                lbl.rectTransform.Place(0, 0, 1, 1, 24, 0, 24, 0);
                 lbl.text = "<b>" + tm.name + "</b>   <color=#8fa3bf>" + info + "  •  força " + Mathf.RoundToInt(Competitions.Strength(t) * 100) + "</color>";
-                if (d.national)
-                {
-                    var fl = UiKit.Image(b.transform, Color.white, Crest.Country(tm.iso), "bandeira");
-                    fl.rectTransform.At(0, 0.5f, 56, 42, 18, 0);
-                    fl.preserveAspect = true;
-                    fl.raycastTarget = false;
-                    fl.enabled = fl.sprite != null;
-                }
                 if (first == null) first = b;
             }
             if (hasRun)
@@ -335,7 +333,19 @@ namespace Craquez
             _back = ShowModes;
             var won = Trophies();
             Title(root, "MURAL DE TROFÉUS", won.Count == 0 ? "Vença uma competição para pôr o primeiro troféu na estante" : won.Count + (won.Count == 1 ? " troféu conquistado" : " troféus conquistados"));
-            var shelf = UiKit.Rect(root, "estante").Place(0, 0, 1, 1, 90, 120, 90, 250);
+            var area = UiKit.Rect(root, "estante").Place(0, 0, 1, 1, 90, 120, 90, 250);
+            var scroll = area.gameObject.AddComponent<ScrollRect>();
+            var view = UiKit.Rect(area, "view").Place(0, 0, 1, 1);
+            view.gameObject.AddComponent<RectMask2D>();
+            var shelf = UiKit.Rect(view, "troféus");
+            shelf.anchorMin = new Vector2(0, 1);
+            shelf.anchorMax = new Vector2(1, 1);
+            shelf.pivot = new Vector2(0.5f, 1);
+            shelf.gameObject.AddComponent<ContentSizeFitter>().verticalFit = ContentSizeFitter.FitMode.PreferredSize;
+            scroll.viewport = view;
+            scroll.content = shelf;
+            scroll.horizontal = false;
+            scroll.scrollSensitivity = 30f;
             var grid = shelf.gameObject.AddComponent<GridLayoutGroup>();
             grid.cellSize = new Vector2(330, 220);
             grid.spacing = new Vector2(18, 12);
@@ -343,7 +353,10 @@ namespace Craquez
             grid.constraintCount = 5;
             grid.childAlignment = TextAnchor.UpperCenter;
             Selectable first = null;
-            foreach (var d in Competitions.All)
+            // os conquistados primeiro, depois os que faltam
+            var order = new List<CompDef>(Competitions.All);
+            order.Sort((x, y) => (won.Exists(t => t.id == y.id) ? 1 : 0).CompareTo(won.Exists(t => t.id == x.id) ? 1 : 0));
+            foreach (var d in order)
             {
                 var mine = won.FindAll(t => t.id == d.id);
                 var dd = d;

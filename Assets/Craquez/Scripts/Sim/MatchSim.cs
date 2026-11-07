@@ -2082,6 +2082,33 @@ namespace Craquez.Sim
             }
             bool hasBall = ball.owner == p.id;
             var intent = p.intent.Limit(1f);
+            // espaço entre companheiros: quem não está com a bola nem sob controle do jogador
+            // desvia de quem está perto (não se trombam nem se empurram disputando o mesmo lugar)
+            if (!hasBall && !p.isKeeper && ctrl[p.team].player != p.id && p.id != passReceiver && !setPiece)
+            {
+                float R = mode.id == GameModes.Field ? 2.6f : 1.6f;
+                var sep = Vector2.zero;
+                foreach (var m in players)
+                {
+                    if (m == p || m.team != p.team) continue;
+                    var d = p.position - m.position;
+                    float l = d.magnitude;
+                    // quem está com a bola ou sob controle do jogador não desvia: os outros abrem mais espaço para ele
+                    bool lead = m.id == ball.owner || ctrl[m.team].player == m.id;
+                    float rr = lead ? R * 1.5f : R;
+                    if (l >= rr) continue;
+                    if (l < 0.01f) d = new Vector2(p.id % 2 == 0 ? 1f : -1f, 0.3f);
+                    float w = (rr - l) / rr;
+                    // quem está mais perto da bola tem preferência: o outro abre espaço
+                    float pri = lead ? 2.2f : m.position.Dist(ball.pos) < p.position.Dist(ball.pos) ? 1.15f : 0.7f;
+                    sep += d.Norm() * w * w * pri;
+                }
+                if (sep.sqrMagnitude > 1e-4f)
+                {
+                    float sm = Mathf.Min(sep.magnitude, 1.4f);
+                    intent = (intent + sep.Norm() * sm * 1.3f).Limit(1f);
+                }
+            }
             p.sprinting = p.wantSprint && p.stamina > 0.05f && intent.magnitude > 0.3f;
             float maxS = p.sprinting ? p.TopSpeed() : p.JogSpeed();
             maxS *= 0.8f + 0.2f * p.stamina;

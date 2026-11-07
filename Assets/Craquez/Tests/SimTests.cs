@@ -382,10 +382,10 @@ namespace Craquez.Tests
             Assert.GreaterOrEqual(kept, 6, "a reposição quase sempre vai para o adversário");
         }
 
-        /// <summary>Todas as competições vão do começo ao campeão (salvando e carregando no meio).</summary>
+        /// <summary>Todas as competições (torneios, ligas e copas) vão do começo ao campeão (salvando e carregando no meio).</summary>
         [Test] public void CompetitionsRunToAChampion()
         {
-            Assert.AreEqual(15, Competitions.All.Length);
+            Assert.GreaterOrEqual(Competitions.All.Length, 50, "torneios + ligas + copas nacionais");
             foreach (var d in Competitions.All)
             {
                 var pool = Competitions.Pool(d);
@@ -411,6 +411,35 @@ namespace Craquez.Tests
                 // ganhando todos os jogos por 2 x 1, o usuário é campeão
                 Assert.AreEqual(user, run.champion, d.name + ": vencendo tudo não foi campeão");
             }
+        }
+
+        /// <summary>Companheiros não se trombam: quase nunca ficam a menos de 1,4 m um do outro (com um jogador humano no time).</summary>
+        [TestCase(GameModes.Field)]
+        [TestCase(GameModes.Society)]
+        [TestCase(GameModes.Futsal)]
+        public void TeammatesDontBump(string mode)
+        {
+            var sim = NewMatch(mode, 5);
+            int samples = 0, close = 0;
+            for (int i = 0; i < 60 * 90; i++)
+            {
+                // time 0 com um "jogador humano": corre atrás da bola e, com ela, conduz para o gol
+                var me = sim.Controlled(0);
+                var to = sim.ball.owner == me.id ? new Vector2(sim.TeamDir(0), 0f) : (sim.ball.pos - me.position).Norm();
+                var f = new InputFrame { move = to, buttons = InputFrame.Sprint };
+                if (sim.ball.owner == me.id && i % 90 == 0) f.buttons |= InputFrame.Pass;
+                sim.Step(new[] { f.Quantized(), default });
+                if (sim.state != MatchState.Playing || i % 6 != 0) continue;
+                foreach (var a in sim.players)
+                    foreach (var b in sim.players)
+                    {
+                        if (a.id >= b.id || a.team != b.team || a.team != 0) continue;
+                        samples++;
+                        if (a.position.Dist(b.position) < 1.4f) close++;
+                    }
+            }
+            float rate = close / (float)Mathf.Max(1, samples);
+            Assert.Less(rate, 0.01f, "companheiros colados em " + (rate * 100f).ToString("F2") + "% do tempo");
         }
 
         [Test] public void JsonRoundTrip()
