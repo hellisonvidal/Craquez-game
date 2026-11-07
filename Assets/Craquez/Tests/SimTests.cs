@@ -233,6 +233,43 @@ namespace Craquez.Tests
             return null;
         }
 
+        [TestCase(true)]
+        [TestCase(false)]
+        public void ThrowInWithHandsOnlyOnField(bool field)
+        {
+            var sim = NewMatch(field ? GameModes.Field : GameModes.Futsal);
+            for (int i = 0; i < 70; i++) sim.Step(new InputFrame[2]);
+            var other = FirstOutfield(sim, 1);
+            sim.ball.owner = -1;
+            sim.ball.pos = new Vector2(sim.TeamDir(0) * 5f, sim.halfW - 0.4f);
+            sim.ball.vel = new Vector2(0f, 7f);
+            sim.ball.z = 0f; sim.ball.vz = 0f;
+            sim.ball.lastTouchTeam = 1; sim.ball.lastTouchId = other.id;
+            bool restarted = false;
+            for (int i = 0; i < 60 * 5 && !(restarted && sim.state == MatchState.Playing); i++)
+            {
+                sim.Step(new InputFrame[2]);
+                foreach (var e in sim.events) if (e.type == "whistle" && e.kind == "throwin") restarted = true;
+            }
+            Assert.IsTrue(restarted, "não houve lateral");
+            Assert.AreEqual(field, sim.throwIn, "lateral com as mãos só no campo");
+            if (field) Assert.Greater(sim.ball.z, 1.8f, "bola não está nas mãos (acima da cabeça)");
+            else Assert.Less(sim.ball.z, 0.3f, "nos outros modos o lateral é com os pés");
+            // cobra: passe
+            bool thrown = false;
+            float zAtRelease = 0f;
+            for (int i = 0; i < 8; i++) sim.Step(new[] { new InputFrame { move = new Vector2(sim.TeamDir(0), -1f), buttons = InputFrame.Pass }, default });
+            for (int i = 0; i < 30 && !thrown; i++)
+            {
+                sim.Step(new[] { new InputFrame { move = new Vector2(sim.TeamDir(0), -1f) }, default });
+                foreach (var e in sim.events) if (e.type == "kick") { thrown = e.kind == "throw"; zAtRelease = sim.ball.z; if (!field) break; }
+                if (!field && sim.ball.owner < 0) break;
+            }
+            Assert.AreEqual(field, thrown, "arremesso com as mãos");
+            if (field) Assert.Greater(zAtRelease, 1.5f, "arremesso sai de cima da cabeça");
+            Assert.IsFalse(sim.throwIn);
+        }
+
         [TestCase(22f, true)]   // fora da área (dentro seria pênalti)
         [TestCase(45f, false)]
         public void FreeKickBallStaysAndOptionsDependOnDistance(float distToGoal, bool shotAllowed)

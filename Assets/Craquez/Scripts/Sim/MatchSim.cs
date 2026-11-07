@@ -81,6 +81,11 @@ namespace Craquez.Sim
         /// toma a bola até a cobrança. Opções: passe, cruzamento na área e, perto do gol, chute direto.
         /// </summary>
         public bool setPiece;
+        /// <summary>Lateral cobrado com as mãos (futebol de campo): o cobrador segura a bola acima da cabeça.</summary>
+        public bool throwIn;
+        public int throwInTaker = -1;
+        public Vector2 throwInSpot;
+        float _throwT;
         public int setPieceTaker = -1, setPieceTeam = -1;
         public Vector2 setPieceSpot;
         /// <summary>A falta é perto o bastante para o chute direto.</summary>
@@ -426,6 +431,16 @@ namespace Craquez.Sim
             }
             restartScene = cut;
             setPiece = kind == "freekick" || kind == "offside";
+            // campo: lateral com as mãos (nos outros modos, cobrado com os pés como um passe)
+            throwIn = kind == "throwin" && mode.id == GameModes.Field;
+            if (throwIn)
+            {
+                throwInTaker = taker.id;
+                throwInSpot = spot;
+                _throwT = 0f;
+                taker.facing = inward;
+                taker.position = spot;
+            }
             if (setPiece)
             {
                 setPieceTaker = taker.id;
@@ -526,6 +541,14 @@ namespace Craquez.Sim
             }
             if (kickoffPass && (ball.owner != kickoffKicker || ball.pos.magnitude > 2f)) kickoffPass = false;
             if (setPiece && (ball.owner != setPieceTaker || ball.pos.Dist(setPieceSpot) > 1.5f)) setPiece = false;
+            if (throwIn && ball.owner != throwInTaker) throwIn = false;
+            if (throwIn)
+            {
+                protectTeam = players[throwInTaker].team;
+                protectT = Mathf.Max(protectT, 0.3f);
+                _throwT += DT;
+                if (_throwT > 10f) Pass(players[throwInTaker], players[throwInTaker].facing, 0.4f, false, false);
+            }
             if (setPiece)
             {
                 // ninguém toma a bola parada; demorou demais, o juiz manda cobrar (passe curto)
@@ -579,7 +602,7 @@ namespace Craquez.Sim
             else if (c.aim == Vector2.zero) c.aim = p.facing;
             if (p.windup > 0f) p.windupAim = c.aim;
             var rs = f.rstick;
-            if (rs.magnitude > 0.7f && c.prevRs.magnitude < 0.45f && ball.owner == p.id && penaltyTeam < 0 && !(kickoffPass && p.id == kickoffKicker) && !(setPiece && p.id == setPieceTaker))
+            if (rs.magnitude > 0.7f && c.prevRs.magnitude < 0.45f && ball.owner == p.id && penaltyTeam < 0 && !(kickoffPass && p.id == kickoffKicker) && !(setPiece && p.id == setPieceTaker) && !(throwIn && p.id == throwInTaker))
                 StartSkill(p, rs.normalized);
             c.prevRs = rs;
             if (penaltyTeam >= 0)
@@ -587,6 +610,16 @@ namespace Craquez.Sim
                 p.intent = Vector2.zero;
                 p.wantSprint = false;
                 if (t != penaltyTeam) return;
+            }
+            if (throwIn && ball.owner == p.id && p.id == throwInTaker)
+            {
+                // lateral: pés atrás da linha, bola nas mãos; o analógico mira; chute vira arremesso longo
+                p.intent = Vector2.zero;
+                p.wantSprint = false;
+                p.vel = Vector2.zero;
+                if (f.move.magnitude > 0.25f) p.facing = V2.RotateToward(p.facing, f.move.normalized, 4f * DT).Norm();
+                if ((pressed & InputFrame.Shoot) != 0) pressed = (pressed & ~InputFrame.Shoot) | InputFrame.Lob;
+                if ((released & InputFrame.Shoot) != 0) released = (released & ~InputFrame.Shoot) | InputFrame.Lob;
             }
             if (setPiece && ball.owner == p.id && p.id == setPieceTaker)
             {
@@ -726,6 +759,7 @@ namespace Craquez.Sim
         void DoKick(SimPlayer p, int kind, float power, Vector2 aim, bool finesse = false)
         {
             if (ball.owner != p.id) return;
+            if (throwIn && p.id == throwInTaker) { Throw(p, aim, power, kind == InputFrame.Lob || kind == InputFrame.Shoot, kind == InputFrame.Through); return; }
             if (kind == InputFrame.Pass) Pass(p, aim, power, false, false);
             else if (kind == InputFrame.Through) Pass(p, aim, power, true, false);
             else if (kind == InputFrame.Lob)
@@ -800,6 +834,7 @@ namespace Craquez.Sim
         {
             kickoffPass = false;
             setPiece = false;
+            throwIn = false;
             ball.owner = -1;
             ball.lastTouchTeam = p.team;
             ball.lastTouchId = p.id;
@@ -872,6 +907,7 @@ namespace Craquez.Sim
 
         void Pass(SimPlayer p, Vector2 aim, float power, bool through, bool lofted)
         {
+            if (throwIn && p.id == throwInTaker && ball.owner == p.id) { Throw(p, aim, power, lofted, through); return; }
             p.kickKind = lofted ? InputFrame.Lob : through ? InputFrame.Through : InputFrame.Pass;
             if (aim.sqrMagnitude < 0.01f) aim = p.facing;
             aim = aim.Norm();
@@ -962,8 +998,59 @@ namespace Craquez.Sim
             Emit("kick", p.team, p.id, lofted ? "lob" : through ? "through" : "pass", power: power);
         }
 
+        /// <summary>
+        /// Arremesso lateral com as duas mãos: a bola sai de cima da cabeça (~2 m) em parábola,
+        /// curta para o pé do companheiro ou longa (até ~28 m) na área; mais lenta que um passe.
+        /// </summary>
+        void Throw(SimPlayer p, Vector2 aim, float power, bool longThrow, bool through)
+        {
+            p.kickKind = InputFrame.Lob;
+            if (aim.sqrMagnitude < 0.01f) aim = p.facing;
+            aim = aim.Norm();
+            // procura o companheiro no cone da mira, até o alcance do arremesso
+            float maxD = longThrow ? 28f : 18f;
+            SimPlayer best = null;
+            float bestS = float.MinValue;
+            foreach (var m in players)
+            {
+                if (m.team != p.team || m == p || m.isKeeper) continue;
+                var to = m.position - ball.pos;
+                float d = to.magnitude;
+                if (d < 2f || d > maxD) continue;
+                float cosang = Vector2.Dot(aim, to / d);
+                if (cosang < 0.5f) continue;
+                float sc = cosang * 2f - d / maxD * (longThrow ? 0f : 0.8f) + (longThrow ? d / maxD : 0f);
+                foreach (var o in players) if (o.team != p.team && o.position.Dist(m.position) < 1.6f) sc -= 0.5f;
+                if (sc > bestS) { bestS = sc; best = m; }
+            }
+            Vector2 target = best != null ? best.position + best.vel * 0.7f + (through ? aim * 4f : Vector2.zero) : ball.pos + aim * Mathf.Lerp(8f, maxD, power);
+            target.x = Mathf.Clamp(target.x, -halfLen + 0.5f, halfLen - 0.5f);
+            target.y = Mathf.Clamp(target.y, -halfW + 0.5f, halfW - 0.5f);
+            var toT = target - ball.pos;
+            float dist = Mathf.Clamp(toT.magnitude, 1.5f, maxD);
+            var dirv = (toT.magnitude > 0.01f ? toT.normalized : aim).Rotated(rng.Gauss() * 0.04f * (1.2f - p.passing));
+            // parábola saindo a 2 m: curto chega na altura do peito/pé, longo cai na área
+            float h0 = 2.05f, hEnd = longThrow ? 0.3f : 0.15f;
+            float flight = (longThrow ? 0.95f : 0.6f) + dist / (longThrow ? 26f : 22f);
+            ball.z = h0;
+            ball.vel = dirv * (dist * 1.02f / flight);
+            ball.vz = (hEnd - h0 + 0.5f * SimBall.G * flight * flight) / flight;
+            ball.spin = 0f;
+            ball.slideT = 0f;
+            if (best != null) { passReceiver = best.id; passReceiverT = 3f; }
+            passTick = tick;
+            passFrom = ball.pos;
+            noOffsideKick = true;
+            p.facing = dirv;
+            ReleaseBall(p);
+            protectTeam = p.team;
+            protectT = 0.25f;
+            Emit("kick", p.team, p.id, "throw", power: power);
+        }
+
         void Shoot(SimPlayer p, Vector2 aim, float power, bool finesse = false)
         {
+            if (throwIn && p.id == throwInTaker && ball.owner == p.id) { Throw(p, aim, power, true, false); return; }
             p.kickKind = InputFrame.Shoot;
             float dir = TeamDir(p.team);
             float gx = halfLen * dir;
@@ -2044,7 +2131,15 @@ namespace Craquez.Sim
                             {
                                 float sa = a.defense + a.vel.magnitude * 0.05f + rng.Range(0f, 0.3f), sb = b.defense + b.vel.magnitude * 0.05f + rng.Range(0f, 0.3f);
                                 var weak = sa < sb ? a : b;
-                                a.vel *= 0.75f; b.vel *= 0.75f;
+                                // choque de corpo: impulso só na direção do contato (inelástico, e = 0,2);
+                                // quem é mais forte/rápido "pesa" mais e perde menos velocidade; o resto
+                                // da velocidade (de lado) continua — um passa raspando pelo outro
+                                var nAB = d / l;
+                                float ma = 1f + a.defense * 0.35f + a.vel.magnitude * 0.03f, mb = 1f + b.defense * 0.35f + b.vel.magnitude * 0.03f;
+                                float imp = closing * 1.2f / (1f / ma + 1f / mb);
+                                a.vel -= nAB * (imp / ma);
+                                b.vel += nAB * (imp / mb);
+                                a.vel *= 0.92f; b.vel *= 0.92f;
                                 weak.offBalance = Mathf.Max(weak.offBalance, 0.3f);
                                 // quem conduz pode perder a bola no choque
                                 if (ball.owner == weak.id && closing > 4f && rng.Chance(0.45f * (1.2f - weak.control)) && !weak.isKeeper)
@@ -2091,6 +2186,16 @@ namespace Craquez.Sim
                 SkillBall(o);
                 return;
             }
+            if (throwIn && o.id == throwInTaker)
+            {
+                // bola nas mãos, acima da cabeça, com os pés na linha lateral
+                o.position = throwInSpot;
+                o.vel = Vector2.zero;
+                ball.pos = throwInSpot - o.facing * 0.06f;
+                ball.vel = Vector2.zero;
+                ball.z = 2.05f; ball.vz = 0f; ball.spin = 0f;
+                return;
+            }
             if (setPiece && o.id == setPieceTaker)
             {
                 // bola parada no lugar da falta; o cobrador gira em volta dela para mirar
@@ -2109,7 +2214,13 @@ namespace Craquez.Sim
                 var perp = new Vector2(-fwd.y, fwd.x);
                 var rel = ball.pos - o.position;
                 float along = Vector2.Dot(rel, fwd), side = Vector2.Dot(rel, perp);
-                if (along < 0.26f + spd * 0.012f)
+                // a bola corre um pouco para o lado do pé que conduz (não "entre as pernas")
+                float foot = (o.id % 4 == 0 ? 1f : -1f) * 0.09f * Mathf.Clamp01(spd / 3f);
+                float sideErr = Mathf.Clamp(side - foot, -0.3f, 0.3f);
+                // mudança brusca de direção com a bola perto: toque de corte na hora (responde ao comando)
+                float turn = ball.vel.sqrMagnitude > 1f ? Vector2.Angle(ball.vel, fwd) : 0f;
+                bool cut = turn > 50f && rel.magnitude < 1.1f && o.touchT <= 0f;
+                if (along < 0.26f + spd * 0.012f || cut)
                 {
                     // toque: a bola sai um pouco à frente (mais no pique e para quem tem menos controle;
                     // andando/trotando fica colada no pé)
@@ -2119,16 +2230,19 @@ namespace Craquez.Sim
                     var near = NearestOpponent(o);
                     if (near != null && near.position.Dist(o.position) < 2.6f) lead *= Mathf.Lerp(0.75f, 0.5f, o.control);
                     else if (o.sprinting && o.flair > 0.6f) lead *= 1.1f;
+                    if (cut) lead *= 0.6f;   // corte: toque curto, a bola fica perto
                     float decel = mode.rollDecel + mode.groundDrag * spd * spd;
                     float extra = Mathf.Sqrt(2f * decel * lead);
-                    ball.vel = fwd * (spd + extra) - perp * side * 4f;
+                    ball.vel = fwd * (spd * (cut ? 0.85f : 1f) + extra) - perp * sideErr * 4f;
+                    // o atleta passou da bola (arrancada): ela é puxada para o pé em vez de atravessar o corpo
+                    if (along < 0.05f) ball.pos = Vector2.Lerp(ball.pos, o.position + fwd * 0.2f + perp * foot, 0.5f);
                     ball.z = 0f;
                     ball.vz = 0f;
                     ball.spin = 0f;
                     ball.slideT = 0f;
                     o.touchT = 0.18f;
                 }
-                else ball.vel -= perp * side * 5f * DT;   // entre os toques a bola rola solta (leve correção de rumo)
+                else ball.vel -= perp * sideErr * 5f * DT;   // entre os toques a bola rola solta (leve correção de rumo)
                 return;
             }
             float ahead = 0.3f + spd * 0.05f;   // parado/andando: bola no pé
@@ -2273,9 +2387,28 @@ namespace Craquez.Sim
                 if (rel > 8f && !rng.Chance(catchP))
                 {
                     // espalmada: a bola volta para o campo e abre para o lado (escanteio ou rebote longe do gol)
+                    // espalmada pela mão: a bola reflete na palma (normal = do corpo para a bola, puxada para
+                    // fora do gol) com pouca energia; alta perto do travessão, vai por cima (escanteio)
                     float sideY = Mathf.Abs(ball.pos.y) > 0.3f ? Mathf.Sign(ball.pos.y) : (rng.Chance(0.5f) ? 1f : -1f);
-                    ball.vel = new Vector2(-Mathf.Sign(ball.vel.x) * Mathf.Max(Mathf.Abs(ball.vel.x) * 0.3f, 4f), ball.vel.y * 0.3f + sideY * rng.Range(4f, 8f));
-                    ball.vz = Mathf.Abs(ball.vz) * 0.2f + 0.8f;
+                    var outDir = new Vector2(TeamDir(p.team), 0f);
+                    var hand = (ball.pos - p.position).Norm();
+                    if (hand == Vector2.zero) hand = new Vector2(0f, sideY);
+                    var n = (outDir * 0.6f + hand * 0.4f + new Vector2(0f, sideY * 0.25f)).Norm();
+                    var vin = ball.vel;
+                    float vn = Vector2.Dot(vin, n);
+                    var refl = vin - n * (vn * 2f);
+                    float e = rng.Range(0.28f, 0.45f) * (1.1f - p.defense * 0.3f);
+                    var vout = refl * e;
+                    if (Vector2.Dot(vout, outDir) < 3f) vout += outDir * (3f - Vector2.Dot(vout, outDir));
+                    if (ball.z > goalH * 0.75f)
+                    {
+                        // ponta dos dedos por cima do travessão
+                        vout = new Vector2(-outDir.x * rng.Range(1f, 2.5f), vin.y * 0.2f + sideY * rng.Range(0.5f, 2f));
+                        ball.vz = rng.Range(3.5f, 5f);
+                    }
+                    else ball.vz = Mathf.Abs(ball.vz) * 0.25f + rng.Range(0.5f, 2.2f);
+                    ball.vel = vout;
+                    ball.spin = rng.Gauss() * 1.5f;
                     ball.lastTouchTeam = p.team;
                     ball.lastTouchId = p.id;
                     p.kickCd = 0.35f;
@@ -2529,6 +2662,7 @@ namespace Craquez.Sim
         void BallPhysics()
         {
             if (ball.owner >= 0 && players[ball.owner].hold > 0f) return;
+            if (throwIn && ball.owner == throwInTaker) return;   // bola nas mãos do cobrador do lateral
             var prev = ball.pos;
             if (ball.Step(DT, mode) && ball.Speed > 4f) Emit("bounce");
             Posts();

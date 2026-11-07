@@ -57,6 +57,7 @@ namespace Craquez
             {
                 case "windup":
                 {
+                    if (view.sim.throwIn && view.sim.throwInTaker == p.id) break;   // lateral: sem gesto de chute
                     float rate = 1.25f;
                     string clip = e.kind == "shot" ? (p.windupPower > 0.6f ? "KickPower" : "Shot") : e.kind == "lob" ? "Kick" : "Pass";
                     float start = 1.1f - p.windupTotal * rate - 0.08f;
@@ -64,6 +65,7 @@ namespace Craquez
                     break;
                 }
                 case "kick":
+                    if (e.kind == "throw") { _throwT = 0.32f; break; }   // arremesso com as mãos
                     if (anim.CurrentAction == null || anim.ActionWeight < 0.3f)
                         anim.Play(e.kind == "shot" ? "Shot" : "Pass", 1.0f, 0.75f, 1.35f, 0.05f);
                     break;
@@ -510,6 +512,47 @@ namespace Craquez
             HeadAndNeck();
             Arms();
             KeeperHold();
+            ThrowArms();
+        }
+
+        float _throwT, _throwHoldW;
+
+        /// <summary>
+        /// Lateral com as mãos: segurando, os dois braços sobem com a bola acima e atrás da cabeça;
+        /// no arremesso, giram para a frente (o tronco acompanha).
+        /// </summary>
+        void ThrowArms()
+        {
+            var sim = view.sim;
+            bool holding = sim.throwIn && sim.throwInTaker == p.id && sim.ball.owner == p.id;
+            _throwHoldW = Mathf.MoveTowards(_throwHoldW, holding ? 1f : 0f, Time.deltaTime / 0.2f);
+            float swing = 0f;
+            if (_throwT > 0f) { _throwT -= Time.deltaTime; swing = 1f - Mathf.Clamp01(_throwT / 0.32f); }
+            float w = Mathf.Max(_throwHoldW, _throwT > 0f ? 1f - swing * swing : 0f);
+            if (w <= 0.001f) return;
+            var fwd = transform.forward;
+            var up = Vector3.up;
+            // segurando: braços para cima e um pouco para trás; arremessando: vão à frente
+            var target = Vector3.Slerp((up * 0.88f - fwd * 0.4f).normalized, (fwd * 0.85f + up * 0.35f).normalized, swing);
+            if (rig.spine != null && swing > 0f) _pose.Rotate(rig.spine, Quaternion.AngleAxis(Mathf.Sin(swing * Mathf.PI) * 18f * w, transform.right));
+            for (int side = -1; side <= 1; side += 2)
+            {
+                string sfx = side < 0 ? "_l" : "_r";
+                rig.bones.TryGetValue("upperarm" + sfx, out var ua);
+                rig.bones.TryGetValue("lowerarm" + sfx, out var la);
+                rig.bones.TryGetValue("hand" + sfx, out var hd);
+                if (ua == null || la == null) continue;
+                var cur = (la.position - ua.position).normalized;
+                var want = (target + transform.right * side * 0.18f).normalized;
+                _pose.Rotate(ua, Quaternion.Slerp(Quaternion.identity, Quaternion.FromToRotation(cur, want), w));
+                if (hd != null)
+                {
+                    // antebraço: dobra o cotovelo para as mãos se encontrarem na bola
+                    var curF = (hd.position - la.position).normalized;
+                    var wantF = (want - transform.right * side * 0.45f - fwd * 0.15f * (1f - swing)).normalized;
+                    _pose.Rotate(la, Quaternion.Slerp(Quaternion.identity, Quaternion.FromToRotation(curF, wantF), w));
+                }
+            }
         }
 
         // ---------------------------------------------------------------- tecido solto

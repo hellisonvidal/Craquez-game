@@ -58,6 +58,18 @@ namespace Craquez.Sim
                     f.buttons |= InputFrame.Pass;
                 return f;
             }
+            if (sim.throwIn && sim.ball.owner == p.id && p.id == sim.throwInTaker)
+            {
+                // lateral com as mãos: espera um instante e arremessa para a frente (longo perto da área)
+                if (_holdBtn != 0 || _cooldown > 0) return f;
+                if (Noise(sim, 50) > 0.03f) return f;
+                var g2 = new Vector2(sim.halfLen * dir, 0f);
+                bool nearBox = p.position.Dist(g2) < 30f;
+                f.move = new Vector2(dir * 0.7f, -Mathf.Sign(p.position.y) * 0.7f).Norm();
+                if (nearBox && Noise(sim, 51) < 0.5f) Press(ref f, InputFrame.Lob, 18);
+                else Press(ref f, InputFrame.Pass, 8);
+                return f;
+            }
             if (sim.setPiece && sim.ball.owner == p.id && p.id == sim.setPieceTaker)
             {
                 // falta: espera os companheiros se posicionarem e escolhe a cobrança
