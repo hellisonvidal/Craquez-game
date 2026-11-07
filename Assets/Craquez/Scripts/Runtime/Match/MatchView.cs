@@ -208,19 +208,91 @@ namespace Craquez
             _referee = av;
         }
 
-        /// <summary>Árbitro: acompanha o lance de longe (não interfere na simulação).</summary>
+        Vector2 _refTarget;
+        int _refThink;
+
+        /// <summary>
+        /// Árbitro (só visual, não interfere na simulação): sistema diagonal — fica na diagonal
+        /// do campo, a 12-18 m do lance, com o jogo entre ele e o assistente; sai das linhas de
+        /// passe, corre até a falta apontando a direção da cobrança e volta ao meio após o gol.
+        /// </summary>
         void RefereeStep()
         {
             if (_referee == null) return;
             var p = _referee.p;
-            var target = sim.ball.pos + new Vector2(-sim.TeamDir(0) * 8f, sim.ball.pos.y > 0 ? -10f : 10f);
-            target.y = Mathf.Clamp(target.y, -sim.halfW * 0.8f, sim.halfW * 0.8f);
-            var to = target - p.position;
-            var want = to.magnitude > 3f ? to.normalized * Mathf.Min(6.5f, to.magnitude) : Vector2.zero;
-            p.vel = Vector2.MoveTowards(p.vel, want, 8f * MatchSim.DT);
+            float hl = sim.halfLen, hw = sim.halfW;
+            var ball = sim.ball.pos + sim.ball.vel * 0.5f;
+            Vector2 target;
+            float urgency = 0f;
+            _referee.point = Vector3.zero;
+            if (sim.state == MatchState.Goal || sim.state == MatchState.Kickoff || sim.state == MatchState.Halftime)
+                target = new Vector2(-sim.TeamDir(sim.kickoffTeam) * 3f, -sim.mode.centerR - 2f);
+            else if (sim.state == MatchState.Foul && sim.foulVictim >= 0)
+            {
+                // corre até o lance e aponta para onde vai a falta
+                var v = sim.players[sim.foulVictim].position;
+                target = v + new Vector2(0f, v.y > 0 ? -4f : 4f);
+                urgency = 1f;
+                if (p.position.Dist(v) < 9f) _referee.point = AthleteView.W(new Vector2(sim.TeamDir(sim.foulTeam), 0f));
+            }
+            else if (sim.setPiece)
+            {
+                // na cobrança: perto da barreira, fora da linha do chute
+                var goal = new Vector2(hl * sim.TeamDir(sim.setPieceTeam), 0f);
+                var mid = Vector2.Lerp(sim.setPieceSpot, goal, 0.35f);
+                target = mid + new Vector2(0f, sim.setPieceSpot.y > 0 ? -7f : 7f);
+            }
+            else
+            {
+                // diagonal do canto (-hl,-hw) ao (hl,hw): projeção da bola na diagonal, puxada para o lado do lance
+                var diag = new Vector2(hl, hw).normalized;
+                float along = Vector2.Dot(ball, diag);
+                var onDiag = diag * along;
+                target = Vector2.Lerp(onDiag, ball, 0.35f);
+                var toBall = ball - target;
+                float d = toBall.magnitude;
+                float want = 14f + Mathf.Clamp01(sim.ball.Speed / 15f) * 4f;
+                if (d > 0.1f && d < want) target = ball - toBall / d * want;
+                else if (d > want + 6f) target = ball - toBall / d * (want + 6f);
+                urgency = Mathf.Clamp01((p.position.Dist(target) - 10f) / 15f);
+            }
+            // fora das linhas de passe e de cima dos jogadores
+            if (--_refThink <= 0)
+            {
+                _refThink = 20;
+                _refTarget = target;
+                foreach (var q in sim.players)
+                {
+                    var dq = _refTarget - q.position;
+                    if (dq.magnitude < 3f) _refTarget += dq.normalized * (3f - dq.magnitude);
+                }
+                if (sim.ball.owner >= 0)
+                {
+                    var own = sim.players[sim.ball.owner];
+                    foreach (var q in sim.players)
+                    {
+                        if (q.team != own.team || q == own) continue;
+                        var c = V2.ClosestOnSegment(_refTarget, own.position, q.position);
+                        if (c.Dist(_refTarget) < 1.6f) _refTarget += (_refTarget - c).Norm() * 2.2f;
+                    }
+                }
+            }
+            else _refTarget = Vector2.Lerp(_refTarget, target, 0.02f);
+            _refTarget.x = Mathf.Clamp(_refTarget.x, -hl + 2f, hl - 2f);
+            _refTarget.y = Mathf.Clamp(_refTarget.y, -hw + 1.5f, hw - 1.5f);
+            // corrida de atleta: acelera e freia aos poucos, trota no geral, pica quando o lance foge
+            var to = _refTarget - p.position;
+            float dist = to.magnitude;
+            float top = Mathf.Lerp(4.2f, 7.2f, urgency);
+            var wantV = dist > 0.6f ? to / dist * Mathf.Min(top, dist * 1.2f) : Vector2.zero;
+            float acc = wantV.magnitude < p.vel.magnitude ? 7f : 4.5f;
+            p.vel = Vector2.MoveTowards(p.vel, wantV, acc * MatchSim.DT);
             p.position += p.vel * MatchSim.DT;
+            // olha para a bola (corre de lado/de costas quando perto, como um juiz de verdade)
             var tb = sim.ball.pos - p.position;
-            if (tb.sqrMagnitude > 0.01f) p.facing = Vector2.Lerp(p.facing, tb.normalized, 0.08f).normalized;
+            var face = p.vel.magnitude > 5.5f ? p.vel.normalized : tb.normalized;
+            if (face.sqrMagnitude > 0.01f) p.facing = V2.RotateToward(p.facing, face, 6f * MatchSim.DT).Norm();
+            p.faceBall = true;
             _referee.OnTick();
         }
 

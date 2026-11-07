@@ -236,6 +236,23 @@ namespace Craquez
             }
         }
 
+        /// <summary>Árbitro: direção para onde aponta (zero = braços normais).</summary>
+        public Vector3 point;
+        float _pointW;
+
+        void PointArm()
+        {
+            _pointW = Mathf.MoveTowards(_pointW, point != Vector3.zero ? 1f : 0f, Time.deltaTime * 4f);
+            if (_pointW <= 0.001f) return;
+            rig.bones.TryGetValue("upperarm_r", out var up);
+            rig.bones.TryGetValue("lowerarm_r", out var lo);
+            rig.bones.TryGetValue("hand_r", out var hd);
+            if (up == null || lo == null || hd == null) return;
+            var dir = (point.normalized * 0.9f + Vector3.up * 0.35f).normalized;
+            _pose.Rotate(up, Quaternion.Slerp(Quaternion.identity, Quaternion.FromToRotation(lo.position - up.position, dir), _pointW));
+            _pose.Rotate(lo, Quaternion.Slerp(Quaternion.identity, Quaternion.FromToRotation(hd.position - lo.position, dir), _pointW));
+        }
+
         float _protest;
 
         /// <summary>Quem fez a falta reclama: braços abertos, palmas para cima.</summary>
@@ -478,6 +495,7 @@ namespace Craquez
                 BodyLayer();
                 FallLimbs();
                 Protest();
+                PointArm();
             }
             GroundFeet();
             if (p == null || rig == null || rig.head == null) return;
