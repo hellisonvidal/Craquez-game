@@ -137,22 +137,42 @@ namespace Craquez
         public static void WhistleEnd() => Play(_i?._whistleEnd, 0.65f);
         public static void Net() => Play(_i?._net, 0.6f);
         public static void Post() => Play(_i?._post, 0.7f);
-        public static void Cheer() => Play(_i?._cheer, 1f);
-        public static void Boo() => Play(_i?._boo, 0.7f, 0.95f + Random.value * 0.1f);
+        /// <summary>
+        /// Sem torcida (society e rua): nenhum som de multidão — ambiente, canto, batucada,
+        /// gol, aplauso, vaia e "uuh" ficam mudos; só bola, apito, rede e trave.
+        /// </summary>
+        public static bool NoCrowd
+        {
+            get => _noCrowd;
+            set
+            {
+                _noCrowd = value;
+                if (value && _i != null)
+                {
+                    _i._crowdTarget = _i._chantTarget = _i._drumTarget = 0f;
+                    _i._crowd.volume = _i._chant.volume = _i._drumSrc.volume = 0f;
+                    if (_i._crowd2 != null) _i._crowd2.volume = 0f;
+                }
+            }
+        }
+        static bool _noCrowd;
+
+        public static void Cheer() { if (!_noCrowd) Play(_i?._cheer, 1f); }
+        public static void Boo() { if (!_noCrowd) Play(_i?._boo, 0.7f, 0.95f + Random.value * 0.1f); }
         /// <summary>Batucada da torcida (0..1).</summary>
-        public static void Drums(float v) { if (_i != null) _i._drumTarget = v; }
-        public static void Ooh() => Play(_i?._ooh, 0.7f, 0.9f + Random.value * 0.2f);
+        public static void Drums(float v) { if (_i != null) _i._drumTarget = _noCrowd ? 0f : v; }
+        public static void Ooh() { if (!_noCrowd) Play(_i?._ooh, 0.7f, 0.9f + Random.value * 0.2f); }
         /// <summary>Aplauso/vibração curta da torcida (desarme, drible, boa defesa).</summary>
-        public static void Applause(float v = 0.4f) => Play(_i?._applause, Mathf.Clamp01(v * 1.3f), 0.97f + Random.value * 0.08f);
+        public static void Applause(float v = 0.4f) { if (!_noCrowd) Play(_i?._applause, Mathf.Clamp01(v * 1.3f), 0.97f + Random.value * 0.08f); }
         /// <summary>Grito curto da torcida (drible, lance bonito).</summary>
-        public static void Hurray(float v = 0.4f) { if (_i?._hurray != null) Play(_i._hurray, v, 0.95f + Random.value * 0.1f); else Applause(v); }
+        public static void Hurray(float v = 0.4f) { if (_noCrowd) return; if (_i?._hurray != null) Play(_i._hurray, v, 0.95f + Random.value * 0.1f); else Applause(v); }
 
         /// <summary>Volume da torcida (0 = silêncio, menu) e canto organizado.</summary>
         public static void Crowd(float level, float chant)
         {
             if (_i == null) return;
-            _i._crowdTarget = level;
-            _i._chantTarget = chant;
+            _i._crowdTarget = _noCrowd ? 0f : level;
+            _i._chantTarget = _noCrowd ? 0f : chant;
         }
 
         // ------------------------------------------------------------- síntese
