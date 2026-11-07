@@ -191,7 +191,6 @@ namespace Craquez
                 if (_count > 0) Apply(At(_replayStart), false);
                 _view.SnapAll();
                 Time.timeScale = ReplaySpeed;
-                _hud.Toast("REPLAY", ReplayEnd - LiveEnd - 0.5f);
                 _view.bcam.cinematic = false;
                 _view.bcam.SnapToBall();
             }

@@ -21,6 +21,7 @@ namespace Craquez
         public float baseSun = 1.2f;
         public Color baseFog, baseAmbient;
         ParticleSystem _rain, _snow, _splash;
+        readonly Color[] _pitchBase = new Color[2];
         Camera _cam;
 
         static Texture2D _streak;
@@ -100,9 +101,10 @@ namespace Craquez
 
         ParticleSystem Particles(Camera cam, bool rain)
         {
+            // o emissor NÃO é filho da câmera: fica em cima do jogo, sempre na horizontal
+            // (filho da câmera, girava junto e as gotas saíam de lado, "rodando" em volta do campo)
             var go = new GameObject(rain ? "Chuva" : "Neve");
-            go.transform.SetParent(cam.transform, false);
-            go.transform.localPosition = new Vector3(0, 10f, 18f);
+            go.transform.SetParent(transform, false);
             var ps = go.AddComponent<ParticleSystem>();
             ps.Stop(true, ParticleSystemStopBehavior.StopEmittingAndClear);
             var main = ps.main;
@@ -118,8 +120,10 @@ namespace Craquez
             em.rateOverTime = rain ? 1800 : 260;
             var sh = ps.shape;
             sh.shapeType = ParticleSystemShapeType.Box;
-            sh.scale = new Vector3(60f, 1f, 50f);
-            sh.rotation = new Vector3(90, 0, 0);
+            // caixa local 60 x 50 (x, y) e fina em z; com o emissor girado 90° em x, y vira a
+            // profundidade do campo e z (direção de saída) aponta para baixo
+            sh.scale = new Vector3(60f, 50f, 1f);
+            sh.rotation = Vector3.zero;
             var r = go.GetComponent<ParticleSystemRenderer>();
             r.renderMode = rain ? ParticleSystemRenderMode.Stretch : ParticleSystemRenderMode.Billboard;
             r.lengthScale = 1f;
@@ -133,7 +137,7 @@ namespace Craquez
                 noise.strength = 0.6f;
                 noise.frequency = 0.3f;
             }
-            go.transform.rotation = Quaternion.identity;
+            go.transform.rotation = Quaternion.Euler(90f, 0f, 0f);   // caixa deitada, gotas para baixo
             return ps;
         }
 
@@ -179,6 +183,15 @@ namespace Craquez
             SetEmit(_rain, _rainK > 0.08f, 1800 * _rainK);
             SetEmit(_snow, _snowK > 0.08f, 300 * _snowK);
             SetEmit(_splash, _rainK > 0.1f, 900 * _rainK);
+            if (_cam != null)
+            {
+                // nuvem de chuva/neve acima da região que a câmera vê
+                var fw = _cam.transform.forward; fw.y = 0f;
+                fw = fw.sqrMagnitude > 0.01f ? fw.normalized : Vector3.forward;
+                var over = _cam.transform.position + fw * 16f;
+                foreach (var ps in new[] { _rain, _snow })
+                    if (ps != null) ps.transform.position = new Vector3(over.x, Mathf.Max(12f, _cam.transform.position.y + 8f), over.z);
+            }
             if (_splash != null && _cam != null)
             {
                 // respingos no chão à frente da câmera (onde o jogo está)
@@ -192,11 +205,19 @@ namespace Craquez
             RenderSettings.fog = _rainK + _snowK > 0.05f || RenderSettings.fog;
             RenderSettings.fogDensity = Mathf.Lerp(RenderSettings.fogDensity, 0.0015f + 0.005f * _rainK + 0.004f * _storm + 0.01f * _snowK, k);
             RenderSettings.fogColor = Color.Lerp(baseFog, new Color(0.45f, 0.48f, 0.53f), Mathf.Max(_rainK, _snowK) * 0.7f);
-            foreach (var pm in new[] { pitch, pitch2 })
+            // gramado molhado: mais escuro e saturado (sem brilho especular — no gramado plano ele
+            // virava uma mancha de luz dura que andava em volta do campo com a câmera)
+            for (int i = 0; i < 2; i++)
             {
+                var pm = i == 0 ? pitch : pitch2;
                 if (pm == null) continue;
-                pm.SetFloat("_Smoothness", 0.12f + 0.5f * _rainK);
-                if (_snowK > 0.01f) pm.SetColor("_BaseColor", Color.Lerp(Color.white, new Color(1.6f, 1.6f, 1.7f), _snowK * 0.7f));
+                if (_pitchBase[i].a <= 0f) _pitchBase[i] = pm.HasProperty("_BaseColor") ? pm.GetColor("_BaseColor") : Color.white;
+                var bc = _pitchBase[i];
+                var wet = new Color(bc.r * 0.8f, bc.g * 0.86f, bc.b * 0.8f, bc.a);
+                var c = Color.Lerp(bc, wet, _rainK);
+                if (_snowK > 0.01f) c = Color.Lerp(c, new Color(1.6f, 1.6f, 1.7f), _snowK * 0.7f);
+                pm.SetColor("_BaseColor", c);
+                pm.SetFloat("_Smoothness", 0.15f);
             }
             if (_storm > 0.5f && dt > 0f)
             {

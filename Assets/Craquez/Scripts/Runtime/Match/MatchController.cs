@@ -55,7 +55,6 @@ namespace Craquez
             view.Build(sim, c, cam);
             view.weather.onChange = msg =>
             {
-                hud?.Toast(msg, 2.6f);
                 hud?.SetWeather(view.venue.name + "  •  " + view.weather.Label);
                 sim.SetRollScale(RollFor(cfg.mode, view.weather.kind));
             };
@@ -222,7 +221,6 @@ namespace Craquez
             if (_touch) _touch.gameObject.SetActive(true);
             _phase = Phase.Playing;
             Sfx.Whistle();
-            hud.Toast(Teams.Get(cfg.teamA).shortName + "  x  " + Teams.Get(cfg.teamB).shortName, 2f);
         }
 
         // ------------------------------------------------------------- loop
@@ -322,25 +320,7 @@ namespace Craquez
                         for (int t = 0; t < 2; t++) if (_cpu[t] == null) InputRouter.Rumble(_dev[t], 0.8f, 0.9f, 0.6f, this);
                         break;
                     }
-                    case "whistle":
-                        switch (e.kind)
-                        {
-                            case "corner": hud.Toast("Escanteio"); break;
-                            case "throwin": hud.Toast("Lateral", 1.4f); break;
-                            case "goalkick": hud.Toast("Tiro de meta", 1.4f); break;
-                            case "freekick": hud.Toast("Falta"); break;
-                            case "penalty": hud.Toast("PÊNALTI!", 3f); break;
-                            case "offside": hud.Toast("Impedimento"); break;
-                            case "halftime": hud.Toast("Fim do 1º tempo", 3f); break;
-                            case "fulltime": hud.Toast("Fim de jogo", 3f); break;
-                        }
-                        break;
-                    case "post":
-                        hud.Toast(e.kind == "bar" ? "No travessão!" : "Na trave!", 1.6f);
-                        break;
-                    case "save":
-                        if (e.ok) hud.Toast("Defesa do goleiro", 1.4f);
-                        break;
+                    // (sem avisos de texto durante o jogo: apito, juiz, torcida e câmera contam o lance)
                     case "tackle":
                         if (e.ok && _cpu[e.team] == null) InputRouter.Rumble(_dev[e.team], 0.4f, 0.2f, 0.15f, this);
                         break;

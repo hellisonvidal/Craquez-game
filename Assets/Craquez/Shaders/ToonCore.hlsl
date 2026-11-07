@@ -66,8 +66,9 @@ half3 ToonLight(Light l, half3 n, half3 v, half3 albedo, half smooth, half shado
     half ndh = saturate(dot(n, h));
     half t0 = 0.987 - smooth * 0.03;
     half aa = max(fwidth(ndh) * 1.5, 0.004);
-    half spec = smoothstep(t0 - aa, t0 + aa, ndh) * smooth * lit * saturate((smooth - 0.35) / 0.3);
-    c += spec * 0.45 * l.color;
+    // só materiais bem lisos (bola, couro, vidro); metais e pisos foscos não "acendem pontos"
+    half spec = smoothstep(t0 - aa, t0 + aa, ndh) * smooth * lit * saturate((smooth - 0.6) / 0.25);
+    c += min(spec * 0.35, 0.35) * min(l.color, 1.5);
     return c;
 }
 
@@ -80,7 +81,8 @@ half4 ToonFrag(ToonVaryings i, FRONT_FACE_TYPE face : FRONT_FACE_SEMANTIC) : SV_
 #if defined(_ALPHATEST_ON)
     clip(albedo.a - _Cutoff);
 #endif
-    half3 n = normalize(i.normalWS) * IS_FRONT_VFACE(face, 1.0, -1.0);
+    // SafeNormalize: normal nula (malha degenerada) não vira NaN — o NaN o bloom espalhava em ponto de luz
+    half3 n = SafeNormalize(i.normalWS) * IS_FRONT_VFACE(face, 1.0, -1.0);
     half3 v = GetWorldSpaceNormalizeViewDir(i.positionWS);
 
     float4 shadowCoord = TransformWorldToShadowCoord(i.positionWS);
@@ -95,7 +97,7 @@ half4 ToonFrag(ToonVaryings i, FRONT_FACE_TYPE face : FRONT_FACE_SEMANTIC) : SV_
     LIGHT_LOOP_BEGIN(lightCount)
         Light l = GetAdditionalLight(lightIndex, i.positionWS, half4(1, 1, 1, 1));
         half att = l.distanceAttenuation * l.shadowAttenuation;
-        col += albedo.rgb * l.color * ToonStep(dot(n, l.direction)) * saturate(att * 4.0) * 0.85;
+        col += albedo.rgb * min(l.color, 2.0) * ToonStep(dot(n, l.direction)) * saturate(att * 4.0) * 0.85;
     LIGHT_LOOP_END
 #endif
 
@@ -122,7 +124,7 @@ ToonVaryings OutlineVert(ToonAttributes v)
     UNITY_TRANSFER_INSTANCE_ID(v, o);
     UNITY_INITIALIZE_VERTEX_OUTPUT_STEREO(o);
     float3 posWS = TransformObjectToWorld(v.positionOS.xyz);
-    float3 nWS = normalize(TransformObjectToWorldNormal(v.normalOS));
+    float3 nWS = SafeNormalize(TransformObjectToWorldNormal(v.normalOS));
     float dist = length(GetCameraPositionWS() - posWS);
     float w = clamp(_ToonOutline.x * dist / 10.0, _ToonOutline.y, _ToonOutline.z);
     posWS += nWS * w;
