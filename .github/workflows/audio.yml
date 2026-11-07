@@ -2,11 +2,9 @@ name: Sons da torcida
 
 # Baixa as gravações reais de torcida (licenças livres, Wikimedia Commons), trata os
 # trechos e grava os .ogg em Assets/Craquez/Resources/Audio na própria branch.
+# Só manual (Actions -> Sons da torcida -> Run workflow): os .ogg já estão no repositório.
 on:
   workflow_dispatch:
-  push:
-    paths:
-      - tools/audio/fetch_crowd.py
 
 permissions:
   contents: write
