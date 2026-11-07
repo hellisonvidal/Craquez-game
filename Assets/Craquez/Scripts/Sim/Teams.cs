@@ -398,6 +398,15 @@ namespace Craquez.Sim
                 object doc;
                 try { doc = MiniJson.Parse(File.ReadAllText(path)); }
                 catch (System.Exception e) { Debug.LogWarning("option_file.json inválido: " + e.Message); return; }
+                ApplyOptionDocument(doc, dir);
+                return;
+            }
+        }
+
+        /// <summary>Aplica um option file já lido (times, uniformes, estádios, elencos, escudos).</summary>
+        public static void ApplyOptionDocument(object doc, string dir)
+        {
+            {
                 OptionDoc = doc;
                 var teams = MiniJson.D(doc, "teams");
                 if (teams == null) return;

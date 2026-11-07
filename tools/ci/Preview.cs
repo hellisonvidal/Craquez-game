@@ -40,6 +40,18 @@ public static class P {
   }
   public static void Main(string[] a) {
     string dir = a[0]; Directory.CreateDirectory(dir);
+    if (a.Length > 3 && a[1] == "importar") {
+      // importa um option file pelo código do jogo e mostra o que mudou
+      Craquez.Sim.Teams.SourceOverride = File.ReadAllText(a[2]);
+      var before = new System.Collections.Generic.List<string>();
+      int n0 = 0; for (int i = 0; Craquez.Sim.Teams.Get(i) != null && i < 2000; i++) { before.Add(Craquez.Sim.Teams.Get(i).name); n0++; }
+      var doc = Craquez.Sim.MiniJson.Parse(File.ReadAllText(a[3]));
+      Craquez.Sim.Teams.ApplyOptionDocument(doc, Path.GetDirectoryName(a[3]));
+      int diff = 0; for (int i = 0; i < n0; i++) if (Craquez.Sim.Teams.Get(i).name != before[i]) diff++;
+      Console.WriteLine("times aplicados: " + Craquez.Sim.Teams.OverrideCount + "  nomes trocados: " + diff + " de " + n0);
+      foreach (int i in new[] { 0, 40, 60, 100, 200, 300 }) Console.WriteLine("  " + before[i] + "  ->  " + Craquez.Sim.Teams.Get(i).name + "  (" + Craquez.Sim.Teams.Get(i).stadium.name + ")");
+      return;
+    }
     if (a.Length > 2 && a[1] == "optionfile") {
       Craquez.Sim.Teams.SourceOverride = File.ReadAllText(a[2]);
       File.WriteAllText(Path.Combine(dir, "option_file.json"), Craquez.OptionFile.Json());
