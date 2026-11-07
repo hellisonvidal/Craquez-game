@@ -98,6 +98,26 @@ namespace Craquez.EditorTools
 
         void OnPreprocessTexture()
         {
+            if (assetPath.StartsWith("Assets/Craquez/Resources/Flags/"))
+            {
+                // bandeiras: legíveis (o jogo desenha a ondulação e a bandeira do clube por cima)
+                var fi = (TextureImporter)assetImporter;
+                fi.isReadable = true;
+                fi.mipmapEnabled = false;
+                fi.textureCompression = TextureImporterCompression.Uncompressed;
+                fi.npotScale = TextureImporterNPOTScale.None;
+                return;
+            }
+            if (assetPath.StartsWith("Assets/Craquez/Resources/UI/"))
+            {
+                // capa e logo: resolução cheia (a capa panorâmica tem 2400 px), sem mipmaps
+                var ui = (TextureImporter)assetImporter;
+                ui.maxTextureSize = 4096;
+                ui.mipmapEnabled = false;
+                ui.npotScale = TextureImporterNPOTScale.None;
+                ui.textureCompression = TextureImporterCompression.CompressedHQ;
+                return;
+            }
             if (!assetPath.StartsWith(AthleteDir + "Textures/")) return;
             var ti = (TextureImporter)assetImporter;
             string n = Path.GetFileNameWithoutExtension(assetPath);

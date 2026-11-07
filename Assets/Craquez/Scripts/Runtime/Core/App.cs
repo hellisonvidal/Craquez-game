@@ -792,7 +792,11 @@ namespace Craquez
                 crest.rectTransform.At(0, 1, 170, 170, 30, -70);
                 crest.preserveAspect = true;
                 var lgIcon = UiKit.Image(col, Color.white, null, "liga");
-                lgIcon.rectTransform.At(0, 1, 56, 56, 210, -14);
+                lgIcon.rectTransform.At(0, 1, 64, 48, 210, -16);
+                lgIcon.preserveAspect = true;
+                // bandeira do clube (cores do uniforme + escudo), ao lado das cores do uniforme
+                var clubFlag = UiKit.Rect(col, "bandeira do clube").At(0, 1, 72, 48, 262, -251).gameObject.AddComponent<RawImage>();
+                clubFlag.raycastTarget = false;
                 var name = UiKit.Label(col, "", 46, Theme.HeadItalic, Theme.Text);
                 name.rectTransform.Place(0, 1, 1, 1, 220, -150, 250, 70);
                 var info = UiKit.Label(col, "", 22, Theme.Body, Theme.TextDim);
@@ -814,6 +818,7 @@ namespace Craquez
                     var t = Teams.Get(Team());
                     crest.sprite = Crest.Team(Team());
                     lgIcon.sprite = Crest.League(Teams.Leagues[Teams.LeagueOf(Team())]);
+                    clubFlag.texture = Crest.ClubFlag(Team(), 144, 96);
                     name.text = t.name;
                     int ovr = 0;
                     foreach (var r in t.roster) ovr += r.ovr;

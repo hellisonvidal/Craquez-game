@@ -19,11 +19,15 @@ namespace Craquez
         float _ringLen;
         bool _night;
 
-        public static CrowdFx Create(Transform parent, MatchSim sim, Venue venue, Kit home, Kit away, bool night, int quality)
+        int _homeTeam = -1, _awayTeam = -1;
+
+        public static CrowdFx Create(Transform parent, MatchSim sim, Venue venue, Kit home, Kit away, bool night, int quality, int homeTeam = -1, int awayTeam = -1)
         {
             var go = new GameObject("Torcida (efeitos)");
             go.transform.SetParent(parent, false);
             var fx = go.AddComponent<CrowdFx>();
+            fx._homeTeam = homeTeam;
+            fx._awayTeam = awayTeam;
             fx.Build(sim, venue, home, away, night, quality);
             return fx;
         }
@@ -67,8 +71,13 @@ namespace Craquez
             {
                 float u = (i + 0.5f) / flags;
                 var pos = RingAt(0.5f + u * (2f * dx / (_ringLen)));   // só na arquibancada oposta à câmera (não tapam o jogo)
-                var k = i % 3 == 2 ? away : home;
-                var tex = FlagTex(k, i);
+                bool isAway = i % 3 == 2;
+                var k = isAway ? away : home;
+                // bandeiras do clube (escudo nas cores do time) intercaladas com as de faixas
+                int team = isAway ? _awayTeam : _homeTeam;
+                Texture2D tex = null;
+                if (team >= 0 && (i % 2 == 0 || isAway)) tex = Craquez.UI.Crest.ClubFlag(team, 128, 80);
+                if (tex == null) tex = FlagTex(k, i);
                 var go = new GameObject("Bandeira");
                 go.transform.SetParent(transform, false);
                 go.transform.position = pos + Vector3.up * (field ? 3.5f : 2f);

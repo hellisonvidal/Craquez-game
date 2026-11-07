@@ -81,7 +81,7 @@ namespace Craquez
 
         public static Texture2D Paint(Mesh mesh, KitPart part, Kit kit, Axes ax, int size)
         {
-            string key = mesh.GetInstanceID() + ":" + part + Teams.Hex(kit.c1) + Teams.Hex(kit.c2) + Teams.Hex(kit.shorts) + Teams.Hex(kit.socks) + kit.pattern + ":" + size;
+            string key = mesh.GetInstanceID() + ":" + part + Teams.Hex(kit.c1) + Teams.Hex(kit.c2) + Teams.Hex(kit.shorts) + Teams.Hex(kit.socks) + kit.pattern + (kit.sleeves.a > 0f ? Teams.Hex(kit.sleeves) : "") + (kit.trim.a > 0f ? Teams.Hex(kit.trim) : "") + ":" + size;
             if (_cache.TryGetValue(key, out var cached) && cached != null) return cached;
             var info = Get(mesh);
             var px = new Color32[size * size];
@@ -107,7 +107,9 @@ namespace Craquez
             if (part == KitPart.Shirt)
             {
                 c = ShirtColor(k, x, h);
-                if (trim > 0.5f) c = Contrast(k.c1, k.c2);
+                // mangas de outra cor (ex.: corpo vermelho e mangas brancas): fora do tronco, na altura dos ombros
+                if (k.sleeves.a > 0f && Mathf.Abs(x) > 0.2f && h < 0.36f) c = k.sleeves;
+                if (trim > 0.5f) c = k.trim.a > 0f ? k.trim : Contrast(k.c1, k.c2);
             }
             else if (part == KitPart.Shorts)
             {

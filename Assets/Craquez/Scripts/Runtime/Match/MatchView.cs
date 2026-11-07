@@ -47,7 +47,7 @@ namespace Craquez
             var gk = new[] { KeeperKit(kits[0], kits[1], 0), KeeperKit(kits[1], kits[0], 1) };
             var parent = new GameObject("Atletas").transform;
             parent.SetParent(transform, false);
-            if (s.mode.id != GameModes.Street) _crowd = CrowdFx.Create(transform, s, venue, kits[0], kits[1], _night, q);
+            if (s.mode.id != GameModes.Street) _crowd = CrowdFx.Create(transform, s, venue, kits[0], kits[1], _night, q, c.teamA, c.teamB);
             AthleteFactory.IndoorShoes = c.mode == GameModes.Futsal;
             foreach (var p in s.players)
             {

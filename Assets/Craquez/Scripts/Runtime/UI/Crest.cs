@@ -9,23 +9,143 @@ namespace Craquez.UI
     {
         static readonly Dictionary<string, Sprite> _cache = new Dictionary<string, Sprite>();
 
+        static readonly Dictionary<string, Texture2D> _flags = new Dictionary<string, Texture2D>();
+
+        /// <summary>Bandeira real do país (PNG em Resources/Flags, código ISO; "EN" = Inglaterra).</summary>
+        public static Texture2D CountryTex(string code)
+        {
+            if (string.IsNullOrEmpty(code)) return null;
+            if (_flags.TryGetValue(code, out var t)) return t;
+            t = Resources.Load<Texture2D>("Flags/" + code.ToUpperInvariant());
+            _flags[code] = t;
+            return t;
+        }
+
+        public static Sprite Country(string code)
+        {
+            string key = "c:" + code;
+            if (_cache.TryGetValue(key, out var s) && s != null) return s;
+            var src = CountryTex(code);
+            if (src == null) return null;
+            var tex = Waved(src, 160, 120);
+            s = Sprite.Create(tex, new Rect(0, 0, tex.width, tex.height), new Vector2(0.5f, 0.5f));
+            _cache[key] = s;
+            return s;
+        }
+
+        /// <summary>Bandeira com ondulação de tecido, sombreado e cantos arredondados.</summary>
+        static Texture2D Waved(Texture2D src, int W, int H)
+        {
+            var readable = Readable(src);
+            var tex = new Texture2D(W, H, TextureFormat.RGBA32, true) { wrapMode = TextureWrapMode.Clamp };
+            var px = new Color32[W * H];
+            for (int y = 0; y < H; y++)
+                for (int x = 0; x < W; x++)
+                {
+                    float u = (x + 0.5f) / W, v = (y + 0.5f) / H;
+                    float wave = Mathf.Sin(u * 7f + v * 2f) * 0.012f;
+                    var c = readable != null ? readable.GetPixelBilinear(u, Mathf.Clamp01(v + wave)) : Color.gray;
+                    float shade = 0.9f + 0.1f * Mathf.Cos(u * 7f + v * 2f);
+                    c = new Color(c.r * shade, c.g * shade, c.b * shade, 1f);
+                    float dx = Mathf.Max(0, Mathf.Abs(u - 0.5f) * W - (W * 0.5f - 10)), dy = Mathf.Max(0, Mathf.Abs(v - 0.5f) * H - (H * 0.5f - 10));
+                    float a = Mathf.Clamp01(10.5f - Mathf.Sqrt(dx * dx + dy * dy));
+                    if (a < 1f && a > 0.4f) c = Color.Lerp(new Color(0, 0, 0, 1), c, a);
+                    c.a = a;
+                    px[y * W + x] = c;
+                }
+            tex.SetPixels32(px);
+            tex.Apply(true);
+            return tex;
+        }
+
+        /// <summary>Cópia legível de uma textura (as importadas não permitem GetPixel).</summary>
+        static Texture2D Readable(Texture2D src)
+        {
+            if (src == null) return null;
+            if (src.isReadable) return src;
+            var rt = RenderTexture.GetTemporary(src.width, src.height, 0, RenderTextureFormat.ARGB32, RenderTextureReadWrite.sRGB);
+            Graphics.Blit(src, rt);
+            var prev = RenderTexture.active;
+            RenderTexture.active = rt;
+            var t = new Texture2D(src.width, src.height, TextureFormat.RGBA32, false);
+            t.ReadPixels(new Rect(0, 0, src.width, src.height), 0, 0);
+            t.Apply();
+            RenderTexture.active = prev;
+            RenderTexture.ReleaseTemporary(rt);
+            return t;
+        }
+
+        static readonly Dictionary<string, Texture2D> _clubFlags = new Dictionary<string, Texture2D>();
+
+        /// <summary>
+        /// Bandeira do clube (a que a torcida agita): as cores e o desenho do uniforme principal
+        /// com o escudo no centro. Seleções usam a bandeira do país.
+        /// </summary>
+        public static Texture2D ClubFlag(int index, int W = 192, int H = 128)
+        {
+            var t = Teams.Get(index);
+            if (t == null) return null;
+            if (t.IsNational && CountryTex(t.iso) != null) return Waved(CountryTex(t.iso), W, H);
+            string key = index + ":" + t.name + ":" + W;
+            if (_clubFlags.TryGetValue(key, out var cached) && cached != null) return cached;
+            var k = t.kits.Count > 0 ? t.kits[0] : new Kit { c1 = t.c1, c2 = t.c2 };
+            var crest = Readable(Team(index).texture);
+            var tex = new Texture2D(W, H, TextureFormat.RGBA32, true) { wrapMode = TextureWrapMode.Clamp };
+            var px = new Color32[W * H];
+            var c2 = Mathf.Abs(k.c1.grayscale - k.c2.grayscale) > 0.08f ? k.c2 : (k.c1.grayscale > 0.5f ? new Color(0.08f, 0.09f, 0.12f) : Color.white);
+            float cs = 0.62f;   // escudo: 62% da altura
+            for (int y = 0; y < H; y++)
+                for (int x = 0; x < W; x++)
+                {
+                    float u = (x + 0.5f) / W, v = (y + 0.5f) / H;
+                    Color c = k.c1;
+                    switch (k.pattern)
+                    {
+                        case 1: case 5: if (Mathf.Repeat(u * (k.pattern == 5 ? 9f : 5f), 1f) < 0.5f) c = c2; break;   // listras
+                        case 2: if (Mathf.Repeat(v * 4f, 1f) < 0.5f) c = c2; break;                                 // aros
+                        case 3: if (Mathf.Abs(u - v * (H / (float)W) - 0.2f) < 0.12f) c = c2; break;                 // faixa diagonal
+                        case 4: if (u > 0.5f) c = c2; break;                                                         // metades
+                        case 6: if (Mathf.Abs(v - 0.5f) < 0.14f) c = c2; break;                                      // faixa no peito
+                        case 8: if (((int)(u * 8f) + (int)(v * 5.33f)) % 2 == 0) c = c2; break;                     // xadrez
+                        default: if (v < 0.16f || v > 0.84f) c = c2; break;                                         // liso: barras
+                    }
+                    // escudo no centro
+                    float cu = (u - 0.5f) * W / (H * cs) + 0.5f, cv = (v - 0.5f) / cs + 0.5f;
+                    if (crest != null && cu >= 0f && cu <= 1f && cv >= 0f && cv <= 1f)
+                    {
+                        var e = crest.GetPixelBilinear(cu, cv);
+                        c = Color.Lerp(c, new Color(e.r, e.g, e.b, 1f), e.a);
+                    }
+                    float wave = Mathf.Cos(u * 7f + v * 2f);
+                    float shade = 0.88f + 0.12f * wave;
+                    px[y * W + x] = new Color(c.r * shade, c.g * shade, c.b * shade, 1f);
+                }
+            tex.SetPixels32(px);
+            tex.Apply(true);
+            _clubFlags[key] = tex;
+            return tex;
+        }
+
         public static Sprite Team(int index)
         {
             var user = Teams.Crest(index);
             var t = Teams.Get(index);
             string key = "t:" + index + ":" + t.name + (user != null ? ":u" : "");
             if (_cache.TryGetValue(key, out var s) && s != null) return s;
-            var tex = user != null ? user : t.flag.Count >= 2 ? Flag(t.flag, 160, 112) : Draw(t);
+            var real = t.IsNational && user == null ? CountryTex(t.iso) : null;
+            var tex = user != null ? user : real != null ? Waved(real, 160, 120) : t.flag.Count >= 2 ? Flag(t.flag, 160, 112) : Draw(t);
             s = Sprite.Create(tex, new Rect(0, 0, tex.width, tex.height), new Vector2(0.5f, 0.5f));
             _cache[key] = s;
             return s;
         }
 
+        /// <summary>Ícone da liga: a bandeira do país (ligas nacionais) ou o troféu desenhado.</summary>
         public static Sprite League(League lg)
         {
             string key = "l:" + lg.id;
             if (_cache.TryGetValue(key, out var s) && s != null) return s;
-            var tex = DrawLeague(lg);
+            var flag = !lg.IsNational ? CountryTex(lg.country) : null;
+            var tex = flag != null ? Waved(flag, 160, 120) : DrawLeague(lg);
             s = Sprite.Create(tex, new Rect(0, 0, tex.width, tex.height), new Vector2(0.5f, 0.5f));
             _cache[key] = s;
             return s;

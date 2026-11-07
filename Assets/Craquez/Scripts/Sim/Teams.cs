@@ -7,7 +7,9 @@ namespace Craquez.Sim
     public class Kit
     {
         public Color c1, c2, shorts, socks;
-        public int pattern;   // 0 liso, 1 listras, 2 aros, 3 faixa, 4 metades, 5 riscas, 6 faixa no peito
+        public int pattern;
+        /// <summary>Mangas e acabamento (gola/punhos) com cor própria; alfa 0 = automático.</summary>
+        public Color sleeves = Color.clear, trim = Color.clear;   // 0 liso, 1 listras, 2 aros, 3 faixa, 4 metades, 5 riscas, 6 faixa no peito
     }
 
     public class RosterEntry
@@ -37,6 +39,8 @@ namespace Craquez.Sim
         /// <summary>Seleções: posição no ranking e bandeira [layout, cores...].</summary>
         public int rank;
         public List<string> flag = new List<string>();
+        /// <summary>Seleções: código do país (bandeira em Resources/Flags).</summary>
+        public string iso = "";
         public bool IsNational => rank > 0;
         public string Key => leagueId + "/" + shortName;
     }
@@ -252,6 +256,8 @@ namespace Craquez.Sim
                         shorts = Col(MiniJson.S(k, "shorts", ""), kc2),
                         socks = Col(MiniJson.S(k, "socks", ""), kc1),
                         pattern = Mathf.Max(0, System.Array.IndexOf(PatternNames, MiniJson.S(k, "pattern", "liso"))),
+                        sleeves = Col(MiniJson.S(k, "sleeves", ""), Color.clear),
+                        trim = Col(MiniJson.S(k, "trim", ""), Color.clear),
                     });
                 }
             if (kits.Count == 0) kits = DefaultKits(c1, c2);
@@ -268,6 +274,7 @@ namespace Craquez.Sim
                 rating = MiniJson.F(to, "rating", 0.7f), rank = MiniJson.I(to, "rank"),
             };
             foreach (var fo in MiniJson.L(to, "flag") ?? new List<object>()) t.flag.Add(fo as string);
+            t.iso = MiniJson.S(to, "iso");
             t.kits = ParseKits(MiniJson.L(to, "kits"), t.c1, t.c2);
             var st = MiniJson.D(to, "stadium");
             if (st != null) t.stadium = new Stadium { name = MiniJson.S(st, "name"), tier = MiniJson.I(st, "tier", 1), cap = MiniJson.I(st, "cap") };
@@ -397,6 +404,8 @@ namespace Craquez.Sim
                         ["c1"] = Hex(k.c1), ["c2"] = Hex(k.c2),
                         ["shorts"] = Hex(k.shorts), ["socks"] = Hex(k.socks),
                         ["pattern"] = PatternNames[Mathf.Clamp(k.pattern, 0, PatternNames.Length - 1)],
+                        ["sleeves"] = k.sleeves.a > 0f ? Hex(k.sleeves) : "",
+                        ["trim"] = k.trim.a > 0f ? Hex(k.trim) : "",
                     });
                 var players = new List<object>();
                 for (int i = 0; i < t.roster.Count; i++)
