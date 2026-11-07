@@ -59,8 +59,180 @@ namespace Craquez
             Floodlights(v, hl, hw, tier, night);
             Dugouts(v, hl, hw);
             CornerFlags(v, hl, hw, homeKit.c1);
+            Pitchside(v, hl, hw, home, away, homeKit, night, quality);
+            Screens(v, hl, hw, tier, home, away);
+            if (quality >= 1) City(v, hl, hw, tier, night, seed);
             v.tunnel = new Vector3(0, 0, -(hw + 6f));
             return v;
+        }
+
+        /// <summary>Pessoa estilizada (tronco, cabeça, pernas) para a beira do campo: fotógrafos, câmeras, gandulas.</summary>
+        static void Figure(MeshKit body, MeshKit skin, Vector3 at, float yaw, bool kneel)
+        {
+            var rot = Quaternion.Euler(0, yaw, 0);
+            Vector3 P(float x, float y, float z) => at + rot * new Vector3(x, y, z);
+            float hip = kneel ? 0.5f : 0.95f;
+            void BoxR(Vector3 c, Vector3 size, MeshKit k)
+            {
+                var h = size * 0.5f;
+                Vector3 Q(float x, float y, float z) => c + rot * new Vector3(x * h.x, y * h.y, z * h.z);
+                // (faces listadas "para dentro": a ordem invertida deixa a normal para fora, como em MeshKit.Box)
+                void F(Vector3 a, Vector3 b, Vector3 cc, Vector3 d) => k.Quad(a, d, cc, b);
+                F(Q(-1, -1, -1), Q(1, -1, -1), Q(1, 1, -1), Q(-1, 1, -1));
+                F(Q(1, -1, 1), Q(-1, -1, 1), Q(-1, 1, 1), Q(1, 1, 1));
+                F(Q(-1, -1, 1), Q(-1, -1, -1), Q(-1, 1, -1), Q(-1, 1, 1));
+                F(Q(1, -1, -1), Q(1, -1, 1), Q(1, 1, 1), Q(1, 1, -1));
+                F(Q(-1, 1, -1), Q(1, 1, -1), Q(1, 1, 1), Q(-1, 1, 1));
+            }
+            BoxR(P(0, hip * 0.5f, 0), new Vector3(0.34f, hip, 0.22f), body);                        // pernas
+            BoxR(P(0, hip + 0.32f, 0), new Vector3(0.44f, 0.64f, 0.26f), body);                     // tronco (colete)
+            BoxR(P(0, hip + 0.78f, 0), new Vector3(0.2f, 0.24f, 0.22f), skin);                      // cabeça
+        }
+
+        /// <summary>
+        /// Beira do campo: fotógrafos agachados atrás das placas dos gols, cinegrafistas em
+        /// plataformas na lateral, gandulas nos cantos e câmeras de TV em tripés.
+        /// </summary>
+        static void Pitchside(Venue v, float hl, float hw, TeamData home, TeamData away, Kit homeKit, bool night, int quality)
+        {
+            var vest = new MeshKit();
+            var staff = new MeshKit();
+            var skin = new MeshKit();
+            var gear = new MeshKit();
+            var rnd = new System.Random(home.name.GetHashCode());
+            foreach (float s in new[] { -1f, 1f })
+            {
+                // fotógrafos: fileira atrás da linha de fundo, dos dois lados do gol
+                int n = quality >= 2 ? 9 : 6;
+                for (int i = 0; i < n; i++)
+                {
+                    float z = (i < n / 2 ? -1f : 1f) * (6f + (i % (n / 2 + 1)) * 2.1f + (float)rnd.NextDouble() * 0.6f);
+                    var at = new Vector3(s * (hl + 3.2f + (float)rnd.NextDouble() * 0.6f), 0f, z);
+                    float yaw = s > 0 ? -90f : 90f;
+                    Figure(vest, skin, at, yaw + (float)rnd.NextDouble() * 20f - 10f, true);
+                    // câmera com teleobjetiva
+                    var lens = at + Quaternion.Euler(0, yaw, 0) * new Vector3(0f, 1.25f, 0.3f);
+                    gear.Cylinder(lens, lens + Quaternion.Euler(0, yaw, 0) * Vector3.forward * 0.4f, 0.06f, 8);
+                }
+                // gandulas nos cantos
+                for (int j = -1; j <= 1; j += 2)
+                    Figure(staff, skin, new Vector3(s * (hl + 2.5f), 0f, j * (hw + 1.8f)), s > 0 ? -135f * j : 45f * j, false);
+            }
+            // cinegrafistas na lateral oposta à câmera principal e no lado da câmera, com tripé
+            for (int i = -1; i <= 1; i++)
+            {
+                var at = new Vector3(i * hl * 0.45f, 0.5f, hw + 3.4f);
+                gear.Box(at - Vector3.up * 0.25f, new Vector3(2.4f, 0.5f, 1.6f), 2f);                 // plataforma
+                Figure(staff, skin, at, 180f, false);
+                var cam = at + new Vector3(0.5f, 1.35f, -0.2f);
+                gear.Box(cam, new Vector3(0.28f, 0.3f, 0.6f));
+                for (int k = 0; k < 3; k++)
+                {
+                    float a = k * Mathf.PI * 2f / 3f;
+                    gear.Cylinder(cam - Vector3.up * 0.15f, at + new Vector3(0.5f + Mathf.Cos(a) * 0.35f, 0f, -0.2f + Mathf.Sin(a) * 0.35f), 0.02f, 5);
+                }
+            }
+            vest.Object("Fotógrafos", Gfx.Lit(new Color(0.95f, 0.55f, 0.1f), null, 0.2f), v.root, quality >= 1);
+            staff.Object("Equipe da beira do campo", Gfx.Lit(Color.Lerp(homeKit.c1, new Color(0.15f, 0.17f, 0.22f), 0.6f), null, 0.2f), v.root, quality >= 1);
+            skin.Object("Rostos", Gfx.Lit(new Color(0.78f, 0.58f, 0.44f), null, 0.3f), v.root, false);
+            gear.Object("Equipamentos", Gfx.Lit(new Color(0.1f, 0.1f, 0.12f), null, 0.5f, 0.3f), v.root, quality >= 1);
+        }
+
+        /// <summary>Telões nos cantos do estádio com o placar e os nomes dos times.</summary>
+        static void Screens(Venue v, float hl, float hw, int tier, TeamData home, TeamData away)
+        {
+            if (tier < 2) return;
+            var tex = Gfx.Led(new[] { home.shortName + "  0 x 0  " + away.shortName, "CRAQUEZ", home.name.ToUpperInvariant(), away.name.ToUpperInvariant() },
+                new[] { new Color(0.02f, 0.03f, 0.08f), new Color(0.05f, 0.25f, 0.6f), home.c1 * 0.6f, away.c1 * 0.6f }, 1024, 64);
+            var mat = Gfx.Emissive(Color.white, new Color(1.3f, 1.3f, 1.3f), tex);
+            v.ledMats.Add(mat);
+            var frame = new MeshKit();
+            var screen = new MeshKit();
+            float y = tier >= 3 ? 24f : 17f, w = tier >= 3 ? 16f : 11f, h = w * 0.42f;
+            foreach (float sx in new[] { -1f, 1f })
+            {
+                // em cima da arquibancada atrás do gol, virado para o campo
+                var c = new Vector3(sx * (hl + v.standDist + 22f), y, sx * hw * 0.55f);
+                var inward = new Vector3(-sx, 0, 0);
+                var right = Vector3.Cross(Vector3.up, inward);
+                var a0 = c - right * w * 0.5f - Vector3.up * h * 0.5f;
+                screen.Quad(a0, a0 + right * w, a0 + right * w + Vector3.up * h, a0 + Vector3.up * h, new Vector2(0, 0), new Vector2(0.5f, 1f));   // de frente para o campo
+                frame.Box(c - inward * 0.35f, new Vector3(Mathf.Abs(right.x) * (w + 0.8f) + 0.6f, h + 0.8f, Mathf.Abs(right.z) * (w + 0.8f) + 0.6f));
+                frame.Cylinder(c - inward * 0.6f - Vector3.up * h * 0.5f, c - inward * 0.6f - Vector3.up * y, 0.4f, 8);
+            }
+            screen.Object("Telões", mat, v.root, false);
+            frame.Object("Estrutura dos telões", Gfx.Lit(new Color(0.14f, 0.15f, 0.18f), null, 0.4f, 0.5f), v.root, true);
+        }
+
+        /// <summary>
+        /// Cidade em volta do estádio: prédios com janelas (acesas à noite), torres e morros ao
+        /// longe. Fica atrás das arquibancadas (o horizonte deixa de ser só céu).
+        /// </summary>
+        static void City(Venue v, float hl, float hw, int tier, bool night, uint seed)
+        {
+            var rnd = new System.Random((int)seed);
+            var winTex = WindowsTex(night, (int)(seed % 997));
+            var bld = new MeshKit();
+            var roofs = new MeshKit();
+            float r0 = hl + v.standDist + 70f;
+            int n = 70;
+            for (int i = 0; i < n; i++)
+            {
+                float a = i / (float)n * Mathf.PI * 2f + (float)rnd.NextDouble() * 0.05f;
+                float r = r0 + (float)rnd.NextDouble() * 90f;
+                var c = new Vector3(Mathf.Cos(a) * r * 1.15f, 0f, Mathf.Sin(a) * r * 0.85f);
+                float hgt = 12f + (float)rnd.NextDouble() * (rnd.NextDouble() < 0.15 ? 90f : 35f);
+                float w = 10f + (float)rnd.NextDouble() * 14f, d = 10f + (float)rnd.NextDouble() * 12f;
+                var size = new Vector3(w, hgt, d);
+                var h = size * 0.5f;
+                Vector3 P(float x, float y, float z) => c + new Vector3(x * h.x, y * hgt * 0.5f + hgt * 0.5f, z * h.z);
+                // 4 fachadas com UV em "andares" (3 m) e "janelas" (3 m)
+                void F(Vector3 p0, Vector3 p1, float len)
+                {
+                    bld.Quad(p0, p0 + Vector3.up * hgt, p1 + Vector3.up * hgt, p1, new Vector2(i * 0.37f, 0), new Vector2(i * 0.37f + len / 12f, hgt / 12f));
+                }
+                F(P(-1, -1, -1), P(1, -1, -1), w); F(P(1, -1, 1), P(-1, -1, 1), w);
+                F(P(-1, -1, 1), P(-1, -1, -1), d); F(P(1, -1, -1), P(1, -1, 1), d);
+                roofs.Quad(P(-1, 1, -1), P(-1, 1, 1), P(1, 1, 1), P(1, 1, -1));
+            }
+            var facade = night ? Gfx.Emissive(new Color(0.2f, 0.22f, 0.27f), new Color(1.1f, 0.95f, 0.7f), winTex) : Gfx.Lit(new Color(0.78f, 0.8f, 0.84f), winTex, 0.35f);
+            bld.Object("Cidade", facade, v.root, false);
+            roofs.Object("Telhados da cidade", Gfx.Lit(new Color(0.35f, 0.36f, 0.4f), null, 0.2f), v.root, false);
+            // morros ao fundo
+            var hills = new MeshKit();
+            int m = 48;
+            float rh = r0 + 260f;
+            for (int i = 0; i < m; i++)
+            {
+                float a0 = i / (float)m * Mathf.PI * 2f, a1 = (i + 1) / (float)m * Mathf.PI * 2f;
+                float h0 = 30f + 40f * Mathf.PerlinNoise(i * 0.31f, seed % 100), h1 = 30f + 40f * Mathf.PerlinNoise((i + 1) * 0.31f, seed % 100);
+                var p0 = new Vector3(Mathf.Cos(a0) * rh, -2f, Mathf.Sin(a0) * rh);
+                var p1 = new Vector3(Mathf.Cos(a1) * rh, -2f, Mathf.Sin(a1) * rh);
+                hills.Quad(p1, p1 + Vector3.up * h1, p0 + Vector3.up * h0, p0);
+            }
+            hills.Object("Morros", Gfx.Lit(night ? new Color(0.05f, 0.07f, 0.1f) : new Color(0.32f, 0.42f, 0.36f), null, 0.05f), v.root, false);
+        }
+
+        /// <summary>Fachada repetível: janelas em grade (algumas acesas à noite), faixas de laje.</summary>
+        static Texture2D WindowsTex(bool night, int seed)
+        {
+            const int S = 128;
+            var t = Gfx.Tex(S, S);
+            var px = new Color32[S * S];
+            for (int y = 0; y < S; y++)
+                for (int x = 0; x < S; x++)
+                {
+                    int cx = x / 8, cy = y / 8;
+                    float fx = (x % 8) / 8f, fy = (y % 8) / 8f;
+                    bool win = fx > 0.18f && fx < 0.82f && fy > 0.25f && fy < 0.8f;
+                    float lit = Gfx.VNoise(cx * 0.9f, cy * 0.9f, 16, seed) > (night ? 0.55f : 2f) ? 1f : 0f;
+                    Color c = win ? (night ? Color.Lerp(new Color(0.05f, 0.06f, 0.09f), new Color(1f, 0.85f, 0.55f), lit) : new Color(0.32f, 0.42f, 0.52f)) : new Color(0.8f, 0.8f, 0.78f);
+                    if (night && !win) c = new Color(0.12f, 0.12f, 0.14f);
+                    px[y * S + x] = c;
+                }
+            t.SetPixels32(px);
+            t.Apply(true);
+            return t;
         }
 
         /// <summary>

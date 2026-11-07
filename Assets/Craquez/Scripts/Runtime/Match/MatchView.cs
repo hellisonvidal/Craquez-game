@@ -165,12 +165,13 @@ namespace Craquez
 
         void BuildBall(int q)
         {
-            var go = GameObject.CreatePrimitive(PrimitiveType.Sphere);
-            go.name = "Bola";
-            Destroy(go.GetComponent<Collider>());
+            // esfera lisa (64 x 32) com o mesmo mapeamento da textura dos gomos
+            var go = new GameObject("Bola");
+            go.AddComponent<MeshFilter>().sharedMesh = BallCatalog.Mesh();
+            var mr = go.AddComponent<MeshRenderer>();
             go.transform.SetParent(transform, false);
             go.transform.localScale = Vector3.one * sim.ball.radius * 2f;
-            go.GetComponent<MeshRenderer>().sharedMaterial = Gfx.Character(Color.white, BallCatalog.Texture(cfg.ball, q >= 2 ? 1024 : 512), 0.6f);
+            mr.sharedMaterial = Gfx.Character(Color.white, BallCatalog.Texture(cfg.ball, q >= 2 ? 1024 : 512), 0.7f);
             _ball = go.transform;
             var sh = GameObject.CreatePrimitive(PrimitiveType.Quad);
             sh.name = "Sombra da bola";
