@@ -76,6 +76,25 @@ namespace Craquez.Sim
                 if (_holdBtn != 0 || _cooldown > 0) return f;
                 var g = new Vector2(sim.halfLen * dir, 0f);
                 float dg = p.position.Dist(g);
+                if (sim.kickIn)
+                {
+                    // lateral do futsal/society: passe curto para o companheiro mais livre (antes dos 4 s)
+                    if (Noise(sim, 46) > 0.03f) return f;
+                    SimPlayer mateBest = null;
+                    float bestS = float.MinValue;
+                    foreach (var m in sim.players)
+                    {
+                        if (m.team != p.team || m == p || m.isKeeper) continue;
+                        float d = m.position.Dist(p.position);
+                        float free = float.MaxValue;
+                        foreach (var o in sim.players) if (o.team != p.team) free = Mathf.Min(free, o.position.Dist(m.position));
+                        float sc = Mathf.Min(free, 5f) * 2f - Mathf.Abs(d - 7f) * 0.5f + (m.position.x - p.position.x) * dir * 0.2f;
+                        if (sc > bestS) { bestS = sc; mateBest = m; }
+                    }
+                    f.move = mateBest != null ? (mateBest.position - p.position).Norm() : new Vector2(dir, 0f);
+                    Press(ref f, InputFrame.Pass, 8);
+                    return f;
+                }
                 if (Noise(sim, 40) > 0.012f) return f;
                 float r = Noise(sim, 41);
                 if (sim.setPieceShot && dg < 28f && r < 0.45f + p.shot * 0.3f)

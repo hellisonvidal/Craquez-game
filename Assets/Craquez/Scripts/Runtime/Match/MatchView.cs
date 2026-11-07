@@ -27,6 +27,23 @@ namespace Craquez
         bool _cheering;
         CrowdFx _crowd;
         AthleteView _referee;
+        float _cardT;
+        GameObject _card;
+
+        /// <summary>O juiz ergue o cartão (amarelo ou vermelho) na mão direita por ~2,5 s.</summary>
+        void ShowCard(Color c)
+        {
+            if (_referee == null || _referee.rig == null) return;
+            if (_card != null) Destroy(_card);
+            _referee.rig.bones.TryGetValue("hand_r", out var hand);
+            if (hand == null) return;
+            var mk = new MeshKit();
+            mk.Box(Vector3.zero, new Vector3(0.075f, 0.105f, 0.008f));
+            _card = mk.Object("Cartão", Gfx.Lit(c, null, 0.4f), hand, false);
+            _card.transform.localPosition = new Vector3(0f, 0.09f, 0f);
+            _card.transform.localRotation = Quaternion.identity;
+            _cardT = 2.6f;
+        }
         public VenueLife life;
         bool _night;
 
@@ -245,6 +262,7 @@ namespace Craquez
                 target = v + new Vector2(0f, v.y > 0 ? -4f : 4f);
                 urgency = 1f;
                 if (p.position.Dist(v) < 9f) _referee.point = AthleteView.W(new Vector2(sim.TeamDir(sim.foulTeam), 0f));
+                if (_cardT > 0f) _referee.point = Vector3.up * 3f + AthleteView.W(new Vector2(sim.TeamDir(sim.foulTeam), 0f)) * 0.3f;   // cartão erguido
             }
             else if (sim.setPiece)
             {
@@ -388,6 +406,9 @@ namespace Craquez
                         }
                     }
                     break;
+                case "card":
+                    ShowCard(e.kind == "yellow" ? new Color(1f, 0.85f, 0.1f) : new Color(0.85f, 0.08f, 0.1f));
+                    break;
                 case "foul":
                     Sfx.Whistle();
                     if (e.team == 1) Sfx.Boo();   // torcida da casa vaia falta do visitante
@@ -478,8 +499,16 @@ namespace Craquez
             Destroy(go, 12f);
         }
 
+        void LateCard()
+        {
+            if (_cardT <= 0f) return;
+            _cardT -= Time.deltaTime;
+            if (_cardT <= 0f && _card != null) { Destroy(_card); _card = null; }
+        }
+
         void Update()
         {
+            LateCard();
             // bola dentro do gol encostando na rede
             if (sim != null && venue != null && Mathf.Abs(sim.ball.pos.x) > sim.halfLen - 0.05f)
             {

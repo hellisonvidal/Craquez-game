@@ -8,6 +8,22 @@ Jogo de futebol feito 100% com inteligência artificial, **gratuito**. Android, 
 - **Linux**: `Craquez-v2.1.0-Linux.tar.gz` → extraia e rode `./Craquez` (ou `./instalar.sh` para o atalho no menu)
 
 ### Novidades
+- **Lateral do futsal e do society**: com os pés, bola parada na linha e sempre um passe para um
+  companheiro (chute vira passe); no futsal, 4 segundos para cobrar, senão a bola vai para o
+  adversário. Os companheiros se oferecem para o passe em vez de correr para a área.
+- **Regras do jogo**:
+  - **recuo para o goleiro**: passe com o pé de um companheiro (ou lateral) não pode ser agarrado —
+    o goleiro joga com os pés;
+  - **cartões**: amarelo na falta imprudente (carrinho por trás, chegada forte), vermelho na
+    violenta, no segundo amarelo ou ao parar o último homem; o juiz ergue o cartão; o expulso sai e
+    o time joga com um a menos (no futsal completa depois de 2 minutos ou de sofrer um gol); na rua
+    não há cartões;
+  - **faltas acumuladas no futsal**: da 6ª falta do time no tempo em diante, tiro livre direto sem
+    barreira da marca dos 10 m (ou do lugar da falta, se mais perto); zeram no intervalo;
+  - quem já tem amarelo entra com mais cuidado nas divididas.
+- **Postura dos atletas (jogadores, goleiros e juiz)**: a inclinação do tronco é medida depois da
+  animação e corrigida — sem corcunda nem tronco caído de lado, peito aberto, ereto parado e
+  inclinado na medida na corrida; goleiro à frente só na posição de espera.
 - **Goleiros reformulados**: o goleiro lê a trajetória da bola em 3D na linha em que está (não só
   na linha do gol), com tempo de reação e erro de leitura conforme a qualidade e a força do chute,
   e escolhe a defesa certa: encaixe de frente, defesa baixa (cai sobre a bola), salto para agarrar

@@ -53,6 +53,10 @@ namespace Craquez.Sim
         /// saveSide = lado do mergulho no eixo y do campo; saveH = altura das mãos no alvo; saveDist = quanto precisa ir de lado.
         /// </summary>
         public int saveKind;
+        /// <summary>Cartões: amarelos recebidos e expulsão (fica fora de campo; no futsal volta outro em 2 min).</summary>
+        public int yellows;
+        public bool sentOff;
+        public float sentOffT;
         /// <summary>Goleiro lendo um chute: desloca em passadas laterais (não corre).</summary>
         public bool keeperSet;
         public float saveT, saveTotal, saveSide, saveH, saveDist;

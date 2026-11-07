@@ -52,11 +52,16 @@ namespace Craquez.Tests
         [TestCase(GameModes.Society)]
         public void FullMatchRunsToTheEnd(string mode)
         {
-            var sim = NewMatch(mode);
-            Play(sim, 60 * 400);
-            Assert.AreEqual(MatchState.Fulltime, sim.state);
-            Assert.IsFalse(float.IsNaN(sim.ball.pos.x));
-            Assert.Greater(sim.statsShots[0] + sim.statsShots[1], 0);
+            int shots = 0;
+            foreach (uint seed in new uint[] { 42, 43 })   // (uma partida só pode, por acaso, não ter chutes)
+            {
+                var sim = NewMatch(mode, seed);
+                Play(sim, 60 * 400);
+                Assert.AreEqual(MatchState.Fulltime, sim.state);
+                Assert.IsFalse(float.IsNaN(sim.ball.pos.x));
+                shots += sim.statsShots[0] + sim.statsShots[1];
+            }
+            Assert.Greater(shots, 0);
         }
 
         [Test] public void StreetSizes()
@@ -429,7 +434,7 @@ namespace Craquez.Tests
                 var f = new InputFrame { move = to, buttons = InputFrame.Sprint };
                 if (sim.ball.owner == me.id && i % 90 == 0) f.buttons |= InputFrame.Pass;
                 sim.Step(new[] { f.Quantized(), default });
-                if (sim.state != MatchState.Playing || i % 6 != 0) continue;
+                if (sim.state != MatchState.Playing || sim.setPiece || i % 6 != 0) continue;   // (bola parada não conta)
                 foreach (var a in sim.players)
                     foreach (var b in sim.players)
                     {
@@ -541,6 +546,79 @@ namespace Craquez.Tests
             Assert.Less(rate, 0.7f, "goleiro defende de menos");
             Assert.Greater(dives, 15, "o goleiro quase não mergulha");
             Assert.Greater(stands, 10, "o goleiro quase não encaixa de frente");
+        }
+
+        /// <summary>Futsal/society: o lateral é com os pés e sempre um passe (nunca chute), cobrado em até 4 s no futsal.</summary>
+        [TestCase("futsal")]
+        [TestCase("society")]
+        public void KickInIsAlwaysAPass(string mode)
+        {
+            int kickins = 0, shotsFromKickIn = 0, timeouts = 0;
+            for (uint seed = 1; seed <= 4; seed++)
+            {
+                var sim = NewMatch(mode, seed);
+                var a = new CpuBrain(0, 0.7f); var b = new CpuBrain(1, 0.7f);
+                for (int i = 0; i < 60 * 300 && sim.state != MatchState.Fulltime; i++)
+                {
+                    bool was = sim.kickIn && sim.setPiece;
+                    int taker = sim.setPieceTaker;
+                    sim.Step(new[] { a.MakeInput(sim), b.MakeInput(sim) });
+                    foreach (var e in sim.events)
+                    {
+                        if (e.type == "whistle" && e.kind == "throwin") { kickins++; Assert.IsTrue(sim.kickIn, "lateral sem a regra do pé"); }
+                        if (was && e.type == "kick" && e.id == taker && e.kind != "pass" && e.kind != "lob") shotsFromKickIn++;
+                    }
+                }
+                timeouts += sim.kickInTimeouts;
+            }
+            Assert.Greater(kickins, 3);
+            Assert.AreEqual(0, shotsFromKickIn, "o lateral virou chute");
+            Assert.LessOrEqual(timeouts, kickins / 5, "CPU estoura os 4 segundos do lateral");
+        }
+
+        /// <summary>Recuo: passe com o pé do companheiro para o goleiro não pode ser agarrado.</summary>
+        [Test] public void BackPassIsNotCaught()
+        {
+            int held = 0, tries = 0;
+            for (uint seed = 1; seed <= 6; seed++)
+            {
+                var sim = NewMatch(GameModes.Field, seed);
+                for (int i = 0; i < 70; i++) sim.Step(new InputFrame[2]);
+                sim.kickoffPass = false;
+                var gk = sim.players.Find(x => x.team == 0 && x.isKeeper);
+                var df = sim.players.Find(x => x.team == 0 && !x.isKeeper);
+                foreach (var q in sim.players) if (q.team == 1) q.position = new Vector2(sim.TeamDir(0) * 30f, q.position.y);
+                df.position = gk.position + new Vector2(sim.TeamDir(0) * 14f, 2f);
+                sim.ball.owner = df.id; sim.ball.pos = df.position; sim.ball.vel = Vector2.zero; sim.ball.z = 0;
+                sim.ctrl[0].player = df.id;
+                var aim = (gk.position - df.position).Norm();
+                var press = new InputFrame { move = aim, buttons = InputFrame.Pass };
+                for (int i = 0; i < 6; i++) sim.Step(new[] { press, default });
+                tries++;
+                for (int i = 0; i < 150; i++) { sim.Step(new[] { new InputFrame(), default }); if (gk.hold > 0f) { held++; break; } }
+            }
+            Assert.AreEqual(0, held, "o goleiro agarrou um recuo de " + tries);
+        }
+
+        /// <summary>Cartões: falta violenta expulsa; o expulso fica fora e o jogo segue sem ele.</summary>
+        [Test] public void RedCardSendsPlayerOff()
+        {
+            var sim = NewMatch(GameModes.Field, 3);
+            for (int i = 0; i < 200; i++) sim.Step(new InputFrame[2]);
+            var off = sim.players.Find(x => x.team == 1 && !x.isKeeper);
+            var vic = sim.players.Find(x => x.team == 0 && !x.isKeeper);
+            int tries = 0;
+            while (!off.sentOff && tries++ < 60)
+            {
+                sim.state = MatchState.Playing;
+                off.vel = new Vector2(9f, 0); off.slide = 0.5f; vic.facing = new Vector2(1f, 0);
+                off.position = vic.position - new Vector2(0.5f, 0);
+                sim.Foul(off, vic);
+            }
+            Assert.IsTrue(off.sentOff, "falta violenta sem vermelho");
+            for (int i = 0; i < 60 * 30; i++) sim.Step(new InputFrame[2]);
+            Assert.Greater(Mathf.Abs(off.position.y), sim.halfW, "expulso voltou para o campo");
+            Assert.AreNotEqual(off.id, sim.ball.owner);
         }
 
         [Test] public void JsonRoundTrip()

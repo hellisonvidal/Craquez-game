@@ -611,10 +611,48 @@ namespace Craquez
             _lastTouchT = p.touchT;
         }
 
+        /// <summary>
+        /// Postura: mede o tronco (quadril -> pescoço) no referencial do corpo e tira o excesso da
+        /// captura — corcunda, tronco caído para um lado — deixando o peito aberto e o atleta ereto.
+        /// O limite cresce com a velocidade (corrida inclina, de pé fica reto). Vale para todos:
+        /// jogadores, goleiros e o juiz.
+        /// </summary>
+        void Posture()
+        {
+            if (rig.pelvis == null || rig.neck == null || rig.spine == null) return;
+            if (p.down > 0f || p.slide > 0f || (p.isKeeper && (p.saveKind > 0 || _saveRec > 0f)) || _celebrate > 0f) return;
+            float act = anim != null ? anim.ActionWeight : 0f;
+            float w = 1f - act * 0.7f;   // chutes e fintas mantêm o gesto
+            var up = transform.up;
+            var fwd = transform.forward;
+            var right = transform.right;
+            var torso = rig.neck.position - rig.pelvis.position;
+            float spd = p.vel.magnitude;
+            float lean = Mathf.Atan2(Vector3.Dot(torso, fwd), Vector3.Dot(torso, up)) * Mathf.Rad2Deg;
+            float side = Mathf.Atan2(Vector3.Dot(torso, right), Vector3.Dot(torso, up)) * Mathf.Rad2Deg;
+            // inclinação permitida: de pé ~5°, trote ~9°, pique ~15° (+ a inclinação da arrancada)
+            float maxLean = Mathf.Lerp(5f, 15f, Mathf.Clamp01(spd / 8f)) + Mathf.Max(0f, _accLean);
+            bool keeperReady = p.isKeeper && spd < 2f;
+            if (keeperReady) maxLean = 16f;   // goleiro em posição de espera: tronco à frente de propósito
+            float minLean = -4f;              // nem jogado para trás
+            float fix = lean > maxLean ? lean - maxLean : lean < minLean ? lean - minLean : 0f;
+            if (Mathf.Abs(fix) > 0.1f)
+            {
+                rig.bones.TryGetValue("spine_01", out var sp1);
+                _pose.Rotate(sp1, Quaternion.AngleAxis(-fix * 0.45f * w, right));
+                _pose.Rotate(rig.spine, Quaternion.AngleAxis(-fix * 0.4f * w, right));
+            }
+            float sideFix = Mathf.Abs(side) > 4f ? side - Mathf.Sign(side) * 4f : 0f;
+            if (Mathf.Abs(sideFix) > 0.1f) _pose.Rotate(rig.spine, Quaternion.AngleAxis(sideFix * 0.8f * w, fwd));
+            // peito aberto: o topo da coluna levemente para trás (ombros não caem para a frente)
+            _pose.Rotate(rig.spine, Quaternion.AngleAxis(-3f * w * (1f - Mathf.Clamp01(spd / 7f)), right));
+        }
+
         /// <summary>Correções por cima da animação: tronco na aceleração e perna do toque.</summary>
         void BodyLayer()
         {
             float dt = Time.deltaTime;
+            Posture();
             if (rig.bones.TryGetValue("spine_01", out var sp1) && Mathf.Abs(_accLean) > 0.05f)
             {
                 var ax = transform.right;
