@@ -267,7 +267,7 @@ namespace Craquez
                     break;
                 case "skill":
                     _crowd?.React("skill");
-                    if (e.team == 0) { Sfx.Applause(0.22f); _crowdHype = Mathf.Max(_crowdHype, 0.45f); }
+                    if (e.team == 0) { Sfx.Hurray(0.3f); _crowdHype = Mathf.Max(_crowdHype, 0.45f); }
                     break;
                 case "fooled":
                     if (e.team == 1) Sfx.Applause(0.3f);    // drible do time da casa deixou o visitante no chão

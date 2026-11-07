@@ -150,6 +150,7 @@ namespace Craquez
 
         RectTransform Page(bool dark = true)
         {
+            Sfx.MenuMusic(true);
             ClearCover();
             UiKit.Clear(_root);
             _pressText = null;
@@ -297,6 +298,7 @@ namespace Craquez
 
         void ShowTitle()
         {
+            Sfx.MenuMusic(true);
             UiKit.Clear(_root);
             _back = null;
             _bg.color = Color.black;
@@ -991,14 +993,39 @@ namespace Craquez
         }
 
         // ------------------------------------------------------------ opções
+        System.Collections.Generic.Dictionary<string, object> _optSnap;
+
         void ShowOptions()
         {
             var root = Page();
-            _back = ShowModes;
-            Title(root, "OPÇÕES", null);
+            // as mudanças aparecem na hora (prévia); SALVAR guarda, CANCELAR (ou voltar) desfaz tudo
+            _optSnap = Settings.Snapshot();
             void Apply() { UrpSetup.Quality(Settings.Quality); UrpSetup.Camera(cam, Settings.Quality); }
+            void Cancel()
+            {
+                bool screen = PlayerPrefs.GetInt("gfx_display", 0) != (_optSnap.TryGetValue("gfx_display", out var dv) ? (int)dv : 0)
+                              || PlayerPrefs.GetInt("gfx_res", -1) != (_optSnap.TryGetValue("gfx_res", out var rv) ? (int)rv : -1);
+                Settings.Restore(_optSnap);
+                _cfg.quickRestarts = Settings.QuickRestarts;
+                Apply();
+                if (screen) GoFullscreen();
+                Sfx.MenuMusic(true);
+                ShowModes();
+            }
+            void Save()
+            {
+                PlayerPrefs.Save();
+                _optSnap = Settings.Snapshot();
+                ShowModes();
+            }
+            _back = Cancel;
+            Title(root, "OPÇÕES", "As mudanças aparecem na hora: SALVAR guarda, CANCELAR desfaz");
+            var save = UiKit.Button(root, "SALVAR", Save, 34, new Color(0.1f, 0.6f, 0.3f));
+            save.GetComponent<RectTransform>().At(1, 0, 260, 84, -90, 120);
+            var cancel = UiKit.Button(root, "CANCELAR", Cancel, 34, new Color(0.6f, 0.14f, 0.18f));
+            cancel.GetComponent<RectTransform>().At(1, 0, 260, 84, -370, 120);
             // coluna 1: jogo e som
-            var list = UiKit.Rect(root, "geral").Place(0, 0, 0.48f, 1, 90, 150, 10, 250);
+            var list = UiKit.Rect(root, "geral").Place(0, 0, 0.48f, 1, 90, 220, 10, 250);
             UiKit.VList(list, 8, 0, false);
             UiKit.Label(list, "JOGO", 26, Theme.Head, Theme.Accent).gameObject.AddComponent<LayoutElement>().minHeight = 34;
             var vols = new List<string>();
@@ -1007,6 +1034,9 @@ namespace Craquez
             UiKit.Size(first, 58, 58);
             if (Application.isMobilePlatform)
                 UiKit.Size(UiKit.Cycler(list, "Vibração", new[] { "Ligada", "Desligada" }, Settings.Vibration ? 0 : 1, i => Settings.Vibration = i == 0), 58, 58);
+            string[] mus = { "Desligada", "20%", "40%", "60%", "80%", "100%" };
+            int mi = Settings.Music ? Mathf.Clamp(Mathf.RoundToInt(Settings.MusicVolume * 5f), 1, 5) : 0;
+            UiKit.Size(UiKit.Cycler(list, "Música dos menus", mus, mi, i => { Settings.Music = i > 0; if (i > 0) Settings.MusicVolume = i / 5f; Sfx.MenuMusic(true); }), 58, 58);
             UiKit.Size(UiKit.Cycler(list, "Câmera", BroadcastCamera.Modes, Settings.Camera, i => Settings.Camera = i), 58, 58);
             UiKit.Size(UiKit.Cycler(list, "Zoom da câmera", BroadcastCamera.Zooms, Settings.CameraZoom + 2, i => Settings.CameraZoom = i - 2), 58, 58);
             UiKit.Size(UiKit.Cycler(list, "Faltas", new[] { "Cena antes da cobrança", "Cobrança rápida" }, Settings.QuickRestarts ? 1 : 0, i => { Settings.QuickRestarts = i == 1; _cfg.quickRestarts = i == 1; }), 58, 58);
@@ -1018,7 +1048,7 @@ namespace Craquez
             UiKit.Size(UiKit.Button(list, "Exportar modelo do option file", () => { status.text = "Modelo gravado em:\n" + Teams.ExportOptionTemplate(); }, 26), 58, 58);
             UiKit.Size(UiKit.Button(list, "Recarregar option file", () => { Teams.Reload(); St(); }, 26), 58, 58);
             // coluna 2: gráficos (no PC, tudo ajustável; no celular, o essencial)
-            var gfx = UiKit.Rect(root, "gráficos").Place(0.5f, 0, 1, 1, 10, 150, 90, 250);
+            var gfx = UiKit.Rect(root, "gráficos").Place(0.5f, 0, 1, 1, 10, 220, 90, 250);
             UiKit.VList(gfx, 8, 0, false);
             UiKit.Label(gfx, "GRÁFICOS", 26, Theme.Head, Theme.Accent).gameObject.AddComponent<LayoutElement>().minHeight = 34;
             UiKit.Size(UiKit.Cycler(gfx, "Predefinição", Settings.QualityNames, Mathf.Min(Settings.Quality, Settings.QualityNames.Length - 1), i => { Settings.Quality = i; Apply(); }), 58, 58);
@@ -1040,6 +1070,7 @@ namespace Craquez
         // ------------------------------------------------------------ partida
         void StartMatch()
         {
+            Sfx.MenuMusic(false);
             StopAttract();
             UiKit.Clear(_root);
             _bg.color = new Color(0, 0, 0, 0);

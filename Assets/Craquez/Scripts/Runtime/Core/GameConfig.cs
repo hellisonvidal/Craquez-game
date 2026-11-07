@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using Craquez.Sim;
 using UnityEngine;
 
@@ -74,6 +75,19 @@ namespace Craquez
             set { PlayerPrefs.SetInt("quick_restarts", value ? 1 : 0); PlayerPrefs.Save(); }
         }
 
+        public static float MusicVolume
+        {
+            get => PlayerPrefs.GetFloat("music_volume", 0.55f);
+            set { PlayerPrefs.SetFloat("music_volume", value); PlayerPrefs.Save(); }
+        }
+
+        /// <summary>Trilha sonora dos menus.</summary>
+        public static bool Music
+        {
+            get => PlayerPrefs.GetInt("music", 1) == 1;
+            set { PlayerPrefs.SetInt("music", value ? 1 : 0); PlayerPrefs.Save(); }
+        }
+
         public static bool SeenIntro
         {
             get => PlayerPrefs.GetInt("seen_intro", 0) == 1;
@@ -92,6 +106,36 @@ namespace Craquez
         static readonly string[] _qualityPc = { "Leve", "Equilibrado", "Alto", "Ultra" };
         static readonly string[] _qualityMobile = { "Leve", "Equilibrado", "Alto" };
         public static string[] QualityNames => Application.isMobilePlatform ? _qualityMobile : _qualityPc;
+
+        // ---- salvar / cancelar (tela de opções) ----
+        static readonly string[] IntKeys = { "quality", "vibration", "camera", "camera_zoom", "quick_restarts", "gfx_scale", "gfx_fps", "gfx_vsync", "gfx_aa", "gfx_shadows", "gfx_tex", "gfx_display", "gfx_res", "music" };
+        static readonly string[] FloatKeys = { "volume", "music_volume" };
+
+        /// <summary>Foto das preferências ao abrir as opções (para o "Cancelar").</summary>
+        public static Dictionary<string, object> Snapshot()
+        {
+            var d = new Dictionary<string, object>();
+            foreach (var k in IntKeys) if (PlayerPrefs.HasKey(k)) d[k] = PlayerPrefs.GetInt(k);
+            foreach (var k in FloatKeys) if (PlayerPrefs.HasKey(k)) d[k] = PlayerPrefs.GetFloat(k);
+            return d;
+        }
+
+        /// <summary>Volta tudo como estava na foto (chaves que não existiam voltam ao padrão).</summary>
+        public static void Restore(Dictionary<string, object> d)
+        {
+            foreach (var k in IntKeys) { if (d.TryGetValue(k, out var v)) PlayerPrefs.SetInt(k, (int)v); else PlayerPrefs.DeleteKey(k); }
+            foreach (var k in FloatKeys) { if (d.TryGetValue(k, out var v)) PlayerPrefs.SetFloat(k, (float)v); else PlayerPrefs.DeleteKey(k); }
+            PlayerPrefs.Save();
+            AudioListener.volume = Volume;
+        }
+
+        public static bool Differs(Dictionary<string, object> d)
+        {
+            var now = Snapshot();
+            if (now.Count != d.Count) return true;
+            foreach (var kv in now) if (!d.TryGetValue(kv.Key, out var v) || !v.Equals(kv.Value)) return true;
+            return false;
+        }
 
         static int I(string k, int d) => PlayerPrefs.GetInt(k, d);
         static void I(string k, int v, bool _) { PlayerPrefs.SetInt(k, v); PlayerPrefs.Save(); }

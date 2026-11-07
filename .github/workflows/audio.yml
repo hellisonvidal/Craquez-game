@@ -1,0 +1,29 @@
+name: Sons da torcida
+
+# Baixa as gravações reais de torcida (licenças livres, Wikimedia Commons), trata os
+# trechos e grava os .ogg em Assets/Craquez/Resources/Audio na própria branch.
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - tools/audio/fetch_crowd.py
+
+permissions:
+  contents: write
+
+jobs:
+  audio:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: sudo apt-get update -qq && sudo apt-get install -y -qq ffmpeg > /dev/null
+      - run: pip install -q numpy scipy
+      - run: python3 tools/audio/fetch_crowd.py
+      - name: Gravar na branch
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add Assets/Craquez/Resources/Audio
+          if git diff --cached --quiet; then echo "sem mudanças"; exit 0; fi
+          git commit -m "Sons reais de torcida (Wikimedia Commons, licenças livres)"
+          git push
