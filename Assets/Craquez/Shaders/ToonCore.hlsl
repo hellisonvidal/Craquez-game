@@ -90,6 +90,30 @@ half3 ToonLight(Light l, half3 n, half3 v, half3 albedo, half smooth, half shado
     return c;
 }
 
+// ---------------------------------------------------------------- atletas (luz suave)
+half3 AthleteLight(Light l, half3 n, half3 v, half3 albedo, half smooth, half skin, half shadowAtten)
+{
+    half ndl = dot(n, l.direction);
+    half sh = smoothstep(0.2, 0.8, shadowAtten);
+    // difusa envolvente (wrap): transição gradual da luz para a sombra, que dá volume aos
+    // músculos; um pouco da faixa do cel shading fica para manter a identidade do jogo
+    half w = saturate((ndl + 0.3) / 1.3);
+    half soft = w * w * (3.0 - 2.0 * w);
+    half lit = lerp(soft, ToonStep(ndl), 0.25) * sh;
+    half3 band = lerp(_ToonShadowTint.rgb, half3(1, 1, 1), lit);
+    half3 c = albedo * band * l.color;
+    // pele: a luz que entra e sai sob a superfície deixa o limite luz/sombra quente (avermelhado)
+    half term = saturate(1.0 - abs(ndl - 0.05) * 2.6) * skin;
+    c += albedo * half3(0.42, 0.13, 0.06) * term * l.color * lerp(0.4, 1.0, sh);
+    // brilho largo e suave (pele levemente suada, tecido acetinado, couro da chuteira)
+    half3 h = SafeNormalize(l.direction + v);
+    half ndh = saturate(dot(n, h));
+    half e = lerp(12.0, 56.0, smooth);
+    half spec = pow(max(ndh, 0.001), e) * smooth * lit * lerp(0.18, 0.3, skin);
+    c += min(spec, 0.3) * min(l.color, 1.5);
+    return c;
+}
+
 half4 ToonFrag(ToonVaryings i, FRONT_FACE_TYPE face : FRONT_FACE_SEMANTIC) : SV_Target
 {
     UNITY_SETUP_INSTANCE_ID(i);
@@ -105,7 +129,11 @@ half4 ToonFrag(ToonVaryings i, FRONT_FACE_TYPE face : FRONT_FACE_SEMANTIC) : SV_
 
     float4 shadowCoord = TransformWorldToShadowCoord(i.positionWS);
     Light mainLight = GetMainLight(shadowCoord);
+#if defined(CRAQUEZ_ATHLETE)
+    half3 col = AthleteLight(mainLight, n, v, albedo.rgb, _Smoothness, _Metallic, mainLight.shadowAttenuation * mainLight.distanceAttenuation);
+#else
     half3 col = ToonLight(mainLight, n, v, albedo.rgb, _Smoothness, mainLight.shadowAttenuation * mainLight.distanceAttenuation);
+#endif
 
 #if defined(_ADDITIONAL_LIGHTS)
     InputData inputData = (InputData)0;
@@ -119,11 +147,23 @@ half4 ToonFrag(ToonVaryings i, FRONT_FACE_TYPE face : FRONT_FACE_SEMANTIC) : SV_
     LIGHT_LOOP_END
 #endif
 
+#if defined(CRAQUEZ_ATHLETE)
+    // ambiente com volume: céu por cima, reflexo do chão por baixo (queixo, axilas e a parte de
+    // baixo das coxas ficam mais escuras) e um recorte suave que destaca a silhueta
+    half up = n.y * 0.5 + 0.5;
+    half3 sky = SampleSH(half3(0, 1, 0));
+    half3 amb = lerp(sky * 0.45, SampleSH(n), 0.5) * lerp(0.62, 1.12, up) * _ToonParams.w * 1.25;
+    col += albedo.rgb * amb;
+    half fres = 1.0 - saturate(dot(n, v));
+    half rim = smoothstep(0.45, 0.95, fres) * saturate(dot(n, mainLight.direction) + 0.5);
+    col += rim * _ToonParams.z * 0.8 * mainLight.color * albedo.rgb;
+#else
     // ambiente plano (o céu) + luz de recorte nas bordas iluminadas
     half3 amb = SampleSH(half3(0, 1, 0)) * _ToonParams.w;
     col += albedo.rgb * amb;
     half rim = smoothstep(0.62, 0.7, 1.0 - saturate(dot(n, v))) * saturate(dot(n, mainLight.direction) + 0.35);
     col += rim * _ToonParams.z * mainLight.color * albedo.rgb;
+#endif
 
 #if defined(_EMISSION)
     col += SAMPLE_TEXTURE2D(_EmissionMap, sampler_EmissionMap, i.uv).rgb * _EmissionColor.rgb;
@@ -146,6 +186,9 @@ ToonVaryings OutlineVert(ToonAttributes v)
     posWS += ClothOffset(posWS, nWS);
     float dist = length(GetCameraPositionWS() - posWS);
     float w = clamp(_ToonOutline.x * dist / 10.0, _ToonOutline.y, _ToonOutline.z);
+#if defined(CRAQUEZ_ATHLETE)
+    w *= 0.6;   // atletas: traço fino (só separa a silhueta do fundo)
+#endif
     posWS += nWS * w;
     o.positionWS = posWS;
     o.positionCS = TransformWorldToHClip(posWS);

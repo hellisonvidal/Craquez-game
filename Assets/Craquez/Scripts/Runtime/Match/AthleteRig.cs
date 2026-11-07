@@ -93,10 +93,11 @@ namespace Craquez
         static readonly (string bone, float slim, float strong)[] Shape =
         {
             // atleta: cintura fina, tórax em "V", coxas e panturrilhas fortes, pescoço firme
-            ("spine_01", 0.82f, 0.94f), ("spine_02", 0.88f, 0.99f), ("spine_03", 0.94f, 1.04f),
+            ("spine_01", 0.8f, 0.92f), ("spine_02", 0.87f, 0.98f), ("spine_03", 0.95f, 1.06f),
             ("clavicle_l", 0.97f, 1.03f), ("clavicle_r", 0.97f, 1.03f),
             ("upperarm_l", 0.88f, 1.03f), ("upperarm_r", 0.88f, 1.03f), ("lowerarm_l", 0.9f, 1.01f), ("lowerarm_r", 0.9f, 1.01f),
-            ("thigh_l", 0.92f, 1.06f), ("thigh_r", 0.92f, 1.06f), ("calf_l", 0.94f, 1.05f), ("calf_r", 0.94f, 1.05f), ("neck_01", 0.97f, 1.05f),
+            ("thigh_l", 0.94f, 1.08f), ("thigh_r", 0.94f, 1.08f), ("calf_l", 0.95f, 1.07f), ("calf_r", 0.95f, 1.07f), ("neck_01", 0.96f, 1.06f),
+            ("pelvis", 0.94f, 1.0f),
         };
 
         /// <summary>
@@ -107,9 +108,9 @@ namespace Craquez
         {
             build = Mathf.Clamp01(build);
             // ombros/caixa torácica: estreitos (0) .. largos (1), independente do porte
-            float fr = Mathf.Lerp(0.97f, 1.1f, Mathf.Clamp01(frame));
+            float fr = Mathf.Lerp(0.98f, 1.12f, Mathf.Clamp01(frame));
             // cabeça um pouco menor (proporção real ~1:7,5 da altura; o modelo base tem cabeça grande)
-            if (head != null) head.localScale *= 0.95f;
+            if (head != null) head.localScale *= 0.93f;
             foreach (var (name, slim, strong) in Shape)
             {
                 float k = Mathf.Lerp(slim, strong, build);

@@ -586,7 +586,7 @@ namespace Craquez
             GL.Clear(true, true, Color.black);
             // fundo: a ilustração do modo, escurecida
             Graphics.DrawTexture(new Rect(0, -H * 0.1f, W, W * 560f / 512f), bg, new Rect(0, 0, 1, 1), 0, 0, 0, 0, new Color(0.28f, 0.3f, 0.38f, 1f));
-            // seis escudos/bandeiras em duas fileiras
+            // seis escudos em duas fileiras (sem bandeiras)
             var lgs = LeaguesFor(mode, national);
             var ids = new List<int>();
             foreach (var l in lgs) for (int i = 0; i < l.count && ids.Count < 6; i++) { ids.Add(l.first + i); if (!national) break; }
@@ -594,17 +594,8 @@ namespace Craquez
             for (int i = 0; i < ids.Count; i++)
             {
                 float cx = W * (0.2f + 0.3f * (i % 3)), cy = H * (i < 3 ? 0.3f : 0.66f);
-                if (national)
-                {
-                    var tm = Teams.Get(ids[i]);
-                    var flag = tm != null ? Crest.CountryTex(tm.iso) : null;
-                    if (flag != null) Graphics.DrawTexture(new Rect(cx - 82, cy - 55, 164, 110), flag);
-                }
-                else
-                {
-                    var sp = Crest.Team(ids[i]);
-                    if (sp != null) Graphics.DrawTexture(new Rect(cx - 70, cy - 70, 140, 140), sp.texture, TexRect(sp), 0, 0, 0, 0);
-                }
+                var sp = Crest.Badge(ids[i]);   // escudos desenhados, sem bandeiras
+                if (sp != null) Graphics.DrawTexture(new Rect(cx - 70, cy - 70, 140, 140), sp.texture, TexRect(sp), 0, 0, 0, 0);
             }
             GL.PopMatrix();
             var tex = new Texture2D(W, H, TextureFormat.RGBA32, false);
@@ -811,12 +802,6 @@ namespace Craquez
                 var crest = UiKit.Image(col, Color.white, null, "escudo");
                 crest.rectTransform.At(0, 1, 170, 170, 30, -70);
                 crest.preserveAspect = true;
-                var lgIcon = UiKit.Image(col, Color.white, null, "liga");
-                lgIcon.rectTransform.At(0, 1, 64, 48, 210, -16);
-                lgIcon.preserveAspect = true;
-                // bandeira do clube (cores do uniforme + escudo), ao lado das cores do uniforme
-                var clubFlag = UiKit.Rect(col, "bandeira do clube").At(0, 1, 72, 48, 262, -251).gameObject.AddComponent<RawImage>();
-                clubFlag.raycastTarget = false;
                 var name = UiKit.Label(col, "", 46, Theme.HeadItalic, Theme.Text);
                 name.rectTransform.Place(0, 1, 1, 1, 220, -150, 250, 70);
                 var info = UiKit.Label(col, "", 22, Theme.Body, Theme.TextDim);
@@ -836,9 +821,7 @@ namespace Craquez
                 void Refresh()
                 {
                     var t = Teams.Get(Team());
-                    crest.sprite = Crest.Team(Team());
-                    lgIcon.sprite = Crest.League(Teams.Leagues[Teams.LeagueOf(Team())]);
-                    clubFlag.texture = Crest.ClubFlag(Team(), 144, 96);
+                    crest.sprite = Crest.Badge(Team());
                     name.text = t.name;
                     int ovr = 0;
                     foreach (var r in t.roster) ovr += r.ovr;

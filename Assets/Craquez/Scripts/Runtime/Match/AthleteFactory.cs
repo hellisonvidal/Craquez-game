@@ -149,7 +149,7 @@ namespace Craquez
                     case "Body":
                     {
                         var skin = Shared("skin:" + look.baseName + Teams.Hex(look.skinTint), () =>
-                            Gfx.Character(look.skinTint, T(SkinTex[look.baseName]), 0.32f));
+                            Gfx.Athlete(look.skinTint, T(SkinTex[look.baseName]), 0.3f, 1f));
                         var mats = new Material[Mathf.Max(1, smr.sharedMesh.subMeshCount)];
                         for (int i = 0; i < mats.Length; i++) mats[i] = skin;
                         smr.sharedMaterials = mats;
@@ -168,14 +168,14 @@ namespace Craquez
                         // tecido dos dois lados (vê-se o avesso pela gola e pelas mangas)
                         if (part == KitPart.Shirt) rig.shirt = smr;
                         else if (part == KitPart.Shorts) rig.shorts = smr;
-                        smr.sharedMaterial = Shared("kit:" + kt.GetInstanceID(), () => Gfx.Character(Color.white, kt, part == KitPart.Shirt ? 0.34f : 0.26f, true));
+                        smr.sharedMaterial = Shared("kit:" + kt.GetInstanceID(), () => Gfx.Athlete(Color.white, kt, part == KitPart.Shirt ? 0.36f : 0.28f, 0f, true));
                         break;
                     }
                     case "Boots":
                     {
                         int d = look.boots;
                         bool indoor = IndoorShoes;
-                        smr.sharedMaterial = Shared("boots:" + d + (indoor ? "f" : ""), () => Gfx.Character(Color.white, BootPainter.Paint(d, indoor), indoor ? 0.35f : 0.62f));
+                        smr.sharedMaterial = Shared("boots:" + d + (indoor ? "f" : ""), () => Gfx.Athlete(Color.white, BootPainter.Paint(d, indoor), indoor ? 0.4f : 0.6f, 0f));
                         break;
                     }
                     default:

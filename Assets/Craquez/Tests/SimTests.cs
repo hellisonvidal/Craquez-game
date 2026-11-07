@@ -313,6 +313,40 @@ namespace Craquez.Tests
             Assert.AreEqual(!shotAllowed, crossed, "cruzamento");
         }
 
+        /// <summary>
+        /// Passe em plena corrida: a preparação traz a bola ao pé e o passe sai de fato
+        /// (sem "chutar o ar" com a bola longe), com a bola junto do pé na saída.
+        /// </summary>
+        [TestCase(1u)]
+        [TestCase(2u)]
+        [TestCase(3u)]
+        public void KickWhileSprintingHitsTheBall(uint seed)
+        {
+            var sim = NewMatch(GameModes.Field, seed);
+            for (int i = 0; i < 70; i++) sim.Step(new InputFrame[2]);
+            var p = sim.Controlled(0);
+            float dir = sim.TeamDir(0);
+            foreach (var o in sim.players) if (o.team == 1) o.position = new Vector2(-dir * 40f, o.position.y);
+            p.position = new Vector2(-dir * 10f, 0f);
+            p.facing = new Vector2(dir, 0);
+            sim.ball.pos = p.position + p.facing * 0.4f;
+            sim.ball.owner = p.id;
+            sim.kickoffPass = false;
+            var run = new InputFrame { move = new Vector2(dir, 0), buttons = InputFrame.Sprint };
+            for (int i = 0; i < 90; i++) sim.Step(new[] { run, default });
+            Assume.That(sim.ball.owner == p.id, "perdeu a bola conduzindo");
+            sim.Step(new[] { new InputFrame { move = new Vector2(dir, 0.4f), buttons = InputFrame.Sprint | InputFrame.Pass }, default });
+            float atKick = -1f;
+            for (int i = 0; i < 40 && atKick < 0f; i++)
+            {
+                var before = p.position.Dist(sim.ball.pos);
+                sim.Step(new[] { run, default });
+                if (sim.ball.owner != p.id) atKick = before;
+            }
+            Assert.GreaterOrEqual(atKick, 0f, "o passe não saiu");
+            Assert.Less(atKick, 0.75f, "bola longe do pé na hora do passe");
+        }
+
         [Test] public void JsonRoundTrip()
         {
             var o = MiniJson.Parse("{\"a\": [1, 2.5, \"x\\n\"], \"b\": {\"c\": true, \"d\": null}}");

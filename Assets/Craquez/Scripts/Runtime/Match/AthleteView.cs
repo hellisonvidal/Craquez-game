@@ -60,14 +60,20 @@ namespace Craquez
                     if (view.sim.throwIn && view.sim.throwInTaker == p.id) break;   // lateral: sem gesto de chute
                     float rate = 1.25f;
                     string clip = e.kind == "shot" ? (p.windupPower > 0.6f ? "KickPower" : "Shot") : e.kind == "lob" ? "Kick" : "Pass";
-                    float start = 1.1f - p.windupTotal * rate - 0.08f;
-                    anim.Play(clip, start, 0.95f, rate, 0.06f);
+                    // o pico do pé (contato) cai no instante em que a simulação solta a bola
+                    float contact = AthleteAnimator.KickContact(clip);
+                    float start = Mathf.Max(0f, contact - p.windupTotal * rate);
+                    anim.Play(clip, start, (contact - start) + 0.5f, rate, 0.05f);
                     break;
                 }
                 case "kick":
                     if (e.kind == "throw") { _throwT = 0.32f; break; }   // arremesso com as mãos
                     if (anim.CurrentAction == null || anim.ActionWeight < 0.3f)
-                        anim.Play(e.kind == "shot" ? "Shot" : "Pass", 1.0f, 0.75f, 1.35f, 0.05f);
+                    {
+                        string c = e.kind == "shot" ? "Shot" : "Pass";
+                        float ct = AthleteAnimator.KickContact(c);
+                        anim.Play(c, ct - 0.06f, 0.6f, 1.35f, 0.04f);
+                    }
                     break;
                 case "skill":
                     switch ((Skill)e.skill)

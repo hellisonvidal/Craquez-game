@@ -181,6 +181,7 @@ namespace Craquez
                 else if (t.name == "pelvis") pel = t;
             }
             if (fl == null || fr == null) return;
+            FindKickContacts(go, fl, fr, pel);
             for (int i = 0; i < Loco.Length; i++)
             {
                 if (!Clips.TryGetValue(Loco[i], out var ci) || !ci.loop || i == IIdle) continue;
@@ -230,6 +231,47 @@ namespace Craquez
                 Debug.Log($"[anim] {Loco[i]}: apoio do pé esq. em {bt:F2} do ciclo, chão a {gs:F2} m/s (json {ci.speed:F2})");
             }
         }
+        static readonly Dictionary<string, float> _kickContact = new Dictionary<string, float>();
+        static readonly string[] KickClips = { "Pass", "Shot", "KickPower", "Kick", "ShotLeft", "Volley" };
+
+        /// <summary>
+        /// Instante (s) em que o pé de chute encontra a bola em cada clipe de chute/passe:
+        /// o pico de velocidade do pé (em relação ao quadril). A ação é tocada de modo que
+        /// esse instante caia exatamente na saída da bola da simulação.
+        /// </summary>
+        static void FindKickContacts(GameObject go, Transform fl, Transform fr, Transform pel)
+        {
+            foreach (var name in KickClips)
+            {
+                if (!Clips.TryGetValue(name, out var ci)) continue;
+                float len = ci.clip.length;
+                const float step = 1f / 60f;
+                Vector3 pl = Vector3.zero, pr = Vector3.zero;
+                float best = 0f, bt = 1.1f;
+                bool first = true;
+                for (float t = 0f; t <= len; t += step)
+                {
+                    ci.clip.SampleAnimation(go, t);
+                    var o = pel != null ? pel.position : go.transform.position;
+                    var l = fl.position - o;
+                    var r = fr.position - o;
+                    if (!first && t > len * 0.15f && t < len * 0.9f)
+                    {
+                        float v = Mathf.Max((l - pl).magnitude, (r - pr).magnitude) / step;
+                        // o pé de chute perto do chão (altura da bola)
+                        float low = Mathf.Min(fl.position.y, fr.position.y) - go.transform.position.y;
+                        if (low < 0.45f && v > best) { best = v; bt = t; }
+                    }
+                    pl = l; pr = r; first = false;
+                }
+                _kickContact[name] = bt;
+                Debug.Log($"[anim] {name}: contato com a bola em {bt:F2}s (pé a {best:F1} m/s)");
+            }
+        }
+
+        /// <summary>Instante do contato com a bola no clipe (s); 1,1 s se não medido.</summary>
+        public static float KickContact(string clip) => _kickContact.TryGetValue(clip, out var t) ? t : 1.1f;
+
         public string CurrentAction { get; private set; }
         public float ActionWeight => _actionW;
 

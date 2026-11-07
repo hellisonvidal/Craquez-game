@@ -115,6 +115,20 @@ namespace Craquez.EditorTools
                 Save("ToonOutlineCutout", oc);
             }
 
+            var ath = Shader.Find("Craquez/Athlete");
+            if (ath != null)
+            {
+                Save("Athlete", new Material(ath));
+                var ac = new Material(ath);
+                ac.SetFloat("_AlphaClip", 1f);
+                ac.SetFloat("_Cutoff", 0.4f);
+                ac.SetFloat("_Cull", (float)CullMode.Off);
+                ac.EnableKeyword("_ALPHATEST_ON");
+                ac.renderQueue = (int)RenderQueue.AlphaTest;
+                Save("AthleteCutout", ac);
+            }
+            else Debug.LogError("Craquez: shader Craquez/Athlete não encontrado");
+
             var cut = new Material(lit);
             cut.SetFloat("_AlphaClip", 1f);
             cut.SetFloat("_Cutoff", 0.4f);

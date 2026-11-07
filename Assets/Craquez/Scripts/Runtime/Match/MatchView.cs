@@ -552,6 +552,22 @@ namespace Craquez
             if (_quietOwner == this) { Sfx.NoCrowd = false; _quietOwner = null; }
         }
 
+        /// <summary>
+        /// Pausa: congela cada atleta (e o juiz) exatamente na pose e no lugar em que estava —
+        /// nada de animação, física de roupa ou correção de pose rodando com o jogo parado.
+        /// </summary>
+        public void Freeze(bool on)
+        {
+            void F(AthleteView a)
+            {
+                if (a == null) return;
+                a.enabled = !on;
+                if (a.rig != null && a.rig.animator != null) a.rig.animator.enabled = !on;
+            }
+            foreach (var a in athletes) F(a);
+            F(_referee);
+        }
+
         public AthleteView ViewOf(int id) => id >= 0 && id < athletes.Count ? athletes[id] : null;
     }
 }

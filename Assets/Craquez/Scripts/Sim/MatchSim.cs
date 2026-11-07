@@ -2052,7 +2052,19 @@ namespace Craquez.Sim
                     turnRate = 12f;
                 }
             }
-            if (p.windup > 0f) turnRate *= 0.4f;
+            if (p.windup > 0f)
+            {
+                // preparando o chute: o corpo vira para a mira (o pé encontra a bola de frente para o alvo)
+                if (p.windupKind == InputFrame.Shoot && !(throwIn && p.id == throwInTaker))
+                {
+                    // chute: o corpo se alinha com o gol (o erro do chute cresce com o corpo torto)
+                    float gy = Mathf.Clamp(p.windupAim.y * goalHalf, -goalHalf * 0.8f, goalHalf * 0.8f);
+                    faceTarget = new Vector2(halfLen * TeamDir(p.team), gy) - p.position;
+                    turnRate = 11f;
+                }
+                else if (p.windupAim.sqrMagnitude > 0.04f) { faceTarget = p.windupAim; turnRate = 9f; }
+                else turnRate *= 0.4f;
+            }
             var nf = V2.RotateToward(p.facing, faceTarget.Norm(), turnRate * DT).Norm();
             if (nf != Vector2.zero) p.facing = nf;
             if (p.sprinting) p.stamina = Mathf.Max(0f, p.stamina - 0.055f * DT * (p.Has(Trait.Resistencia) ? 0.65f : 1f));
@@ -2176,6 +2188,7 @@ namespace Craquez.Sim
             }
             float spd = o.vel.magnitude;
             float lose = spd > 5f ? 2.4f : 1.7f;
+            if (o.windup > 0f) lose = 2.8f;   // preparando o chute: a bola é trazida ao pé, não se perde por distância
             if (o.stun > 0f || o.slide > 0f || o.position.Dist(ball.pos) > lose)
             {
                 ball.owner = -1;
@@ -2203,6 +2216,21 @@ namespace Craquez.Sim
                 ball.vel = Vector2.zero;
                 ball.z = 0f; ball.vz = 0f; ball.spin = 0f;
                 o.position = setPieceSpot - o.facing * 0.5f;
+                return;
+            }
+            if (o.windup > 0f && ball.z < 0.8f)
+            {
+                // preparação do chute/passe: a bola chega ao ponto do pé de chute exatamente quando
+                // a perna desce (ao fim da preparação) — o pé não chuta o ar nem a bola longe dele
+                var f = o.facing == Vector2.zero ? Vector2.right : o.facing;
+                var side = new Vector2(f.y, -f.x);   // à direita do corpo (pé direito)
+                var spot = o.position + o.vel * o.windup + f * 0.42f + side * 0.1f;
+                float frac = Mathf.Clamp01(DT / Mathf.Max(o.windup, DT));
+                ball.pos += (spot - ball.pos) * frac;
+                ball.vel = o.vel;
+                ball.z = Mathf.Max(0f, ball.z - 3f * DT);
+                ball.vz = 0f;
+                ball.spin = 0f;
                 return;
             }
             // condução em toques (do trote ao pique): a bola é tocada à frente e o atleta vai atrás dela

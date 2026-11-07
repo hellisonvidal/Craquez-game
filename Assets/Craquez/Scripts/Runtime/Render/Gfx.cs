@@ -21,6 +21,7 @@ namespace Craquez
                 string shader = name.StartsWith("Unlit") ? "Universal Render Pipeline/Unlit" :
                     name == "Particles" ? "Universal Render Pipeline/Particles/Unlit" :
                     name.StartsWith("ToonOutline") ? "Craquez/ToonOutline" :
+                    name.StartsWith("Athlete") ? "Craquez/Athlete" :
                     name == "LitTransparent" ? "Universal Render Pipeline/Lit" : "Craquez/Toon";
                 if (Shader.Find(shader) == null) shader = "Universal Render Pipeline/Lit";
                 var sh = Shader.Find(shader) ?? Shader.Find("Standard");
@@ -50,6 +51,20 @@ namespace Craquez
             var m = new Material(Template(cutout ? "ToonOutlineCutout" : "ToonOutline"));
             Set(m, c, tex);
             m.SetFloat("_Smoothness", smooth);
+            if (cutout) m.SetFloat("_Cutoff", 0.01f);
+            return m;
+        }
+
+        /// <summary>
+        /// Material dos atletas (luz suave e volume): skin = 1 na pele (espalhamento quente no
+        /// limite luz/sombra), 0 no tecido e nas chuteiras.
+        /// </summary>
+        public static Material Athlete(Color c, Texture tex, float smooth, float skin, bool cutout = false)
+        {
+            var m = new Material(Template(cutout ? "AthleteCutout" : "Athlete"));
+            Set(m, c, tex);
+            m.SetFloat("_Smoothness", smooth);
+            m.SetFloat("_Metallic", Mathf.Clamp01(skin));
             if (cutout) m.SetFloat("_Cutoff", 0.01f);
             return m;
         }

@@ -332,10 +332,14 @@ namespace Craquez
         }
 
         // ------------------------------------------------------------- pausa / fim
+        Phase _beforePause = Phase.Playing;
+
         void Pause()
         {
+            _beforePause = _phase == Phase.Goal ? Phase.Goal : Phase.Playing;
             _phase = Phase.Paused;
             Time.timeScale = 0f;
+            view.Freeze(true);   // atletas parados exatamente onde estavam
             // os controles de toque ficam numa camada acima do HUD: escondidos, os botões do menu respondem
             if (_touch) _touch.gameObject.SetActive(false);
             hud.ShowPauseButton(false);
@@ -413,7 +417,8 @@ namespace Craquez
         {
             if (_pauseMenu != null) Destroy(_pauseMenu);
             Time.timeScale = 1f;
-            _phase = Phase.Playing;
+            view.Freeze(false);
+            _phase = _beforePause;
             if (_touch) _touch.gameObject.SetActive(true);
             hud.ShowPauseButton(true);
             for (int t = 0; t < 2; t++) _prevPause[t] = InputFrame.Pause;
