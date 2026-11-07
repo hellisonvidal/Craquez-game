@@ -94,6 +94,28 @@ namespace Craquez
             lanes.Object("Raias", Gfx.Lit(new Color(0.95f, 0.95f, 0.95f), null, 0.1f), v.root, false);
         }
 
+        /// <summary>Forro do ginásio: placas claras com frisos e luminárias embutidas.</summary>
+        static Texture2D CeilingPanels(int variant)
+        {
+            const int S = 256;
+            var t = Gfx.Tex(S, S);
+            var px = new Color32[S * S];
+            for (int y = 0; y < S; y++)
+                for (int x = 0; x < S; x++)
+                {
+                    float u = x / (float)S * 4f, w = y / (float)S * 4f;
+                    float fu = u - Mathf.Floor(u), fw = w - Mathf.Floor(w);
+                    float k = 0.92f + Gfx.VNoise(x * 0.05f, y * 0.05f, 13, variant + 70) * 0.08f;
+                    if (fu < 0.03f || fw < 0.03f) k = 0.55f;                          // frisos entre placas
+                    if (Mathf.Abs(fu - 0.5f) < 0.18f && Mathf.Abs(fw - 0.5f) < 0.06f) k = 1.25f;   // luminária
+                    var c = new Color(k, k, k * 1.02f, 1f);
+                    px[y * S + x] = c;
+                }
+            t.SetPixels32(px);
+            t.Apply(true);
+            return t;
+        }
+
         static void Pitch(Venue v, float hl, float hw, uint seed, int quality, int cut = 0)
         {
             int dq = Mathf.Max(quality, Settings.DetailLevel);
@@ -321,7 +343,8 @@ namespace Craquez
                     roof.Box(new Vector3(0, ry, -(dist + rows * step * 0.45f)), new Vector3(len, 0.6f, rows * step * 1.15f), 6f);
                     for (float x = -len / 2; x <= len / 2 + 0.1f; x += len / 6f)
                         roof.Cylinder(new Vector3(x, 0, -far - 0.5f), new Vector3(x, ry, -far - 0.5f), 0.35f, 8);
-                    var gr = roof.Object("Cobertura " + side, Gfx.Lit(new Color(0.85f, 0.86f, 0.9f), null, 0.4f, 0.2f), v.root, true);
+                    // parte de baixo da cobertura recebe a luz refletida do campo (sem breu sobre a torcida)
+                    var gr = roof.Object("Cobertura " + side, Gfx.Emissive(new Color(0.85f, 0.86f, 0.9f), night ? new Color(0.1f, 0.1f, 0.11f) : new Color(0.16f, 0.17f, 0.18f)), v.root, true);
                     gr.transform.localRotation = Quaternion.Euler(0, yaw, 0);
                 }
             }
@@ -413,14 +436,15 @@ namespace Craquez
             variant = Mathf.Abs(variant) % SocietyNames.Length;
             float hl = sim.halfLen, hw = sim.halfW;
             var grassTex = Gfx.Grass(512, Color.white, variant + 50);
-            var turf = Gfx.LitN(new Color(0.42f, 0.78f, 0.32f), grassTex, Gfx.GrassNormal, 0.25f, 0.5f);
-            var turf2 = Gfx.LitN(new Color(0.36f, 0.68f, 0.28f), grassTex, Gfx.GrassNormal, 0.25f, 0.5f);
+            // grama sintética: verde vivo, mas não "limão" (o pós-processamento ainda satura)
+            var turf = Gfx.LitN(new Color(0.33f, 0.62f, 0.27f), grassTex, Gfx.GrassNormal, 0.25f, 0.5f);
+            var turf2 = Gfx.LitN(new Color(0.29f, 0.55f, 0.24f), grassTex, Gfx.GrassNormal, 0.25f, 0.5f);
             if (variant == 0)
             {
                 var vi = new Venue { root = new GameObject("Society").transform, name = SocietyNames[0] };
                 vi.root.SetParent(parent, false);
                 var sur = Gfx.Lit(new Color(0.2f, 0.36f, 0.2f), grassTex, 0.1f);
-                BuildFutsalHall(vi, sim, home, away, homeKit, awayKit, (new Color(0.42f, 0.78f, 0.32f), new Color(0.2f, 0.36f, 0.2f), 2), turf, sur, 7, night, quality);
+                BuildFutsalHall(vi, sim, home, away, homeKit, awayKit, (new Color(0.33f, 0.62f, 0.27f), new Color(0.2f, 0.36f, 0.2f), 2), turf, sur, 7, night, quality);
                 return vi;
             }
             var v = new Venue { root = new GameObject("Society").transform, name = SocietyNames[variant] };
@@ -600,7 +624,14 @@ namespace Craquez
             high.Object("Parede alta", wallHigh, v.root, false);
             var roof = new MeshKit();
             roof.Quad(new Vector3(-W, H, -D), new Vector3(W, H, -D), new Vector3(W, H, D), new Vector3(-W, H, D), new Vector2(0, 0), new Vector2(W / 3f, D / 3f));
-            roof.Object("Teto", Gfx.Lit(new Color(0.22f, 0.24f, 0.28f), Gfx.Asphalt(128, Color.white, 3, 0f), 0.2f), v.root, false);
+            // teto voltado para baixo não recebe a luz principal: antes ficava preto (um "vazio" acima
+            // das arquibancadas). Agora: forro de painéis claros com luz própria suave + claraboias
+            var ceilTex = CeilingPanels(variant);
+            roof.Object("Teto", Gfx.Emissive(new Color(0.78f, 0.8f, 0.84f), night ? new Color(0.13f, 0.135f, 0.15f) : new Color(0.22f, 0.23f, 0.25f), ceilTex), v.root, false);
+            var sky = new MeshKit();
+            for (float x = -W + 6f; x <= W - 6f; x += 10f)
+                sky.Box(new Vector3(x, H - 0.05f, 0f), new Vector3(2.2f, 0.1f, D * 1.7f));
+            sky.Object("Claraboias", Gfx.Emissive(Color.white, night ? new Color(0.5f, 0.55f, 0.65f) : new Color(2.2f, 2.3f, 2.4f)), v.root, false);
             // tesouras metálicas do telhado
             var steel = new MeshKit();
             for (float x = -W + 4f; x <= W - 4f; x += 7f)

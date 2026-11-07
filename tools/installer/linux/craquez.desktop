@@ -1,0 +1,8 @@
+[Desktop Entry]
+Type=Application
+Name=Craquez
+Comment=Futebol, futsal, society e rua (feito com IA, gratuito)
+Exec=Craquez
+Icon=craquez
+Terminal=false
+Categories=Game;SportsGame;

@@ -80,7 +80,7 @@ jobs:
             targetPlatform: Android
           - name: Windows
             targetPlatform: StandaloneWindows64
-          - name: Linux (screenshots)
+          - name: Linux
             targetPlatform: StandaloneLinux64
     steps:
       - uses: jlumbroso/free-disk-space@v1.3.1
@@ -125,6 +125,24 @@ jobs:
         with:
           name: Craquez-Windows-Instalador
           path: Craquez-Setup.exe
+          retention-days: 14
+      # Linux: pacote .tar.gz (mantém a permissão de execução) com atalho .desktop e ícone
+      - name: Pacote Linux
+        if: matrix.targetPlatform == 'StandaloneLinux64'
+        run: |
+          sudo chown -R "$USER" build
+          D=build/StandaloneLinux64
+          chmod +x "$D/Craquez" || chmod +x "$D/Craquez.x86_64" || true
+          cp tools/installer/linux/craquez.desktop tools/installer/linux/instalar.sh "$D/"
+          chmod +x "$D/instalar.sh"
+          cp Assets/Craquez/Resources/UI/craquez_logo.png "$D/craquez.png"
+          tar czf Craquez-Linux.tar.gz -C build --transform 's,^StandaloneLinux64,Craquez,' StandaloneLinux64
+          ls -la Craquez-Linux.tar.gz
+      - uses: actions/upload-artifact@v4
+        if: matrix.targetPlatform == 'StandaloneLinux64'
+        with:
+          name: Craquez-Linux
+          path: Craquez-Linux.tar.gz
           retention-days: 14
       # roda o jogo (renderização por software) e tira screenshots de todas as telas e modos
       - name: Screenshots

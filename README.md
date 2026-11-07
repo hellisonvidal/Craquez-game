@@ -1,6 +1,6 @@
 # ⚽ Craquez
 
-Jogo de futebol **3D realista** feito em **Unity 6.3 LTS (URP)**, com jogabilidade no estilo EA FC / eFootball, para **Android** e **Windows**.
+Jogo de futebol **3D realista** feito em **Unity 6.3 LTS (URP)**, com jogabilidade no estilo EA FC / eFootball, para **Android**, **Windows** e **Linux**.
 Modos **Campo (11×11)**, **Futsal (5×5)** e **Rua (3×3, bola na parede vale)**. Contra a CPU ou contra um amigo no mesmo aparelho/PC.
 Controles **Xbox / PlayStation**, teclado e toque, detectados automaticamente.
 
@@ -26,6 +26,12 @@ Feito 100% com inteligência artificial, por isso é e sempre será **gratuito**
 | **Táticas** | Formação, mentalidade, pressão e escalação (troca titular ↔ reserva) |
 | **Cerimônia** | Sobrevoo do estádio, entrada dos times e apresentação das escalações |
 | **Option file** | Personalize nomes, uniformes, estádios e escudos no seu aparelho — [docs/OPTION_FILE.md](docs/OPTION_FILE.md) |
+| **IA** | Cada atleta tem personalidade (disposição, ousadia, disciplina tática, leitura de jogo): decide no seu ritmo, oferece linhas de passe diferentes dos companheiros e o time mantém o espaçamento (sem bolo em volta da bola) |
+| **Goleiros** | Tempo de reação individual (mais lento com a visão encoberta), passo lateral ou mergulho com alcance real, defesa na ponta dos dedos, espalmada, saída no mano a mano |
+| **Faltas** | A vítima tropeça, cai, rola segurando a perna e levanta; quem fez reclama. Cobrança rápida ou cena curta com barreira montada (opção) |
+| **Saída de bola** | Sempre com um passe para o companheiro ao lado |
+| **Bandeiras** | Bandeiras reais dos países em ligas, seleções e nacionalidades; bandeira de cada clube (cores + escudo) na escolha e na torcida |
+| **Gráficos** | Predefinições Leve / Equilibrado / Alto / Ultra e, no PC, modo de tela, resolução, sincronia vertical, limite de quadros, escala de render, antisserrilhado (FXAA, SMAA, MSAA), sombras e texturas |
 | **Física** | Determinística a 60 Hz: bola com arrasto e "crise do arrasto" em chutes fortes, efeito Magnus, quique por superfície com fase de deslize, desvio no corpo pelo ângulo de impacto; goleiro com tempo de reação, mergulho, encaixe ou espalmada; faltas, pênalti, impedimento, laterais, escanteios |
 
 ## Telas e modos

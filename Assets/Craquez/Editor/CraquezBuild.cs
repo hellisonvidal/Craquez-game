@@ -25,7 +25,7 @@ namespace Craquez.EditorTools
         [InitializeOnLoadMethod]
         static void OnLoad()
         {
-            // Linux (só usado nas screenshots do CI): Vulkan + OpenGL, para rodar com lavapipe
+            // Linux: Vulkan (padrão) + OpenGL de reserva (placas antigas e as screenshots do CI)
             try
             {
                 var want = new[] { UnityEngine.Rendering.GraphicsDeviceType.Vulkan, UnityEngine.Rendering.GraphicsDeviceType.OpenGLCore };
@@ -265,6 +265,14 @@ namespace Craquez.EditorTools
         {
             Common();
             Run(BuildTarget.StandaloneWindows64, BuildTargetGroup.Standalone, Out("Builds/Windows/Craquez.exe"));
+        }
+
+        /// <summary>Linux x86-64 (Vulkan, com OpenGL de reserva). Saída: Builds/Linux/Craquez.x86_64.</summary>
+        [MenuItem("Craquez/Build Linux")]
+        public static void BuildLinux()
+        {
+            Common();
+            Run(BuildTarget.StandaloneLinux64, BuildTargetGroup.Standalone, Out("Builds/Linux/Craquez.x86_64"));
         }
     }
 }
