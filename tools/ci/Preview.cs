@@ -50,6 +50,13 @@ public static class P {
       int diff = 0; for (int i = 0; i < n0; i++) if (Craquez.Sim.Teams.Get(i).name != before[i]) diff++;
       Console.WriteLine("times aplicados: " + Craquez.Sim.Teams.OverrideCount + "  nomes trocados: " + diff + " de " + n0);
       foreach (int i in new[] { 0, 40, 60, 100, 200, 300 }) Console.WriteLine("  " + before[i] + "  ->  " + Craquez.Sim.Teams.Get(i).name + "  (" + Craquez.Sim.Teams.Get(i).stadium.name + ")");
+      for (int i = 0; i < n0; i++) {
+        var t = Craquez.Sim.Teams.Get(i);
+        if (t.name != "Real Madrid" && t.name != "Flamengo" && t.name != "Brasil") continue;
+        var sb = new System.Text.StringBuilder("  " + t.name + ": ");
+        foreach (var r in t.roster) sb.Append(r.num + " " + r.n + " (" + r.pos + " " + r.ovr + (r.a.Length >= 6 ? " vel " + r.a[0].ToString("0.00") + " def " + r.a[5].ToString("0.00") : "") + "), ");
+        Console.WriteLine(sb.ToString());
+      }
       return;
     }
     if (a.Length > 2 && a[1] == "optionfile") {

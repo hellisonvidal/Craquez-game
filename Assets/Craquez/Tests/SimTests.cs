@@ -442,6 +442,47 @@ namespace Craquez.Tests
             Assert.Less(rate, 0.01f, "companheiros colados em " + (rate * 100f).ToString("F2") + "% do tempo");
         }
 
+        [Test] public void SubstitutionSwapsPlayerAndBlocksReturn()
+        {
+            var sim = NewMatch(GameModes.Field);
+            var p = sim.players.Find(x => x.team == 0 && !x.isKeeper);
+            var roster = sim.teams[0].data.roster;
+            int bench = -1;
+            for (int i = 0; i < roster.Count; i++)
+            {
+                if (roster[i].pos == "GK") continue;
+                if (!sim.players.Exists(x => x.team == 0 && x.rosterIndex == i)) { bench = i; break; }
+            }
+            Assert.GreaterOrEqual(bench, 0, "banco sem reserva de linha");
+            int outIdx = p.rosterIndex;
+            Assert.IsTrue(sim.Substitute(p.id, bench));
+            Assert.AreEqual(roster[bench].n, p.name);
+            Assert.AreEqual(4, sim.subsLeft[0]);
+            // quem saiu não volta (campo); goleiro só por goleiro
+            var q = sim.players.Find(x => x.team == 0 && !x.isKeeper && x.id != p.id);
+            Assert.IsFalse(sim.Substitute(q.id, outIdx));
+            var gk = sim.players.Find(x => x.team == 0 && x.isKeeper);
+            int outfield = roster.FindIndex(e => e.pos != "GK" && !sim.players.Exists(x => x.team == 0 && x.rosterIndex == roster.IndexOf(e)) && roster.IndexOf(e) != outIdx);
+            Assert.IsFalse(sim.Substitute(gk.id, outfield));
+        }
+
+        [Test] public void BallStaysInsideTheNet()
+        {
+            var sim = NewMatch(GameModes.Field);
+            sim.ball.owner = -1;
+            sim.ball.pos = new Vector2(sim.halfLen + 0.3f, 2f);
+            sim.ball.vel = new Vector2(30f, 4f);
+            sim.ball.z = 1.5f;
+            sim.ball.vz = 2f;
+            float maxImpact = 0f;
+            for (int i = 0; i < 300; i++) maxImpact = Mathf.Max(maxImpact, sim.StepBallInNet());
+            Assert.Greater(maxImpact, 10f, "a bola tem de bater forte na rede");
+            Assert.Greater(sim.ball.pos.x, sim.halfLen, "a bola fica dentro do gol");
+            Assert.LessOrEqual(sim.ball.pos.x, sim.halfLen + sim.mode.goalDepth);
+            Assert.LessOrEqual(Mathf.Abs(sim.ball.pos.y), sim.goalHalf);
+            Assert.Less(sim.ball.Speed, 1.5f, "a rede segura a bola");
+        }
+
         [Test] public void JsonRoundTrip()
         {
             var o = MiniJson.Parse("{\"a\": [1, 2.5, \"x\\n\"], \"b\": {\"c\": true, \"d\": null}}");

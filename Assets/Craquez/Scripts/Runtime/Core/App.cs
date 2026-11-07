@@ -220,10 +220,7 @@ namespace Craquez
             var nav = back.navigation;
             nav.mode = Navigation.Mode.None;   // não rouba o foco do controle; Esc/B/voltar do Android também funcionam
             back.navigation = nav;
-            var logoIc = UiKit.Rect(top, "ícone").At(0, 0.5f, 52, 52, 214, 0).gameObject.AddComponent<RawImage>();
-            logoIc.texture = Resources.Load<Texture2D>("UI/craquez_logo");
-            logoIc.raycastTarget = false;
-            UiKit.Label(top, "CRAQUEZ", 36, Theme.HeadItalic, Color.white).rectTransform.Place(0, 0, 0.3f, 1, 276, 0, 0, 0);
+            UiKit.Label(top, "CRAQUEZ", 36, Theme.HeadItalic, Color.white).rectTransform.Place(0, 0, 0.3f, 1, 218, 0, 0, 0);
             if (!string.IsNullOrEmpty(crumb))
                 UiKit.Label(top, crumb, 24, Theme.Head, Theme.TextDim).rectTransform.Place(0, 0, 0.7f, 1, 450, 0, 0, 0);
             UiKit.Label(top, InputRouter.DeviceName(InputRouter.DefaultP1()) + "   •   v" + Application.version, 22, Theme.BodyBold, Theme.TextDim, TextAnchor.MiddleRight)
@@ -566,7 +563,7 @@ namespace Craquez
             var root = Page("MENU");
             _back = ShowTitle;
             Title(root, "CRAQUEZ", "O que vamos jogar hoje?");
-            var grid = UiKit.Rect(root, "menu").Place(0, 0, 1, 1, 90, 186, 90, 200);
+            var grid = UiKit.Rect(root, "menu").Place(0, 0, 1, 1, 90, 196, 90, 200);
             UiKit.HList(grid, 30).childForceExpandHeight = true;
             var wc = Competitions.All[0];
             int titles = Trophies().Count;
@@ -575,7 +572,37 @@ namespace Craquez
             var lc = Competitions.All[4];
             BigCard(grid, "MURAL DE TROFÉUS", titles + (titles == 1 ? " TÍTULO" : " TÍTULOS"), "As suas conquistas", TrophyArt.Texture(lc.trophy, lc.c1, lc.c2, 512, titles == 0), 1f, new Color(0.85f, 0.55f, 0.2f), ShowTrophyWall);
             BigCard(grid, "CONFIGURAÇÕES", "OPÇÕES", "Som, câmera, gráficos e option file", _settingsArt ??= MenuArt.SettingsArt(), 512f / 560f, new Color(0.35f, 0.5f, 0.9f), ShowOptions);
+            // sair do jogo sem precisar fechar o app à força (também pelo voltar do menu principal)
+            var quit = UiKit.Button(root, "SAIR DO JOGO", ConfirmQuit, 28, new Color(0.55f, 0.1f, 0.14f));
+            quit.GetComponent<RectTransform>().At(1, 0, 300, 62, -90, 112);
+            _back = ConfirmQuit;
             UiKit.Select(play);
+        }
+
+        /// <summary>Pergunta antes de fechar o jogo (Application.Quit).</summary>
+        void ConfirmQuit()
+        {
+            var prevBack = _back;
+            var shade = UiKit.Image(_root, new Color(0, 0, 0, 0.78f), null, "sair?").rectTransform.Place(0, 0, 1, 1);
+            var box = UiKit.Image(shade, new Color(0.04f, 0.07f, 0.16f, 0.98f), null, "caixa").rectTransform.At(0.5f, 0.5f, 820, 360);
+            UiKit.Image(box, Theme.Hot, null, "faixa").rectTransform.Place(0, 1, 1, 1, 0, -6, 0, 0);
+            UiKit.Label(box, "SAIR DO CRAQUEZ?", 54, Theme.HeadItalic, Color.white, TextAnchor.MiddleCenter).rectTransform.Place(0, 0.55f, 1, 1, 20, 0, 20, -20);
+            UiKit.Label(box, "O progresso das competições e os troféus ficam salvos.", 26, Theme.Body, Theme.TextDim, TextAnchor.MiddleCenter).rectTransform.Place(0, 0.38f, 1, 0.58f, 20, 0, 20, 0);
+            void Close() { Destroy(shade.gameObject); _back = prevBack; }
+            var yes = UiKit.Button(box, "SAIR", () =>
+            {
+                PlayerPrefs.Save();
+#if UNITY_EDITOR
+                UnityEditor.EditorApplication.isPlaying = false;
+#else
+                Application.Quit();
+#endif
+            }, 32, new Color(0.75f, 0.12f, 0.16f));
+            yes.GetComponent<RectTransform>().Place(0.08f, 0.1f, 0.47f, 0.34f);
+            var no = UiKit.Button(box, "CONTINUAR JOGANDO", () => { Close(); var s = _root.GetComponentInChildren<Selectable>(); if (s != null) UiKit.Select(s); }, 28, new Color(0.1f, 0.3f, 0.6f));
+            no.GetComponent<RectTransform>().Place(0.53f, 0.1f, 0.92f, 0.34f);
+            _back = Close;
+            UiKit.Select(no);
         }
 
         /// <summary>Jogar (amistoso): só a modalidade (quatro cartões); clubes ou seleções vêm depois.</summary>
@@ -1390,8 +1417,9 @@ namespace Craquez
         }
         public void Tour_Teams() => ShowTeams();
         public void Tour_Tactics() => ShowTactics(0);
-        public MatchController Tour_Match(string mode, bool national, string tod, string weather)
+        public MatchController Tour_Match(string mode, bool national, string tod, string weather, int stadium = 0)
         {
+            _cfg.stadium = stadium;
             _cfg.mode = mode;
             _cfg.national = national;
             FixTeamsForMode();

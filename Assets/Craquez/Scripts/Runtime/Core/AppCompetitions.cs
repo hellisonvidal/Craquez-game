@@ -51,24 +51,7 @@ namespace Craquez
             PlayerPrefs.Save();
         }
 
-        static RectTransform Scroll(RectTransform parent, float spacing = 6f)
-        {
-            var scroll = parent.gameObject.AddComponent<ScrollRect>();
-            var view = UiKit.Rect(parent, "view").Place(0, 0, 1, 1, 14, 14, 14, 14);
-            view.gameObject.AddComponent<RectMask2D>();
-            var content = UiKit.Rect(view, "conteudo");
-            content.anchorMin = new Vector2(0, 1);
-            content.anchorMax = new Vector2(1, 1);
-            content.pivot = new Vector2(0.5f, 1);
-            content.sizeDelta = new Vector2(0f, content.sizeDelta.y);   // mesma largura da área visível (antes sobravam 100 px, cortando o texto)
-            UiKit.VList(content, spacing, 0, false);
-            content.gameObject.AddComponent<ContentSizeFitter>().verticalFit = ContentSizeFitter.FitMode.PreferredSize;
-            scroll.viewport = view;
-            scroll.content = content;
-            scroll.horizontal = false;
-            scroll.scrollSensitivity = 30f;
-            return content;
-        }
+        static RectTransform Scroll(RectTransform parent, float spacing = 6f) => UiKit.Scroll(parent, spacing);
 
         static string ModeLabel(CompDef d) => GameModes.DisplayName(d.mode) + (d.national ? "  •  Seleções" : "  •  Clubes");
 

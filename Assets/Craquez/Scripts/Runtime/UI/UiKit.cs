@@ -260,6 +260,26 @@ namespace Craquez.UI
             return c;
         }
 
+        /// <summary>Lista vertical com rolagem (conteúdo na largura da área visível).</summary>
+        public static RectTransform Scroll(RectTransform parent, float spacing = 6f)
+        {
+            var scroll = parent.gameObject.AddComponent<ScrollRect>();
+            var view = Rect(parent, "view").Place(0, 0, 1, 1, 14, 14, 14, 14);
+            view.gameObject.AddComponent<RectMask2D>();
+            var content = Rect(view, "conteudo");
+            content.anchorMin = new Vector2(0, 1);
+            content.anchorMax = new Vector2(1, 1);
+            content.pivot = new Vector2(0.5f, 1);
+            content.sizeDelta = new Vector2(0f, content.sizeDelta.y);
+            VList(content, spacing, 0, false);
+            content.gameObject.AddComponent<ContentSizeFitter>().verticalFit = ContentSizeFitter.FitMode.PreferredSize;
+            scroll.viewport = view;
+            scroll.content = content;
+            scroll.horizontal = false;
+            scroll.scrollSensitivity = 30f;
+            return content;
+        }
+
         public static VerticalLayoutGroup VList(RectTransform rt, float spacing = 12, int pad = 0, bool expandH = true)
         {
             var v = rt.gameObject.AddComponent<VerticalLayoutGroup>();

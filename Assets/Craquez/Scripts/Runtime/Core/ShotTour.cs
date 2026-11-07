@@ -131,6 +131,25 @@ namespace Craquez
                     bc.cinematic = false;
                 }
                 yield return Shot(tag + "_jogo2", 3f);
+                if (mc != null && tag == "campo_noite")
+                {
+                    // gol forçado: bola entrando no canto (rede balançando) e a comemoração sem corte
+                    var sim = mc.sim;
+                    sim.ball.owner = -1;
+                    sim.ball.pos = new Vector2(sim.halfLen - 1.2f, 1.5f);
+                    sim.ball.vel = new Vector2(24f, 0.5f);
+                    sim.ball.z = 1.1f;
+                    sim.ball.vz = 0.5f;
+                    yield return Shot("gol_rede", 0.5f);
+                    yield return Shot("gol_rede2", 0.6f);
+                    yield return Shot("gol_comemoracao", 2.5f);
+                    yield return Shot("gol_comemoracao2", 3f);
+                    // intervalo: relógio no fim do 1º tempo
+                    yield return new WaitForSecondsRealtime(12f);
+                    sim.clock = sim.halfSeconds;
+                    yield return Shot("intervalo_apito", 1.2f);
+                    yield return Shot("intervalo", 2.5f);
+                }
                 // câmeras próximas do jogador (só nas duas primeiras partidas, para não alongar o roteiro)
                 if (mc != null && mc.view != null && (tag == "campo_noite" || tag == "futsal"))
                 {
@@ -140,6 +159,30 @@ namespace Craquez
                         yield return Shot(tag + "_cam_" + k, 2.5f);
                     }
                     mc.view.bcam.mode = 0;
+                }
+                _app.Tour_EndMatch();
+                yield return new WaitForSecondsRealtime(0.5f);
+            }
+            // estádios: vista aberta de cada modelo (arquibancada, cobertura, torcida, entorno)
+            foreach (int m in new[] { 1, 2, 5, 6, 7, 9, 11, 13, 14 })
+            {
+                var mc = _app.Tour_Match(GameModes.Field, false, m % 2 == 0 ? "noite" : "dia", "sol", m);
+                yield return new WaitForSecondsRealtime(1.5f);
+                if (mc != null && mc.view != null)
+                {
+                    var bc = mc.view.bcam;
+                    float hl = mc.sim.halfLen, hw = mc.sim.halfW;
+                    bc.cinematic = true;
+                    bc.cam.transform.position = bc.cinePos = new Vector3(-hl * 0.55f, 16f, -hw * 0.9f);
+                    bc.cineLook = new Vector3(hl * 0.2f, 8f, hw + 10f);
+                    bc.cam.transform.LookAt(bc.cineLook);
+                    bc.cam.fieldOfView = bc.cineFov = 62f;
+                    yield return Shot("estadio_" + m, 1.2f);
+                    bc.cam.transform.position = bc.cinePos = new Vector3(0f, 3f, -hw - 2f);
+                    bc.cineLook = new Vector3(hl * 0.9f, 7f, 0f);
+                    bc.cam.transform.LookAt(bc.cineLook);
+                    yield return Shot("estadio_" + m + "_fundo", 1f);
+                    bc.cinematic = false;
                 }
                 _app.Tour_EndMatch();
                 yield return new WaitForSecondsRealtime(0.5f);

@@ -24,6 +24,7 @@ namespace Craquez
         Vector3 _ballPrev, _ballCur;
         Quaternion _ballRot = Quaternion.identity;
         float _crowdT, _crowdHype, _silence;
+        bool _cheering;
         CrowdFx _crowd;
         AthleteView _referee;
         public VenueLife life;
@@ -49,7 +50,10 @@ namespace Craquez
             else venue = VenueBuilder.Stadium(s, home, away, kits[0], kits[1], _night, q, transform, c.stadium);
             // goleiros: uniforme de cor neutra que não confunde com nenhum dos dois
             var gk = new[] { KeeperKit(kits[0], kits[1], 0), KeeperKit(kits[1], kits[0], 1) };
+            _gk = gk;
+            _q = q;
             var parent = new GameObject("Atletas").transform;
+            _athParent = parent;
             parent.SetParent(transform, false);
             if (s.mode.id != GameModes.Street) _crowd = CrowdFx.Create(transform, s, venue, kits[0], kits[1], _night, q, c.teamA, c.teamB);
             life = VenueLife.Create(transform, s, venue, kits[0], kits[1], home, away, _night, q, cam, c.venue);
@@ -401,7 +405,7 @@ namespace Craquez
                     _silence = homeGoal ? 0f : 6f;
                     bcam.Shake(0.6f);
                     foreach (var n in venue.nets)
-                        n.Hit(new Vector3(sim.ball.pos.x, sim.ball.z + 0.3f, sim.ball.pos.y), sim.ball.Speed + 10f);
+                        n.Hit(new Vector3(sim.ball.pos.x, sim.ball.z + 0.3f, sim.ball.pos.y), sim.ball.Speed * 0.35f);   // o tranco forte vem quando a bola chega ao fundo
                     break;
             }
         }
@@ -513,11 +517,25 @@ namespace Craquez
             float want = homeAttack ? danger * 0.7f : danger * 0.15f;
             if (_silence > 0f) { _silence -= Time.deltaTime; want = 0f; }
             _crowdHype = Mathf.MoveTowards(_crowdHype, want, Time.deltaTime * 0.3f);
-            float bounce = Mathf.Abs(Mathf.Sin(_crowdT * (6f + _crowdHype * 6f))) * (0.002f + _crowdHype * 0.006f);
             foreach (var m in venue.crowdMats)
             {
+                // cada grupo de fileiras pula no seu tempo
+                float ph = venue.crowdPhase.TryGetValue(m, out var f) ? f : 0f;
+                float bounce = Mathf.Abs(Mathf.Sin(_crowdT * (6f + _crowdHype * 6f) + ph)) * (0.002f + _crowdHype * 0.006f) * (ph > 0f ? 1.6f : 1f);
                 m.mainTextureOffset = new Vector2(0, bounce);
                 if (m.HasProperty("_BaseMap")) m.SetTextureOffset("_BaseMap", new Vector2(0, bounce));
+            }
+            // gol do mandante / lance de perigo: a arquibancada levanta os braços
+            bool cheering = _crowdHype > 0.95f && _silence <= 0f;
+            if (cheering != _cheering)
+            {
+                _cheering = cheering;
+                foreach (var cc in venue.crowdCheer)
+                {
+                    var tex = cheering ? cc.cheer : cc.normal;
+                    cc.mat.mainTexture = tex;
+                    if (cc.mat.HasProperty("_BaseMap")) cc.mat.SetTexture("_BaseMap", tex);
+                }
             }
             float quiet = _silence > 0f ? 0.55f : 1f;
             float tense = !homeAttack ? danger * 0.12f : 0f;   // murmúrio quando o visitante ameaça
@@ -559,8 +577,35 @@ namespace Craquez
         /// Pausa: congela cada atleta (e o juiz) exatamente na pose e no lugar em que estava —
         /// nada de animação, física de roupa ou correção de pose rodando com o jogo parado.
         /// </summary>
+        Kit[] _gk;
+        int _q;
+        Transform _athParent;
+        bool _frozen;
+
+        /// <summary>Substituição: refaz o atleta <paramref name="id"/> com a cara, o nome e o número de quem entrou.</summary>
+        public void Replace(int id)
+        {
+            if (id < 0 || id >= athletes.Count) return;
+            var p = sim.players[id];
+            var old = athletes[id];
+            var rig = AthleteFactory.Create(p, kits[p.team], _gk[p.team], _athParent, _q, (p.team == 0 ? cfg.tacticsA : cfg.tacticsB).boots);
+            var av = rig.gameObject.AddComponent<AthleteView>();
+            av.Setup(p, rig, this);
+            athletes[id] = av;
+            if (old != null) Destroy(old.gameObject);
+            av.Snap();
+            if (_frozen) StartCoroutine(FreezeAfterPose(av));
+        }
+
+        System.Collections.IEnumerator FreezeAfterPose(AthleteView a)
+        {
+            yield return new WaitForEndOfFrame();   // um quadro animado para assumir a pose parada
+            if (_frozen && a != null) { if (a.rig != null && a.rig.animator != null) a.rig.animator.Update(0.2f); a.enabled = false; if (a.rig != null && a.rig.animator != null) a.rig.animator.enabled = false; }
+        }
+
         public void Freeze(bool on)
         {
+            _frozen = on;
             void F(AthleteView a)
             {
                 if (a == null) return;

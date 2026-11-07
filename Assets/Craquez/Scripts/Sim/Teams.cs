@@ -441,6 +441,20 @@ namespace Craquez.Sim
                         if (pd.ContainsKey("pos")) e.pos = MiniJson.S(pl, "pos");
                         if (pd.ContainsKey("nat")) e.nat = MiniJson.S(pl, "nat");
                         if (pd.ContainsKey("ovr")) e.ovr = Mathf.Clamp(MiniJson.I(pl, "ovr"), 30, 99);
+                        // atributos [velocidade, aceleração, chute, passe, controle, defesa] em 0-1
+                        var al = MiniJson.L(pl, "a");
+                        if (al != null && al.Count >= 6)
+                        {
+                            var fa = Floats(al);
+                            for (int k = 0; k < fa.Length; k++) fa[k] = Mathf.Clamp(fa[k], 0.2f, 0.99f);
+                            e.a = fa;
+                        }
+                        var tl = MiniJson.L(pl, "traits") ?? MiniJson.L(pl, "t");
+                        if (tl != null)
+                        {
+                            e.t.Clear();
+                            foreach (var x in tl) if (x is string ts) e.t.Add(ts);
+                        }
                     }
                     string crest = MiniJson.S(o, "crest", "");
                     if (crest != "" && File.Exists(Path.Combine(dir, crest)))

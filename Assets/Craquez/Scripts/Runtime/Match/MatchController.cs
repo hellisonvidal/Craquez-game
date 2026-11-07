@@ -12,7 +12,7 @@ namespace Craquez
     /// </summary>
     public class MatchController : MonoBehaviour
     {
-        enum Phase { Ceremony, Playing, Paused, Ended, Goal }
+        enum Phase { Ceremony, Playing, Paused, Ended, Goal, Halftime }
 
         public MatchConfig cfg;
         public MatchSim sim;
@@ -237,6 +237,9 @@ namespace Craquez
                 case Phase.Paused:
                 case Phase.Ended:
                     return;
+                case Phase.Halftime:
+                    UpdateHalftime(dt);
+                    return;
                 case Phase.Goal:
                     if (!_show.Update(dt, AnyPress()))
                     {
@@ -282,6 +285,11 @@ namespace Craquez
                     _phase = Phase.Goal;
                     _acc = 0f;
                     if (_touch) _touch.gameObject.SetActive(false);
+                    return;
+                }
+                if (sim.state == MatchState.Halftime && !attract && !_halfShown)
+                {
+                    BeginHalftime();
                     return;
                 }
                 if (sim.state == MatchState.Fulltime)
@@ -368,6 +376,7 @@ namespace Craquez
                 UiKit.Size(first, 76, 76);
                 UiKit.Size(UiKit.Button(list, "Configurações gerais", () => PausePage(1)), 76, 76);
                 UiKit.Size(UiKit.Button(list, "Equipes e táticas", () => PausePage(2)), 76, 76);
+                UiKit.Size(UiKit.Button(list, "Substituições", () => SubsPage(-1)), 76, 76);
                 UiKit.Size(UiKit.Button(list, "Reiniciar partida", () => { Resume(); onRestart?.Invoke(cfg); }), 76, 76);
                 UiKit.Size(UiKit.Button(list, "Menu principal", () => { Resume(); onExit?.Invoke(); }), 76, 76);
                 var dev = _cpu[0] == null ? _dev[0] : _dev[1];
@@ -386,7 +395,7 @@ namespace Craquez
                 UiKit.Size(UiKit.Cycler(list, "Vibração", new[] { "Ligada", "Desligada" }, Settings.Vibration ? 0 : 1, i => Settings.Vibration = i == 0), 72, 72);
                 if (cfg.mode != GameModes.Futsal)
                     UiKit.Size(UiKit.Cycler(list, "Clima dinâmico", new[] { "Ligado", "Desligado" }, view.weather.dynamic ? 0 : 1, i => view.weather.dynamic = i == 0), 72, 72);
-                UiKit.Size(UiKit.Button(list, "‹  Voltar", () => PausePage(0)), 72, 72);
+                UiKit.Size(UiKit.Button(list, "‹  Voltar", MenuHome), 72, 72);
             }
             else
             {
@@ -408,11 +417,194 @@ namespace Craquez
                     UiKit.Size(UiKit.Cycler(list, "Mentalidade", new[] { "Defensiva", "Equilibrada", "Ofensiva" }, tac.mentality, i => { tac.mentality = i; sim.ApplyTactics(team, tac); }), 72, 72);
                     UiKit.Size(UiKit.Cycler(list, "Pressão", new[] { "Baixa", "Média", "Alta" }, tac.press, i => { tac.press = i; sim.ApplyTactics(team, tac); }), 72, 72);
                 }
-                var back = UiKit.Button(list, "‹  Voltar", () => PausePage(0));
+                var back = UiKit.Button(list, "‹  Voltar", MenuHome);
                 UiKit.Size(back, 72, 72);
                 if (first == null) first = back;
             }
             UiKit.Select(first);
+        }
+
+        void MenuHome()
+        {
+            if (_phase == Phase.Halftime) HalftimeMenu();
+            else PausePage(0);
+        }
+
+        // ------------------------------------------------------------- intervalo
+        bool _halfShown;
+        float _htT;
+        int _htStage;   // 0 = apito e câmera, 1 = transição, 2 = menu aberto, 3 = saindo
+        GameObject _htFx;
+
+        void BeginHalftime()
+        {
+            _halfShown = true;
+            _phase = Phase.Halftime;
+            _htT = 0f;
+            _htStage = 0;
+            _acc = 0f;
+            if (_touch) _touch.gameObject.SetActive(false);
+            hud.ShowPauseButton(false);
+            Sfx.Applause(0.5f);
+            // plano aberto do estádio enquanto os atletas param: câmera alta girando devagar
+            view.bcam.Scene(new Vector3(-sim.halfLen * 0.9f, sim.halfLen * 0.45f + 6f, -sim.halfW * 1.9f), new Vector3(0, 0, 0), 600f, 42f);
+        }
+
+        void UpdateHalftime(float dt)
+        {
+            _htT += dt;
+            _orbit += dt * 0.05f;
+            float R = Mathf.Max(sim.halfLen * 1.35f, 22f);
+            view.bcam.cinePos = new Vector3(Mathf.Cos(_orbit + 3.8f) * R, sim.halfLen * 0.4f + 6f, Mathf.Sin(_orbit + 3.8f) * R * 0.85f);
+            view.bcam.cineLook = Vector3.up * 1.5f;
+            if (_htStage == 0 && _htT > 1.6f)
+            {
+                _htStage = 1;
+                Wipe.Play(hud.Overlay);   // varredura de transmissão
+                _htT = 0f;
+            }
+            else if (_htStage == 1 && _htT > 0.45f)
+            {
+                _htStage = 2;
+                HalftimeMenu();
+                foreach (Transform c in hud.Overlay) if (c.name == "transição") c.SetAsLastSibling();   // a varredura termina por cima do menu
+            }
+            else if (_htStage == 3 && _htT > 0.45f)
+            {
+                // volta para o jogo: o apito do 2º tempo sai logo
+                if (_pauseMenu != null) Destroy(_pauseMenu);
+                view.bcam.Scene(view.bcam.cam.transform.position, Vector3.zero, 0.01f);
+                sim.stateTimer = Mathf.Min(sim.stateTimer, 0.3f);
+                _phase = Phase.Playing;
+                _acc = 0f;
+                if (_touch) _touch.gameObject.SetActive(true);
+                hud.ShowPauseButton(true);
+                for (int t = 0; t < 2; t++) _prevPause[t] = InputFrame.Pause;
+            }
+        }
+
+        void StartSecondHalf()
+        {
+            if (_htStage != 2) return;
+            _htStage = 3;
+            _htT = 0f;
+            Wipe.Play(hud.Overlay);
+            Sfx.Ui();
+        }
+
+        /// <summary>Tela do intervalo: placar, números do 1º tempo e os menus para mexer no time.</summary>
+        void HalftimeMenu()
+        {
+            if (_pauseMenu != null) Destroy(_pauseMenu);
+            var ta = Teams.Get(cfg.teamA);
+            var tb = Teams.Get(cfg.teamB);
+            var root = hud.Overlay;
+            var dim = UiKit.Image(root, new Color(0.01f, 0.02f, 0.06f, 0.55f), null, "intervalo");
+            dim.rectTransform.Place(0, 0, 1, 1);
+            _pauseMenu = dim.gameObject;
+            // faixa de transmissão: INTERVALO + placar
+            var band = UiKit.Image(dim.transform, new Color(0.02f, 0.05f, 0.14f, 0.94f), null, "faixa").rectTransform.Place(0, 0.68f, 1, 0.9f);
+            UiKit.Image(band, Theme.Accent, null, "linha").rectTransform.Place(0, 0, 1, 0, 0, 0, 0, -5);
+            UiKit.Label(band, "INTERVALO", 38, Theme.HeadItalic, Theme.Accent, TextAnchor.UpperCenter).rectTransform.Place(0, 0, 1, 1, 0, 0, 0, 14);
+            UiKit.Label(band, ta.name.ToUpperInvariant(), 44, Theme.Head, Color.white, TextAnchor.MiddleRight).rectTransform.Place(0, 0, 0.42f, 0.8f, 20, 0, 0, 0);
+            UiKit.Label(band, sim.score[0] + "  -  " + sim.score[1], 72, Theme.HeadItalic, Color.white, TextAnchor.MiddleCenter).rectTransform.Place(0.42f, 0, 0.58f, 0.8f);
+            UiKit.Label(band, tb.name.ToUpperInvariant(), 44, Theme.Head, Color.white, TextAnchor.MiddleLeft).rectTransform.Place(0.58f, 0, 1, 0.8f, 0, 0, 20, 0);
+            band.gameObject.AddComponent<PageFx>();
+            int pa = sim.statsPoss[0], pb = sim.statsPoss[1];
+            int poss = pa + pb > 0 ? Mathf.RoundToInt(100f * pa / (pa + pb)) : 50;
+            var stats = UiKit.Label(dim.transform, "Posse de bola   " + poss + "%  x  " + (100 - poss) + "%        Finalizações   " + sim.statsShots[0] + "  x  " + sim.statsShots[1],
+                28, Theme.BodyBold, Theme.Text, TextAnchor.MiddleCenter);
+            stats.rectTransform.Place(0, 0.6f, 1, 0.68f);
+            UiKit.Shadow(stats, 2);
+            var panel = UiKit.Panel(dim.transform).rectTransform.At(0.5f, 0.06f, 760, 470);
+            panel.pivot = new Vector2(0.5f, 0f);
+            var list = UiKit.Rect(panel, "lista").Place(0, 0, 1, 1, 40, 30, 40, 30);
+            UiKit.VList(list, 12, 0, false);
+            var go = UiKit.Button(list, "Começar o 2º tempo  ›", StartSecondHalf, 34, new Color(0.1f, 0.55f, 0.28f));
+            UiKit.Size(go, 84, 84);
+            UiKit.Size(UiKit.Button(list, "Substituições", () => SubsPage(-1)), 76, 76);
+            UiKit.Size(UiKit.Button(list, "Equipes e táticas", () => PausePage(2)), 76, 76);
+            UiKit.Size(UiKit.Button(list, "Configurações gerais", () => PausePage(1)), 76, 76);
+            UiKit.Select(go);
+        }
+
+        /// <summary>Substituições: escolhe quem sai (out = -1) e depois quem entra.</summary>
+        void SubsPage(int outId)
+        {
+            if (_pauseMenu != null) Destroy(_pauseMenu);
+            var root = hud.Overlay;
+            var dim = UiKit.Image(root, new Color(0, 0, 0, 0.6f), null, "substituições");
+            dim.rectTransform.Place(0, 0, 1, 1);
+            _pauseMenu = dim.gameObject;
+            int team = _cpu[0] == null ? 0 : 1;
+            if (outId >= 0) team = sim.players[outId].team;
+            var td = Teams.Get(team == 0 ? cfg.teamA : cfg.teamB);
+            var panel = UiKit.Panel(dim.transform).rectTransform.At(0.5f, 0.5f, 980, 960);
+            string left = sim.rollingSubs ? "trocas livres" : sim.subsLeft[team] + (sim.subsLeft[team] == 1 ? " troca restante" : " trocas restantes");
+            UiKit.Label(panel, outId < 0 ? "QUEM SAI?" : "QUEM ENTRA NO LUGAR DE " + sim.players[outId].name.ToUpperInvariant() + "?", 40, Theme.HeadItalic, Theme.Accent, TextAnchor.MiddleCenter)
+                .rectTransform.Place(0, 1, 1, 1, 20, -84, 20, 18);
+            UiKit.Label(panel, td.name + "  •  " + left, 24, Theme.Body, Theme.TextDim, TextAnchor.MiddleCenter).rectTransform.Place(0, 1, 1, 1, 20, -124, 20, 84);
+            var list = UiKit.Rect(panel, "lista").Place(0, 0, 1, 1, 40, 110, 40, 140);
+            var content = UiKit.Scroll(list, 8f);
+            var roster = td.roster;
+            Selectable first = null;
+            if (outId < 0)
+            {
+                // bancos dos dois times quando os dois são humanos: um time de cada vez (o primeiro humano)
+                foreach (var p in sim.players)
+                {
+                    if (p.team != team) continue;
+                    var pp = p;
+                    string ovr = p.rosterIndex >= 0 && p.rosterIndex < roster.Count ? "   " + roster[p.rosterIndex].ovr : "";
+                    string tired = p.stamina < 0.45f ? "   (cansado)" : "";
+                    var b = UiKit.Button(content, p.number + "   " + p.name + "   " + (p.isKeeper ? "GK" : p.pos) + ovr + tired, () => SubsPage(pp.id), 28);
+                    UiKit.Size(b, 58, 58);
+                    if (first == null) first = b;
+                }
+                if (_cpu[0] == null && _cpu[1] == null)
+                {
+                    int other = 1 - team;
+                    // dois jogadores: o segundo também troca (escolhendo um atleta dele)
+                    foreach (var p in sim.players)
+                    {
+                        if (p.team != other) continue;
+                        var pp = p;
+                        var b = UiKit.Button(content, "[" + Teams.Get(other == 0 ? cfg.teamA : cfg.teamB).shortName + "]  " + p.number + "   " + p.name, () => SubsPage(pp.id), 26, new Color(0.25f, 0.15f, 0.12f));
+                        UiKit.Size(b, 54, 54);
+                    }
+                }
+            }
+            else
+            {
+                var po = sim.players[outId];
+                for (int i = 0; i < roster.Count; i++)
+                {
+                    bool onField = false;
+                    foreach (var q in sim.players) if (q.team == team && q.rosterIndex == i) onField = true;
+                    if (onField || sim.subbedOut[team].Contains(i)) continue;
+                    var e = roster[i];
+                    if (sim.mode.keeper && po.isKeeper != (e.pos == "GK")) continue;
+                    int ri = i;
+                    var b = UiKit.Button(content, e.num + "   " + e.n + "   " + e.pos + "   " + e.ovr, () =>
+                    {
+                        if (sim.Substitute(outId, ri)) { view.Replace(outId); Sfx.Whistle(); }
+                        SubsPage(-1);
+                    }, 28);
+                    UiKit.Size(b, 58, 58);
+                    if (first == null) first = b;
+                }
+                if (first == null)
+                    UiKit.Size(UiKit.Label(content, "Ninguém disponível no banco para essa posição.", 26, Theme.Body, Theme.TextDim, TextAnchor.MiddleCenter), 60, 60);
+            }
+            bool noneLeft = !sim.rollingSubs && sim.subsLeft[team] <= 0;
+            if (noneLeft && outId < 0)
+            {
+                foreach (var b in content.GetComponentsInChildren<Button>()) b.interactable = false;
+                first = null;
+            }
+            var back = UiKit.Button(panel, "‹  Voltar", () => { if (outId >= 0) SubsPage(-1); else MenuHome(); }, 30);
+            back.GetComponent<RectTransform>().Place(0.3f, 0, 0.7f, 0, 0, 24, 0, -94);
+            UiKit.Select(first ?? back);
         }
 
         void Resume()

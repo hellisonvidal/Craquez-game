@@ -424,44 +424,98 @@ namespace Craquez
             return t;
         }
 
-        /// <summary>Silhuetas de torcedores (cabeça, ombros, braços, cachecóis e bandeiras) com alfa, repetível.</summary>
-        public static Texture2D CrowdPeople(int w, int h, Color home, Color home2, Color away, int seed)
+        /// <summary>
+        /// Silhuetas de torcedores com alfa, repetível: corpos de larguras e alturas diferentes
+        /// (crianças inclusive), camisa do time (listrada quando o uniforme é listrado), boné,
+        /// cachecol no pescoço ou esticado acima da cabeça, braços para cima e bandeiras.
+        /// <paramref name="cheer"/> 0-1 = quantos estão de braços erguidos (1 = comemoração de gol).
+        /// </summary>
+        public static Texture2D CrowdPeople(int w, int h, Color home, Color home2, Color away, int seed, float cheer = 0f, bool stripes = false)
         {
             var t = Tex(w, h, true);
             var px = new Color32[w * h];
-            int pw = 14;
+            int pw = Mathf.Max(10, h * 14 / 64);
             int n = w / pw;
             for (int i = 0; i < n; i++)
             {
                 float r = Hash(i, 1, seed);
-                if (r > 0.94f) continue;   // lugar vazio
+                if (r > 0.95f) continue;   // lugar vazio
                 bool awaySide = i > n * 0.82f;
+                bool fanShirt = r < 0.8f;
                 Color shirt = awaySide ? away : (r < 0.55f ? home : r < 0.8f ? home2 : Color.HSVToRGB(Hash(i, 5, seed), 0.35f, 0.75f));
-                Color skin = Color.Lerp(new Color(0.36f, 0.22f, 0.15f), new Color(0.95f, 0.78f, 0.65f), Hash(i, 2, seed));
-                Color hair = Color.Lerp(new Color(0.05f, 0.04f, 0.03f), new Color(0.45f, 0.32f, 0.2f), Hash(i, 3, seed) * 0.7f);
-                int cx = i * pw + pw / 2 + (int)((Hash(i, 4, seed) - 0.5f) * 4);
-                float hgt = 0.82f + Hash(i, 6, seed) * 0.18f;
-                bool armsUp = Hash(i, 7, seed) > 0.72f;
+                Color shirt2 = awaySide ? Color.Lerp(away, Color.white, 0.6f) : (shirt == home ? home2 : home);
+                bool striped = stripes && fanShirt && !awaySide && Hash(i, 10, seed) > 0.35f;
+                Color skin = Color.Lerp(new Color(0.3f, 0.19f, 0.12f), new Color(0.96f, 0.8f, 0.68f), Hash(i, 2, seed));
+                Color hair = Color.Lerp(new Color(0.04f, 0.03f, 0.02f), new Color(0.5f, 0.36f, 0.22f), Hash(i, 3, seed) * 0.7f);
+                int cx = i * pw + pw / 2 + (int)((Hash(i, 4, seed) - 0.5f) * pw * 0.3f);
+                bool kid = Hash(i, 11, seed) > 0.9f;
+                float hgt = kid ? 0.66f : 0.82f + Hash(i, 6, seed) * 0.18f;
+                float wide = (kid ? 0.8f : 0.9f + Hash(i, 12, seed) * 0.25f);
+                bool armsUp = Hash(i, 7, seed) > 0.72f - cheer * 0.68f;
+                bool scarfUp = !armsUp && Hash(i, 13, seed) > 0.9f - cheer * 0.2f;   // cachecol esticado acima da cabeça
+                bool cap = Hash(i, 14, seed) > 0.82f;
                 bool flag = Hash(i, 8, seed) > 0.95f;
+                float lean = (Hash(i, 15, seed) - 0.5f) * 0.12f;
                 for (int y = 0; y < h; y++)
-                    for (int x = Mathf.Max(0, cx - pw); x < Mathf.Min(w, cx + pw); x++)
+                    for (int x = Mathf.Max(0, cx - pw * 2); x < Mathf.Min(w, cx + pw * 2); x++)
                     {
-                        float u = (x - cx) / (float)pw, v = y / (float)h / hgt;   // v: 0 base .. 1 topo da cabeça
+                        float v = y / (float)h / hgt;                       // 0 base .. 1 topo da cabeça
+                        float u = ((x - cx) / (float)pw - lean * v) / wide;
                         Color c = new Color(0, 0, 0, 0);
-                        if (v < 0.62f && Mathf.Abs(u) < 0.42f - (v > 0.5f ? (v - 0.5f) * 1.5f : 0f)) c = shirt * (0.8f + v * 0.3f);
-                        if (v > 0.6f && v < 0.7f && Mathf.Abs(u) < 0.12f) c = skin * 0.9f;                                     // pescoço
-                        if (new Vector2(u * 1.3f, (v - 0.8f) * 1.0f).magnitude < 0.2f) c = v > 0.86f ? hair : skin;          // cabeça
-                        if (armsUp && v > 0.45f && v < 1.05f && Mathf.Abs(Mathf.Abs(u) - 0.42f + (v - 0.45f) * 0.25f) < 0.08f) c = v > 0.95f ? skin : shirt * 0.9f;
-                        if (v > 0.52f && v < 0.58f && Mathf.Abs(u) < 0.4f && Hash(i, 9, seed) > 0.6f) c = home2;           // cachecol
+                        // tronco (ombros arredondados)
+                        if (v < 0.62f && Mathf.Abs(u) < 0.42f - (v > 0.5f ? (v - 0.5f) * 1.5f : 0f))
+                        {
+                            c = striped && Mathf.Repeat(u * 5f + 0.25f, 1f) < 0.5f ? shirt2 : shirt;
+                            c *= 0.78f + v * 0.3f + (u < 0f ? 0.06f : -0.04f);   // luz de um lado, sombra do outro
+                        }
+                        if (v > 0.6f && v < 0.7f && Mathf.Abs(u) < 0.12f) c = skin * 0.85f;                                    // pescoço
+                        if (new Vector2(u * 1.3f, (v - 0.8f) * 1.0f).magnitude < 0.2f) c = (v > 0.86f ? hair : skin) * (u < 0f ? 1f : 0.9f);   // cabeça
+                        if (cap && v > 0.88f && v < 0.99f && Mathf.Abs(u) < 0.17f + (v < 0.9f && u > 0f ? 0.1f : 0f)) c = shirt2 * 0.9f;   // boné
+                        if (armsUp && v > 0.45f && v < 1.08f && Mathf.Abs(Mathf.Abs(u) - 0.42f + (v - 0.45f) * 0.25f) < 0.08f) c = v > 0.98f ? skin : shirt * 0.88f;
+                        if (scarfUp)
+                        {
+                            if (v > 0.5f && v < 1.12f && Mathf.Abs(Mathf.Abs(u) - 0.5f) < 0.07f) c = v > 1.02f ? skin : shirt * 0.85f;   // braços
+                            if (v > 1.04f && v < 1.14f && Mathf.Abs(u) < 0.62f) c = Mathf.Repeat(u * 4f, 1f) < 0.5f ? home : home2;  // cachecol
+                        }
+                        else if (v > 0.52f && v < 0.58f && Mathf.Abs(u) < 0.4f && Hash(i, 9, seed) > 0.6f) c = home2;             // cachecol no pescoço
                         if (flag && u > 0.2f && v > 0.7f && v < 1.15f && u < 1.4f) c = Mathf.Repeat(v * 6f, 1f) < 0.5f ? home : home2;
                         c.a = c.a > 0f ? 1f : 0f;
-                        if (c.a > 0f) px[Mathf.Min(h - 1, y) * w + x] = c;
+                        int yy = Mathf.Min(h - 1, y);
+                        if (c.a > 0f) px[yy * w + x] = c;
                     }
             }
             t.SetPixels32(px);
             t.filterMode = FilterMode.Trilinear;
             t.Apply(true);
             KeepCoverage(t);
+            return t;
+        }
+
+        /// <summary>Faixa de torcida (pano pendurado) nas cores do time, com uma palavra de apoio.</summary>
+        public static Texture2D Banner(Color c1, Color c2, string text, int seed)
+        {
+            int W = 512, H = 96;
+            var t = Tex(W, H, true);
+            var px = new Color32[W * H];
+            int style = seed % 3;
+            var g = Craquez.Glyphs.Render(text, 46);
+            int gw = g.GetLength(0), gh = g.GetLength(1);
+            int gx0 = (W - gw) / 2, gy0 = (H - gh) / 2;
+            Color fg = c2.grayscale > 0.5f == c1.grayscale > 0.5f ? (c1.grayscale > 0.5f ? new Color(0.08f, 0.08f, 0.1f) : Color.white) : c2;
+            for (int y = 0; y < H; y++)
+                for (int x = 0; x < W; x++)
+                {
+                    Color c = style == 0 ? c1 : style == 1 ? (y < H / 3 || y >= 2 * H / 3 ? c2 : c1) : ((x / 64) % 2 == 0 ? c1 : Color.Lerp(c1, c2, 0.35f));
+                    int lx = x - gx0, ly = y - gy0;
+                    if (lx >= 0 && ly >= 0 && lx < gw && ly < gh && g[lx, ly]) c = fg;
+                    if (y < 4 || y > H - 5) c = c2 * 0.8f;   // bainha
+                    float n = VNoise(x / 11f, y / 11f, W / 11, seed + 3);
+                    c *= 0.86f + n * 0.18f;                 // dobras do pano
+                    c.a = 1f;
+                    px[y * W + x] = c;
+                }
+            t.SetPixels32(px);
+            t.Apply(true);
             return t;
         }
 

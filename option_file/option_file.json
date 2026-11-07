@@ -13016,10 +13016,10 @@
       "kits": [
         {
           "c1": "#1d4ed8",
-          "c2": "#111827",
-          "shorts": "#111827",
+          "c2": "#111111",
+          "shorts": "#111111",
           "socks": "#1d4ed8",
-          "pattern": "liso",
+          "pattern": "listras",
           "sleeves": "",
           "trim": ""
         },
@@ -13028,7 +13028,7 @@
           "c2": "#1d4ed8",
           "shorts": "#f8fafc",
           "socks": "#f8fafc",
-          "pattern": "aros",
+          "pattern": "liso",
           "sleeves": "",
           "trim": ""
         },
@@ -13763,20 +13763,20 @@
       "short": "CAM",
       "kits": [
         {
-          "c1": "#facc15",
-          "c2": "#1d4ed8",
-          "shorts": "#1d4ed8",
-          "socks": "#facc15",
+          "c1": "#6cabdd",
+          "c2": "#f8fafc",
+          "shorts": "#6cabdd",
+          "socks": "#6cabdd",
           "pattern": "liso",
           "sleeves": "",
           "trim": ""
         },
         {
-          "c1": "#1d4ed8",
-          "c2": "#facc15",
-          "shorts": "#1d4ed8",
-          "socks": "#1d4ed8",
-          "pattern": "faixa_peito",
+          "c1": "#f8fafc",
+          "c2": "#6cabdd",
+          "shorts": "#f8fafc",
+          "socks": "#f8fafc",
+          "pattern": "liso",
           "sleeves": "",
           "trim": ""
         },
@@ -14010,18 +14010,18 @@
       "short": "OHI",
       "kits": [
         {
-          "c1": "#38bdf8",
+          "c1": "#6cabdd",
           "c2": "#f8fafc",
           "shorts": "#f8fafc",
-          "socks": "#38bdf8",
-          "pattern": "faixa_peito",
+          "socks": "#6cabdd",
+          "pattern": "liso",
           "sleeves": "",
           "trim": ""
         },
         {
           "c1": "#f8fafc",
-          "c2": "#38bdf8",
-          "shorts": "#38bdf8",
+          "c2": "#6cabdd",
+          "shorts": "#f8fafc",
           "socks": "#f8fafc",
           "pattern": "liso",
           "sleeves": "",
@@ -14513,9 +14513,9 @@
           "c2": "#1d4ed8",
           "shorts": "#1d4ed8",
           "socks": "#f8fafc",
-          "pattern": "liso",
+          "pattern": "faixa_peito",
           "sleeves": "",
-          "trim": ""
+          "trim": "#c8102e"
         },
         {
           "c1": "#1d4ed8",
@@ -15006,18 +15006,18 @@
       "short": "ITA",
       "kits": [
         {
-          "c1": "#15803d",
+          "c1": "#00843d",
           "c2": "#f8fafc",
-          "shorts": "#15803d",
-          "socks": "#15803d",
-          "pattern": "metades",
+          "shorts": "#f8fafc",
+          "socks": "#00843d",
+          "pattern": "liso",
           "sleeves": "",
-          "trim": ""
+          "trim": "#f8fafc"
         },
         {
           "c1": "#f8fafc",
-          "c2": "#15803d",
-          "shorts": "#15803d",
+          "c2": "#00843d",
+          "shorts": "#f8fafc",
           "socks": "#f8fafc",
           "pattern": "liso",
           "sleeves": "",
@@ -15252,20 +15252,20 @@
       "short": "LIL",
       "kits": [
         {
-          "c1": "#a855f7",
+          "c1": "#5b2a86",
           "c2": "#f8fafc",
           "shorts": "#f8fafc",
-          "socks": "#a855f7",
-          "pattern": "faixa_peito",
+          "socks": "#5b2a86",
+          "pattern": "liso",
           "sleeves": "",
           "trim": ""
         },
         {
           "c1": "#f8fafc",
-          "c2": "#a855f7",
+          "c2": "#5b2a86",
           "shorts": "#f8fafc",
           "socks": "#f8fafc",
-          "pattern": "riscas",
+          "pattern": "liso",
           "sleeves": "",
           "trim": ""
         },
@@ -16484,18 +16484,18 @@
       "short": "ROM",
       "kits": [
         {
-          "c1": "#1e3a8a",
+          "c1": "#00843d",
           "c2": "#f8fafc",
           "shorts": "#f8fafc",
-          "socks": "#1e3a8a",
-          "pattern": "riscas",
+          "socks": "#00843d",
+          "pattern": "liso",
           "sleeves": "",
           "trim": ""
         },
         {
           "c1": "#f8fafc",
-          "c2": "#1e3a8a",
-          "shorts": "#1e3a8a",
+          "c2": "#00843d",
+          "shorts": "#f8fafc",
           "socks": "#f8fafc",
           "pattern": "liso",
           "sleeves": "",
@@ -22600,18 +22600,18 @@
       "kits": [
         {
           "c1": "#f8fafc",
-          "c2": "#1e3a8a",
-          "shorts": "#1e3a8a",
+          "c2": "#0b1d3a",
+          "shorts": "#f8fafc",
           "socks": "#f8fafc",
           "pattern": "liso",
           "sleeves": "",
-          "trim": ""
+          "trim": "#c8102e"
         },
         {
-          "c1": "#1e3a8a",
+          "c1": "#0b1d3a",
           "c2": "#f8fafc",
-          "shorts": "#1e3a8a",
-          "socks": "#1e3a8a",
+          "shorts": "#0b1d3a",
+          "socks": "#0b1d3a",
           "pattern": "liso",
           "sleeves": "",
           "trim": ""
@@ -23350,10 +23350,10 @@
       "kits": [
         {
           "c1": "#1d4ed8",
-          "c2": "#f8fafc",
+          "c2": "#9ca3af",
           "shorts": "#f8fafc",
           "socks": "#1d4ed8",
-          "pattern": "faixa_peito",
+          "pattern": "liso",
           "sleeves": "",
           "trim": ""
         },
@@ -23362,7 +23362,7 @@
           "c2": "#1d4ed8",
           "shorts": "#f8fafc",
           "socks": "#f8fafc",
-          "pattern": "faixa",
+          "pattern": "liso",
           "sleeves": "",
           "trim": ""
         },
@@ -24098,19 +24098,19 @@
       "short": "DAQ",
       "kits": [
         {
-          "c1": "#facc15",
-          "c2": "#1d4ed8",
-          "shorts": "#1d4ed8",
-          "socks": "#facc15",
-          "pattern": "aros",
+          "c1": "#c8102e",
+          "c2": "#f8fafc",
+          "shorts": "#f8fafc",
+          "socks": "#c8102e",
+          "pattern": "liso",
           "sleeves": "",
           "trim": ""
         },
         {
-          "c1": "#1d4ed8",
-          "c2": "#facc15",
-          "shorts": "#1d4ed8",
-          "socks": "#1d4ed8",
+          "c1": "#f8fafc",
+          "c2": "#c8102e",
+          "shorts": "#f8fafc",
+          "socks": "#f8fafc",
           "pattern": "liso",
           "sleeves": "",
           "trim": ""
@@ -24590,20 +24590,20 @@
       "short": "IDO",
       "kits": [
         {
-          "c1": "#facc15",
-          "c2": "#111827",
-          "shorts": "#111827",
-          "socks": "#facc15",
-          "pattern": "riscas",
+          "c1": "#fcd116",
+          "c2": "#111111",
+          "shorts": "#111111",
+          "socks": "#fcd116",
+          "pattern": "liso",
           "sleeves": "",
           "trim": ""
         },
         {
-          "c1": "#111827",
-          "c2": "#facc15",
-          "shorts": "#111827",
-          "socks": "#111827",
-          "pattern": "faixa",
+          "c1": "#111111",
+          "c2": "#fcd116",
+          "shorts": "#111111",
+          "socks": "#111111",
+          "pattern": "liso",
           "sleeves": "",
           "trim": ""
         },
@@ -25334,18 +25334,18 @@
       "short": "MOR",
       "kits": [
         {
-          "c1": "#dc2626",
+          "c1": "#c8102e",
           "c2": "#f8fafc",
           "shorts": "#f8fafc",
-          "socks": "#dc2626",
-          "pattern": "aros",
+          "socks": "#c8102e",
+          "pattern": "liso",
           "sleeves": "",
           "trim": ""
         },
         {
           "c1": "#f8fafc",
-          "c2": "#dc2626",
-          "shorts": "#dc2626",
+          "c2": "#c8102e",
+          "shorts": "#f8fafc",
           "socks": "#f8fafc",
           "pattern": "liso",
           "sleeves": "",
@@ -25583,19 +25583,19 @@
       "short": "AUC",
       "kits": [
         {
-          "c1": "#facc15",
-          "c2": "#dc2626",
-          "shorts": "#dc2626",
-          "socks": "#facc15",
-          "pattern": "riscas",
+          "c1": "#fcd116",
+          "c2": "#c8102e",
+          "shorts": "#c8102e",
+          "socks": "#fcd116",
+          "pattern": "liso",
           "sleeves": "",
           "trim": ""
         },
         {
-          "c1": "#dc2626",
-          "c2": "#facc15",
-          "shorts": "#dc2626",
-          "socks": "#dc2626",
+          "c1": "#c8102e",
+          "c2": "#fcd116",
+          "shorts": "#c8102e",
+          "socks": "#c8102e",
           "pattern": "liso",
           "sleeves": "",
           "trim": ""
@@ -26077,17 +26077,17 @@
       "short": "IDV",
       "kits": [
         {
-          "c1": "#111827",
-          "c2": "#1d4ed8",
-          "shorts": "#1d4ed8",
-          "socks": "#111827",
-          "pattern": "riscas",
+          "c1": "#1d4ed8",
+          "c2": "#111111",
+          "shorts": "#111111",
+          "socks": "#111111",
+          "pattern": "listras",
           "sleeves": "",
           "trim": ""
         },
         {
           "c1": "#f8fafc",
-          "c2": "#111827",
+          "c2": "#111111",
           "shorts": "#f8fafc",
           "socks": "#f8fafc",
           "pattern": "liso",
@@ -26325,20 +26325,20 @@
       "short": "TEC",
       "kits": [
         {
-          "c1": "#dc2626",
-          "c2": "#f8fafc",
-          "shorts": "#dc2626",
-          "socks": "#dc2626",
+          "c1": "#fcd116",
+          "c2": "#1d4ed8",
+          "shorts": "#1d4ed8",
+          "socks": "#fcd116",
           "pattern": "liso",
           "sleeves": "",
           "trim": ""
         },
         {
           "c1": "#f8fafc",
-          "c2": "#dc2626",
+          "c2": "#1d4ed8",
           "shorts": "#f8fafc",
           "socks": "#f8fafc",
-          "pattern": "faixa_peito",
+          "pattern": "liso",
           "sleeves": "",
           "trim": ""
         },
@@ -34740,20 +34740,20 @@
       "short": "INT",
       "kits": [
         {
-          "c1": "#1e3a8a",
+          "c1": "#0b1d3a",
           "c2": "#f8fafc",
-          "shorts": "#f8fafc",
-          "socks": "#1e3a8a",
-          "pattern": "riscas",
+          "shorts": "#0b1d3a",
+          "socks": "#0b1d3a",
+          "pattern": "listras",
           "sleeves": "",
           "trim": ""
         },
         {
           "c1": "#f8fafc",
-          "c2": "#1e3a8a",
-          "shorts": "#1e3a8a",
+          "c2": "#0b1d3a",
+          "shorts": "#f8fafc",
           "socks": "#f8fafc",
-          "pattern": "faixa_peito",
+          "pattern": "liso",
           "sleeves": "",
           "trim": ""
         },
@@ -35484,17 +35484,17 @@
       "short": "CEL",
       "kits": [
         {
-          "c1": "#38bdf8",
+          "c1": "#41b6e6",
           "c2": "#f8fafc",
-          "shorts": "#38bdf8",
-          "socks": "#38bdf8",
-          "pattern": "listras",
+          "shorts": "#f8fafc",
+          "socks": "#41b6e6",
+          "pattern": "liso",
           "sleeves": "",
           "trim": ""
         },
         {
           "c1": "#f8fafc",
-          "c2": "#38bdf8",
+          "c2": "#41b6e6",
           "shorts": "#f8fafc",
           "socks": "#f8fafc",
           "pattern": "liso",
@@ -36219,19 +36219,19 @@
       "short": "CRE",
       "kits": [
         {
-          "c1": "#fef3c7",
-          "c2": "#111827",
-          "shorts": "#111827",
-          "socks": "#fef3c7",
-          "pattern": "faixa",
+          "c1": "#f3e5c0",
+          "c2": "#7a1f2b",
+          "shorts": "#111111",
+          "socks": "#f3e5c0",
+          "pattern": "liso",
           "sleeves": "",
-          "trim": ""
+          "trim": "#7a1f2b"
         },
         {
-          "c1": "#111827",
-          "c2": "#fef3c7",
-          "shorts": "#111827",
-          "socks": "#111827",
+          "c1": "#111111",
+          "c2": "#f3e5c0",
+          "shorts": "#111111",
+          "socks": "#111111",
           "pattern": "liso",
           "sleeves": "",
           "trim": ""
@@ -36466,17 +36466,17 @@
       "short": "DOM",
       "kits": [
         {
-          "c1": "#dc2626",
-          "c2": "#111827",
-          "shorts": "#111827",
-          "socks": "#dc2626",
-          "pattern": "riscas",
+          "c1": "#c8102e",
+          "c2": "#111111",
+          "shorts": "#111111",
+          "socks": "#c8102e",
+          "pattern": "metades",
           "sleeves": "",
           "trim": ""
         },
         {
           "c1": "#f8fafc",
-          "c2": "#dc2626",
+          "c2": "#c8102e",
           "shorts": "#f8fafc",
           "socks": "#f8fafc",
           "pattern": "liso",
@@ -43888,20 +43888,20 @@
       "short": "KRA",
       "kits": [
         {
-          "c1": "#15803d",
-          "c2": "#111827",
-          "shorts": "#111827",
-          "socks": "#15803d",
-          "pattern": "faixa_peito",
+          "c1": "#111111",
+          "c2": "#00843d",
+          "shorts": "#111111",
+          "socks": "#111111",
+          "pattern": "liso",
           "sleeves": "",
-          "trim": ""
+          "trim": "#00843d"
         },
         {
           "c1": "#f8fafc",
-          "c2": "#15803d",
+          "c2": "#00843d",
           "shorts": "#f8fafc",
           "socks": "#f8fafc",
-          "pattern": "riscas",
+          "pattern": "liso",
           "sleeves": "",
           "trim": ""
         },
@@ -44383,9 +44383,9 @@
         {
           "c1": "#1d4ed8",
           "c2": "#f8fafc",
-          "shorts": "#1d4ed8",
+          "shorts": "#f8fafc",
           "socks": "#1d4ed8",
-          "pattern": "listras",
+          "pattern": "liso",
           "sleeves": "",
           "trim": ""
         },
@@ -44630,20 +44630,20 @@
       "short": "CSK",
       "kits": [
         {
-          "c1": "#dc2626",
-          "c2": "#1e3a8a",
-          "shorts": "#1e3a8a",
-          "socks": "#dc2626",
-          "pattern": "aros",
+          "c1": "#c8102e",
+          "c2": "#1d4ed8",
+          "shorts": "#1d4ed8",
+          "socks": "#c8102e",
+          "pattern": "metades",
           "sleeves": "",
           "trim": ""
         },
         {
           "c1": "#f8fafc",
-          "c2": "#dc2626",
+          "c2": "#c8102e",
           "shorts": "#f8fafc",
           "socks": "#f8fafc",
-          "pattern": "aros",
+          "pattern": "liso",
           "sleeves": "",
           "trim": ""
         },
@@ -44875,20 +44875,20 @@
       "short": "LOK",
       "kits": [
         {
-          "c1": "#dc2626",
-          "c2": "#15803d",
-          "shorts": "#15803d",
-          "socks": "#dc2626",
-          "pattern": "riscas",
+          "c1": "#c8102e",
+          "c2": "#00843d",
+          "shorts": "#c8102e",
+          "socks": "#c8102e",
+          "pattern": "faixa_peito",
           "sleeves": "",
           "trim": ""
         },
         {
           "c1": "#f8fafc",
-          "c2": "#dc2626",
+          "c2": "#00843d",
           "shorts": "#f8fafc",
           "socks": "#f8fafc",
-          "pattern": "riscas",
+          "pattern": "liso",
           "sleeves": "",
           "trim": ""
         },
@@ -45375,17 +45375,17 @@
       "short": "SPM",
       "kits": [
         {
-          "c1": "#dc2626",
+          "c1": "#c8102e",
           "c2": "#f8fafc",
-          "shorts": "#dc2626",
-          "socks": "#dc2626",
-          "pattern": "liso",
+          "shorts": "#f8fafc",
+          "socks": "#c8102e",
+          "pattern": "faixa_peito",
           "sleeves": "",
           "trim": ""
         },
         {
           "c1": "#f8fafc",
-          "c2": "#dc2626",
+          "c2": "#c8102e",
           "shorts": "#f8fafc",
           "socks": "#f8fafc",
           "pattern": "liso",
@@ -46367,20 +46367,20 @@
       "short": "ZEN",
       "kits": [
         {
-          "c1": "#38bdf8",
+          "c1": "#0077c8",
           "c2": "#f8fafc",
-          "shorts": "#38bdf8",
-          "socks": "#38bdf8",
+          "shorts": "#f8fafc",
+          "socks": "#0077c8",
           "pattern": "liso",
           "sleeves": "",
-          "trim": ""
+          "trim": "#f8fafc"
         },
         {
           "c1": "#f8fafc",
-          "c2": "#38bdf8",
+          "c2": "#0077c8",
           "shorts": "#f8fafc",
           "socks": "#f8fafc",
-          "pattern": "listras",
+          "pattern": "liso",
           "sleeves": "",
           "trim": ""
         },
@@ -48598,20 +48598,20 @@
       "short": "AHL",
       "kits": [
         {
-          "c1": "#15803d",
+          "c1": "#00843d",
           "c2": "#f8fafc",
-          "shorts": "#15803d",
-          "socks": "#15803d",
-          "pattern": "faixa_peito",
+          "shorts": "#f8fafc",
+          "socks": "#00843d",
+          "pattern": "liso",
           "sleeves": "",
           "trim": ""
         },
         {
           "c1": "#f8fafc",
-          "c2": "#15803d",
-          "shorts": "#15803d",
+          "c2": "#00843d",
+          "shorts": "#f8fafc",
           "socks": "#f8fafc",
-          "pattern": "faixa_peito",
+          "pattern": "liso",
           "sleeves": "",
           "trim": ""
         },
@@ -48846,20 +48846,20 @@
       "short": "ITT",
       "kits": [
         {
-          "c1": "#facc15",
-          "c2": "#111827",
-          "shorts": "#111827",
-          "socks": "#facc15",
-          "pattern": "aros",
+          "c1": "#fcd116",
+          "c2": "#111111",
+          "shorts": "#111111",
+          "socks": "#111111",
+          "pattern": "listras",
           "sleeves": "",
           "trim": ""
         },
         {
-          "c1": "#111827",
-          "c2": "#facc15",
-          "shorts": "#111827",
-          "socks": "#111827",
-          "pattern": "faixa",
+          "c1": "#f8fafc",
+          "c2": "#111111",
+          "shorts": "#f8fafc",
+          "socks": "#f8fafc",
+          "pattern": "liso",
           "sleeves": "",
           "trim": ""
         },
@@ -50589,20 +50589,20 @@
       "short": "HIL",
       "kits": [
         {
-          "c1": "#1d4ed8",
+          "c1": "#0033a0",
           "c2": "#f8fafc",
-          "shorts": "#1d4ed8",
-          "socks": "#1d4ed8",
-          "pattern": "faixa_peito",
+          "shorts": "#0033a0",
+          "socks": "#0033a0",
+          "pattern": "liso",
           "sleeves": "",
-          "trim": ""
+          "trim": "#f8fafc"
         },
         {
           "c1": "#f8fafc",
-          "c2": "#1d4ed8",
+          "c2": "#0033a0",
           "shorts": "#f8fafc",
           "socks": "#f8fafc",
-          "pattern": "riscas",
+          "pattern": "liso",
           "sleeves": "",
           "trim": ""
         },
@@ -50840,18 +50840,18 @@
       "kits": [
         {
           "c1": "#f8fafc",
-          "c2": "#111827",
-          "shorts": "#111827",
+          "c2": "#111111",
+          "shorts": "#111111",
           "socks": "#f8fafc",
-          "pattern": "faixa_peito",
+          "pattern": "liso",
           "sleeves": "",
           "trim": ""
         },
         {
-          "c1": "#111827",
+          "c1": "#111111",
           "c2": "#f8fafc",
-          "shorts": "#111827",
-          "socks": "#111827",
+          "shorts": "#111111",
+          "socks": "#111111",
           "pattern": "liso",
           "sleeves": "",
           "trim": ""
@@ -52075,20 +52075,20 @@
       "short": "SHA",
       "kits": [
         {
-          "c1": "#f97316",
-          "c2": "#111827",
-          "shorts": "#111827",
-          "socks": "#f97316",
-          "pattern": "faixa",
+          "c1": "#f36c21",
+          "c2": "#111111",
+          "shorts": "#111111",
+          "socks": "#f36c21",
+          "pattern": "listras",
           "sleeves": "",
           "trim": ""
         },
         {
           "c1": "#f8fafc",
-          "c2": "#f97316",
+          "c2": "#f36c21",
           "shorts": "#f8fafc",
           "socks": "#f8fafc",
-          "pattern": "faixa_peito",
+          "pattern": "liso",
           "sleeves": "",
           "trim": ""
         },
@@ -53072,18 +53072,18 @@
         {
           "c1": "#f8fafc",
           "c2": "#1d4ed8",
-          "shorts": "#1d4ed8",
+          "shorts": "#f8fafc",
           "socks": "#f8fafc",
           "pattern": "liso",
           "sleeves": "",
-          "trim": ""
+          "trim": "#1d4ed8"
         },
         {
           "c1": "#1d4ed8",
           "c2": "#f8fafc",
           "shorts": "#1d4ed8",
           "socks": "#1d4ed8",
-          "pattern": "aros",
+          "pattern": "liso",
           "sleeves": "",
           "trim": ""
         },
@@ -54794,20 +54794,20 @@
       "short": "KAR",
       "kits": [
         {
-          "c1": "#15803d",
+          "c1": "#00843d",
           "c2": "#f8fafc",
-          "shorts": "#15803d",
-          "socks": "#15803d",
+          "shorts": "#f8fafc",
+          "socks": "#00843d",
           "pattern": "liso",
           "sleeves": "",
           "trim": ""
         },
         {
           "c1": "#f8fafc",
-          "c2": "#15803d",
+          "c2": "#00843d",
           "shorts": "#f8fafc",
           "socks": "#f8fafc",
-          "pattern": "listras",
+          "pattern": "liso",
           "sleeves": "",
           "trim": ""
         },
@@ -55044,10 +55044,10 @@
       "kits": [
         {
           "c1": "#1d4ed8",
-          "c2": "#111827",
-          "shorts": "#111827",
-          "socks": "#1d4ed8",
-          "pattern": "liso",
+          "c2": "#111111",
+          "shorts": "#111111",
+          "socks": "#111111",
+          "pattern": "listras",
           "sleeves": "",
           "trim": ""
         },
@@ -55056,7 +55056,7 @@
           "c2": "#1d4ed8",
           "shorts": "#f8fafc",
           "socks": "#f8fafc",
-          "pattern": "faixa_peito",
+          "pattern": "liso",
           "sleeves": "",
           "trim": ""
         },
@@ -55781,20 +55781,20 @@
       "short": "BOH",
       "kits": [
         {
-          "c1": "#f8fafc",
-          "c2": "#111827",
-          "shorts": "#111827",
-          "socks": "#f8fafc",
-          "pattern": "faixa",
+          "c1": "#111111",
+          "c2": "#f8fafc",
+          "shorts": "#111111",
+          "socks": "#111111",
+          "pattern": "listras",
           "sleeves": "",
           "trim": ""
         },
         {
-          "c1": "#111827",
-          "c2": "#f8fafc",
-          "shorts": "#111827",
-          "socks": "#111827",
-          "pattern": "metades",
+          "c1": "#f8fafc",
+          "c2": "#111111",
+          "shorts": "#f8fafc",
+          "socks": "#f8fafc",
+          "pattern": "liso",
           "sleeves": "",
           "trim": ""
         },
@@ -56269,17 +56269,17 @@
       "short": "CER",
       "kits": [
         {
-          "c1": "#15803d",
+          "c1": "#6cabdd",
           "c2": "#f8fafc",
           "shorts": "#f8fafc",
-          "socks": "#15803d",
+          "socks": "#6cabdd",
           "pattern": "listras",
           "sleeves": "",
           "trim": ""
         },
         {
           "c1": "#f8fafc",
-          "c2": "#15803d",
+          "c2": "#6cabdd",
           "shorts": "#f8fafc",
           "socks": "#f8fafc",
           "pattern": "liso",
@@ -56516,17 +56516,17 @@
       "short": "DAR",
       "kits": [
         {
-          "c1": "#dc2626",
-          "c2": "#f8fafc",
+          "c1": "#00843d",
+          "c2": "#c8102e",
           "shorts": "#f8fafc",
-          "socks": "#dc2626",
-          "pattern": "liso",
+          "socks": "#00843d",
+          "pattern": "listras",
           "sleeves": "",
           "trim": ""
         },
         {
           "c1": "#f8fafc",
-          "c2": "#dc2626",
+          "c2": "#00843d",
           "shorts": "#f8fafc",
           "socks": "#f8fafc",
           "pattern": "liso",
@@ -56767,19 +56767,19 @@
       "kits": [
         {
           "c1": "#f8fafc",
-          "c2": "#111827",
-          "shorts": "#111827",
+          "c2": "#111111",
+          "shorts": "#111111",
           "socks": "#f8fafc",
-          "pattern": "liso",
+          "pattern": "faixa",
           "sleeves": "",
           "trim": ""
         },
         {
-          "c1": "#111827",
+          "c1": "#111111",
           "c2": "#f8fafc",
-          "shorts": "#111827",
-          "socks": "#111827",
-          "pattern": "listras",
+          "shorts": "#111111",
+          "socks": "#111111",
+          "pattern": "faixa",
           "sleeves": "",
           "trim": ""
         },
@@ -57013,20 +57013,20 @@
       "short": "GAU",
       "kits": [
         {
-          "c1": "#facc15",
-          "c2": "#dc2626",
-          "shorts": "#dc2626",
-          "socks": "#facc15",
-          "pattern": "faixa_peito",
+          "c1": "#00843d",
+          "c2": "#f8fafc",
+          "shorts": "#f8fafc",
+          "socks": "#00843d",
+          "pattern": "listras",
           "sleeves": "",
           "trim": ""
         },
         {
-          "c1": "#dc2626",
-          "c2": "#facc15",
-          "shorts": "#dc2626",
-          "socks": "#dc2626",
-          "pattern": "riscas",
+          "c1": "#f8fafc",
+          "c2": "#00843d",
+          "shorts": "#f8fafc",
+          "socks": "#f8fafc",
+          "pattern": "liso",
           "sleeves": "",
           "trim": ""
         },
@@ -57259,20 +57259,20 @@
       "short": "LVP",
       "kits": [
         {
-          "c1": "#111827",
+          "c1": "#111111",
           "c2": "#1d4ed8",
-          "shorts": "#1d4ed8",
-          "socks": "#111827",
-          "pattern": "faixa",
+          "shorts": "#111111",
+          "socks": "#111111",
+          "pattern": "listras",
           "sleeves": "",
           "trim": ""
         },
         {
           "c1": "#f8fafc",
-          "c2": "#111827",
+          "c2": "#111111",
           "shorts": "#f8fafc",
           "socks": "#f8fafc",
-          "pattern": "faixa_peito",
+          "pattern": "liso",
           "sleeves": "",
           "trim": ""
         },
@@ -57998,17 +57998,17 @@
       "short": "PIO",
       "kits": [
         {
-          "c1": "#dc2626",
-          "c2": "#1e3a8a",
-          "shorts": "#1e3a8a",
-          "socks": "#dc2626",
-          "pattern": "liso",
+          "c1": "#c8102e",
+          "c2": "#f5c400",
+          "shorts": "#f8fafc",
+          "socks": "#c8102e",
+          "pattern": "listras",
           "sleeves": "",
           "trim": ""
         },
         {
           "c1": "#f8fafc",
-          "c2": "#dc2626",
+          "c2": "#c8102e",
           "shorts": "#f8fafc",
           "socks": "#f8fafc",
           "pattern": "liso",
@@ -59225,20 +59225,20 @@
       "short": "VIO",
       "kits": [
         {
-          "c1": "#7c3aed",
+          "c1": "#5b2a86",
           "c2": "#f8fafc",
           "shorts": "#f8fafc",
-          "socks": "#7c3aed",
-          "pattern": "metades",
+          "socks": "#5b2a86",
+          "pattern": "liso",
           "sleeves": "",
           "trim": ""
         },
         {
           "c1": "#f8fafc",
-          "c2": "#7c3aed",
+          "c2": "#5b2a86",
           "shorts": "#f8fafc",
           "socks": "#f8fafc",
-          "pattern": "faixa_peito",
+          "pattern": "liso",
           "sleeves": "",
           "trim": ""
         },
@@ -64176,20 +64176,20 @@
       "short": "AUS",
       "kits": [
         {
-          "c1": "#16a34a",
-          "c2": "#111827",
-          "shorts": "#111827",
-          "socks": "#16a34a",
-          "pattern": "listras",
+          "c1": "#00b140",
+          "c2": "#111111",
+          "shorts": "#111111",
+          "socks": "#00b140",
+          "pattern": "liso",
           "sleeves": "",
           "trim": ""
         },
         {
-          "c1": "#f8fafc",
-          "c2": "#16a34a",
-          "shorts": "#f8fafc",
-          "socks": "#f8fafc",
-          "pattern": "faixa_peito",
+          "c1": "#111111",
+          "c2": "#00b140",
+          "shorts": "#111111",
+          "socks": "#111111",
+          "pattern": "liso",
           "sleeves": "",
           "trim": ""
         },
@@ -64422,20 +64422,20 @@
       "short": "DCU",
       "kits": [
         {
-          "c1": "#111827",
-          "c2": "#dc2626",
-          "shorts": "#dc2626",
-          "socks": "#111827",
+          "c1": "#111111",
+          "c2": "#c8102e",
+          "shorts": "#111111",
+          "socks": "#111111",
           "pattern": "liso",
           "sleeves": "",
-          "trim": ""
+          "trim": "#c8102e"
         },
         {
           "c1": "#f8fafc",
-          "c2": "#111827",
-          "shorts": "#111827",
+          "c2": "#111111",
+          "shorts": "#f8fafc",
           "socks": "#f8fafc",
-          "pattern": "faixa",
+          "pattern": "liso",
           "sleeves": "",
           "trim": ""
         },
@@ -65167,20 +65167,20 @@
       "short": "CIN",
       "kits": [
         {
-          "c1": "#f97316",
-          "c2": "#1e3a8a",
-          "shorts": "#1e3a8a",
-          "socks": "#f97316",
-          "pattern": "aros",
+          "c1": "#003087",
+          "c2": "#f36c21",
+          "shorts": "#003087",
+          "socks": "#003087",
+          "pattern": "liso",
           "sleeves": "",
-          "trim": ""
+          "trim": "#f36c21"
         },
         {
           "c1": "#f8fafc",
-          "c2": "#f97316",
-          "shorts": "#f97316",
+          "c2": "#003087",
+          "shorts": "#f8fafc",
           "socks": "#f8fafc",
-          "pattern": "faixa",
+          "pattern": "liso",
           "sleeves": "",
           "trim": ""
         },
@@ -65660,20 +65660,20 @@
       "short": "CLB",
       "kits": [
         {
-          "c1": "#facc15",
-          "c2": "#111827",
-          "shorts": "#111827",
-          "socks": "#facc15",
-          "pattern": "listras",
+          "c1": "#fedd00",
+          "c2": "#111111",
+          "shorts": "#111111",
+          "socks": "#fedd00",
+          "pattern": "liso",
           "sleeves": "",
           "trim": ""
         },
         {
-          "c1": "#111827",
-          "c2": "#facc15",
-          "shorts": "#111827",
-          "socks": "#111827",
-          "pattern": "faixa",
+          "c1": "#111111",
+          "c2": "#fedd00",
+          "shorts": "#111111",
+          "socks": "#111111",
+          "pattern": "liso",
           "sleeves": "",
           "trim": ""
         },
@@ -65908,18 +65908,18 @@
       "short": "DAL",
       "kits": [
         {
-          "c1": "#dc2626",
+          "c1": "#c8102e",
           "c2": "#1d4ed8",
           "shorts": "#1d4ed8",
-          "socks": "#dc2626",
-          "pattern": "liso",
+          "socks": "#c8102e",
+          "pattern": "aros",
           "sleeves": "",
           "trim": ""
         },
         {
           "c1": "#f8fafc",
-          "c2": "#dc2626",
-          "shorts": "#dc2626",
+          "c2": "#c8102e",
+          "shorts": "#f8fafc",
           "socks": "#f8fafc",
           "pattern": "liso",
           "sleeves": "",
@@ -66151,18 +66151,18 @@
       "short": "HOU",
       "kits": [
         {
-          "c1": "#ea580c",
-          "c2": "#111827",
-          "shorts": "#111827",
-          "socks": "#ea580c",
-          "pattern": "aros",
+          "c1": "#f36c21",
+          "c2": "#111111",
+          "shorts": "#f8fafc",
+          "socks": "#f36c21",
+          "pattern": "liso",
           "sleeves": "",
           "trim": ""
         },
         {
           "c1": "#f8fafc",
-          "c2": "#ea580c",
-          "shorts": "#ea580c",
+          "c2": "#f36c21",
+          "shorts": "#f8fafc",
           "socks": "#f8fafc",
           "pattern": "liso",
           "sleeves": "",
@@ -67883,19 +67883,19 @@
       "short": "NSH",
       "kits": [
         {
-          "c1": "#fde047",
-          "c2": "#1e3a8a",
-          "shorts": "#1e3a8a",
-          "socks": "#fde047",
-          "pattern": "listras",
+          "c1": "#ece83a",
+          "c2": "#1f1646",
+          "shorts": "#1f1646",
+          "socks": "#ece83a",
+          "pattern": "liso",
           "sleeves": "",
           "trim": ""
         },
         {
-          "c1": "#1e3a8a",
-          "c2": "#fde047",
-          "shorts": "#1e3a8a",
-          "socks": "#1e3a8a",
+          "c1": "#1f1646",
+          "c2": "#ece83a",
+          "shorts": "#1f1646",
+          "socks": "#1f1646",
           "pattern": "liso",
           "sleeves": "",
           "trim": ""
@@ -68870,20 +68870,20 @@
       "short": "ORL",
       "kits": [
         {
-          "c1": "#6d28d9",
-          "c2": "#ffffff",
-          "shorts": "#ffffff",
-          "socks": "#6d28d9",
-          "pattern": "riscas",
+          "c1": "#633492",
+          "c2": "#f8fafc",
+          "shorts": "#633492",
+          "socks": "#633492",
+          "pattern": "liso",
           "sleeves": "",
           "trim": ""
         },
         {
           "c1": "#f8fafc",
-          "c2": "#6d28d9",
+          "c2": "#633492",
           "shorts": "#f8fafc",
           "socks": "#f8fafc",
-          "pattern": "faixa_peito",
+          "pattern": "liso",
           "sleeves": "",
           "trim": ""
         },
@@ -69119,17 +69119,17 @@
       "short": "PHI",
       "kits": [
         {
-          "c1": "#1e3a8a",
-          "c2": "#facc15",
-          "shorts": "#facc15",
-          "socks": "#1e3a8a",
+          "c1": "#071b2c",
+          "c2": "#b19b69",
+          "shorts": "#071b2c",
+          "socks": "#071b2c",
           "pattern": "liso",
           "sleeves": "",
-          "trim": ""
+          "trim": "#b19b69"
         },
         {
           "c1": "#f8fafc",
-          "c2": "#1e3a8a",
+          "c2": "#071b2c",
           "shorts": "#f8fafc",
           "socks": "#f8fafc",
           "pattern": "liso",
@@ -95520,8 +95520,8 @@
           "c1": "#111111",
           "c2": "#f8fafc",
           "shorts": "#111111",
-          "socks": "#111111",
-          "pattern": "faixa_peito",
+          "socks": "#9ca3af",
+          "pattern": "listras",
           "sleeves": "",
           "trim": ""
         },
@@ -96268,19 +96268,19 @@
       "short": "GIG",
       "kits": [
         {
-          "c1": "#f8fafc",
-          "c2": "#111111",
+          "c1": "#111111",
+          "c2": "#f8fafc",
           "shorts": "#111111",
-          "socks": "#f8fafc",
+          "socks": "#111111",
           "pattern": "faixa",
           "sleeves": "",
           "trim": ""
         },
         {
-          "c1": "#111111",
-          "c2": "#f8fafc",
-          "shorts": "#111111",
-          "socks": "#111111",
+          "c1": "#f8fafc",
+          "c2": "#111111",
+          "shorts": "#f8fafc",
+          "socks": "#f8fafc",
           "pattern": "faixa",
           "sleeves": "",
           "trim": ""
@@ -96760,17 +96760,17 @@
       "short": "LEA",
       "kits": [
         {
-          "c1": "#111111",
-          "c2": "#ff6a00",
-          "shorts": "#111111",
-          "socks": "#111111",
+          "c1": "#ffd200",
+          "c2": "#00843d",
+          "shorts": "#00843d",
+          "socks": "#ffd200",
           "pattern": "liso",
           "sleeves": "",
           "trim": ""
         },
         {
           "c1": "#f8fafc",
-          "c2": "#ff6a00",
+          "c2": "#00843d",
           "shorts": "#f8fafc",
           "socks": "#f8fafc",
           "pattern": "liso",
@@ -97511,7 +97511,7 @@
           "socks": "#f8fafc",
           "pattern": "liso",
           "sleeves": "",
-          "trim": ""
+          "trim": "#111111"
         },
         {
           "c1": "#111111",
@@ -107982,20 +107982,20 @@
       "short": "DOU",
       "kits": [
         {
-          "c1": "#facc15",
-          "c2": "#15803d",
-          "shorts": "#15803d",
-          "socks": "#facc15",
-          "pattern": "listras",
+          "c1": "#f5c400",
+          "c2": "#00843d",
+          "shorts": "#00843d",
+          "socks": "#f5c400",
+          "pattern": "liso",
           "sleeves": "",
           "trim": ""
         },
         {
-          "c1": "#15803d",
-          "c2": "#facc15",
-          "shorts": "#15803d",
-          "socks": "#15803d",
-          "pattern": "riscas",
+          "c1": "#00843d",
+          "c2": "#f5c400",
+          "shorts": "#00843d",
+          "socks": "#00843d",
+          "pattern": "liso",
           "sleeves": "",
           "trim": ""
         },
@@ -108234,17 +108234,17 @@
       "short": "DRA",
       "kits": [
         {
-          "c1": "#dc2626",
-          "c2": "#111827",
-          "shorts": "#111827",
-          "socks": "#dc2626",
-          "pattern": "faixa",
+          "c1": "#c8102e",
+          "c2": "#111111",
+          "shorts": "#111111",
+          "socks": "#c8102e",
+          "pattern": "listras",
           "sleeves": "",
           "trim": ""
         },
         {
           "c1": "#f8fafc",
-          "c2": "#dc2626",
+          "c2": "#c8102e",
           "shorts": "#f8fafc",
           "socks": "#f8fafc",
           "pattern": "liso",
@@ -108479,17 +108479,17 @@
       "short": "ESM",
       "kits": [
         {
-          "c1": "#15803d",
-          "c2": "#ffffff",
-          "shorts": "#ffffff",
-          "socks": "#15803d",
-          "pattern": "listras",
+          "c1": "#006437",
+          "c2": "#f8fafc",
+          "shorts": "#f8fafc",
+          "socks": "#006437",
+          "pattern": "liso",
           "sleeves": "",
           "trim": ""
         },
         {
           "c1": "#f8fafc",
-          "c2": "#15803d",
+          "c2": "#006437",
           "shorts": "#f8fafc",
           "socks": "#f8fafc",
           "pattern": "liso",
@@ -108972,20 +108972,20 @@
       "short": "FAN",
       "kits": [
         {
-          "c1": "#111827",
+          "c1": "#111111",
           "c2": "#f8fafc",
-          "shorts": "#f8fafc",
-          "socks": "#111827",
-          "pattern": "metades",
+          "shorts": "#111111",
+          "socks": "#111111",
+          "pattern": "listras",
           "sleeves": "",
           "trim": ""
         },
         {
           "c1": "#f8fafc",
-          "c2": "#111827",
-          "shorts": "#111827",
+          "c2": "#111111",
+          "shorts": "#f8fafc",
           "socks": "#f8fafc",
-          "pattern": "faixa_peito",
+          "pattern": "liso",
           "sleeves": "",
           "trim": ""
         },
@@ -109219,18 +109219,18 @@
       "short": "CRB",
       "kits": [
         {
-          "c1": "#dc2626",
-          "c2": "#ffffff",
-          "shorts": "#dc2626",
-          "socks": "#dc2626",
-          "pattern": "liso",
+          "c1": "#c8102e",
+          "c2": "#f8fafc",
+          "shorts": "#f8fafc",
+          "socks": "#c8102e",
+          "pattern": "aros",
           "sleeves": "",
           "trim": ""
         },
         {
           "c1": "#f8fafc",
-          "c2": "#dc2626",
-          "shorts": "#dc2626",
+          "c2": "#c8102e",
+          "shorts": "#f8fafc",
           "socks": "#f8fafc",
           "pattern": "liso",
           "sleeves": "",
@@ -109467,20 +109467,20 @@
       "short": "ILH",
       "kits": [
         {
-          "c1": "#dc2626",
-          "c2": "#111827",
-          "shorts": "#111827",
-          "socks": "#dc2626",
-          "pattern": "liso",
+          "c1": "#c8102e",
+          "c2": "#111111",
+          "shorts": "#111111",
+          "socks": "#111111",
+          "pattern": "aros",
           "sleeves": "",
           "trim": ""
         },
         {
           "c1": "#f8fafc",
-          "c2": "#dc2626",
-          "shorts": "#dc2626",
+          "c2": "#c8102e",
+          "shorts": "#f8fafc",
           "socks": "#f8fafc",
-          "pattern": "faixa",
+          "pattern": "liso",
           "sleeves": "",
           "trim": ""
         },
@@ -109713,17 +109713,17 @@
       "short": "PIC",
       "kits": [
         {
-          "c1": "#1d4ed8",
-          "c2": "#dc2626",
-          "shorts": "#dc2626",
-          "socks": "#1d4ed8",
-          "pattern": "liso",
+          "c1": "#0b3d91",
+          "c2": "#c8102e",
+          "shorts": "#0b3d91",
+          "socks": "#0b3d91",
+          "pattern": "aros",
           "sleeves": "",
-          "trim": ""
+          "trim": "#f8fafc"
         },
         {
           "c1": "#f8fafc",
-          "c2": "#1d4ed8",
+          "c2": "#0b3d91",
           "shorts": "#f8fafc",
           "socks": "#f8fafc",
           "pattern": "liso",
@@ -110207,19 +110207,19 @@
       "short": "MCC",
       "kits": [
         {
-          "c1": "#111827",
-          "c2": "#f8fafc",
-          "shorts": "#111827",
-          "socks": "#111827",
-          "pattern": "listras",
+          "c1": "#f8fafc",
+          "c2": "#111111",
+          "shorts": "#111111",
+          "socks": "#f8fafc",
+          "pattern": "faixa",
           "sleeves": "",
           "trim": ""
         },
         {
-          "c1": "#f8fafc",
-          "c2": "#111827",
-          "shorts": "#111827",
-          "socks": "#f8fafc",
+          "c1": "#111111",
+          "c2": "#f8fafc",
+          "shorts": "#111111",
+          "socks": "#111111",
           "pattern": "liso",
           "sleeves": "",
           "trim": ""
@@ -111948,20 +111948,20 @@
       "short": "TBU",
       "kits": [
         {
-          "c1": "#dc2626",
-          "c2": "#ffffff",
-          "shorts": "#ffffff",
-          "socks": "#dc2626",
-          "pattern": "aros",
+          "c1": "#c8102e",
+          "c2": "#f8fafc",
+          "shorts": "#f8fafc",
+          "socks": "#c8102e",
+          "pattern": "listras",
           "sleeves": "",
           "trim": ""
         },
         {
           "c1": "#f8fafc",
-          "c2": "#dc2626",
-          "shorts": "#dc2626",
+          "c2": "#c8102e",
+          "shorts": "#f8fafc",
           "socks": "#f8fafc",
-          "pattern": "faixa_peito",
+          "pattern": "liso",
           "sleeves": "",
           "trim": ""
         },
@@ -112441,18 +112441,18 @@
       "short": "VOZ",
       "kits": [
         {
-          "c1": "#111827",
+          "c1": "#111111",
           "c2": "#f8fafc",
-          "shorts": "#111827",
-          "socks": "#111827",
-          "pattern": "metades",
+          "shorts": "#111111",
+          "socks": "#111111",
+          "pattern": "listras",
           "sleeves": "",
           "trim": ""
         },
         {
           "c1": "#f8fafc",
-          "c2": "#111827",
-          "shorts": "#111827",
+          "c2": "#111111",
+          "shorts": "#f8fafc",
           "socks": "#f8fafc",
           "pattern": "liso",
           "sleeves": "",

@@ -102,6 +102,13 @@ namespace Craquez.Sim
         public bool noOffsideKick;
         public int lastScorer = -1, lastGoalTeam = -1;
         public int[] statsShots = new int[2];
+        /// <summary>Posse de bola em ticks e substituições restantes por time.</summary>
+        public int[] statsPoss = new int[2];
+        public int[] subsLeft = { 5, 5 };
+        public bool rollingSubs;
+        /// <summary>Índices do elenco que já saíram de campo (não voltam).</summary>
+        public readonly HashSet<int>[] subbedOut = { new HashSet<int>(), new HashSet<int>() };
+        /// <summary>Índice do elenco por atleta, para trocas no intervalo/pausa.</summary>
         public int[] teamMentality = { 1, 1 };
         public int[] teamPress = { 1, 1 };
         /// <summary>Ajuste de rolagem por clima (chuva = bola mais rápida).</summary>
@@ -133,6 +140,9 @@ namespace Craquez.Sim
             halfSeconds = secondsPerHalf;
             rng = new SimRng(seed);
             teams = new[] { a, b };
+            bool rolling = modeId != GameModes.Field;   // futsal, society e rua: substituições à vontade (quem sai pode voltar)
+            subsLeft = new[] { rolling ? 99 : 5, rolling ? 99 : 5 };
+            rollingSubs = rolling;
             players.Clear();
             ctrl = new[] { new Ctrl(), new Ctrl() };
             var forms = GameModes.Formations(modeId);
@@ -172,7 +182,7 @@ namespace Craquez.Sim
                             used.Add(tac.lineup[i]);
                         }
                         else e = PickFromRoster(roster, want, used, !mode.keeper);
-                        if (e != null) ApplyRoster(p, e);
+                        if (e != null) { ApplyRoster(p, e); p.rosterIndex = roster.IndexOf(e); }
                     }
                     Personality(p);
                     players.Add(p);
@@ -243,6 +253,31 @@ namespace Craquez.Sim
                 p.pace = Mathf.Min(0.99f, p.pace + 0.04f);
                 p.accel = Mathf.Min(0.99f, p.accel + 0.03f);
             }
+        }
+
+        /// <summary>
+        /// Substituição: o atleta <paramref name="playerId"/> sai e entra o jogador do elenco
+        /// <paramref name="rosterIdx"/> (que não pode estar em campo nem ter saído). Goleiro só por goleiro.
+        /// </summary>
+        public bool Substitute(int playerId, int rosterIdx)
+        {
+            if (playerId < 0 || playerId >= players.Count) return false;
+            var p = players[playerId];
+            int t = p.team;
+            var roster = teams[t].data != null ? teams[t].data.roster : null;
+            if (roster == null || rosterIdx < 0 || rosterIdx >= roster.Count || subsLeft[t] <= 0) return false;
+            if (subbedOut[t].Contains(rosterIdx)) return false;
+            foreach (var q in players) if (q.team == t && q.rosterIndex == rosterIdx) return false;
+            var e = roster[rosterIdx];
+            if (mode.keeper && p.isKeeper != (e.pos == "GK")) return false;
+            if (p.rosterIndex >= 0 && !rollingSubs) subbedOut[t].Add(p.rosterIndex);
+            p.traits = 0;
+            ApplyRoster(p, e);
+            p.rosterIndex = rosterIdx;
+            p.stamina = 1f;
+            Personality(p);
+            subsLeft[t]--;
+            return true;
         }
 
         /// <summary>Melhor atleta livre do elenco para a posição (média dos atributos).</summary>
@@ -489,8 +524,7 @@ namespace Craquez.Sim
                     stateTimer -= DT;
                     AiAll(false);
                     foreach (var p in players) { p.intent *= 0.5f; MovePlayer(p); }
-                    ball.Step(DT, mode);
-                    KeepBallInNet();
+                    StepBallInNet();
                     if (stateTimer <= 0f) ResetForKickoff(kickoffTeam);
                     break;
                 case MatchState.Foul:
@@ -502,6 +536,7 @@ namespace Craquez.Sim
                     {
                         half = 2;
                         clock = 0f;
+                        foreach (var pl in players) pl.stamina = Mathf.Min(1f, pl.stamina + 0.6f);   // descanso no vestiário
                         kickoffTeam = 1;
                         ResetForKickoff(1);
                     }
@@ -512,6 +547,7 @@ namespace Craquez.Sim
         void StepPlaying(InputFrame[] frames)
         {
             clock += DT;
+            if (ball.owner >= 0) statsPoss[players[ball.owner].team]++;
             protectT = Mathf.Max(0f, protectT - DT);
             passReceiverT -= DT;
             if (passReceiverT <= 0f) passReceiver = -1;
@@ -2918,19 +2954,59 @@ namespace Craquez.Sim
             Emit("goal", t, lastScorer, ownGoal ? "own" : null);
         }
 
-        void KeepBallInNet()
+        /// <summary>Bola dentro do gol (comemoração): segue rolando/quicando até morrer na rede. Retorna a velocidade do choque com a rede (0 = sem choque).</summary>
+        public float StepBallInNet()
         {
+            float side = Mathf.Sign(ball.pos.x);
+            bool inside = Mathf.Abs(ball.pos.x) > halfLen;
+            ball.Step(DT, mode);
+            float imp = KeepBallInNet();
+            // depois do gol a bola morre lá dentro: o rebote da rede não a devolve ao campo
+            if (inside && Mathf.Abs(ball.pos.x) < halfLen + ball.radius && Mathf.Sign(ball.pos.x) == side)
+            {
+                ball.pos.x = side * (halfLen + ball.radius);
+                if (ball.vel.x * side < 0f) ball.vel.x *= -0.2f;
+            }
+            if (inside) { ball.vel *= 1f - 1.2f * DT; ball.spin *= 1f - 2f * DT; }   // atrito da rede/grama
+            return imp;
+        }
+
+        /// <summary>
+        /// A rede segura a bola: fundo inclinado (mais fundo embaixo), laterais e teto. O choque
+        /// tira quase toda a velocidade (a rede cede e devolve só um pouco).
+        /// </summary>
+        float KeepBallInNet()
+        {
+            float impact = 0f;
             float depth = mode.goalDepth;
-            if (Mathf.Abs(ball.pos.x) > halfLen + depth - ball.radius)
+            if (Mathf.Abs(ball.pos.x) <= halfLen) return 0f;
+            float sx = Mathf.Sign(ball.pos.x);
+            float back = halfLen + Mathf.Lerp(depth, depth * 0.35f, Mathf.Clamp01(ball.z / Mathf.Max(0.1f, goalH))) - ball.radius;
+            if (Mathf.Abs(ball.pos.x) > back)
             {
-                ball.pos.x = Mathf.Sign(ball.pos.x) * (halfLen + depth - ball.radius);
-                ball.vel *= 0.2f;
+                float vin = ball.vel.x * sx;
+                if (vin > 0f)
+                {
+                    impact = Mathf.Sqrt(vin * vin + ball.vz * ball.vz * 0.3f);
+                    ball.vel.x = -sx * vin * 0.08f;
+                    ball.vel.y *= 0.45f;
+                    ball.vz *= 0.35f;
+                    ball.spin *= 0.3f;
+                }
+                ball.pos.x = sx * back;
             }
-            if (Mathf.Abs(ball.pos.x) > halfLen)
+            float side = goalHalf - ball.radius;
+            if (Mathf.Abs(ball.pos.y) > side)
             {
-                ball.pos.y = Mathf.Clamp(ball.pos.y, -goalHalf + ball.radius, goalHalf - ball.radius);
-                ball.z = Mathf.Min(ball.z, goalH - ball.radius);
+                if (ball.vel.y * Mathf.Sign(ball.pos.y) > 0f) { impact = Mathf.Max(impact, Mathf.Abs(ball.vel.y) * 0.6f); ball.vel.y *= -0.15f; ball.vel.x *= 0.6f; }
+                ball.pos.y = Mathf.Sign(ball.pos.y) * side;
             }
+            if (ball.z > goalH - ball.radius)
+            {
+                ball.z = goalH - ball.radius;
+                if (ball.vz > 0f) { impact = Mathf.Max(impact, ball.vz * 0.5f); ball.vz *= -0.1f; }
+            }
+            return impact;
         }
     }
 }

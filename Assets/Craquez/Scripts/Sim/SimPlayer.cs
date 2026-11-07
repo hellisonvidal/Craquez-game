@@ -41,6 +41,8 @@ namespace Craquez.Sim
 
         public Vector2 position, vel, facing = Vector2.right, intent;
         public float stamina = 1f;
+        /// <summary>Índice no elenco do time (-1 = gerado); usado nas substituições.</summary>
+        public int rosterIndex = -1;
         public bool wantSprint, sprinting;
 
         public float kickCd, stun, slide, tackleAnim, kickAnim, hold, dive, runPhase;
