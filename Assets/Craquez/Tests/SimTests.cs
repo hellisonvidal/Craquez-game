@@ -483,6 +483,66 @@ namespace Craquez.Tests
             Assert.Less(sim.ball.Speed, 1.5f, "a rede segura a bola");
         }
 
+        /// <summary>Chutes no gol de 11 a 22 m: o goleiro defende boa parte, mas não todos (e mergulha nos cantos).</summary>
+        [Test] public void KeeperSavesAndConcedes()
+        {
+            int goals = 0, shots = 0, dives = 0, stands = 0;
+            var evs = new System.Collections.Generic.Dictionary<string, int>();
+            var hist = new System.Collections.Generic.SortedDictionary<int, (int, int, int)>();
+            var r = new System.Random(7);
+            for (int n = 0; n < 160; n++)
+            {
+                var sim = NewMatch(GameModes.Field, (uint)(n + 1));
+                for (int i = 0; i < 70; i++) sim.Step(new InputFrame[2]);
+                float dir = sim.TeamDir(0);
+                float gx = dir * sim.halfLen;
+                var gk = sim.players.Find(x => x.team == 1 && x.isKeeper);
+                // ninguém de linha por perto: só goleiro x bola
+                foreach (var q in sim.players) if (!q.isKeeper) q.position = new Vector2(-dir * 20f, q.position.y);
+                gk.position = new Vector2(gx - dir * 1f, 0f);
+                gk.vel = Vector2.zero;
+                float dist = 11f + (float)r.NextDouble() * 9f;
+                var from = new Vector2(gx - dir * dist, ((float)r.NextDouble() * 2f - 1f) * 8f);
+                var tgt = new Vector2(gx, ((float)r.NextDouble() * 2f - 1f) * (sim.goalHalf - 0.25f));
+                float tz = (float)r.NextDouble() * (sim.goalH - 0.3f);
+                float speed = 24f + (float)r.NextDouble() * 10f;
+                var d = (tgt - from);
+                float t = d.magnitude / speed;
+                sim.ball.owner = -1;
+                sim.ball.pos = from;
+                sim.ball.vel = d / t;
+                sim.ball.z = 0.11f;
+                sim.ball.vz = (tz + 0.5f * SimBall.G * t * t - 0.11f) / t;
+                sim.ball.lastTouchTeam = 0;
+                sim.lastShotTick = sim.tick;
+                sim.kickoffPass = false;
+                sim.protectT = 0f;
+                shots++;
+                bool dived = false, stood = false;
+                for (int i = 0; i < 150 && sim.state == MatchState.Playing; i++)
+                {
+                    sim.Step(new InputFrame[2]);
+                    foreach (var ev in sim.events) if (ev.type == "save" || ev.type == "touch" || ev.type == "post" || ev.type == "out" || ev.type == "whistle") { string key = ev.type + ":" + ev.kind + ":" + ev.ok; evs[key] = evs.TryGetValue(key, out var c0) ? c0 + 1 : 1; }
+                    if (gk.saveKind >= 3) dived = true;
+                    else if (gk.saveKind > 0) stood = true;
+                }
+                if (dived) dives++;
+                if (stood) stands++;
+                if (sim.score[0] > 0) goals++;
+                int bk = Mathf.Min(3, (int)(Mathf.Abs(tgt.y) / 1f)) * 10 + (tz < 0.6f ? 0 : tz < 1.5f ? 1 : 2);
+                hist[bk] = hist.TryGetValue(bk, out var hv) ? (hv.Item1 + 1, hv.Item2 + (sim.score[0] > 0 ? 1 : 0), hv.Item3 + (dived ? 1 : 0)) : (1, sim.score[0] > 0 ? 1 : 0, dived ? 1 : 0);
+            }
+            foreach (var kv in hist) System.Console.WriteLine($"   y~{kv.Key / 10} m, altura {(kv.Key % 10 == 0 ? "baixa" : kv.Key % 10 == 1 ? "média" : "alta")}: {kv.Value.Item2}/{kv.Value.Item1} gols, {kv.Value.Item3} mergulhos");
+            float rate = goals / (float)shots;
+
+            foreach (var kv in evs) System.Console.WriteLine("   " + kv.Key + " " + kv.Value);
+            System.Console.WriteLine($"[goleiro] {goals}/{shots} gols ({rate:P0}), mergulhos {dives}, encaixes {stands}");
+            Assert.Greater(rate, 0.15f, "goleiro defende demais");
+            Assert.Less(rate, 0.7f, "goleiro defende de menos");
+            Assert.Greater(dives, 15, "o goleiro quase não mergulha");
+            Assert.Greater(stands, 10, "o goleiro quase não encaixa de frente");
+        }
+
         [Test] public void JsonRoundTrip()
         {
             var o = MiniJson.Parse("{\"a\": [1, 2.5, \"x\\n\"], \"b\": {\"c\": true, \"d\": null}}");

@@ -64,6 +64,7 @@ namespace Craquez
             hud = new GameObject("HUD").AddComponent<Hud>();
             hud.transform.SetParent(transform, false);
             hud.Build(sim, c, view.kits);
+            hud.view = view;
             hud.SetWeather(view.venue.name + "  •  " + view.weather.Label);
             view.onCut = () => { if (!attract) hud.Cut(); };
             hud.onPause = () => { if (_phase == Phase.Playing || _phase == Phase.Goal) Pause(); };
@@ -392,6 +393,7 @@ namespace Craquez
                 var vols = new List<string>();
                 for (int i = 0; i <= 10; i++) vols.Add(i * 10 + "%");
                 UiKit.Size(UiKit.Cycler(list, "Volume", vols, Mathf.RoundToInt(Settings.Volume * 10), i => Settings.Volume = i / 10f), 72, 72);
+                UiKit.Size(UiKit.Cycler(list, "Nomes dos atletas", Settings.PlayerTagNames, Settings.PlayerTags, i => Settings.PlayerTags = i), 72, 72);
                 UiKit.Size(UiKit.Cycler(list, "Vibração", new[] { "Ligada", "Desligada" }, Settings.Vibration ? 0 : 1, i => Settings.Vibration = i == 0), 72, 72);
                 if (cfg.mode != GameModes.Futsal)
                     UiKit.Size(UiKit.Cycler(list, "Clima dinâmico", new[] { "Ligado", "Desligado" }, view.weather.dynamic ? 0 : 1, i => view.weather.dynamic = i == 0), 72, 72);

@@ -8,11 +8,30 @@ Jogo de futebol feito 100% com inteligência artificial, **gratuito**. Android, 
 - **Linux**: `Craquez-v2.1.0-Linux.tar.gz` → extraia e rode `./Craquez` (ou `./instalar.sh` para o atalho no menu)
 
 ### Novidades
+- **Goleiros reformulados**: o goleiro lê a trajetória da bola em 3D na linha em que está (não só
+  na linha do gol), com tempo de reação e erro de leitura conforme a qualidade e a força do chute,
+  e escolhe a defesa certa: encaixe de frente, defesa baixa (cai sobre a bola), salto para agarrar
+  no alto ou ponte rasteira, à meia-altura e no ângulo. Desloca-se em passadas laterais (não corre
+  de lado) e a ponte é um impulso de verdade, com voo e queda. O alcance é o das mãos e do corpo na
+  posição da defesa (ponte rasteira não pega bola no ângulo) e a bola não "atravessa" as mãos.
+- **Animação das defesas**: corpo sai do chão de lado, esticado, com as duas mãos indo juntas na
+  bola, pernas juntas, queda deitado e levantada; encaixe com as mãos atrás da bola, defesa baixa
+  ajoelhando, salto com os braços no alto.
+- **Domínio de bola**: ao receber, o pé mais perto vai ao encontro da bola e amortece (coxa sobe,
+  parte de dentro do pé virada para a bola, corpo sobre ela).
+- **Chutes e passes com o corpo**: braço contrário abre para equilibrar, o outro recua; tronco sobre
+  a bola no rasteiro e inclinado para trás na bola alta.
+- **Nomes e números sobre os atletas**: etiqueta com o número na cor do time e o sobrenome em cima
+  do jogador controlado e de quem está com a bola (ou de todos, ou desligado — em Configurações e
+  no menu de pausa).
+- **12 músicas originais** (pop-rock, samba eletrônico, house, reggae, funk, baião, rock...): cada
+  vez que o jogo abre começa uma sorteada e, ao fim, vem outra.
+- **Locais mais vivos**: câmera aérea em cabos sobre o campo nos estádios, bandeirinhas de
+  escanteio tremulando, varais de bandeirolas no teto dos ginásios, bandeira do clube no mastro do
+  society, pipas no céu, bandeirinhas de festa e varal de roupas nas ruas.
 - **Atletas com corpo firme**: menos inclinação e balanço do tronco nas curvas e arrancadas (o
   tronco inclina a partir do quadril, sem envergar a coluna), camisa e calção sem ondular como
   gelatina e luz com forma mais definida nos músculos.
-- **Trilha da abertura mais suave**: pop-rock animado em sol maior (guitarra limpa dedilhando,
-  violão com pouca distorção, teclado, baixo e bateria leves, melodia no refrão).
 - **Gramados de TV**: faixas de corte com contraste e brilho diferentes conforme o sentido, grama
   mais nítida.
 - **Society**: grama sintética de verdade, com fios, borracha preta entre eles e emendas dos rolos.

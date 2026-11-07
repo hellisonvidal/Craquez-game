@@ -49,6 +49,14 @@ namespace Craquez
             set { PlayerPrefs.SetFloat("volume", value); PlayerPrefs.Save(); AudioListener.volume = value; }
         }
 
+        /// <summary>Nomes e números sobre os atletas: 0 controlados e quem tem a bola, 1 todos, 2 desligado.</summary>
+        public static int PlayerTags
+        {
+            get => PlayerPrefs.GetInt("player_tags", 0);
+            set { PlayerPrefs.SetInt("player_tags", value); PlayerPrefs.Save(); }
+        }
+        public static readonly string[] PlayerTagNames = { "Controlados e bola", "Todos", "Desligado" };
+
         public static bool Vibration
         {
             get => PlayerPrefs.GetInt("vibration", 1) == 1;

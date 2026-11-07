@@ -47,6 +47,15 @@ namespace Craquez.Sim
 
         public float kickCd, stun, slide, tackleAnim, kickAnim, hold, dive, runPhase;
         public bool slideHitBall;
+        /// <summary>
+        /// Defesa do goleiro: 0 nenhuma, 1 encaixe de frente, 2 defesa baixa (cai sobre a bola),
+        /// 3 ponte rasteira, 4 ponte à meia-altura, 5 ponte alta (no ângulo), 6 salto para agarrar no alto.
+        /// saveSide = lado do mergulho no eixo y do campo; saveH = altura das mãos no alvo; saveDist = quanto precisa ir de lado.
+        /// </summary>
+        public int saveKind;
+        /// <summary>Goleiro lendo um chute: desloca em passadas laterais (não corre).</summary>
+        public bool keeperSet;
+        public float saveT, saveTotal, saveSide, saveH, saveDist;
 
         public float windup, windupTotal, windupPower;
         public int windupKind;

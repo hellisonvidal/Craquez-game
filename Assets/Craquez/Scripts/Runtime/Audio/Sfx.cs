@@ -90,15 +90,34 @@ namespace Craquez
                 _crowd2.time = c2.length * 0.37f;
             }
             if (_crowdLoop.length > 10f) _crowd.time = Random.value * _crowdLoop.length * 0.8f;
-            var theme = R("menu_theme");
-            if (theme != null)
-            {
-                _music = gameObject.AddComponent<AudioSource>();
-                _music.clip = theme;
-                _music.loop = true;
-                _music.volume = 0f;
-                _music.ignoreListenerPause = true;
-            }
+            // 12 trilhas originais: cada abertura do jogo começa por uma sorteada e, ao fim de
+            // cada uma, vem outra (sem repetir a anterior)
+            _music = gameObject.AddComponent<AudioSource>();
+            _music.loop = false;
+            _music.volume = 0f;
+            _music.ignoreListenerPause = true;
+            _track = Random.Range(0, Tracks);
+            LoadTrack(_track);
+        }
+
+        public const int Tracks = 12;
+        int _track = -1;
+        bool _musicHeld;   // pausada por nós (fade a zero), não terminou
+
+        void LoadTrack(int i)
+        {
+            var old = _music.clip;
+            var c = Resources.Load<AudioClip>("Audio/Music/track_" + (i + 1).ToString("00"));
+            _music.clip = c;
+            if (old != null && old != c) Resources.UnloadAsset(old);
+        }
+
+        void NextTrack()
+        {
+            int n = Random.Range(0, Tracks - 1);
+            _track = n >= _track ? n + 1 : n;
+            LoadTrack(_track);
+            _music.Play();
         }
 
         /// <summary>Trilha sonora dos menus (liga/desliga com fade).</summary>
@@ -106,7 +125,11 @@ namespace Craquez
         {
             if (_i == null || _i._music == null) return;
             _i._musicTarget = on && Settings.Music ? Mathf.Clamp01(Settings.MusicVolume) : 0f;
-            if (_i._musicTarget > 0f && !_i._music.isPlaying) _i._music.Play();
+            if (_i._musicTarget > 0f && !_i._music.isPlaying)
+            {
+                if (_i._musicHeld) _i._music.UnPause(); else _i._music.Play();
+                _i._musicHeld = false;
+            }
         }
 
         void Update()
@@ -118,7 +141,8 @@ namespace Craquez
             if (_music != null)
             {
                 _music.volume = Mathf.MoveTowards(_music.volume, _musicTarget, Time.unscaledDeltaTime * 0.5f);
-                if (_music.volume <= 0f && _musicTarget <= 0f && _music.isPlaying) _music.Pause();
+                if (_music.volume <= 0f && _musicTarget <= 0f && _music.isPlaying) { _music.Pause(); _musicHeld = true; }
+                else if (_musicTarget > 0f && !_music.isPlaying && !_musicHeld && _music.clip != null) NextTrack();   // acabou: próxima
             }
         }
 

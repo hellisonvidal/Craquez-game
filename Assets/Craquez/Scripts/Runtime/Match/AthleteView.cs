@@ -64,6 +64,9 @@ namespace Craquez
                     float contact = AthleteAnimator.KickContact(clip);
                     float start = Mathf.Max(0f, contact - p.windupTotal * rate);
                     anim.Play(clip, start, (contact - start) + 0.5f, rate, 0.05f);
+                    _kickBodyT = _kickBodyTotal = (contact - start) / rate + 0.45f;
+                    _kickContactU = ((contact - start) / rate) / _kickBodyTotal;
+                    _kickLoft = e.kind == "lob" || e.kind == "cross" ? 1f : 0f;
                     break;
                 }
                 case "kick":
@@ -104,6 +107,15 @@ namespace Craquez
                 case "header":
                     _hopT = 0.55f;
                     break;
+                case "receive":
+                {
+                    // domínio: o pé mais perto da bola vai ao encontro dela e recua junto (amortece)
+                    var bw = W(view.sim.ball.pos);
+                    _recvLeg = rig.footL != null && rig.footR != null && (bw - rig.footL.position).sqrMagnitude < (bw - rig.footR.position).sqrMagnitude ? 0 : 1;
+                    _recvT = e.ok ? 0.34f : 0.26f;
+                    _recvTotal = _recvT;
+                    break;
+                }
                 case "tackle_try":
                     _pitch = 18f;
                     break;
@@ -345,11 +357,10 @@ namespace Craquez
                 pitch = Mathf.Lerp(pitch, -62f, k);
                 lift = Mathf.Lerp(lift, 0.12f, k);
             }
-            else if (p.isKeeper && p.dive > 0f)
+            else if (p.isKeeper && (p.saveKind > 0 || _saveRec > 0f))
             {
-                float u = 1f - p.dive / 0.6f;
-                roll = _diveSide * Mathf.Lerp(0f, 78f, Mathf.Clamp01(u * 3f));
-                lift = Mathf.Sin(Mathf.Clamp01(u * 1.6f) * Mathf.PI) * 0.6f + 0.25f * Mathf.Clamp01(u * 3f);
+                var sp = SavePose(dt);
+                pitch += sp.x; roll += sp.y; lift += sp.z;
             }
             else if (p.down > 0f)
             {
@@ -395,6 +406,8 @@ namespace Craquez
                 animFwd = Mathf.Max(animFwd, animSpeed * 0.8f);
             }
             if (p.down > 0f) { animSpeed = 0f; animFwd = 0f; guard = false; }   // caído: sem passada
+            if (p.isKeeper && (p.saveKind >= 3 || (_saveRec > 0f && _saveKindV >= 3))) { animSpeed = 0f; animFwd = 0f; guard = false; }   // no voo: sem passada
+            if (p.isKeeper && p.saveKind > 0 && p.saveKind < 3) guard = true;
             Cuts(dt, spd);
             Touches();
             _pose.Restore();   // tira as correções do quadro anterior antes de avaliar a animação
@@ -405,6 +418,155 @@ namespace Craquez
                 Debug.Log($"[diag] atleta {p.name}: cabeça a {rig.head.position.y - transform.position.y:F2} m do chão (raiz), pés {rig.footL?.position.y - transform.position.y:F2} m; rotação do modelo {rig.model.localEulerAngles}");
             }
             if (_celebrate > 0f) _celebrate -= dt;
+        }
+
+        // ------------------------------------------------------------ defesas do goleiro
+        int _saveKindV;
+        float _saveRec, _saveSideV, _saveU;
+
+        /// <summary>
+        /// Corpo na defesa (pitch, roll, lift): ponte = impulso de lado, voo com o corpo esticado e
+        /// queda deitado de lado; encaixe = corpo atrás da bola; baixa = ajoelha sobre a bola;
+        /// salto = sobe com os braços. Depois levanta (_saveRec).
+        /// </summary>
+        Vector3 SavePose(float dt)
+        {
+            if (p.saveKind > 0)
+            {
+                _saveKindV = p.saveKind;
+                // lado do mergulho no corpo: + = para a direita do goleiro
+                var sideW = new Vector3(0, 0, p.saveSide);
+                _saveSideV = Vector3.Dot(sideW, transform.right) >= 0f ? 1f : -1f;
+                _saveU = 1f - p.saveT / Mathf.Max(0.01f, p.saveTotal);
+                _saveRec = 0.45f;
+            }
+            else
+            {
+                _saveRec = Mathf.Max(0f, _saveRec - dt);
+            }
+            float u = _saveU;
+            float rec = p.saveKind > 0 ? 1f : _saveRec / 0.45f;   // 1 = em defesa .. 0 = de pé de novo
+            float pitch = 0f, roll = 0f, lift = 0f;
+            switch (_saveKindV)
+            {
+                case 3: case 4: case 5:
+                {
+                    // impulso (0-15%), voo (15-55%), queda e corpo no chão (55-100%)
+                    float peak = _saveKindV == 3 ? 0.22f : _saveKindV == 4 ? 0.55f : 0.95f;
+                    float lay = _saveKindV == 3 ? 88f : _saveKindV == 4 ? 80f : 70f;
+                    float k = Smooth(u / 0.3f);
+                    roll = -_saveSideV * lay * k;
+                    float fly = u < 0.6f ? Mathf.Sin(Mathf.Clamp01(u / 0.6f) * Mathf.PI) * peak : 0f;
+                    lift = fly + 0.28f * k;   // deitado de lado, o quadril fica a ~0,3 m do chão
+                    pitch = -8f * k;          // peito um pouco virado para a bola
+                    break;
+                }
+                case 2:   // baixa: ajoelha e cai sobre a bola
+                    pitch = 34f * Smooth(u / 0.35f);
+                    lift = -0.1f * Smooth(u / 0.35f);
+                    break;
+                case 6:   // salto no alto
+                    lift = Mathf.Sin(Mathf.Clamp01(u / 0.7f) * Mathf.PI) * 0.45f;
+                    pitch = -6f;
+                    break;
+                default:  // encaixe de frente: corpo atrás da bola, leve flexão
+                    pitch = 10f * Smooth(u / 0.3f);
+                    break;
+            }
+            return new Vector3(pitch, roll, lift) * rec;
+        }
+
+        /// <summary>Braços na defesa: as duas mãos vão juntas na bola (ou no ponto do mergulho).</summary>
+        void SaveArms()
+        {
+            float w = p.saveKind > 0 ? Smooth(_saveU / 0.18f) : _saveRec / 0.45f;
+            if (!p.isKeeper || _saveKindV == 0 || w <= 0.001f || rig.spine == null) return;
+            var sim = view.sim;
+            var ballW = W(sim.ball.pos, sim.ball.z + 0.11f);
+            Vector3 target;
+            var chest = rig.spine.position;
+            if (_saveKindV >= 3)
+            {
+                // mergulho: braços esticados "acima da cabeça" no plano do voo, puxando para a bola
+                var along = Quaternion.AngleAxis(-_saveSideV * (_saveKindV == 5 ? 18f : 6f), transform.forward) * (transform.up * 0.2f + transform.right * _saveSideV * 0.0f);
+                var reach = (rig.head != null ? rig.head.position - chest : transform.up).normalized;
+                target = chest + reach * 1.0f + transform.forward * 0.15f + along;
+                if ((ballW - chest).magnitude < 2.2f) target = Vector3.Lerp(target, ballW, 0.6f);
+            }
+            else if (_saveKindV == 2) target = chest + transform.forward * 0.45f - Vector3.up * 0.75f;
+            else target = (ballW - chest).magnitude < 3f ? ballW : chest + transform.forward * 0.5f + Vector3.up * (_saveKindV == 6 ? 0.8f : 0.1f);
+            for (int side = -1; side <= 1; side += 2)
+            {
+                string sfx = side < 0 ? "_l" : "_r";
+                rig.bones.TryGetValue("upperarm" + sfx, out var up);
+                rig.bones.TryGetValue("lowerarm" + sfx, out var lo);
+                rig.bones.TryGetValue("hand" + sfx, out var hd);
+                if (up == null || lo == null || hd == null) continue;
+                float s = Mathf.Sign(Vector3.Dot(up.position - chest, transform.right));
+                // mãos lado a lado (formando o "W" atrás da bola)
+                var handT = target + transform.right * s * 0.09f;
+                var dirUp = handT - up.position;
+                if (dirUp.sqrMagnitude < 1e-4f) continue;
+                _pose.Rotate(up, Quaternion.Slerp(Quaternion.identity, Quaternion.FromToRotation(lo.position - up.position, dirUp), w));
+                _pose.Rotate(lo, Quaternion.Slerp(Quaternion.identity, Quaternion.FromToRotation(hd.position - lo.position, handT - lo.position), w));
+            }
+            // pernas na ponte: juntas e esticadas, a de cima um pouco dobrada
+            if (_saveKindV >= 3)
+            {
+                rig.bones.TryGetValue(_saveSideV > 0 ? "calf_l" : "calf_r", out var topCalf);
+                _pose.Rotate(topCalf, Quaternion.AngleAxis(25f * w, transform.right));
+            }
+            else if (_saveKindV == 2)
+            {
+                foreach (var b in new[] { "calf_l", "calf_r" })
+                    if (rig.bones.TryGetValue(b, out var cf)) _pose.Rotate(cf, Quaternion.AngleAxis(-60f * w, transform.right));
+            }
+        }
+
+        float _kickBodyT, _kickBodyTotal, _kickContactU, _kickLoft;
+
+        /// <summary>
+        /// Corpo no chute: braço do lado contrário abre para equilibrar, o outro vai para trás; no
+        /// contato o tronco fica sobre a bola (rasteiro) ou um pouco para trás (por cima).
+        /// </summary>
+        void KickBody()
+        {
+            if (_kickBodyT <= 0f || rig.spine == null) return;
+            _kickBodyT -= Time.deltaTime;
+            float u = 1f - Mathf.Clamp01(_kickBodyT / Mathf.Max(0.01f, _kickBodyTotal));
+            float w = Smooth(u / Mathf.Max(0.05f, _kickContactU * 0.6f)) * (1f - Smooth((u - _kickContactU) / (1f - _kickContactU + 1e-3f)) * 0.8f);
+            var ax = transform.right;
+            // tronco: sobre a bola no rasteiro, inclinado para trás na bola alta
+            _pose.Rotate(rig.spine, Quaternion.AngleAxis(Mathf.Lerp(9f, -10f, _kickLoft) * w, ax));
+            // braços: o esquerdo abre (chute de direita), o direito recua
+            foreach (var (sfx, abd, back) in new[] { ("_l", 1f, 0f), ("_r", 0.3f, 1f) })
+            {
+                if (!rig.bones.TryGetValue("upperarm" + sfx, out var up)) continue;
+                float s = sfx == "_l" ? -1f : 1f;
+                _pose.Rotate(up, Quaternion.AngleAxis(-s * 55f * abd * w, transform.forward) * Quaternion.AngleAxis(25f * back * w, ax));
+            }
+        }
+
+        float _recvT, _recvTotal;
+        int _recvLeg;
+
+        /// <summary>Gesto do domínio: coxa sobe, pé vira por dentro e recua acompanhando a bola.</summary>
+        void ReceiveLeg()
+        {
+            if (_recvT <= 0f) return;
+            _recvT -= Time.deltaTime;
+            float u = 1f - Mathf.Clamp01(_recvT / Mathf.Max(0.01f, _recvTotal));
+            float k = u < 0.35f ? Smooth(u / 0.35f) : 1f - Smooth((u - 0.35f) / 0.65f);
+            string sfx = _recvLeg == 0 ? "_l" : "_r";
+            rig.bones.TryGetValue("thigh" + sfx, out var th);
+            rig.bones.TryGetValue("calf" + sfx, out var cf);
+            rig.bones.TryGetValue("foot" + sfx, out var ft);
+            var ax = transform.right;
+            float out_ = _recvLeg == 0 ? 1f : -1f;
+            _pose.Rotate(th, Quaternion.AngleAxis(-30f * k, ax) * Quaternion.AngleAxis(out_ * 18f * k, transform.forward));
+            _pose.Rotate(cf, Quaternion.AngleAxis(22f * k, ax));
+            _pose.Rotate(ft, Quaternion.AngleAxis(out_ * 35f * k, transform.up));   // parte de dentro do pé de frente para a bola
+            if (rig.spine != null) _pose.Rotate(rig.spine, Quaternion.AngleAxis(6f * k, ax));   // corpo sobre a bola
         }
 
         float _animSpd;
@@ -453,6 +615,8 @@ namespace Craquez
                 _pose.Rotate(rig.spine, Quaternion.AngleAxis(_accLean * 0.2f, ax));
             }
             ArmsDown();
+            ReceiveLeg();
+            KickBody();
             FeetFirm();
             if (_touchAnim > 0f)
             {
@@ -539,6 +703,7 @@ namespace Craquez
             if (p == null || rig == null || rig.head == null) return;
             HeadAndNeck();
             Arms();
+            SaveArms();
             KeeperHold();
             ThrowArms();
         }

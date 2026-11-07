@@ -57,6 +57,7 @@ namespace Craquez
             parent.SetParent(transform, false);
             if (s.mode.id != GameModes.Street) _crowd = CrowdFx.Create(transform, s, venue, kits[0], kits[1], _night, q, c.teamA, c.teamB);
             life = VenueLife.Create(transform, s, venue, kits[0], kits[1], home, away, _night, q, cam, c.venue);
+            VenueExtras.Create(transform, s, venue, kits[0], kits[1], _night, q, c.venue);
             AthleteFactory.IndoorShoes = c.mode == GameModes.Futsal;
             foreach (var p in s.players)
             {
