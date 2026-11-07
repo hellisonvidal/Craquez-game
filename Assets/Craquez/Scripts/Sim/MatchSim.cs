@@ -1816,6 +1816,8 @@ namespace Craquez.Sim
             {
                 p.intent = Vector2.zero;
                 p.facing = new Vector2(dir, 0);
+                // com a bola nas mãos: dá alguns passos à frente (sem sair da área) antes de repor
+                if (p.hold > 0.6f && Mathf.Abs(p.position.x - gx) < Mathf.Max(2f, mode.boxDepth - 3f)) p.intent = new Vector2(dir * 0.3f, 0f);
                 if (!frozen && p.hold > 0f)
                 {
                     p.hold -= DT;
@@ -1900,12 +1902,19 @@ namespace Craquez.Sim
             return false;
         }
 
-        /// <summary>Goleiro solta a bola para o companheiro mais livre (curto se der, longo se não).</summary>
+        /// <summary>
+        /// Reposição do goleiro com a bola nas mãos: companheiro livre por perto = arremesso com as
+        /// mãos (rolada rasteira no curto, por cima no médio); ninguém livre ou longe = chutão de
+        /// bate-pronto para o ataque (no futsal só com as mãos, como na regra).
+        /// </summary>
         void KeeperDistribute(SimPlayer p)
         {
             float dir = TeamDir(p.team);
-            SimPlayer best = null;
-            float bestS = float.MinValue;
+            bool field = mode.id == GameModes.Field;
+            bool canPunt = mode.id != GameModes.Futsal;
+            float throwMax = field ? 30f : mode.id == GameModes.Futsal ? halfLen * 1.4f : 20f;
+            SimPlayer best = null, far = null;
+            float bestS = float.MinValue, farS = float.MinValue;
             foreach (var m in players)
             {
                 if (m.team != p.team || m == p) continue;
@@ -1914,14 +1923,88 @@ namespace Craquez.Sim
                 float d = m.position.Dist(p.position);
                 float ahead = (m.position.x - p.position.x) * dir;
                 if (ahead < 2f) continue;   // nunca para trás nem para o lado colado no gol
-                float sc = Mathf.Min(free, 10f) - d * 0.06f + ahead * 0.03f + rng.Range(0f, 1.5f);
-                if (sc > bestS) { bestS = sc; best = m; }
+                // arremesso: livre e ao alcance da mão
+                if (d < throwMax)
+                {
+                    float sc = Mathf.Min(free, 10f) - d * 0.08f + ahead * 0.03f + rng.Range(0f, 1.5f);
+                    if (free > (field ? 3.5f : 2.2f) && sc > bestS) { bestS = sc; best = m; }
+                }
+                // chutão: o mais adiantado (e menos marcado)
+                float fs = ahead * 0.1f + Mathf.Min(free, 6f) * 0.4f + rng.Range(0f, 1f);
+                if (fs > farS) { farS = fs; far = m; }
             }
-            if (best == null) { Pass(p, new Vector2(dir, rng.Range(-0.3f, 0.3f)), 0.75f, false, true); return; }
-            float dist = best.position.Dist(p.position);
-            bool lofted = dist > halfLen * 0.55f;
-            float power = Mathf.Clamp(dist / (halfLen * (lofted ? 1.3f : 0.9f)), 0.35f, 0.9f);
-            Pass(p, best.position + best.vel * 0.4f - p.position, power, false, lofted);
+            bool punt = canPunt && (best == null || rng.Chance(field ? 0.25f : 0.15f));
+            if (!punt && best == null) best = far;
+            if (punt) Punt(p, far);
+            else if (best != null) KeeperThrow(p, best);
+            else Pass(p, new Vector2(dir, rng.Range(-0.3f, 0.3f)), 0.75f, false, true);
+        }
+
+        /// <summary>Arremesso do goleiro com as mãos (rasteiro no curto, por cima no médio).</summary>
+        void KeeperThrow(SimPlayer p, SimPlayer m)
+        {
+            float d0 = m.position.Dist(p.position);
+            var target = m.position + m.vel * (0.25f + d0 / 25f);
+            var to = target - p.position;
+            float d = Mathf.Max(to.magnitude, 1f);
+            var dirv = (to / d).Rotated(rng.Gauss() * 0.025f * (1.3f - p.passing));
+            ball.pos = p.position + dirv * 0.45f;
+            if (d < (mode.id == GameModes.Field ? 15f : 10f))
+            {
+                // rolada: a bola sai rente ao chão, rápida o bastante para chegar redonda
+                float vEnd = mode.id == GameModes.Field ? 3.5f : 2.5f;
+                float v0 = Mathf.Sqrt(vEnd * vEnd + 2f * mode.rollDecel * d);
+                ball.vel = dirv * v0;
+                ball.z = 0.12f;
+                ball.vz = 0f;
+            }
+            else
+            {
+                // por cima do ombro: sai da mão alta e cai no pé do companheiro
+                float T = 0.55f + d / 26f;
+                float h0 = 2.0f;
+                ball.z = h0;
+                ball.vel = dirv * (d * 0.95f / T);
+                ball.vz = (0.4f - h0 + 0.5f * SimBall.G * T * T) / T;
+            }
+            ball.spin = 0f;
+            passReceiver = m.id;
+            passReceiverT = 3f;
+            passTick = tick;
+            passFrom = ball.pos;
+            ReleaseBall(p);
+            protectTeam = p.team;
+            protectT = 0.8f;
+            p.kickKind = InputFrame.Pass;
+            Emit("kick", p.team, p.id, "gkthrow", power: 0.4f);
+        }
+
+        /// <summary>Chutão de bate-pronto: a bola cai da mão e sai alta para o campo de ataque.</summary>
+        void Punt(SimPlayer p, SimPlayer m)
+        {
+            float dir = TeamDir(p.team);
+            bool field = mode.id == GameModes.Field;
+            float reach = field ? rng.Range(42f, 60f) * (0.85f + 0.3f * p.passing) : halfLen * rng.Range(0.9f, 1.3f);
+            Vector2 target = m != null ? m.position + m.vel * 1.2f : p.position + new Vector2(dir * reach, 0f);
+            // não passa do alcance do chute (e não vai para o próprio campo)
+            var to = target - p.position;
+            if (to.x * dir < 8f) to = new Vector2(dir * reach, to.y);
+            if (to.magnitude > reach) to = to.normalized * reach;
+            float d = to.magnitude;
+            var dirv = (to / d).Rotated(rng.Gauss() * 0.06f);
+            float T = field ? 2.3f + d / 60f : 1.3f + d / 40f;
+            float h0 = 0.6f;
+            ball.pos = p.position + dirv * 0.5f;
+            ball.z = h0;
+            ball.vel = dirv * (d * 0.9f / T);
+            ball.vz = Mathf.Min(24f, (0f - h0 + 0.5f * SimBall.G * T * T) / T);
+            ball.spin = rng.Gauss() * 0.6f;
+            if (m != null) { passReceiver = m.id; passReceiverT = 4f; passTick = tick; passFrom = ball.pos; }
+            ReleaseBall(p);
+            protectTeam = p.team;
+            protectT = 0.6f;
+            p.kickKind = InputFrame.Lob;
+            Emit("kick", p.team, p.id, "punt", power: 1f);
         }
 
         /// <summary>Defensores não invadem o espaço do goleiro (nem ficam colados nele).</summary>
@@ -2023,14 +2106,26 @@ namespace Craquez.Sim
             var targetV = intent * maxS;
             float spd = p.vel.magnitude;
             float acc = Mathf.Lerp(5f, 8.5f, p.accel) * (p.burst > 0f ? 1.6f : 1f) * (p.offBalance > 0f ? 0.4f : 1f) * (0.82f + 0.18f * p.stamina);
-            float rate = acc;
-            if (targetV.magnitude < spd - 0.2f || Vector2.Dot(targetV, p.vel) < 0f) rate = 12f;
-            if (spd > 3f && targetV.magnitude > 0.1f)
+            // movimento do atleta em duas componentes (ao longo da corrida e de lado):
+            //   • arrancada forte parado e cada vez menor perto da velocidade máxima;
+            //   • frenagem limitada pelo atrito (mais curta devagar, mais longa no pique);
+            //   • curva limitada pela aceleração lateral (aberta no pique, fechada devagar)
+            var dv = targetV - p.vel;
+            float agil = (0.85f + 0.3f * p.accel) * (p.offBalance > 0f ? 0.4f : 1f) * (p.burst > 0f ? 1.3f : 1f);
+            if (spd > 0.6f)
             {
-                float turn = Mathf.Abs(p.vel.AngleTo(targetV));
-                if (turn > 0.8f) rate *= Mathf.Lerp(1f, 0.55f, Mathf.Clamp01((spd - 3f) / 5f));
+                var tdir = p.vel / spd;
+                var ndir = new Vector2(-tdir.y, tdir.x);
+                float dT = Vector2.Dot(dv, tdir), dN = Vector2.Dot(dv, ndir);
+                float top = Mathf.Max(4f, p.TopSpeed());
+                float accT = acc * Mathf.Clamp(1.35f - spd / top, 0.3f, 1.35f);
+                float brake = Mathf.Lerp(14f, 8.5f, Mathf.Clamp01(spd / 9f)) * agil;
+                float lat = Mathf.Lerp(17f, 7.5f, Mathf.Clamp01(spd / 9f)) * agil * (hasBall ? 0.85f : 1f);
+                dT = Mathf.Clamp(dT, -brake * DT, accT * DT);
+                dN = Mathf.Clamp(dN, -lat * DT, lat * DT);
+                p.vel += tdir * dT + ndir * dN;
             }
-            p.vel += (targetV - p.vel).Limit(rate * DT);
+            else p.vel += dv.Limit(acc * 1.35f * DT);   // saindo do lugar: para qualquer lado
             p.position += p.vel * DT;
             var faceTarget = p.vel.magnitude > 0.4f ? p.vel : intent;
             if (p.faceBall && !hasBall && !p.sprinting && ctrl[p.team].player != p.id) faceTarget = ball.pos - p.position;

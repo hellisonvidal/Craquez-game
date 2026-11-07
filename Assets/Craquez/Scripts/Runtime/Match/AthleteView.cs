@@ -67,7 +67,21 @@ namespace Craquez
                     break;
                 }
                 case "kick":
-                    if (e.kind == "throw") { _throwT = 0.32f; break; }   // arremesso com as mãos
+                    if (e.kind == "throw") { _throwT = 0.32f; _oneArm = false; _throwLow = false; break; }   // lateral com as mãos
+                    if (e.kind == "gkthrow")
+                    {
+                        // goleiro: um braço só — por cima do ombro, ou rolando rente ao chão
+                        _throwT = 0.32f; _oneArm = true; _throwLow = view.sim.ball.z < 0.5f;
+                        if (_throwLow) _pitch = 22f;
+                        break;
+                    }
+                    if (e.kind == "punt")
+                    {
+                        // chutão de bate-pronto: chute forte começando um pouco antes do contato
+                        float pc = AthleteAnimator.KickContact("KickPower");
+                        anim.Play("KickPower", pc - 0.12f, 0.7f, 1.3f, 0.04f);
+                        break;
+                    }
                     if (anim.CurrentAction == null || anim.ActionWeight < 0.3f)
                     {
                         string c = e.kind == "shot" ? "Shot" : "Pass";
@@ -359,6 +373,13 @@ namespace Craquez
                 var toOw = ow.position - p.position;
                 guard = ow.team != p.team && toOw.magnitude < 2.6f && Vector2.Dot(toOw.normalized, p.facing) > 0.5f;
             }
+            // goleiro em posição de espera (joelhos flexionados, peso na ponta dos pés) quando o
+            // adversário vem com a bola, e deslocando de lado acompanhando o lance
+            if (p.isKeeper && p.hold <= 0f && p.dive <= 0f && view.sim.ball.owner >= 0)
+            {
+                var ow = view.sim.players[view.sim.ball.owner];
+                if (ow.team != p.team && ow.position.Dist(p.position) < (view.sim.mode.id == GameModes.Field ? 24f : 12f)) guard = true;
+            }
             // velocidade da passada suavizada, com arrancada/freada de gente (sem trocar de
             // passada a cada passo da simulação nem "pular" de andar para correr)
             float rawSpd = p.vel.magnitude;
@@ -527,6 +548,8 @@ namespace Craquez
         /// Lateral com as mãos: segurando, os dois braços sobem com a bola acima e atrás da cabeça;
         /// no arremesso, giram para a frente (o tronco acompanha).
         /// </summary>
+        bool _oneArm, _throwLow;
+
         void ThrowArms()
         {
             var sim = view.sim;
@@ -540,9 +563,13 @@ namespace Craquez
             var up = Vector3.up;
             // segurando: braços para cima e um pouco para trás; arremessando: vão à frente
             var target = Vector3.Slerp((up * 0.88f - fwd * 0.4f).normalized, (fwd * 0.85f + up * 0.35f).normalized, swing);
+            if (_oneArm && _throwT > 0f)
+                target = _throwLow ? Vector3.Slerp((-fwd * 0.7f - up * 0.6f).normalized, (fwd * 0.9f - up * 0.35f).normalized, swing)   // rolada: de trás para a frente, por baixo
+                                   : Vector3.Slerp((up * 0.7f - fwd * 0.7f).normalized, (fwd * 0.9f + up * 0.45f).normalized, swing);  // por cima do ombro
             if (rig.spine != null && swing > 0f) _pose.Rotate(rig.spine, Quaternion.AngleAxis(Mathf.Sin(swing * Mathf.PI) * 18f * w, transform.right));
             for (int side = -1; side <= 1; side += 2)
             {
+                if (_oneArm && _throwT > 0f && side < 0) continue;   // goleiro: só o braço direito
                 string sfx = side < 0 ? "_l" : "_r";
                 rig.bones.TryGetValue("upperarm" + sfx, out var ua);
                 rig.bones.TryGetValue("lowerarm" + sfx, out var la);

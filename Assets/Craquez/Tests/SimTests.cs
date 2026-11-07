@@ -347,6 +347,41 @@ namespace Craquez.Tests
             Assert.Less(atKick, 0.75f, "bola longe do pé na hora do passe");
         }
 
+        /// <summary>Goleiro com a bola nas mãos repõe com as mãos (arremesso/rolada) ou de chutão — e o time fica com ela.</summary>
+        [TestCase(GameModes.Field)]
+        [TestCase(GameModes.Futsal)]
+        public void KeeperDistributesWithHandsOrPunt(string mode)
+        {
+            int throws = 0, punts = 0, kept = 0;
+            for (uint seed = 1; seed <= 12; seed++)
+            {
+                var sim = NewMatch(mode, seed);
+                for (int i = 0; i < 70; i++) sim.Step(new InputFrame[2]);
+                SimPlayer gk = null;
+                foreach (var p in sim.players) if (p.isKeeper && p.team == 1) gk = p;
+                sim.kickoffPass = false;
+                gk.position = new Vector2(-sim.halfLen * sim.TeamDir(1) + sim.TeamDir(1) * 1.5f, 0f);
+                sim.ball.pos = gk.position;
+                sim.ball.owner = gk.id;
+                gk.hold = 0.3f;
+                string kind = null;
+                for (int i = 0; i < 120 && kind == null; i++)
+                {
+                    sim.events.Clear();
+                    sim.Step(new InputFrame[2]);
+                    foreach (var e in sim.events) if (e.type == "kick" && e.id == gk.id) kind = e.kind;
+                }
+                Assert.IsNotNull(kind, "o goleiro não repôs a bola");
+                if (kind == "gkthrow") throws++;
+                else if (kind == "punt") punts++;
+                for (int i = 0; i < 240 && sim.ball.owner < 0; i++) sim.Step(new InputFrame[2]);
+                if (sim.ball.owner >= 0 && sim.players[sim.ball.owner].team == 1) kept++;
+            }
+            Assert.Greater(throws, 0, "nunca repôs com as mãos");
+            if (mode == GameModes.Futsal) Assert.AreEqual(0, punts, "futsal não tem chutão de bate-pronto");
+            Assert.GreaterOrEqual(kept, 6, "a reposição quase sempre vai para o adversário");
+        }
+
         [Test] public void JsonRoundTrip()
         {
             var o = MiniJson.Parse("{\"a\": [1, 2.5, \"x\\n\"], \"b\": {\"c\": true, \"d\": null}}");
