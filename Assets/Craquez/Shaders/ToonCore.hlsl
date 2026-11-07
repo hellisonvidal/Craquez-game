@@ -97,9 +97,10 @@ half3 AthleteLight(Light l, half3 n, half3 v, half3 albedo, half smooth, half sk
     half sh = smoothstep(0.2, 0.8, shadowAtten);
     // difusa envolvente (wrap): transição gradual da luz para a sombra, que dá volume aos
     // músculos; um pouco da faixa do cel shading fica para manter a identidade do jogo
-    half w = saturate((ndl + 0.3) / 1.3);
+    // (envolvente mais curta e mais faixa: forma definida, músculos firmes — antes o volume "derretia")
+    half w = saturate((ndl + 0.12) / 1.12);
     half soft = w * w * (3.0 - 2.0 * w);
-    half lit = lerp(soft, ToonStep(ndl), 0.25) * sh;
+    half lit = lerp(soft, ToonStep(ndl), 0.42) * sh;
     half3 band = lerp(_ToonShadowTint.rgb, half3(1, 1, 1), lit);
     half3 c = albedo * band * l.color;
     // pele: a luz que entra e sai sob a superfície deixa o limite luz/sombra quente (avermelhado)

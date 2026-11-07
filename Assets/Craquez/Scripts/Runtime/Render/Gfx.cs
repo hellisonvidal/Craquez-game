@@ -269,6 +269,38 @@ namespace Craquez
             return t;
         }
 
+        /// <summary>
+        /// Grama sintética (society): fios finos no sentido do rolo, grânulos de borracha preta
+        /// aparecendo entre os fios e a emenda entre dois rolos (textura de ~2 m, emenda no meio).
+        /// </summary>
+        public static Texture2D Turf(int size, int seed)
+        {
+            var t = Tex(size, size);
+            t.anisoLevel = 8;
+            var px = new Color32[size * size];
+            for (int y = 0; y < size; y++)
+                for (int x = 0; x < size; x++)
+                {
+                    float u = x / (float)size, v = y / (float)size;
+                    float fib = VNoise(u * 260f, v * 18f, 260, seed + 3);            // fios
+                    float fib2 = VNoise(u * 420f + v * 6f, v * 30f, 420, seed + 5);
+                    float low = Fbm(u * 4, v * 4, 4, seed, 3) - 0.5f;
+                    float k = 0.88f + (fib - 0.5f) * 0.3f + (fib2 - 0.5f) * 0.14f + low * 0.08f;
+                    var c = new Color(k * 0.98f, k, k * 0.9f, 1f);
+                    // borracha entre os fios (pontinhos escuros) e um pouco de areia clara
+                    float g = Hash(x, y, seed + 11);
+                    if (g > 0.93f && fib < 0.5f) c = new Color(0.16f, 0.16f, 0.15f, 1f);
+                    else if (g < 0.015f) c *= 1.18f;
+                    // emenda entre rolos (4 cm, um pouco mais escura) na metade da textura
+                    if (Mathf.Abs(u - 0.5f) < 0.01f) c *= 0.72f;
+                    c.a = 1f;
+                    px[y * size + x] = c;
+                }
+            t.SetPixels32(px);
+            t.Apply(true);
+            return t;
+        }
+
         /// <summary>Madeira de quadra (tábuas).</summary>
         public static Texture2D Wood(int size, Color baseC, int seed)
         {

@@ -8,6 +8,16 @@ Jogo de futebol feito 100% com inteligência artificial, **gratuito**. Android, 
 - **Linux**: `Craquez-v2.1.0-Linux.tar.gz` → extraia e rode `./Craquez` (ou `./instalar.sh` para o atalho no menu)
 
 ### Novidades
+- **Atletas com corpo firme**: menos inclinação e balanço do tronco nas curvas e arrancadas (o
+  tronco inclina a partir do quadril, sem envergar a coluna), camisa e calção sem ondular como
+  gelatina e luz com forma mais definida nos músculos.
+- **Trilha da abertura mais suave**: pop-rock animado em sol maior (guitarra limpa dedilhando,
+  violão com pouca distorção, teclado, baixo e bateria leves, melodia no refrão).
+- **Gramados de TV**: faixas de corte com contraste e brilho diferentes conforme o sentido, grama
+  mais nítida.
+- **Society**: grama sintética de verdade, com fios, borracha preta entre eles e emendas dos rolos.
+- **Futsal**: ginásios poliesportivos com as linhas de vôlei e de basquete pintadas por baixo.
+- **Ruas**: tampas de bueiro, bocas de lobo, manchas de óleo, remendos de asfalto, meio-fio e sarjeta.
 - **Intervalo de verdade**: apito, plano aberto do estádio, varredura de transmissão e a tela do
   intervalo com placar, posse de bola e finalizações; dali dá para abrir as **substituições**, as
   táticas e as configurações antes de começar o 2º tempo (os atletas voltam descansados).
@@ -27,8 +37,6 @@ Jogo de futebol feito 100% com inteligência artificial, **gratuito**. Android, 
   bandeirões no Caldeirão e na Metropolitana, marquise com nervuras no Estadual e painéis de sombra
   no Deserto.
 - **Sair do jogo**: botão "SAIR DO JOGO" no menu principal (e no voltar do menu), com confirmação.
-- **Trilha nova na abertura e nos menus**: rock pesado original (guitarras distorcidas, riff em
-  palm mute, bateria com bumbo duplo e solo no refrão), composta e sintetizada por código.
 - **Sem o logo antigo** na barra dos menus.
 - **Rua**: no lugar das placas de publicidade, placas brancas baixas e separadas.
 - **Uniformes mais fiéis**: 64 clubes corrigidos (Série B, MLS, Uruguai, Peru, Chile, Equador,

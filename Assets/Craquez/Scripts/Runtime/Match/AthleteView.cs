@@ -320,11 +320,11 @@ namespace Craquez
             var local = Quaternion.Euler(0, -_yaw, 0) * W(acc);
             // inclinação para dentro da curva (força centrípeta) + aceleração lateral
             float centri = -_yawRate * Mathf.Deg2Rad * spd * 1.6f;
-            _lean = Mathf.Lerp(_lean, Mathf.Clamp(-local.x * 0.6f + centri, -16f, 16f), 1f - Mathf.Exp(-dt * 6f));
+            _lean = Mathf.Lerp(_lean, Mathf.Clamp(-local.x * 0.3f + centri * 0.6f, -7f, 7f), 1f - Mathf.Exp(-dt * 10f));   // corpo firme: inclina pouco e sem atraso
             _pitch = Mathf.Lerp(_pitch, 0f, 1f - Mathf.Exp(-dt * 5f));
             // aceleração inclina o tronco (na coluna, em LateUpdate), não o corpo inteiro: pés firmes
             // tronco: inclina na arrancada e, em velocidade, fica um pouco à frente (como corredor de verdade)
-            _accLean = Mathf.Lerp(_accLean, Mathf.Clamp(local.z * 1.1f, -7f, 9f) + Mathf.Clamp01((spd - 3f) / 5f) * 7f, 1f - Mathf.Exp(-dt * 5f));
+            _accLean = Mathf.Lerp(_accLean, Mathf.Clamp(local.z * 0.5f, -3f, 4f) + Mathf.Clamp01((spd - 3f) / 5f) * 4f, 1f - Mathf.Exp(-dt * 9f));
             float lift = 0f, roll = _lean, pitch = _pitch;
             if (_celebrate > 0f && p.vel.magnitude < 3f)
             {
@@ -358,7 +358,7 @@ namespace Craquez
             }
             else if (p.offBalance > 0f)
             {
-                roll += Mathf.Sin(Time.time * 18f) * 6f;
+                roll += Mathf.Sin(Time.time * 12f) * 2.5f;
             }
             transform.position = pos + Vector3.up * lift;
             transform.rotation = Quaternion.Euler(pitch, _yaw, roll);
@@ -448,8 +448,9 @@ namespace Craquez
             if (rig.bones.TryGetValue("spine_01", out var sp1) && Mathf.Abs(_accLean) > 0.05f)
             {
                 var ax = transform.right;
-                _pose.Rotate(sp1, Quaternion.AngleAxis(_accLean * 0.55f, ax));
-                _pose.Rotate(rig.spine, Quaternion.AngleAxis(_accLean * 0.45f, ax));
+                // o tronco inclina como um bloco (quadril), não dobrando a coluna em arco
+                _pose.Rotate(sp1, Quaternion.AngleAxis(_accLean * 0.8f, ax));
+                _pose.Rotate(rig.spine, Quaternion.AngleAxis(_accLean * 0.2f, ax));
             }
             ArmsDown();
             FeetFirm();
@@ -611,20 +612,20 @@ namespace Craquez
             var acc = (vel - _clothVel) / dt;
             _clothVel = Vector3.Lerp(_clothVel, vel, 1f - Mathf.Exp(-dt * 12f));
             // alvo: o tecido "fica para trás" do movimento e da aceleração
-            var target = -_clothVel * 0.0055f - Vector3.ClampMagnitude(acc, 40f) * 0.0011f;
+            var target = -_clothVel * 0.0025f - Vector3.ClampMagnitude(acc, 40f) * 0.0004f;
             target.y = Mathf.Clamp(target.y, -0.02f, 0.02f);
-            target = Vector3.ClampMagnitude(target, 0.06f);
-            // mola amortecida (passa um pouco do ponto e volta: o balanço)
-            _clothDragV += ((target - _clothDrag) * 140f - _clothDragV * 11f) * dt;
+            target = Vector3.ClampMagnitude(target, 0.025f);
+            // mola com amortecimento crítico: o tecido acompanha sem ficar balançando (o corpo não parece gelatina)
+            _clothDragV += ((target - _clothDrag) * 260f - _clothDragV * 32f) * dt;
             _clothDrag += _clothDragV * dt;
             float spd = new Vector2(_clothVel.x, _clothVel.z).magnitude;
-            float flutAmp = 0.0025f + Mathf.Min(spd, 9f) * 0.0011f;
+            float flutAmp = 0.0004f + Mathf.Min(spd, 9f) * 0.00025f;   // só a barra tremula de leve
             float freq = 9f + spd * 1.3f;
             if (rig.shirt != null)
             {
                 float top = (rig.spine != null ? rig.spine.position.y : pos.y + 0.4f) + 0.02f;
                 rig.shirt.GetPropertyBlock(_mpb);
-                _mpb.SetFloat(IdInflate, 0.011f);
+                _mpb.SetFloat(IdInflate, 0.007f);
                 _mpb.SetVector(IdBand, new Vector4(top, pos.y - 0.14f, 0, 0));
                 _mpb.SetVector(IdDrag, _clothDrag);
                 _mpb.SetVector(IdFlutter, new Vector4(flutAmp, freq, _clothPhase, 0));
