@@ -382,6 +382,37 @@ namespace Craquez.Tests
             Assert.GreaterOrEqual(kept, 6, "a reposição quase sempre vai para o adversário");
         }
 
+        /// <summary>Todas as competições vão do começo ao campeão (salvando e carregando no meio).</summary>
+        [Test] public void CompetitionsRunToAChampion()
+        {
+            Assert.AreEqual(15, Competitions.All.Length);
+            foreach (var d in Competitions.All)
+            {
+                var pool = Competitions.Pool(d);
+                Assert.GreaterOrEqual(pool.Count, Mathf.Min(d.size, 4), d.name + ": poucos times");
+                int user = pool[pool.Count / 2];
+                var run = CompRun.Start(d, user, 7u);
+                Assert.IsTrue(run.teams.Contains(user), d.name + ": time do usuário fora");
+                int guard = 0, userGames = 0;
+                while (!run.Finished && guard++ < 100)
+                {
+                    var m = run.NextUserMatch();
+                    if (m != null) { userGames++; run.PlayRound(2, 1); }
+                    else run.SimulateRound();
+                    if (guard == 2)
+                    {
+                        var json = MiniJson.Write(run.ToJson());
+                        run = CompRun.FromJson(MiniJson.Parse(json));
+                        Assert.IsNotNull(run, d.name + ": não carregou");
+                    }
+                }
+                Assert.IsTrue(run.Finished, d.name + ": não terminou (rodada " + run.CurrentRound + ", jogos " + run.matches.Count + ", grupos " + run.groups.Count + ", times " + run.teams.Count + ", pendentes " + run.matches.FindAll(x => !x.Played).Count + ")");
+                Assert.Greater(userGames, 0, d.name + ": o usuário não jogou");
+                // ganhando todos os jogos por 2 x 1, o usuário é campeão
+                Assert.AreEqual(user, run.champion, d.name + ": vencendo tudo não foi campeão");
+            }
+        }
+
         [Test] public void JsonRoundTrip()
         {
             var o = MiniJson.Parse("{\"a\": [1, 2.5, \"x\\n\"], \"b\": {\"c\": true, \"d\": null}}");

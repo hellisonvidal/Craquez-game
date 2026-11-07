@@ -53,6 +53,20 @@ public static class P {
       Png(Path.Combine(dir, "torcida.png"), bg, 1024, 256);
       return;
     }
+    if (a.Length > 1 && a[1] == "trofeus") {
+      int cs = 200, nn = Craquez.Sim.Competitions.All.Length, cols3 = 5, rows3 = (nn + cols3 - 1) / cols3;
+      var sh = new Color32[cs * cols3 * cs * rows3];
+      for (int i = 0; i < sh.Length; i++) sh[i] = new Color32(24, 30, 48, 255);
+      for (int i = 0; i < nn; i++) {
+        var d = Craquez.Sim.Competitions.All[i];
+        var px = Craquez.UI.TrophyArt.Pixels(d.trophy, d.c1, d.c2, cs, cs);
+        int ox = (i % cols3) * cs, oy = (rows3 - 1 - i / cols3) * cs;
+        for (int y = 0; y < cs; y++) for (int x = 0; x < cs; x++) { var c = px[y * cs + x]; if (c.a > 0) sh[(oy + y) * cs * cols3 + ox + x] = c; }
+        Console.WriteLine(i + " " + d.name);
+      }
+      Png(Path.Combine(dir, "trofeus.png"), sh, cs * cols3, cs * rows3);
+      return;
+    }
     if (a.Length > 1 && a[1] == "estadios") {
       int cw = 480, ch = 270, nn = Craquez.VenueBuilder.StadiumModels.Length, cols2 = 3, rows2 = (nn + cols2 - 1) / cols2;
       var sheet2 = new Color32[cw * cols2 * ch * rows2];

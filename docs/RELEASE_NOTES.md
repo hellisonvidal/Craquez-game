@@ -8,6 +8,31 @@ Jogo de futebol feito 100% com inteligência artificial, **gratuito**. Android, 
 - **Linux**: `Craquez-v2.1.0-Linux.tar.gz` → extraia e rode `./Craquez` (ou `./instalar.sh` para o atalho no menu)
 
 ### Novidades
+- **Modo Competições**: 15 torneios — Copa do Mundo, Copa das Américas, Eurocopa, Copa
+  Afro-Asiática, Liga dos Campeões, Libertadores, Brasileirão (pontos corridos), Copa do Brasil,
+  Sul-Americana, Mundial de Clubes, Supercopa, Copa do Mundo e Liga de Futsal, Copa Society e Torneio
+  de Rua. Tabela, grupos e chave do mata-mata; jogue ou simule cada partida; empate no mata-mata vai
+  aos pênaltis; a campanha fica salva.
+- **Troféus e Mural de Troféus**: cada competição tem a sua taça (globo, orelhuda, estrela, bola,
+  prato, planeta...); as conquistas ficam na estante com o time e a data.
+- **+8 estádios** (15 no total), cada um com a sua identidade: bacia fechada ou só laterais,
+  cobertura em anel, arco, faixa de camarotes ou de LED, cor das cadeiras, refletores em torres, na
+  cobertura ou em postes, alambrado e entorno (cidade, mar, montanhas, neve, deserto, rio, campo). A
+  imagem do seletor mostra essas diferenças.
+- **Goleiro**: repõe a bola com as mãos (rolada rasteira no curto, por cima do ombro no médio) ou de
+  chutão de bate-pronto para o ataque (no futsal só com as mãos); dá alguns passos antes de repor e
+  fica em posição de espera quando o adversário se aproxima.
+- **Física revista**: o quique da bola perde velocidade conforme a força do impacto (rasante quase
+  não freia); o atleta arranca forte e perde aceleração perto da velocidade máxima, freia de forma
+  realista e faz curvas mais abertas em velocidade.
+- **Seleções** com a bandeira do país e divididas por continente; **sem escudos** na escolha dos
+  times.
+- **Rua sem muretas nas linhas de fundo**: a bola sai e vira tiro de meta ou escanteio.
+- **Option file**: "Carregar option file…" abre um navegador de pastas (Downloads, Documentos,
+  unidades, a pasta do jogo) para escolher qualquer .json; a opção de exportar saiu.
+- **Resoluções**: lista com 16:9, 16:10, 4:3 e 21:9; janela redimensionável; a interface se
+  reajusta a qualquer formato e a câmera do jogo mostra a mesma largura de campo em telas mais
+  estreitas.
 - **Chutes e passes no tempo certo**: na preparação a bola é trazida ao pé de chute e o corpo vira
   para o alvo (o chute não sai mais torto por causa do corpo atravessado); o instante em que o pé
   encontra a bola é medido em cada animação e cai exatamente na saída da bola.

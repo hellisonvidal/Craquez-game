@@ -19,6 +19,8 @@ namespace Craquez
         public MatchView view;
         public Hud hud;
         public System.Action onExit;
+        /// <summary>Competições: placar final (mandante, visitante) — troca os botões do fim de jogo por "Continuar".</summary>
+        public System.Action<int, int> onResult;
         public System.Action<MatchConfig> onRestart;
         /// <summary>Partida CPU x CPU de fundo nos menus (sem interface, câmera cinematográfica).</summary>
         public bool attract;
@@ -443,9 +445,18 @@ namespace Craquez
                 .rectTransform.Place(0, 1, 1, 1, 20, -260, 20, 210);
             var row = UiKit.Rect(panel, "botoes").Place(0, 0, 1, 0, 80, 60, 80, -140);
             UiKit.HList(row, 30);
-            var again = UiKit.Button(row, "Jogar de novo", () => onRestart?.Invoke(cfg));
-            UiKit.Button(row, "Menu principal", () => onExit?.Invoke());
-            UiKit.Select(again);
+            if (onResult != null)
+            {
+                int ga = sim.score[0], gb = sim.score[1];
+                var cont = UiKit.Button(row, "Continuar  ›", () => onResult?.Invoke(ga, gb));
+                UiKit.Select(cont);
+            }
+            else
+            {
+                var again = UiKit.Button(row, "Jogar de novo", () => onRestart?.Invoke(cfg));
+                UiKit.Button(row, "Menu principal", () => onExit?.Invoke());
+                UiKit.Select(again);
+            }
             Sfx.Crowd(0.3f, 0f);
         }
 

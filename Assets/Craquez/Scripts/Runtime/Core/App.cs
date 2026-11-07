@@ -14,7 +14,7 @@ namespace Craquez
     /// título ("pressione qualquer botão") / modos /
     /// configuração / times (+ táticas) / partida. Opções a partir do título/modos.
     /// </summary>
-    public class App : MonoBehaviour
+    public partial class App : MonoBehaviour
     {
         [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterSceneLoad)]
         static void Boot()
@@ -567,8 +567,12 @@ namespace Craquez
             _modeButtons[GameModes.Futsal] = BigCard(grid, "FUTSAL", "5 x 5", "Quadra  •  " + VenueBuilder.FutsalNames.Length + " ginásios", ModeArt(MenuArt.Kind.Futsal), 512f / 560f, new Color(0.96f, 0.62f, 0.04f), () => ShowKind(GameModes.Futsal));
             _modeButtons[GameModes.Society] = BigCard(grid, "SOCIETY", "7 x 7", "Grama sintética  •  " + VenueBuilder.SocietyNames.Length + " campos", ModeArt(MenuArt.Kind.Society), 512f / 560f, new Color(0.02f, 0.71f, 0.83f), () => ShowKind(GameModes.Society));
             _modeButtons[GameModes.Street] = BigCard(grid, "RUA", "3 A 5 POR LADO", "Times de rua  •  " + VenueBuilder.StreetNames.Length + " ruas", ModeArt(MenuArt.Kind.Street), 512f / 560f, new Color(0.93f, 0.28f, 0.6f), () => { _lastMode = GameModes.Street; Choose(GameModes.Street, false); });
-            var opt = UiKit.Button(root, "⚙  OPÇÕES", ShowOptions, 30, new Color(0.1f, 0.14f, 0.25f));
-            opt.GetComponent<RectTransform>().At(0.5f, 0, 380, 80, 0, 92);
+            // competições, mural de troféus e opções
+            var bar = UiKit.Rect(root, "atalhos").At(0.5f, 0, 1240, 80, 0, 92);
+            UiKit.HList(bar, 30);
+            UiKit.Button(bar, "COMPETIÇÕES", ShowCompetitions, 30, new Color(0.62f, 0.42f, 0.06f));
+            UiKit.Button(bar, "MURAL DE TROFÉUS", ShowTrophyWall, 30, new Color(0.3f, 0.22f, 0.1f));
+            UiKit.Button(bar, "⚙  OPÇÕES", ShowOptions, 30, new Color(0.1f, 0.14f, 0.25f));
             UiKit.Select(_lastMode != null && _modeButtons.TryGetValue(_lastMode, out var lb) && lb != null ? lb : first);
         }
 

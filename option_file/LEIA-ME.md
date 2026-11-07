@@ -13,9 +13,11 @@
 ## Como usar
 
 - **PC (Windows/Linux):** a pasta `option_file` vai junto do jogo, ao lado do executável. Edite
-  `option_file.json` e abra o jogo (ou em *Opções › Recarregar option file*).
+  `option_file.json` e abra o jogo (ou em *Opções › Recarregar option file*). Para usar um
+  arquivo em outro lugar, *Opções › Carregar option file…* abre um navegador de pastas.
 - **Android:** copie a pasta para a pasta de dados do app
-  (`Android/data/<pacote do jogo>/files/option_file/`).
+  (`Android/data/<pacote do jogo>/files/option_file/`), ou escolha o arquivo pelo navegador de
+  pastas (*Opções › Carregar option file…*, por exemplo em Downloads).
 - **Escudos:** PNG quadrado em `crests/`, com o nome indicado em cada time (`"crest"`).
 - Apague os times ou as seções que não quiser alterar; o que faltar fica como o original.
 
@@ -24,6 +26,5 @@ pode renomear e recolorir como quiser para uso próprio.
 
 ## Gerar de novo
 
-No jogo: *Opções › Exportar modelo do option file* grava `option_file_modelo.json` na pasta de
-dados. No repositório, o arquivo é gerado pelo mesmo código do jogo (`OptionFile.Json()`), com
+No repositório, o arquivo é gerado pelo mesmo código do jogo (`OptionFile.Json()`), com
 `tools/ci/Preview.cs optionfile <leagues.json>` (ver o comentário no topo do arquivo).
