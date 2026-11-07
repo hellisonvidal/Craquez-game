@@ -76,6 +76,16 @@ namespace Craquez.Sim
         public Vector2 foulSpot;
         bool _foulPenalty;
         public readonly List<int> wallIds = new List<int>();
+        /// <summary>
+        /// Bola parada (falta): o cobrador fica na bola parada, adversários a distância e ninguém
+        /// toma a bola até a cobrança. Opções: passe, cruzamento na área e, perto do gol, chute direto.
+        /// </summary>
+        public bool setPiece;
+        public int setPieceTaker = -1, setPieceTeam = -1;
+        public Vector2 setPieceSpot;
+        /// <summary>A falta é perto o bastante para o chute direto.</summary>
+        public bool setPieceShot;
+        float _setPieceT;
         public int kickoffKicker = -1, kickoffMate = -1;
         public Vector2 kickoffMateSpot;
         float kickoffT;
@@ -415,6 +425,18 @@ namespace Craquez.Sim
                 if (cut) { p.down = 0f; p.stun = 0f; }
             }
             restartScene = cut;
+            setPiece = kind == "freekick" || kind == "offside";
+            if (setPiece)
+            {
+                setPieceTaker = taker.id;
+                setPieceTeam = t;
+                setPieceSpot = spot;
+                var goal = new Vector2(halfLen * TeamDir(t), 0f);
+                setPieceShot = spot.Dist(goal) < (mode.id == GameModes.Field ? 32f : halfLen * 0.6f) && mode.keeper;
+                _setPieceT = 0f;
+                taker.facing = setPieceShot ? (goal - spot).Norm() : inward;
+                taker.position = spot - taker.facing * 0.5f;
+            }
             protectTeam = t;
             protectT = 2.5f;
             offsideIds.Clear();
@@ -503,6 +525,15 @@ namespace Craquez.Sim
                 return;
             }
             if (kickoffPass && (ball.owner != kickoffKicker || ball.pos.magnitude > 2f)) kickoffPass = false;
+            if (setPiece && (ball.owner != setPieceTaker || ball.pos.Dist(setPieceSpot) > 1.5f)) setPiece = false;
+            if (setPiece)
+            {
+                // ninguém toma a bola parada; demorou demais, o juiz manda cobrar (passe curto)
+                protectTeam = setPieceTeam;
+                protectT = Mathf.Max(protectT, 0.3f);
+                _setPieceT += DT;
+                if (_setPieceT > 12f) Pass(players[setPieceTaker], players[setPieceTaker].facing, 0.4f, false, false);
+            }
             for (int t = 0; t < 2; t++)
                 ProcessController(t, frames != null && t < frames.Length ? frames[t] : default);
             if (kickoffPass)
@@ -548,7 +579,7 @@ namespace Craquez.Sim
             else if (c.aim == Vector2.zero) c.aim = p.facing;
             if (p.windup > 0f) p.windupAim = c.aim;
             var rs = f.rstick;
-            if (rs.magnitude > 0.7f && c.prevRs.magnitude < 0.45f && ball.owner == p.id && penaltyTeam < 0 && !(kickoffPass && p.id == kickoffKicker))
+            if (rs.magnitude > 0.7f && c.prevRs.magnitude < 0.45f && ball.owner == p.id && penaltyTeam < 0 && !(kickoffPass && p.id == kickoffKicker) && !(setPiece && p.id == setPieceTaker))
                 StartSkill(p, rs.normalized);
             c.prevRs = rs;
             if (penaltyTeam >= 0)
@@ -556,6 +587,16 @@ namespace Craquez.Sim
                 p.intent = Vector2.zero;
                 p.wantSprint = false;
                 if (t != penaltyTeam) return;
+            }
+            if (setPiece && ball.owner == p.id && p.id == setPieceTaker)
+            {
+                // cobrador parado na bola; o analógico mira. Longe do gol, B vira cruzamento.
+                p.intent = Vector2.zero;
+                p.wantSprint = false;
+                p.vel = Vector2.zero;
+                if (f.move.magnitude > 0.25f) p.facing = V2.RotateToward(p.facing, f.move.normalized, 4f * DT).Norm();
+                if (!setPieceShot && (pressed & InputFrame.Shoot) != 0) pressed = (pressed & ~InputFrame.Shoot) | InputFrame.Lob;
+                if (!setPieceShot && (released & InputFrame.Shoot) != 0) { released = (released & ~InputFrame.Shoot) | InputFrame.Lob; }
             }
             if (kickoffPass && ball.owner == p.id && p.id == kickoffKicker)
             {
@@ -689,6 +730,7 @@ namespace Craquez.Sim
             else if (kind == InputFrame.Through) Pass(p, aim, power, true, false);
             else if (kind == InputFrame.Lob)
             {
+                if (setPiece && p.id == setPieceTaker) { CrossToBox(p, aim, power); return; }
                 if (TryChip(p, aim, power)) return;
                 Pass(p, aim, power, false, true);
             }
@@ -757,6 +799,7 @@ namespace Craquez.Sim
         void ReleaseBall(SimPlayer p)
         {
             kickoffPass = false;
+            setPiece = false;
             ball.owner = -1;
             ball.lastTouchTeam = p.team;
             ball.lastTouchId = p.id;
@@ -766,6 +809,36 @@ namespace Craquez.Sim
             protectT = 0f;
             MarkOffside(p);
             penaltyTeam = -1;
+        }
+
+        /// <summary>
+        /// Cruzamento na área (bola parada): procura o companheiro na área com melhor cabeceio
+        /// (o lado vem da mira); sem ninguém, joga na marca do pênalti. A força escolhe 1º ou 2º pau.
+        /// </summary>
+        public void CrossToBox(SimPlayer p, Vector2 aim, float power)
+        {
+            float dir = TeamDir(p.team);
+            var goal = new Vector2(halfLen * dir, 0f);
+            float depth = Mathf.Max(mode.boxDepth, 6f);
+            SimPlayer best = null;
+            float bestS = float.MinValue;
+            foreach (var m in players)
+            {
+                if (m.team != p.team || m == p || m.isKeeper) continue;
+                float dx = Mathf.Abs(m.position.x - goal.x);
+                if (dx > depth + 2f || Mathf.Abs(m.position.y) > Mathf.Max(mode.boxHalf, goalHalf * 2.5f)) continue;
+                float sc = (m.Has(Trait.Cabeceador) ? 1f : 0f) + Mathf.Max(m.defense, m.pace) - dx * 0.03f;
+                if (aim.sqrMagnitude > 0.1f) sc += Vector2.Dot((m.position - ball.pos).Norm(), aim.Norm()) * 0.8f;
+                foreach (var o in players) if (o.team != p.team && o.position.Dist(m.position) < 1.5f) sc -= 0.4f;
+                if (sc > bestS) { bestS = sc; best = m; }
+            }
+            Vector2 target = best != null ? best.position + best.vel * 0.6f : goal - new Vector2(dir * mode.penaltyDist, Mathf.Lerp(-1f, 1f, 0.5f + aim.y * 0.5f) * goalHalf * 0.5f);
+            // força: fraca = primeiro pau, forte = segundo pau
+            target.y += Mathf.Lerp(-1f, 1f, power) * goalHalf * 0.4f * -Mathf.Sign(ball.pos.y == 0f ? 1f : ball.pos.y);
+            target.x = Mathf.Clamp(target.x, -halfLen + 1f, halfLen - 1f);
+            if (best != null) { passReceiver = best.id; passReceiverT = 3f; }
+            Pass(p, target - ball.pos, Mathf.Clamp(0.35f + power * 0.4f, 0.3f, 0.8f), false, true);
+            Emit("cross", p.team, p.id);
         }
 
         /// <summary>Toque curto da saída de bola para o companheiro ao lado.</summary>
@@ -1305,6 +1378,21 @@ namespace Craquez.Sim
                 else { p.intent = Vector2.zero; p.wantSprint = false; }
                 return;
             }
+            if (setPiece && !frozen && state == MatchState.Playing)
+            {
+                if (wallIds.Contains(p.id))
+                {
+                    // barreira: fica plantada, de frente para a bola
+                    p.intent = Vector2.zero; p.wantSprint = false; p.vel = Vector2.zero;
+                    p.facing = (ball.pos - p.position).Norm();
+                    return;
+                }
+                if (p.id != setPieceTaker)
+                {
+                    SteerTo(p, SetPieceTarget(p), false);
+                    return;
+                }
+            }
             bool attacking = TeamHasBall(t);
             bool live = !frozen && state == MatchState.Playing;
             var target = FormationTarget(p, attacking);
@@ -1370,6 +1458,59 @@ namespace Craquez.Sim
             // bola solta perto do gol é do goleiro: o zagueiro não disputa com ele
             if (!urgent || (ball.owner < 0 && KeeperClaims(t))) target = KeeperSpace(p, target);
             SteerTo(p, target, urgent);
+        }
+
+        /// <summary>
+        /// Posições na bola parada: perto do gol, quem ataca ocupa a área (1º pau, 2º pau, marca
+        /// do pênalti, entrada da área) e quem defende marca dentro dela; longe, cada um na sua zona.
+        /// </summary>
+        Vector2 SetPieceTarget(SimPlayer p)
+        {
+            float dir = TeamDir(setPieceTeam);
+            var goal = new Vector2(halfLen * dir, 0f);
+            bool attackers = p.team == setPieceTeam;
+            float dist = setPieceSpot.Dist(goal);
+            if (dist > halfLen * 0.95f) return FormationTarget(p, attackers);
+            int rank = 0;
+            foreach (var m in players)
+                if (m.team == p.team && !m.isKeeper && m.id != setPieceTaker && !wallIds.Contains(m.id) && m.basePos.x > p.basePos.x) rank++;
+            float bd = Mathf.Max(mode.boxDepth, 6f);
+            Vector2[] slots =
+            {
+                new Vector2(goal.x - dir * bd * 0.35f, -goalHalf * 0.8f), new Vector2(goal.x - dir * bd * 0.4f, goalHalf * 0.9f),
+                new Vector2(goal.x - dir * bd * 0.62f, 0f), new Vector2(goal.x - dir * bd * 0.55f, goalHalf * 2.2f),
+                new Vector2(goal.x - dir * bd * 0.55f, -goalHalf * 2.2f), new Vector2(goal.x - dir * bd * 1.15f, 0f),
+            };
+            Vector2 t;
+            if (attackers)
+            {
+                // os mais adiantados vão para a área; zagueiros e o volante ficam na cobertura
+                if (rank < (mode.id == GameModes.Field ? 5 : 2)) t = slots[rank % slots.Length];
+                else t = FormationTarget(p, true);
+            }
+            else
+            {
+                // defensores: colados no atacante mais próximo dentro da área
+                SimPlayer near = null; float nd = 99f;
+                foreach (var o in players)
+                {
+                    if (o.team == p.team || o.isKeeper || o.id == setPieceTaker || _marked.Contains(o.id)) continue;
+                    if (Mathf.Abs(o.position.x - goal.x) > bd + 3f) continue;
+                    float d = o.position.Dist(p.position);
+                    if (d < nd) { nd = d; near = o; }
+                }
+                if (near != null && rank < (mode.id == GameModes.Field ? 7 : 3))
+                {
+                    _marked.Add(near.id);
+                    t = near.position + (goal - near.position).Norm() * 0.9f;
+                }
+                else t = FormationTarget(p, false);
+            }
+            // distância regulamentar da bola para quem defende
+            if (!attackers && t.Dist(setPieceSpot) < mode.restartDist) t = setPieceSpot + (t - setPieceSpot).Norm() * mode.restartDist;
+            t.x = Mathf.Clamp(t.x, -halfLen + 0.5f, halfLen - 0.5f);
+            t.y = Mathf.Clamp(t.y, -halfW + 0.5f, halfW - 0.5f);
+            return t;
         }
 
         /// <summary>
@@ -1845,6 +1986,12 @@ namespace Craquez.Sim
                     if (d.magnitude < 3f) p.position = gk.position + (d.magnitude > 0.1f ? d.normalized : new Vector2(TeamDir(gk.team), 0)) * 3f;
                 }
             }
+            if (setPiece && p.team != setPieceTeam && !wallIds.Contains(p.id))
+            {
+                // respeitam a distância até a cobrança
+                var d = p.position - setPieceSpot;
+                if (d.magnitude < mode.restartDist - 0.2f) p.position = setPieceSpot + (d.magnitude > 0.1f ? d.normalized : new Vector2(TeamDir(setPieceTeam), 0f)) * (mode.restartDist - 0.2f);
+            }
             if (kickoffPass && kickoffKicker >= 0 && p.team != players[kickoffKicker].team)
             {
                 // adversários fora do círculo central até a bola rolar
@@ -1942,6 +2089,15 @@ namespace Craquez.Sim
             if (o.skill != Skill.None)
             {
                 SkillBall(o);
+                return;
+            }
+            if (setPiece && o.id == setPieceTaker)
+            {
+                // bola parada no lugar da falta; o cobrador gira em volta dela para mirar
+                ball.pos = setPieceSpot;
+                ball.vel = Vector2.zero;
+                ball.z = 0f; ball.vz = 0f; ball.spin = 0f;
+                o.position = setPieceSpot - o.facing * 0.5f;
                 return;
             }
             // condução em toques (do trote ao pique): a bola é tocada à frente e o atleta vai atrás dela

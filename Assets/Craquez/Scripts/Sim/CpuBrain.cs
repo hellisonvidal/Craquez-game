@@ -58,6 +58,34 @@ namespace Craquez.Sim
                     f.buttons |= InputFrame.Pass;
                 return f;
             }
+            if (sim.setPiece && sim.ball.owner == p.id && p.id == sim.setPieceTaker)
+            {
+                // falta: espera os companheiros se posicionarem e escolhe a cobrança
+                if (_holdBtn != 0 || _cooldown > 0) return f;
+                var g = new Vector2(sim.halfLen * dir, 0f);
+                float dg = p.position.Dist(g);
+                if (Noise(sim, 40) > 0.012f) return f;
+                float r = Noise(sim, 41);
+                if (sim.setPieceShot && dg < 28f && r < 0.45f + p.shot * 0.3f)
+                {
+                    float side = Noise(sim, 42) > 0.5f ? 1f : -1f;
+                    f.move = new Vector2(dir, side * 0.7f);
+                    _finesse = Noise(sim, 43) < 0.7f;
+                    if (_finesse) f.buttons |= InputFrame.Finesse;
+                    Press(ref f, InputFrame.Shoot, (int)Mathf.Lerp(22f, 38f, dg / 28f));
+                }
+                else if (dg < sim.halfLen * 0.85f && r < 0.8f)
+                {
+                    f.move = (g - p.position).Norm();
+                    Press(ref f, InputFrame.Lob, 14 + (int)(Noise(sim, 44) * 16f));
+                }
+                else
+                {
+                    f.move = new Vector2(dir, (Noise(sim, 45) - 0.5f) * 1.4f).Norm();
+                    Press(ref f, InputFrame.Pass, 10);
+                }
+                return f;
+            }
             if (sim.ball.owner == p.id)
             {
                 var goal = new Vector2(sim.halfLen * dir, 0f);

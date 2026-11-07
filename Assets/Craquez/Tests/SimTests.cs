@@ -227,6 +227,55 @@ namespace Craquez.Tests
             Assert.Greater(maxW - minW, 0.2f);
         }
 
+        static SimPlayer FirstOutfield(MatchSim sim, int team)
+        {
+            foreach (var p in sim.players) if (!p.isKeeper && p.team == team) return p;
+            return null;
+        }
+
+        [TestCase(22f, true)]   // fora da área (dentro seria pênalti)
+        [TestCase(45f, false)]
+        public void FreeKickBallStaysAndOptionsDependOnDistance(float distToGoal, bool shotAllowed)
+        {
+            var sim = NewMatch(GameModes.Field);
+            for (int i = 0; i < 70; i++) sim.Step(new InputFrame[2]);
+            float dir = sim.TeamDir(0);
+            var victim = FirstOutfield(sim, 0);
+            var offender = FirstOutfield(sim, 1);
+            victim.position = new Vector2(dir * (sim.halfLen - distToGoal), 6f);
+            offender.position = victim.position - new Vector2(dir, 0) * 0.6f;
+            offender.vel = new Vector2(dir * 6f, 0);
+            sim.ball.owner = victim.id;
+            sim.Foul(offender, victim);
+            for (int i = 0; i < 60 * 5 && sim.state != MatchState.Playing; i++) sim.Step(new InputFrame[2]);
+            Assert.IsTrue(sim.setPiece, "sem bola parada");
+            Assert.AreEqual(shotAllowed, sim.setPieceShot);
+            var spot = sim.setPieceSpot;
+            // o cobrador tenta sair conduzindo: a bola continua parada no lugar; adversários longe
+            for (int i = 0; i < 90; i++)
+            {
+                sim.Step(new[] { new InputFrame { move = new Vector2(dir, 0.3f), buttons = InputFrame.Sprint }, default });
+                foreach (var p in sim.players)
+                    if (p.team == 1 && !sim.wallIds.Contains(p.id))
+                        Assert.GreaterOrEqual(p.position.Dist(spot), sim.mode.restartDist - 0.4f, "adversário em cima da bola");
+            }
+            Assert.Less(sim.ball.pos.Dist(spot), 0.01f, "bola saiu do lugar");
+            Assert.IsTrue(sim.setPiece);
+            // B: chute direto perto da área; longe, vira cruzamento
+            bool crossed = false, shot = false;
+            int before = sim.statsShots[0];
+            for (int i = 0; i < 30; i++) { sim.Step(new[] { new InputFrame { move = new Vector2(dir, 0), buttons = InputFrame.Shoot }, default }); }
+            for (int i = 0; i < 30; i++)
+            {
+                sim.Step(new[] { new InputFrame { move = new Vector2(dir, 0) }, default });
+                foreach (var e in sim.events) if (e.type == "cross") crossed = true;
+            }
+            shot = sim.statsShots[0] > before;
+            Assert.IsFalse(sim.setPiece, "falta não foi cobrada");
+            Assert.AreEqual(shotAllowed, shot, "chute direto");
+            Assert.AreEqual(!shotAllowed, crossed, "cruzamento");
+        }
+
         [Test] public void JsonRoundTrip()
         {
             var o = MiniJson.Parse("{\"a\": [1, 2.5, \"x\\n\"], \"b\": {\"c\": true, \"d\": null}}");

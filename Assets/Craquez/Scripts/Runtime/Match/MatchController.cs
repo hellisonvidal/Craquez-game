@@ -78,6 +78,8 @@ namespace Craquez
             {
                 if (sides[t] == Side.Cpu) _cpu[t] = new CpuBrain(t, c.difficulty);
                 _dev[t] = sides[t] == Side.Player2 ? InputRouter.DefaultP2(p1) : p1;
+                hud.devices[t] = _dev[t];
+                hud.human[t] = sides[t] != Side.Cpu;
             }
             if (attract)
             {

@@ -193,6 +193,7 @@ namespace Craquez.UI
                 _power[t].fillAmount = ch;
                 _power[t].color = Color.Lerp(Theme.Accent2, Theme.Hot, Mathf.Clamp01((ch - 0.7f) / 0.3f));
             }
+            SetPieceHint();
             _toastT -= Time.unscaledDeltaTime;
             _toastCg.alpha = Mathf.Clamp01(_toastT * 3f);
             _goalT -= Time.unscaledDeltaTime;
@@ -206,5 +207,25 @@ namespace Craquez.UI
         }
 
         public void SetWeather(string s) => _weather.text = s;
+
+        /// <summary>Quem é humano (e com que controle): para mostrar as opções da cobrança de falta.</summary>
+        public DeviceKind[] devices = new DeviceKind[2];
+        public bool[] human = new bool[2];
+        Text _setPiece;
+        int _setPieceShown = -1;
+
+        void SetPieceHint()
+        {
+            if (_setPiece == null)
+            {
+                _setPiece = UiKit.Label(_overlay != null ? _overlay : (RectTransform)transform, "", 26, Theme.BodyBold, Color.white, TextAnchor.MiddleCenter);
+                _setPiece.rectTransform.Place(0, 0, 1, 0, 40, 150, 40, -200);
+                UiKit.Shadow(_setPiece, 3, 0.9f);
+            }
+            int want = _sim.setPiece && _sim.setPieceTeam >= 0 && human[_sim.setPieceTeam] && _sim.ball.owner == _sim.setPieceTaker ? (_sim.setPieceShot ? 1 : 0) : -1;
+            if (want == _setPieceShown) return;
+            _setPieceShown = want;
+            _setPiece.text = want < 0 ? "" : InputRouter.SetPieceHelp(devices[_sim.setPieceTeam], want == 1);
+        }
     }
 }
