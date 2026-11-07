@@ -37,6 +37,9 @@ namespace Craquez
             var home = Teams.Get(c.teamA);
             var away = Teams.Get(c.teamB);
             kits = Teams.PickKits(home, away, c.kitA, c.kitB);
+            // society e rua: sem som de torcida (campo pequeno, sem arquibancada cheia)
+            Sfx.NoCrowd = s.mode.id == GameModes.Society || s.mode.id == GameModes.Street;
+            _quietOwner = this;
             _night = c.timeOfDay == "noite";
             Lighting(c.timeOfDay, s.mode.id, q);
             if (s.mode.id == GameModes.Futsal) venue = VenueBuilder.Futsal(s, home, away, kits[0], kits[1], c.venue, _night, q, transform);
@@ -533,7 +536,14 @@ namespace Craquez
             m.rotation = Quaternion.Euler(0, Mathf.Atan2(p.facing.x, p.facing.y) * Mathf.Rad2Deg, 0);
         }
 
-        void OnDestroy() => Sfx.Drums(0f);
+        static MatchView _quietOwner;
+
+        void OnDestroy()
+        {
+            Sfx.Drums(0f);
+            // (ao "jogar de novo" a partida nova já foi montada antes desta ser destruída)
+            if (_quietOwner == this) { Sfx.NoCrowd = false; _quietOwner = null; }
+        }
 
         public AthleteView ViewOf(int id) => id >= 0 && id < athletes.Count ? athletes[id] : null;
     }

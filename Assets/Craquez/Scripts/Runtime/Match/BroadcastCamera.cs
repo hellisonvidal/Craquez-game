@@ -4,13 +4,22 @@ using UnityEngine;
 namespace Craquez
 {
     /// <summary>
-    /// Câmera de transmissão (estilo TV): fica na lateral, acompanha a bola com
-    /// antecipação e suavização, aproxima em lances perto da área. Modos: TV,
-    /// TV próxima, alta (tática) e cinema (cerimônia / replays).
+    /// Câmera da partida. Três famílias:
+    /// transmissão (TV, TV próxima, aberta, tática) na lateral, acompanhando a bola com antecipação;
+    /// próximas ao jogador (perto do jogador, atrás do jogador, ombro, rente ao gramado), que
+    /// seguem o atleta controlado; e especiais (dinâmica, atrás do gol, drone).
     /// </summary>
     public class BroadcastCamera : MonoBehaviour
     {
-        public static readonly string[] Modes = { "TV", "TV Próxima", "Alta (tática)", "Atrás do Jogador", "Dinâmica", "Beira do Campo", "Atrás do Gol", "Drone", "Isométrica", "Transmissão Aberta" };
+        public enum Kind { Tv, TvClose, Wide, Tactical, PlayerSide, Behind, Shoulder, Pitchside, Dynamic, BehindGoal, Drone }
+        public static readonly string[] Modes =
+        {
+            "TV", "TV Próxima", "Transmissão Aberta", "Alta (tática)",
+            "Perto do Jogador", "Atrás do Jogador", "Ombro (bem perto)", "Rente ao Gramado",
+            "Dinâmica", "Atrás do Gol", "Drone",
+        };
+        /// <summary>Índices antigos (versão 2.0) -> novos, para manter a escolha salva.</summary>
+        public static int FromOld(int old) => old switch { 0 => 0, 1 => 1, 2 => 3, 3 => 5, 4 => 8, 5 => 7, 6 => 9, 7 => 10, 9 => 2, _ => 0 };
         public static readonly string[] Zooms = { "Bem aberto", "Aberto", "Normal", "Perto", "Bem perto" };
         /// <summary>Zoom: -2 (aberto) .. +2 (perto).</summary>
         public int zoom;
@@ -154,96 +163,134 @@ namespace Craquez
             var target = ball + _lead;
             target.x = Mathf.Clamp(target.x, -hl * 0.88f, hl * 0.88f);
             target.z = Mathf.Clamp(target.z * 0.55f, -hw * 0.5f, hw * 0.5f);
-            _focus = Vector3.SmoothDamp(_focus, target, ref _vel, 0.35f, 60f, dt);
+            var kind = (Kind)Mathf.Clamp(mode, 0, Modes.Length - 1);
+            bool onPlayer = kind == Kind.PlayerSide || kind == Kind.Behind || kind == Kind.Shoulder || kind == Kind.Dynamic;
+            if (!onPlayer) _focus = Vector3.SmoothDamp(_focus, target, ref _vel, 0.35f, 60f, dt);
             // perto do gol: aproxima um pouco
             float nearGoal = Mathf.Clamp01((Mathf.Abs(_focus.x) - hl * 0.55f) / (hl * 0.35f));
             float zk = 1f - zoom * 0.14f;   // zoom afasta/aproxima mantendo o ângulo
-            if (mode == 3 || mode == 4)
+            switch (kind)
             {
-                // câmeras "por trás": seguem a direção do ataque (jogador controlado ou time com a bola)
-                Vector3 anchor;
-                float dir;
-                if (mode == 3)
-                {
-                    var pl = sim.Controlled(followTeam);
-                    anchor = new Vector3(pl.position.x, 0, pl.position.y);
-                    dir = sim.TeamDir(followTeam);
-                }
-                else
-                {
-                    int t = sim.ball.owner >= 0 ? sim.players[sim.ball.owner].team : (sim.ball.lastTouchTeam >= 0 ? sim.ball.lastTouchTeam : 0);
-                    anchor = ball;
-                    dir = sim.TeamDir(t);
-                }
-                _attackDir = Vector3.Slerp(_attackDir, new Vector3(dir, 0, 0), 1f - Mathf.Exp(-dt * 1.2f));
-                float bk = (field ? (mode == 3 ? 10f : 20f) : (mode == 3 ? 7f : 11f)) * zk;
-                float up = (field ? (mode == 3 ? 4.2f : 9f) : (mode == 3 ? 3.2f : 6f)) * zk;
-                var focus = Vector3.Lerp(anchor, ball, mode == 3 ? 0.35f : 1f);
-                _focus = Vector3.SmoothDamp(_focus, focus, ref _vel, 0.25f, 80f, dt);
-                var p3 = _focus - _attackDir * bk + Vector3.up * up;
-                if (_shake > 0f) { _shake = Mathf.MoveTowards(_shake, 0f, dt * 2.5f); p3 += Random.insideUnitSphere * _shake * 0.2f; }
-                cam.transform.position = Vector3.Lerp(cam.transform.position, p3, 1f - Mathf.Exp(-dt * 6f));
-                cam.transform.rotation = Quaternion.Slerp(cam.transform.rotation, Quaternion.LookRotation(_focus + _attackDir * (field ? 8f : 4f) + Vector3.up * 0.5f - cam.transform.position), 1f - Mathf.Exp(-dt * 6f));
-                cam.fieldOfView = Mathf.Lerp(cam.fieldOfView, 52f, 1f - Mathf.Exp(-dt * 2f));
-                return;
-            }
-            if (mode >= 6 && mode <= 8)
-            {
-                Vector3 p6, look6;
-                float fov6;
-                if (mode == 6)
-                {
-                    // atrás do gol que o time seguido defende, olhando o campo no sentido do ataque
-                    float dir = sim.TeamDir(followTeam);
-                    float behind = (field ? 16f : 8f) * zk;
-                    p6 = new Vector3(-dir * (hl + behind) + _focus.x * 0.35f, (field ? 11f : 6.5f) * zk, _focus.z * 0.6f);
-                    look6 = new Vector3(_focus.x, 0.5f, _focus.z);
-                    fov6 = field ? 46f : 50f;
-                }
-                else if (mode == 7)
-                {
-                    // drone: quase de cima, um pouco atrás, acompanha a bola de perto
-                    p6 = _focus + new Vector3(0f, (field ? 30f : 15f) * zk, -(field ? 9f : 5f) * zk);
-                    look6 = _focus;
-                    fov6 = 42f;
-                }
-                else
-                {
-                    // isométrica: diagonal de um canto, estilo jogo de estratégia
-                    float dd = (field ? 34f : 17f) * zk;
-                    p6 = _focus + new Vector3(-dd * 0.7f, dd * 0.8f, -dd * 0.7f);
-                    look6 = _focus;
-                    fov6 = 30f;
-                }
-                if (_shake > 0f) { _shake = Mathf.MoveTowards(_shake, 0f, dt * 2.5f); p6 += Random.insideUnitSphere * _shake * 0.25f; }
-                cam.transform.position = Vector3.Lerp(cam.transform.position, p6, 1f - Mathf.Exp(-dt * 5f));
-                cam.transform.rotation = Quaternion.Slerp(cam.transform.rotation, Quaternion.LookRotation(look6 - cam.transform.position), 1f - Mathf.Exp(-dt * 6f));
-                cam.fieldOfView = Mathf.Lerp(cam.fieldOfView, fov6, 1f - Mathf.Exp(-dt * 2f));
-                return;
+                case Kind.PlayerSide: PlayerSide(ball, field, zk, dt); return;
+                case Kind.Behind:
+                case Kind.Shoulder:
+                case Kind.Dynamic: BehindCam(kind, ball, field, zk, dt); return;
+                case Kind.BehindGoal:
+                case Kind.Drone: Special(kind, field, hl, zk, dt); return;
             }
             float height, back, fov;
-            switch (mode)
+            switch (kind)
             {
-                case 1: height = field ? 11f : 7f; back = field ? 28f : 15f; fov = 34f; break;
-                case 2: height = field ? 42f : 20f; back = field ? 36f : 18f; fov = 38f; break;
-                case 5: height = field ? 3.2f : 2.4f; back = field ? 14f : 6f; fov = 44f; break;
-                case 9: height = field ? 30f : 14f; back = field ? 58f : 24f; fov = 34f; break;   // transmissão aberta: o campo todo
+                case Kind.TvClose: height = field ? 11f : 7f; back = field ? 28f : 15f; fov = 34f; break;
+                case Kind.Tactical: height = field ? 42f : 20f; back = field ? 36f : 18f; fov = 38f; break;
+                case Kind.Pitchside: height = field ? 2.6f : 2.1f; back = field ? 10f : 5f; fov = 46f; break;
+                case Kind.Wide: height = field ? 30f : 14f; back = field ? 58f : 24f; fov = 34f; break;   // o campo todo
                 default: height = field ? 18f : 10f; back = field ? 38f : 16f; fov = field ? 31f : 38f; break;
             }
             height *= zk;
             back *= zk;
             fov -= nearGoal * 4f;
             _dist = Mathf.Lerp(_dist <= 0 ? back : _dist, back * (1f - nearGoal * 0.1f), 1f - Mathf.Exp(-dt * 1.5f));
-            var pos = new Vector3(_focus.x * 0.82f, height, -(hw + _dist) + _focus.z * 0.25f);
-            if (_shake > 0f)
-            {
-                _shake = Mathf.MoveTowards(_shake, 0f, dt * 2.5f);
-                pos += Random.insideUnitSphere * _shake * 0.25f;
-            }
+            var pos = new Vector3(_focus.x * (kind == Kind.Pitchside ? 0.95f : 0.82f), height, -(hw + _dist) + _focus.z * 0.25f);
+            pos += ShakeOffset(dt, 0.25f);
             cam.transform.position = pos;
-            var look = _focus + Vector3.up * 0.6f;
+            var look = _focus + Vector3.up * (kind == Kind.Pitchside ? 1.1f : 0.6f);
             cam.transform.rotation = Quaternion.LookRotation(look - pos);
             cam.fieldOfView = Mathf.Lerp(cam.fieldOfView, fov, 1f - Mathf.Exp(-dt * 2f));
+        }
+
+        Vector3 ShakeOffset(float dt, float k)
+        {
+            if (_shake <= 0f) return Vector3.zero;
+            _shake = Mathf.MoveTowards(_shake, 0f, dt * 2.5f);
+            return Random.insideUnitSphere * _shake * k;
+        }
+
+        Vector3 _player;
+
+        /// <summary>Posição do atleta controlado (suavizada), puxada um pouco para a bola.</summary>
+        Vector3 PlayerAnchor(Vector3 ball, float toBall, float dt)
+        {
+            var pl = sim.Controlled(Mathf.Clamp(followTeam, 0, 1));
+            var p = new Vector3(pl.position.x, 0, pl.position.y);
+            var want = Vector3.Lerp(p, ball, toBall);
+            _player = _player == Vector3.zero ? want : Vector3.Lerp(_player, want, 1f - Mathf.Exp(-dt * 5f));
+            return _player;
+        }
+
+        /// <summary>"Perto do jogador": lateral, baixa e fechada no atleta controlado (estilo câmera pro).</summary>
+        void PlayerSide(Vector3 ball, bool field, float zk, float dt)
+        {
+            var a = PlayerAnchor(ball, 0.3f, dt);
+            _focus = Vector3.SmoothDamp(_focus, a, ref _vel, 0.22f, 80f, dt);
+            float dist = (field ? 15f : 8.5f) * zk, h = (field ? 6.2f : 4.2f) * zk;
+            var p = new Vector3(_focus.x, h, _focus.z - dist) + ShakeOffset(dt, 0.2f);
+            cam.transform.position = Vector3.Lerp(cam.transform.position, p, 1f - Mathf.Exp(-dt * 6f));
+            var q = Quaternion.LookRotation(_focus + Vector3.up * 1.0f - cam.transform.position);
+            cam.transform.rotation = Quaternion.Slerp(cam.transform.rotation, q, 1f - Mathf.Exp(-dt * 7f));
+            cam.fieldOfView = Mathf.Lerp(cam.fieldOfView, field ? 36f : 42f, 1f - Mathf.Exp(-dt * 2f));
+        }
+
+        /// <summary>Câmeras "por trás", no sentido do ataque: atrás do jogador, ombro (bem perto) e dinâmica (segue a bola).</summary>
+        void BehindCam(Kind kind, Vector3 ball, bool field, float zk, float dt)
+        {
+            Vector3 anchor;
+            float dir;
+            if (kind == Kind.Dynamic)
+            {
+                int t = sim.ball.owner >= 0 ? sim.players[sim.ball.owner].team : (sim.ball.lastTouchTeam >= 0 ? sim.ball.lastTouchTeam : 0);
+                anchor = ball;
+                dir = sim.TeamDir(t);
+            }
+            else
+            {
+                anchor = PlayerAnchor(ball, kind == Kind.Shoulder ? 0.12f : 0.35f, dt);
+                dir = sim.TeamDir(Mathf.Clamp(followTeam, 0, 1));
+            }
+            _attackDir = Vector3.Slerp(_attackDir, new Vector3(dir, 0, 0), 1f - Mathf.Exp(-dt * 1.2f));
+            float bk, up, fov, ahead;
+            switch (kind)
+            {
+                case Kind.Shoulder: bk = field ? 4.6f : 3.6f; up = field ? 2.3f : 2.0f; fov = 60f; ahead = field ? 12f : 7f; break;
+                case Kind.Dynamic: bk = field ? 20f : 11f; up = field ? 9f : 6f; fov = 52f; ahead = field ? 8f : 4f; break;
+                default: bk = field ? 10f : 7f; up = field ? 4.2f : 3.2f; fov = 52f; ahead = field ? 8f : 4f; break;
+            }
+            bk *= zk; up *= zk;
+            _focus = Vector3.SmoothDamp(_focus, anchor, ref _vel, kind == Kind.Shoulder ? 0.15f : 0.25f, 80f, dt);
+            // ombro: um pouco para o lado, para o atleta não tapar a jogada
+            var side = Vector3.Cross(Vector3.up, _attackDir).normalized * (kind == Kind.Shoulder ? -1.1f : 0f);
+            var p3 = _focus - _attackDir * bk + Vector3.up * up + side + ShakeOffset(dt, 0.2f);
+            float follow = kind == Kind.Shoulder ? 9f : 6f;
+            cam.transform.position = Vector3.Lerp(cam.transform.position, p3, 1f - Mathf.Exp(-dt * follow));
+            var look = _focus + _attackDir * ahead + Vector3.up * (kind == Kind.Shoulder ? 1.0f : 0.5f);
+            cam.transform.rotation = Quaternion.Slerp(cam.transform.rotation, Quaternion.LookRotation(look - cam.transform.position), 1f - Mathf.Exp(-dt * follow));
+            cam.fieldOfView = Mathf.Lerp(cam.fieldOfView, fov, 1f - Mathf.Exp(-dt * 2f));
+        }
+
+        void Special(Kind kind, bool field, float hl, float zk, float dt)
+        {
+            Vector3 p6, look6;
+            float fov6;
+            if (kind == Kind.BehindGoal)
+            {
+                // atrás do gol que o time seguido defende, olhando o campo no sentido do ataque
+                float dir = sim.TeamDir(followTeam);
+                float behind = (field ? 16f : 8f) * zk;
+                p6 = new Vector3(-dir * (hl + behind) + _focus.x * 0.35f, (field ? 11f : 6.5f) * zk, _focus.z * 0.6f);
+                look6 = new Vector3(_focus.x, 0.5f, _focus.z);
+                fov6 = field ? 46f : 50f;
+            }
+            else
+            {
+                // drone: quase de cima, um pouco atrás, acompanha a bola de perto
+                p6 = _focus + new Vector3(0f, (field ? 30f : 15f) * zk, -(field ? 9f : 5f) * zk);
+                look6 = _focus;
+                fov6 = 42f;
+            }
+            p6 += ShakeOffset(dt, 0.25f);
+            cam.transform.position = Vector3.Lerp(cam.transform.position, p6, 1f - Mathf.Exp(-dt * 5f));
+            cam.transform.rotation = Quaternion.Slerp(cam.transform.rotation, Quaternion.LookRotation(look6 - cam.transform.position), 1f - Mathf.Exp(-dt * 6f));
+            cam.fieldOfView = Mathf.Lerp(cam.fieldOfView, fov6, 1f - Mathf.Exp(-dt * 2f));
         }
 
         public void SnapToBall()

@@ -84,6 +84,8 @@ namespace Craquez
             yield return Shot("titulo", 2.5f);
             _app.Tour_Modes();
             yield return Shot("modos", 1.2f);
+            _app.Tour_Options();
+            yield return Shot("opcoes", 1.2f);
             _app.Tour_Setup(GameModes.Field, false);
             yield return Shot("config_campo", 1f);
             _app.Tour_Teams();
@@ -129,6 +131,16 @@ namespace Craquez
                     bc.cinematic = false;
                 }
                 yield return Shot(tag + "_jogo2", 3f);
+                // câmeras próximas do jogador (só nas duas primeiras partidas, para não alongar o roteiro)
+                if (mc != null && mc.view != null && (tag == "campo_noite" || tag == "futsal"))
+                {
+                    foreach (var k in new[] { BroadcastCamera.Kind.PlayerSide, BroadcastCamera.Kind.Shoulder, BroadcastCamera.Kind.Behind })
+                    {
+                        mc.view.bcam.mode = (int)k;
+                        yield return Shot(tag + "_cam_" + k, 2.5f);
+                    }
+                    mc.view.bcam.mode = 0;
+                }
                 _app.Tour_EndMatch();
                 yield return new WaitForSecondsRealtime(0.5f);
             }

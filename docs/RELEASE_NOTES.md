@@ -1,4 +1,30 @@
-## Craquez 2.0.0
+## Craquez 2.1.0
+
+Jogo de futebol feito 100% com inteligência artificial, **gratuito**. Android, Windows e Linux.
+
+### Downloads
+- **Android**: `Craquez-v2.1.0.apk` (instale permitindo "fontes desconhecidas")
+- **Windows**: `Craquez-v2.1.0-Instalador-Windows.exe` (instalador) ou `Craquez-v2.1.0-Windows.zip` (portátil)
+- **Linux**: `Craquez-v2.1.0-Linux.tar.gz` → extraia e rode `./Craquez` (ou `./instalar.sh` para o atalho no menu)
+
+### Novidades
+- **Menus reformulados**: fundo animado (arte da capa com feixes de luz e partículas), transição
+  em faixas entre as telas, conteúdo entrando em sequência, trilha de navegação no topo e dicas
+  de controle em "teclas" na barra de baixo; painéis e botões com novo acabamento.
+- **Tela de modos** com quatro cartões grandes (Futebol, Futsal, Society, Rua) e ilustrações novas,
+  sem bola: estádio à noite com refletores, ginásio de futsal, society com alambrado no fim de
+  tarde e rua com muro grafitado. O cartão em foco cresce e acende na cor da modalidade.
+- **Conquistas retiradas**.
+- **Locais da partida** voltaram a ser desenhos 2D (escurecem à noite e esquentam no fim de tarde).
+- **Society e rua sem som de torcida** (só bola, apito, rede e trave).
+- **Câmeras redefinidas**: TV, TV Próxima, Transmissão Aberta, Alta (tática) e as novas próximas do
+  jogador — **Perto do Jogador** (lateral e fechada no atleta), **Atrás do Jogador**, **Ombro (bem
+  perto)** e **Rente ao Gramado** —, além de Dinâmica, Atrás do Gol e Drone.
+- **Bolas refeitas**: corrigido o defeito que deixava todas acinzentadas com costuras claras;
+  costura em sulco escuro, gomos estofados e desenhos alinhados aos gomos. Catálogo com
+  **18 bolas brancas de campo** (e 5 de futsal), além das coloridas.
+
+## Craquez 2.0.0 (anterior)
 
 Jogo de futebol feito 100% com inteligência artificial, **gratuito**. Android, Windows e Linux.
 
@@ -34,4 +60,3 @@ Jogo de futebol feito 100% com inteligência artificial, **gratuito**. Android, 
 - Gráficos: Leve / Equilibrado / Alto / Ultra e, no PC, modo de tela, resolução, sincronia vertical,
   limite de quadros, escala de render, antisserrilhado, sombras e texturas.
 - **Salvar / Cancelar** nas configurações; volume da música.
-- Menu de **conquistas**.

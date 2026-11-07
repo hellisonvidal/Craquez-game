@@ -5,14 +5,15 @@ using UnityEngine;
 namespace Craquez
 {
     /// <summary>
-    /// Bolas originais (sem marcas) de campo e de futsal. Cada bola tem uma construção de gomos
-    /// de verdade (32 gomos clássicos, 6 hélices, 8 gomos curvos, 2 metades costuradas, 18 tiras
-    /// de couro, 20 triângulos), costuras com relevo, bordas suavizadas e um desenho por cima.
+    /// Bolas originais (sem marcas) de campo e de futsal, a maioria brancas como as bolas de jogo
+    /// de verdade. Cada bola tem uma construção de gomos real (32 gomos clássicos, 6 hélices,
+    /// 8 gomos curvos, 2 metades, 18 tiras de couro, 20 triângulos), costuras em sulco com o
+    /// gomo estofado em volta, e um desenho alinhado aos gomos.
     /// </summary>
     public static class BallCatalog
     {
         public enum Panels { Classic32, Propeller6, Curved8, TwoPiece, Leather18, Tri20 }
-        public enum Art { Plain, Pentagons, Triads, Swoosh, Stripes, Comet, Stars, Gradient, Waves, Splash, Hex, Band, Laces, Halves, Shards }
+        public enum Art { Plain, Pentagons, Triads, Swoosh, Stripes, Comet, Stars, Gradient, Waves, Splash, Band, Laces, Halves, Shards, Corners, Arcs, Ribbons, Outline, Dots, Zigzag, Spiral }
 
         public class Ball
         {
@@ -39,46 +40,50 @@ namespace Craquez
         static Ball B(string n, Panels p, Art a, string c1, string c2, string c3, bool futsal = false)
             => new Ball { name = n, panels = p, art = a, a = H(c1), b = H(c2), c = H(c3), futsal = futsal };
 
+        const string W = "#f7f8fa";   // branco das bolas (levemente frio, não estoura na luz)
+
         public static readonly Ball[] All =
         {
-            B("Craquez Pro 26", Panels.Propeller6, Art.Swoosh, "#f8fafc", "#0f172a", "#22c55e"),
-            B("Clássica 70", Panels.Classic32, Art.Pentagons, "#ffffff", "#111111", "#111111"),
-            B("Tríade", Panels.Classic32, Art.Triads, "#ffffff", "#111827", "#9ca3af"),
-            B("Hélice Azul", Panels.Propeller6, Art.Comet, "#f8fafc", "#1d4ed8", "#38bdf8"),
-            B("Fogo", Panels.Curved8, Art.Comet, "#fff7ed", "#ea580c", "#facc15"),
-            B("Inverno", Panels.Propeller6, Art.Swoosh, "#f97316", "#1e293b", "#fde68a"),
+            // ---- brancas (campo)
+            B("Craquez Pro 26", Panels.Propeller6, Art.Corners, W, "#0b1f4d", "#e11d48"),
+            B("Clássica 70", Panels.Classic32, Art.Pentagons, W, "#121212", "#121212"),
+            B("Tríade", Panels.Classic32, Art.Triads, W, "#111827", "#9ca3af"),
+            B("Copa Branca", Panels.Tri20, Art.Outline, W, "#1d4ed8", "#f59e0b"),
+            B("Hélice Azul", Panels.Propeller6, Art.Arcs, W, "#1d4ed8", "#38bdf8"),
+            B("Samba", Panels.Propeller6, Art.Waves, W, "#16a34a", "#facc15"),
+            B("Brisa", Panels.Curved8, Art.Ribbons, W, "#0ea5e9", "#0f172a"),
+            B("Pincel", Panels.Propeller6, Art.Swoosh, W, "#111827", "#ef4444"),
+            B("Pontilhada", Panels.Curved8, Art.Dots, W, "#15803d", "#84cc16"),
+            B("Relâmpago", Panels.Propeller6, Art.Zigzag, W, "#111827", "#facc15"),
+            B("Estrela", Panels.Classic32, Art.Stars, W, "#dc2626", "#1e3a8a"),
+            B("Celeste", Panels.TwoPiece, Art.Halves, W, "#7dd3fc", "#0f172a"),
+            B("Tricolor", Panels.Propeller6, Art.Stripes, W, "#1d4ed8", "#dc2626"),
+            B("Cometa", Panels.Curved8, Art.Comet, W, "#0f172a", "#fbbf24"),
+            B("Prisma", Panels.Tri20, Art.Shards, W, "#7c3aed", "#06b6d4"),
+            B("Linha Fina", Panels.Classic32, Art.Outline, W, "#0f172a", "#0f172a"),
+            B("Espiral", Panels.Curved8, Art.Spiral, W, "#e11d48", "#0f172a"),
+            B("Branca 62", Panels.Leather18, Art.Plain, "#f4efe2", "#e4d8bd", "#6b4f2a"),
+            // ---- coloridas (campo)
+            B("Fogo", Panels.Curved8, Art.Comet, "#ea580c", "#facc15", "#7c2d12"),
+            B("Inverno", Panels.Propeller6, Art.Corners, "#f97316", "#1e293b", "#fde68a"),
             B("Neve Visível", Panels.Curved8, Art.Band, "#facc15", "#111827", "#ef4444"),
-            B("Samba", Panels.Propeller6, Art.Waves, "#ffffff", "#16a34a", "#facc15"),
-            B("Celeste", Panels.TwoPiece, Art.Halves, "#ffffff", "#38bdf8", "#0f172a"),
             B("Meia-Noite", Panels.Curved8, Art.Gradient, "#0f172a", "#a855f7", "#22d3ee"),
-            B("Estrela", Panels.Classic32, Art.Stars, "#ffffff", "#dc2626", "#1e3a8a"),
-            B("Colmeia", Panels.Classic32, Art.Hex, "#f1f5f9", "#0f766e", "#f59e0b"),
-            B("Triângulos", Panels.Tri20, Art.Shards, "#ffffff", "#e11d48", "#0f172a"),
-            B("Ondas do Mar", Panels.Curved8, Art.Waves, "#e0f2fe", "#0369a1", "#0ea5e9"),
-            B("Rua Grafite", Panels.Propeller6, Art.Splash, "#e5e7eb", "#111827", "#f43f5e"),
-            B("Ouro", Panels.Propeller6, Art.Stripes, "#fef3c7", "#b45309", "#f59e0b"),
-            B("Futsal Max", Panels.Curved8, Art.Band, "#fde047", "#1d4ed8", "#ffffff", true),
-            B("Copa Verde", Panels.Curved8, Art.Swoosh, "#ffffff", "#15803d", "#fbbf24"),
-            B("Tricolor", Panels.Propeller6, Art.Stripes, "#ffffff", "#1d4ed8", "#dc2626"),
+            B("Ouro", Panels.Propeller6, Art.Arcs, "#fbbf24", "#78350f", "#fff7ed"),
             B("Retrô Couro", Panels.Leather18, Art.Laces, "#a16207", "#713f12", "#fde68a"),
-            B("Prisma", Panels.Tri20, Art.Shards, "#f8fafc", "#7c3aed", "#06b6d4"),
             B("Vulcão", Panels.Curved8, Art.Splash, "#1c1917", "#ef4444", "#f97316"),
-            B("Aurora", Panels.Propeller6, Art.Gradient, "#ecfeff", "#10b981", "#8b5cf6"),
-            B("Pixel", Panels.Classic32, Art.Hex, "#ffffff", "#111827", "#22c55e"),
-            B("Cometa", Panels.Propeller6, Art.Comet, "#ffffff", "#0f172a", "#fbbf24"),
-            B("Rosa Choque", Panels.Classic32, Art.Triads, "#fdf2f8", "#db2777", "#111827"),
-            B("Areia", Panels.Leather18, Art.Plain, "#fef9c3", "#ca8a04", "#78350f"),
-            B("Noturna Neon", Panels.Curved8, Art.Splash, "#111827", "#84cc16", "#f0abfc"),
+            B("Noturna Neon", Panels.Tri20, Art.Outline, "#111827", "#84cc16", "#f0abfc"),
             B("Bandeirinha", Panels.TwoPiece, Art.Halves, "#16a34a", "#facc15", "#1d4ed8"),
             B("Lenda", Panels.Classic32, Art.Stars, "#0b0b0b", "#f8fafc", "#d4a017"),
-            // futsal (tamanho 4)
+            // ---- futsal (tamanho 4)
+            B("Salão Branca", Panels.Classic32, Art.Pentagons, W, "#1d4ed8", "#1d4ed8", true),
+            B("Quadra Pro", Panels.Propeller6, Art.Corners, W, "#dc2626", "#1d4ed8", true),
+            B("Ginásio", Panels.Curved8, Art.Dots, W, "#f97316", "#16a34a", true),
+            B("Ala Rápida", Panels.Propeller6, Art.Zigzag, W, "#0f766e", "#ef4444", true),
+            B("Pivô", Panels.Tri20, Art.Shards, W, "#7c3aed", "#facc15", true),
             B("Salão Clássica", Panels.Classic32, Art.Pentagons, "#facc15", "#111827", "#111827", true),
-            B("Quadra Pro", Panels.Propeller6, Art.Swoosh, "#ffffff", "#dc2626", "#1d4ed8", true),
-            B("Ginásio Neon", Panels.Curved8, Art.Gradient, "#f0fdf4", "#16a34a", "#f97316", true),
-            B("Salão Azul", Panels.Propeller6, Art.Comet, "#eff6ff", "#1e40af", "#facc15", true),
-            B("Taco de Madeira", Panels.Leather18, Art.Plain, "#fff7ed", "#c2410c", "#0f172a", true),
-            B("Pivô", Panels.Tri20, Art.Shards, "#ffffff", "#7c3aed", "#facc15", true),
-            B("Ala Rápida", Panels.Curved8, Art.Waves, "#fef08a", "#0f766e", "#ef4444", true),
+            B("Futsal Max", Panels.Curved8, Art.Band, "#fde047", "#1d4ed8", "#ffffff", true),
+            B("Salão Azul", Panels.Propeller6, Art.Arcs, "#1e40af", "#facc15", "#ffffff", true),
+            B("Taco de Madeira", Panels.Leather18, Art.Plain, "#fff7ed", "#fed7aa", "#0f172a", true),
         };
 
         static readonly Dictionary<long, Texture2D> _cache = new Dictionary<long, Texture2D>();
@@ -89,10 +94,20 @@ namespace Craquez
             i = ((i % All.Length) + All.Length) % All.Length;
             long key = i * 100000L + w;
             if (_cache.TryGetValue(key, out var t) && t != null) return t;
+            t = new Texture2D(w, w / 2, TextureFormat.RGBA32, true) { wrapMode = TextureWrapMode.Repeat, anisoLevel = 8 };
+            t.SetPixels32(Pixels(i, w));
+            t.Apply(true, true);
+            _cache[key] = t;
+            return t;
+        }
+
+        /// <summary>Pixels da textura (só C#, sem a engine: também usado pela prévia em PNG do CI).</summary>
+        public static Color32[] Pixels(int i, int w)
+        {
+            i = ((i % All.Length) + All.Length) % All.Length;
             var b = All[i];
             int h = w / 2;
             float px = Mathf.PI * 2f / w;   // largura angular de um pixel (para suavizar as bordas)
-            t = new Texture2D(w, h, TextureFormat.RGBA32, true) { wrapMode = TextureWrapMode.Repeat, anisoLevel = 8 };
             var buf = new Color32[w * h];
             for (int y = 0; y < h; y++)
             {
@@ -108,10 +123,7 @@ namespace Craquez
                     buf[y * w + x] = c;
                 }
             }
-            t.SetPixels32(buf);
-            t.Apply(true, true);
-            _cache[key] = t;
-            return t;
+            return buf;
         }
 
         // ------------------------------------------------------------ geometria dos gomos
@@ -208,11 +220,17 @@ namespace Craquez
             }
         }
 
+        /// <summary>smoothstep que aceita bordas invertidas (e0 &gt; e1 = 1 antes, 0 depois).</summary>
         static float Smooth(float e0, float e1, float x)
         {
-            float t = Mathf.Clamp01((x - e0) / Mathf.Max(1e-6f, e1 - e0));
+            float d = e1 - e0;
+            if (Mathf.Abs(d) < 1e-6f) return x < e0 ? 0f : 1f;
+            float t = Mathf.Clamp01((x - e0) / d);
             return t * t * (3f - 2f * t);
         }
+
+        /// <summary>Faixa suave: 1 dentro de |x| &lt; half, com borda de largura aa.</summary>
+        static float Band(float x, float half, float aa) => Smooth(half + aa, half - aa, Mathf.Abs(x));
 
         /// <summary>Rotação em torno do eixo y por um ângulo (para torcer os gomos em hélice).</summary>
         static Vector3 Twist(Vector3 p, float k)
@@ -222,8 +240,8 @@ namespace Craquez
             return new Vector3(p.x * c - p.z * s, p.y, p.x * s + p.z * c);
         }
 
-        /// <summary>Gomo do ponto: índice, "distância" até a costura (≈ radianos) e se é um pentágono (bola clássica).</summary>
-        static int Panel(Ball b, Vector3 p, out float seam, out bool pent)
+        /// <summary>Gomo do ponto: índice, "distância" até a costura (≈ radianos), centro do gomo e se é um pentágono (bola clássica).</summary>
+        static int Panel(Ball b, Vector3 p, out float seam, out bool pent, out Vector3 center)
         {
             pent = false;
             int idx; float near, sec;
@@ -233,21 +251,25 @@ namespace Craquez
                     Voronoi(p, Ball32, out idx, out near, out sec);
                     pent = idx < 12;
                     seam = (near - sec) * 1.6f;
+                    center = Ball32[idx];
                     return idx;
                 case Panels.Propeller6:
                     // 6 gomos de cubo com bordas em "S" (cata-vento simétrico, como as bolas modernas)
                     idx = Saddle(p, Cube, CubeU, CubeV, 0.6f, out seam);
+                    center = Cube[idx];
                     return idx;
                 case Panels.Curved8:
                     idx = Saddle(p, Octa, OctaU, OctaV, 0.45f, out seam);
                     seam *= 1.2f;
+                    center = Octa[idx];
                     return idx;
                 case Panels.TwoPiece:
                 {
-                    // curva de bola de tênis: y = 0,45 sen(2 lon)
+                    // curva de bola de tênis
                     float lon = Mathf.Atan2(p.z, p.x);
                     float f = p.y - 0.42f * Mathf.Sin(2f * lon) * Mathf.Sqrt(Mathf.Max(0f, 1f - p.y * p.y));
                     seam = Mathf.Abs(f);
+                    center = f > 0 ? Vector3.up : Vector3.down;
                     return f > 0 ? 0 : 1;
                 }
                 case Panels.Leather18:
@@ -255,26 +277,40 @@ namespace Craquez
                     // 6 faces de cubo, cada uma com 3 tiras (bola de couro antiga)
                     Voronoi(p, Cube, out idx, out near, out sec);
                     var n = Cube[idx];
+                    center = n;
                     var u = Mathf.Abs(n.y) > 0.5f ? (idx % 4 == 2 ? Vector3.right : Vector3.forward) : Vector3.up;
                     if (idx >= 4) u = Vector3.right;
                     float s = Vector3.Dot(p, u) / Mathf.Max(0.3f, near);
                     float strip = (s + 1f) * 1.5f;
                     int k = Mathf.Clamp(Mathf.FloorToInt(strip), 0, 2);
                     float inStrip = Mathf.Abs(strip - Mathf.Round(strip)) * 0.4f;
-                    seam = Mathf.Min((near - sec) * 1.1f, inStrip < 0.05f && strip > 0.3f && strip < 2.7f ? inStrip : 9f);
+                    seam = Mathf.Min((near - sec) * 1.1f, strip > 0.3f && strip < 2.7f ? inStrip : 9f);
                     return idx * 3 + k;
                 }
                 default: // Tri20: triângulos do icosaedro
                     Voronoi(p, Dode, out idx, out near, out sec);
                     seam = (near - sec) * 1.4f;
+                    center = Dode[idx];
                     return idx;
             }
         }
 
+        /// <summary>Cantos dos gomos (onde 3+ gomos se encontram), para os desenhos de canto.</summary>
+        static Vector3[] Corners(Panels p) => p == Panels.Propeller6 ? Octa : p == Panels.Curved8 ? Cube : p == Panels.Tri20 ? Ico : Dode;
+
+        static readonly Vector3[] RibbonN =
+        {
+            new Vector3(0.2f, 1f, 0.15f).normalized, new Vector3(1f, -0.35f, 0.5f).normalized, new Vector3(-0.45f, 0.3f, 1f).normalized,
+        };
+
         static Color Shade(Ball b, Vector3 p, float aa)
         {
-            int idx = Panel(b, p, out float seam, out bool pent);
+            int idx = Panel(b, p, out float seam, out bool pent, out var center);
             float lon = Mathf.Atan2(p.z, p.x);
+            // coordenadas locais no gomo (plano tangente ao centro)
+            var e1 = Vector3.Cross(center, Mathf.Abs(center.y) < 0.9f ? Vector3.up : Vector3.right).normalized;
+            var e2 = Vector3.Cross(center, e1);
+            float lx = Vector3.Dot(p, e1), ly = Vector3.Dot(p, e2);
             Color c = b.a;
             switch (b.art)
             {
@@ -284,28 +320,31 @@ namespace Craquez
                 case Art.Triads:
                 {
                     // formas curvas ligando os pentágonos (estilo anos 2000)
-                    Voronoi(p, Ico, out int ii, out float n, out float s2);
-                    float ring = Mathf.Abs(n - 0.86f);
-                    float ang = Mathf.Atan2(Vector3.Dot(p, Vector3.Cross(Ico[ii], Vector3.up).normalized), Vector3.Dot(p, Vector3.up));
-                    float m = Smooth(0.05f + aa, 0.05f - aa, ring) * (0.6f + 0.4f * Mathf.Abs(Mathf.Sin(ang * 1.5f)));
+                    Voronoi(p, Ico, out int ii, out float n, out _);
+                    float ring = Mathf.Abs(n - 0.875f);
+                    var t1 = Vector3.Cross(Ico[ii], Mathf.Abs(Ico[ii].y) < 0.9f ? Vector3.up : Vector3.right).normalized;
+                    float ang = Mathf.Atan2(Vector3.Dot(p, Vector3.Cross(Ico[ii], t1)), Vector3.Dot(p, t1));
+                    float m = Band(ring, 0.028f * (0.55f + 0.45f * Mathf.Abs(Mathf.Sin(ang * 1.5f))), aa);
                     c = Color.Lerp(c, b.b, m);
-                    c = Color.Lerp(c, b.c, Smooth(0.965f - aa, 0.965f + aa, n));
+                    c = Color.Lerp(c, b.c, Smooth(0.968f - aa, 0.968f + aa, n));
                     break;
                 }
                 case Art.Swoosh:
                 {
-                    // pinceladas largas que atravessam os gomos
-                    float f = Mathf.Sin(lon * 2f + p.y * 3.2f + Gfx.VNoise(p.x * 3 + 7, p.z * 3 + p.y * 2 + 7, 32, 3) * 1.6f);
-                    c = Color.Lerp(c, b.b, Smooth(0.72f - aa * 3, 0.72f + aa * 3, f));
-                    float g = Mathf.Sin(lon * 2f + p.y * 3.2f + 0.6f);
-                    c = Color.Lerp(c, b.c, Smooth(0.93f - aa * 3, 0.93f + aa * 3, g));
+                    // pinceladas largas que atravessam os gomos, com borda irregular de pincel
+                    float wob = Gfx.VNoise(p.x * 3 + 7, p.z * 3 + p.y * 2 + 7, 32, 3) * 1.2f + Gfx.VNoise(p.x * 30 + 2, p.y * 30 + p.z * 25, 64, 8) * 0.12f;
+                    float f = Mathf.Sin(lon * 2f + p.y * 3.2f + wob);
+                    c = Color.Lerp(c, b.b, Smooth(0.78f - aa * 4, 0.78f + aa * 4, f));
+                    float g = Mathf.Sin(lon * 2f + p.y * 3.2f + wob + 0.75f);
+                    c = Color.Lerp(c, b.c, Smooth(0.95f - aa * 4, 0.95f + aa * 4, g));
                     break;
                 }
                 case Art.Stripes:
                 {
-                    float f = Mathf.Abs(Mathf.Sin(lon * 3f + p.y * 2f));
-                    c = Color.Lerp(c, b.b, Smooth(0.86f - aa * 3, 0.86f + aa * 3, f));
-                    c = Color.Lerp(c, b.c, Smooth(0.3f + aa * 3, 0.3f - aa * 3, f) * Smooth(0.15f, 0.17f, f));
+                    // duas faixas finas paralelas em cada gomo de hélice
+                    float d = lx * 0.8f + ly * 0.6f;
+                    c = Color.Lerp(c, b.b, Band(d - 0.12f, 0.06f, aa));
+                    c = Color.Lerp(c, b.c, Band(d + 0.06f, 0.03f, aa));
                     break;
                 }
                 case Art.Comet:
@@ -313,22 +352,18 @@ namespace Craquez
                     // cometas em espiral com cauda em degradê
                     float a = lon + p.y * 4.5f;
                     float s = Mathf.Repeat(a / (Mathf.PI * 2f / 3f), 1f);
-                    float body = Smooth(0.18f, 0.0f, Mathf.Abs(s - 0.5f) - 0.0f);
-                    c = Color.Lerp(c, b.b, body * Smooth(0.75f, 0.1f, Mathf.Abs(p.y)));
-                    c = Color.Lerp(c, b.c, Smooth(0.03f + aa * 2, 0.03f - aa * 2, Mathf.Abs(s - 0.62f)));
+                    float body = Smooth(0.2f, 0.02f, Mathf.Abs(s - 0.5f)) * Smooth(0.85f, 0.35f, Mathf.Abs(p.y));
+                    c = Color.Lerp(c, b.b, body);
+                    c = Color.Lerp(c, b.c, Band(s - 0.66f, 0.022f, aa * 0.6f) * Smooth(0.9f, 0.5f, Mathf.Abs(p.y)));
                     break;
                 }
                 case Art.Stars:
                     if (pent)
                     {
-                        Voronoi(p, Ico, out int si, out float sn, out _);
-                        var local = p - Ico[si] * sn;
-                        var e1 = Vector3.Cross(Ico[si], Mathf.Abs(Ico[si].y) > 0.9f ? Vector3.right : Vector3.up).normalized;
-                        var e2 = Vector3.Cross(Ico[si], e1);
-                        float ang = Mathf.Atan2(Vector3.Dot(local, e2), Vector3.Dot(local, e1));
-                        float r = local.magnitude;
-                        float lim = 0.13f * (0.55f + 0.45f * Mathf.Cos(ang * 5f));
-                        c = Color.Lerp(c, si % 2 == 0 ? b.b : b.c, Smooth(lim + aa, lim - aa, r));
+                        float ang = Mathf.Atan2(ly, lx);
+                        float r = Mathf.Sqrt(lx * lx + ly * ly);
+                        float lim = 0.15f * (0.5f + 0.5f * Mathf.Cos(ang * 5f));
+                        c = Color.Lerp(c, idx % 2 == 0 ? b.b : b.c, Smooth(lim + aa * 1.5f, lim - aa * 1.5f, r));
                     }
                     break;
                 case Art.Gradient:
@@ -340,9 +375,9 @@ namespace Craquez
                 }
                 case Art.Waves:
                 {
-                    float w = Mathf.Sin(p.y * 9f + Mathf.Sin(lon * 3f) * 1.8f);
-                    c = Color.Lerp(c, b.b, Smooth(0.45f - aa * 4, 0.45f + aa * 4, w));
-                    c = Color.Lerp(c, b.c, Smooth(-0.86f + aa * 4, -0.86f - aa * 4, w));
+                    float w = Mathf.Sin(p.y * 7f + Mathf.Sin(lon * 3f) * 1.6f);
+                    c = Color.Lerp(c, b.b, Band(w - 0.75f, 0.25f, aa * 6));
+                    c = Color.Lerp(c, b.c, Band(w + 0.2f, 0.12f, aa * 6));
                     break;
                 }
                 case Art.Splash:
@@ -352,15 +387,11 @@ namespace Craquez
                     c = Color.Lerp(c, b.c, Smooth(0.34f, 0.31f, n));
                     break;
                 }
-                case Art.Hex:
-                    if (!pent && idx % 3 == 0) c = b.b;
-                    else if (pent) c = b.c;
-                    break;
                 case Art.Band:
                 {
-                    float band = Mathf.Abs(p.y - 0.15f * Mathf.Sin(lon * 3f));
-                    c = Color.Lerp(c, b.b, Smooth(0.3f + aa, 0.3f - aa, band));
-                    c = Color.Lerp(c, b.c, Smooth(0.05f + aa, 0.05f - aa, Mathf.Abs(band - 0.36f)));
+                    float band = p.y - 0.15f * Mathf.Sin(lon * 3f);
+                    c = Color.Lerp(c, b.b, Band(band, 0.28f, aa));
+                    c = Color.Lerp(c, b.c, Band(Mathf.Abs(band) - 0.34f, 0.025f, aa));
                     break;
                 }
                 case Art.Laces:
@@ -372,24 +403,91 @@ namespace Craquez
                 }
                 case Art.Halves:
                     c = idx == 0 ? b.a : b.b;
+                    c = Color.Lerp(c, b.c, Band(seam - 0.05f, 0.012f, aa));
                     break;
                 case Art.Shards:
                     c = idx % 3 == 0 ? b.b : idx % 3 == 1 ? b.a : b.c;
                     break;
+                case Art.Corners:
+                {
+                    // triângulos curvos girando em volta de cada canto onde os gomos se encontram
+                    var cs = Corners(b.panels);
+                    Voronoi(p, cs, out int ci, out float cn, out _);
+                    var cc = cs[ci];
+                    var t1 = Vector3.Cross(cc, Mathf.Abs(cc.y) < 0.9f ? Vector3.up : Vector3.right).normalized;
+                    var t2 = Vector3.Cross(cc, t1);
+                    float ang = Mathf.Atan2(Vector3.Dot(p, t2), Vector3.Dot(p, t1));
+                    float r = Mathf.Acos(Mathf.Clamp(cn, -1f, 1f));
+                    float lim = 0.3f + 0.09f * Mathf.Cos(3f * ang + r * 6f);
+                    c = Color.Lerp(c, b.b, Smooth(lim + aa * 1.5f, lim - aa * 1.5f, r));
+                    c = Color.Lerp(c, b.c, Band(r - lim - 0.05f, 0.014f, aa));
+                    break;
+                }
+                case Art.Arcs:
+                {
+                    // um arco largo em cada gomo + filete
+                    float d = Mathf.Sqrt((lx - 0.5f) * (lx - 0.5f) + ly * ly) - 0.5f;
+                    c = Color.Lerp(c, b.b, Band(d, 0.06f, aa));
+                    c = Color.Lerp(c, b.c, Band(d - 0.1f, 0.014f, aa));
+                    break;
+                }
+                case Art.Ribbons:
+                    for (int k = 0; k < RibbonN.Length; k++)
+                    {
+                        float d = Vector3.Dot(p, RibbonN[k]);
+                        c = Color.Lerp(c, b.b, Band(d, 0.032f, aa));
+                        c = Color.Lerp(c, b.c, Band(Mathf.Abs(d) - 0.062f, 0.008f, aa * 0.8f));
+                    }
+                    break;
+                case Art.Outline:
+                    // contorno colorido por dentro de cada gomo (na clássica, só nos pentágonos)
+                    if (b.panels != Panels.Classic32 || pent)
+                    {
+                        c = Color.Lerp(c, b.b, Band(seam - 0.055f, 0.018f, aa));
+                        if (b.panels == Panels.Tri20) c = Color.Lerp(c, b.c, Smooth(0.3f - aa, 0.3f + aa, seam));
+                        else if (pent && b.b != b.c) c = Color.Lerp(c, b.c, Smooth(0.2f - aa, 0.2f + aa, seam));
+                    }
+                    break;
+                case Art.Dots:
+                {
+                    // retícula de pontos em degradê (cheia embaixo, some em cima)
+                    float g = Smooth(0.55f, -0.75f, p.y + 0.2f * Mathf.Sin(lon * 2f));
+                    var q = p * 15f;
+                    var f = new Vector3(q.x - Mathf.Round(q.x), q.y - Mathf.Round(q.y), q.z - Mathf.Round(q.z));
+                    float r = f.magnitude, lim = 0.5f * g;
+                    float a = aa * 15f * 1.2f;
+                    c = Color.Lerp(c, idx % 2 == 0 ? b.b : b.c, Smooth(lim + a, lim - a, r) * Smooth(0.03f, 0.1f, g));
+                    break;
+                }
+                case Art.Zigzag:
+                {
+                    // faixa em zigue-zague em volta da bola, com filete
+                    float tw = Mathf.Abs(Mathf.Repeat(lon / (Mathf.PI * 2f) * 7f, 1f) * 2f - 1f) * 2f - 1f;
+                    float d = p.y - 0.16f * tw;
+                    c = Color.Lerp(c, b.b, Band(d, 0.075f, aa * 1.5f));
+                    c = Color.Lerp(c, b.c, Band(Mathf.Abs(d) - 0.12f, 0.018f, aa * 1.5f));
+                    break;
+                }
+                case Art.Spiral:
+                {
+                    float f = Mathf.Repeat((lon + p.y * 5f) / (Mathf.PI * 2f) * 4f, 1f);
+                    c = Color.Lerp(c, b.b, Band(f - 0.5f, 0.05f, aa * 2f) * Smooth(0.98f, 0.8f, Mathf.Abs(p.y)));
+                    c = Color.Lerp(c, b.c, Band(f - 0.66f, 0.012f, aa * 2f) * Smooth(0.98f, 0.8f, Mathf.Abs(p.y)));
+                    break;
+                }
                 default:
                     if (b.panels == Panels.Leather18) c = Color.Lerp(b.a, b.b, Gfx.VNoise(p.x * 9 + 20, p.y * 9 + p.z * 7 + 20, 64, 2) * 0.45f + (idx % 3) * 0.08f);
                     break;
             }
-            // relevo do gomo: escurece perto da costura (o gomo é estofado), costura fina e escura
-            float puff = Mathf.Lerp(0.8f, 1f, Smooth(0f, 0.09f, seam));
+            // gomo estofado: escurece suavemente em direção à costura; costura em sulco fino e escuro
+            float puff = Mathf.Lerp(0.8f, 1f, Smooth(0f, 0.11f, seam));
             c *= puff;
-            float line = Smooth(0.006f + aa * 0.7f, 0.006f - aa * 0.3f, seam);
-            if (b.panels == Panels.TwoPiece) c = Color.Lerp(c, b.c, Smooth(0.045f + aa, 0.045f - aa, seam));
-            c = Color.Lerp(c, new Color(0.08f, 0.08f, 0.09f), line * 0.75f);
-            // textura fina do material (micro-relevo de PU) e leve brilho
+            float lum = b.a.r * 0.3f + b.a.g * 0.59f + b.a.b * 0.11f;
+            var seamCol = lum > 0.45f ? new Color(0.36f, 0.37f, 0.4f) : new Color(0.02f, 0.02f, 0.03f);
+            c = Color.Lerp(c, seamCol, Smooth(0.007f + aa, 0.007f - aa * 0.5f, seam) * 0.85f);
+            // textura fina do material (micro-relevo do PU)
             float grain = (Gfx.VNoise(p.x * 160 + 3, p.y * 160 + p.z * 140 + 3, 256, 11) - 0.5f) * 0.05f;
-            c = new Color(c.r * (1f + grain), c.g * (1f + grain), c.b * (1f + grain), 1f);
-            return c;
+            return new Color(c.r * (1f + grain), c.g * (1f + grain), c.b * (1f + grain), 1f);
         }
 
         static Mesh _mesh;

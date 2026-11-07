@@ -55,10 +55,16 @@ namespace Craquez
             set { PlayerPrefs.SetInt("vibration", value ? 1 : 0); PlayerPrefs.Save(); }
         }
 
+        /// <summary>Câmera da partida (lista da 2.1; a escolha da 2.0 é convertida na primeira leitura).</summary>
         public static int Camera
         {
-            get => PlayerPrefs.GetInt("camera", 0);
-            set { PlayerPrefs.SetInt("camera", value); PlayerPrefs.Save(); }
+            get
+            {
+                if (!PlayerPrefs.HasKey("camera_v2") && PlayerPrefs.HasKey("camera"))
+                    PlayerPrefs.SetInt("camera_v2", BroadcastCamera.FromOld(PlayerPrefs.GetInt("camera", 0)));
+                return PlayerPrefs.GetInt("camera_v2", 0);
+            }
+            set { PlayerPrefs.SetInt("camera_v2", value); PlayerPrefs.Save(); }
         }
 
         /// <summary>-2 (aberto) .. +2 (perto).</summary>
@@ -108,7 +114,7 @@ namespace Craquez
         public static string[] QualityNames => Application.isMobilePlatform ? _qualityMobile : _qualityPc;
 
         // ---- salvar / cancelar (tela de opções) ----
-        static readonly string[] IntKeys = { "quality", "vibration", "camera", "camera_zoom", "quick_restarts", "gfx_scale", "gfx_fps", "gfx_vsync", "gfx_aa", "gfx_shadows", "gfx_tex", "gfx_display", "gfx_res", "music" };
+        static readonly string[] IntKeys = { "quality", "vibration", "camera_v2", "camera_zoom", "quick_restarts", "gfx_scale", "gfx_fps", "gfx_vsync", "gfx_aa", "gfx_shadows", "gfx_tex", "gfx_display", "gfx_res", "music" };
         static readonly string[] FloatKeys = { "volume", "music_volume" };
 
         /// <summary>Foto das preferências ao abrir as opções (para o "Cancelar").</summary>

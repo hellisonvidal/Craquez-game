@@ -31,7 +31,13 @@ namespace Craquez.UI
             return f != null ? f : Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
         }
 
-        static Sprite _round, _roundSmall, _circle, _soft;
+        static Sprite _round, _roundSmall, _circle, _soft, _button, _panel, _fade;
+        /// <summary>Botão: arredondado com leve degradê vertical e filete claro no topo.</summary>
+        public static Sprite ButtonSprite => _button ??= MakeRound(64, 16, true, 0.78f, 0.12f);
+        /// <summary>Painel: arredondado com borda clara fina (vidro escuro).</summary>
+        public static Sprite PanelSprite => _panel ??= MakeRound(64, 20, true, 0.9f, 0f, 0.16f);
+        /// <summary>Degradê vertical de transparência (opaco embaixo) para escurecer a base de imagens.</summary>
+        public static Sprite Fade => _fade ??= MakeFade();
         /// <summary>Retângulo arredondado (9-slice).</summary>
         public static Sprite Round => _round ??= MakeRound(64, 18);
         public static Sprite RoundSmall => _roundSmall ??= MakeRound(32, 8);
@@ -39,7 +45,8 @@ namespace Craquez.UI
         /// <summary>Círculo com borda suave (brilhos, sombras).</summary>
         public static Sprite Soft => _soft ??= MakeSoft(128);
 
-        static Sprite MakeRound(int size, int radius, bool slice = true)
+        /// <param name="bottom">brilho embaixo (1 = sem degradê)</param><param name="topLine">filete claro no topo</param><param name="border">borda clara</param>
+        static Sprite MakeRound(int size, int radius, bool slice = true, float bottom = 1f, float topLine = 0f, float border = 0f)
         {
             var t = new Texture2D(size, size, TextureFormat.RGBA32, false) { wrapMode = TextureWrapMode.Clamp };
             var px = new Color32[size * size];
@@ -50,12 +57,34 @@ namespace Craquez.UI
                     float cy = Mathf.Clamp(y + 0.5f, radius, size - radius);
                     float d = Vector2.Distance(new Vector2(x + 0.5f, y + 0.5f), new Vector2(cx, cy));
                     float a = Mathf.Clamp01(radius - d + 0.5f);
-                    px[y * size + x] = new Color32(255, 255, 255, (byte)(a * 255));
+                    // (o 9-slice estica o miolo: o degradê fica nas bordas de cima/baixo, suave no meio)
+                    float v = (y + 0.5f) / size;
+                    float lum = Mathf.Lerp(bottom, 1f, v);
+                    float edge = radius - d;   // distância até a borda (px)
+                    if (topLine > 0f && y >= size - 3 && edge > 1f) lum = Mathf.Min(1f, lum + topLine);
+                    if (border > 0f && edge < 2.5f) lum = Mathf.Min(1f, lum + border);
+                    byte l = (byte)(Mathf.Clamp01(lum) * 255);
+                    px[y * size + x] = new Color32(l, l, l, (byte)(a * 255));
                 }
             t.SetPixels32(px);
             t.Apply();
             var b = slice ? new Vector4(radius, radius, radius, radius) : Vector4.zero;
             return Sprite.Create(t, new Rect(0, 0, size, size), new Vector2(0.5f, 0.5f), 100, 0, SpriteMeshType.FullRect, b);
+        }
+
+        static Sprite MakeFade()
+        {
+            var t = new Texture2D(4, 64, TextureFormat.RGBA32, false) { wrapMode = TextureWrapMode.Clamp };
+            var px = new Color32[4 * 64];
+            for (int y = 0; y < 64; y++)
+            {
+                float a = 1f - y / 63f;
+                a = a * a * (3f - 2f * a);
+                for (int x = 0; x < 4; x++) px[y * 4 + x] = new Color32(255, 255, 255, (byte)(a * 255));
+            }
+            t.SetPixels32(px);
+            t.Apply();
+            return Sprite.Create(t, new Rect(0, 0, 4, 64), new Vector2(0.5f, 0.5f));
         }
 
         static Sprite MakeSoft(int size)
@@ -145,7 +174,7 @@ namespace Craquez.UI
             return img;
         }
 
-        public static Image Panel(Transform parent, Color? c = null) => Image(parent, c ?? Theme.Panel, Theme.Round, "panel");
+        public static Image Panel(Transform parent, Color? c = null) => Image(parent, c ?? Theme.Panel, Theme.PanelSprite, "panel");
 
         public static Text Label(Transform parent, string text, int size = 32, Font font = null, Color? color = null, TextAnchor align = TextAnchor.MiddleLeft)
         {
@@ -186,7 +215,7 @@ namespace Craquez.UI
         /// <summary>Botão com texto; muda a cor do texto ao ser selecionado.</summary>
         public static Button Button(Transform parent, string text, Action onClick, int size = 34, Color? bg = null)
         {
-            var img = Image(parent, Color.white, Theme.Round, "btn:" + text);
+            var img = Image(parent, Color.white, Theme.ButtonSprite, "btn:" + text);
             var b = img.gameObject.AddComponent<Button>();
             b.targetGraphic = img;
             b.colors = Colors(bg ?? Theme.PanelLight);
@@ -199,7 +228,7 @@ namespace Craquez.UI
 
         public static Cycler Cycler(Transform parent, string caption, IList<string> options, int index, Action<int> onChange)
         {
-            var img = Image(parent, Color.white, Theme.Round, "cycler:" + caption);
+            var img = Image(parent, Color.white, Theme.ButtonSprite, "cycler:" + caption);
             var c = img.gameObject.AddComponent<Cycler>();
             c.targetGraphic = img;
             c.colors = Colors(Theme.PanelLight);
