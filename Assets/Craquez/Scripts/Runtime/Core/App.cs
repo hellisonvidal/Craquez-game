@@ -529,8 +529,7 @@ namespace Craquez
                 tl.rectTransform.Place(0, 0, 1, 1);
                 // nome e descrição sobre a base da ilustração
                 var stripe = UiKit.Image(body.transform, accent, null, "faixa").rectTransform;
-                stripe.Place(0, 0.24f, 0, 0.24f, 26, 106, 0, -114);
-                stripe.sizeDelta = new Vector2(54, 8);
+                stripe.At(0, 0.24f, 54, 8, 28, 104);
                 stripe.localRotation = Quaternion.Euler(0, 0, 8f);
                 var tt = UiKit.Label(body.transform, title, 62, Theme.HeadItalic, Color.white);
                 tt.rectTransform.Place(0, 0.24f, 1, 0.24f, 24, 20, 12, -100);
