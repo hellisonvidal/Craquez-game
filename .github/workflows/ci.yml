@@ -167,11 +167,12 @@ jobs:
           path: shots
           retention-days: 14
 
-  # versão: ao enviar uma tag v*, publica uma Release com o APK, o .exe (zip + instalador) e o Linux
+  # versão: com "[publicar]" na mensagem do commit (ou uma tag v*), cria a tag v<versão do projeto>
+  # e publica a Release com o APK, o .exe (zip + instalador) e o Linux
   release:
     name: Publicar versão
     needs: [build]
-    if: startsWith(github.ref, 'refs/tags/v')
+    if: startsWith(github.ref, 'refs/tags/v') || (github.event_name == 'push' && contains(github.event.head_commit.message, '[publicar]'))
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -183,8 +184,18 @@ jobs:
         with:
           sparse-checkout: docs
           path: src
+      - uses: actions/checkout@v4
+        with:
+          sparse-checkout: ProjectSettings
+          path: ver
       - name: Preparar arquivos
+        id: ver
         run: |
+          V=$(grep -m1 "bundleVersion:" ver/ProjectSettings/ProjectSettings.asset | awk '{print $2}')
+          TAG="v$V"
+          [ "${GITHUB_REF_TYPE}" = "tag" ] && TAG="${GITHUB_REF_NAME}"
+          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
+          GITHUB_REF_NAME="$TAG"
           mkdir -p out && cp src/docs/RELEASE_NOTES.md out/NOTAS.md
           ls -R art | head -50
           mkdir -p out
@@ -195,7 +206,9 @@ jobs:
           ls -la out
       - uses: softprops/action-gh-release@v2
         with:
-          name: Craquez ${{ github.ref_name }}
+          tag_name: ${{ steps.ver.outputs.tag }}
+          target_commitish: ${{ github.sha }}
+          name: Craquez ${{ steps.ver.outputs.tag }}
           body_path: ${{ github.workspace }}/out/NOTAS.md
           files: |
             out/*.apk
