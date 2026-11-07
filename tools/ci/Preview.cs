@@ -53,6 +53,7 @@ public static class P {
       Png(Path.Combine(dir, "torcida.png"), bg, 1024, 256);
       return;
     }
+    if (a.Length > 1 && a[1] == "config") { Png(Path.Combine(dir, "config.png"), Craquez.UI.MenuArt.SettingsPixels(512, 560), 512, 560); return; }
     if (a.Length > 1 && a[1] == "trofeus") {
       int cs = 200, nn = Craquez.Sim.Competitions.All.Length, cols3 = 5, rows3 = (nn + cols3 - 1) / cols3;
       var sh = new Color32[cs * cols3 * cs * rows3];

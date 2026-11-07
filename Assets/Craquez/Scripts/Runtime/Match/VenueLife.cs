@@ -322,8 +322,8 @@ namespace Craquez
 
         void BuildBirds(Venue v, System.Random rng, int n, float hl, float hw, float perchY, bool onWall)
         {
-            var bodyMat = Gfx.Lit(new Color(0.55f, 0.56f, 0.62f), null, 0.15f);
-            var wingMat = Gfx.Lit(new Color(0.42f, 0.44f, 0.5f), null, 0.15f);
+            var bodyMat = Gfx.Lit(new Color(0.36f, 0.37f, 0.42f), null, 0f);   // foscos e escuros (claros, viravam pontos brilhando no ar)
+            var wingMat = Gfx.Lit(new Color(0.28f, 0.29f, 0.34f), null, 0f);
             var bodyMesh = new MeshKit();
             bodyMesh.Box(new Vector3(0, 0.12f, 0), new Vector3(0.12f, 0.12f, 0.24f));
             bodyMesh.Box(new Vector3(0, 0.21f, 0.11f), new Vector3(0.08f, 0.08f, 0.08f));
@@ -379,9 +379,10 @@ namespace Craquez
                         if (scared)
                         {
                             b.state = 1;
-                            var away = b.pos - ball; away.y = 0;
+                            // foge para fora do campo (nunca por cima do jogo), baixo e logo some de vista
+                            var away = new Vector3(b.pos.x, 0, b.pos.z);
                             if (away.sqrMagnitude < 0.01f) away = Vector3.forward;
-                            b.vel = away.normalized * Random.Range(3f, 5f) + Vector3.up * Random.Range(3.5f, 5f) + Random.insideUnitSphere;
+                            b.vel = away.normalized * Random.Range(4f, 6f) + Vector3.up * Random.Range(2f, 3f);
                             b.timer = Random.Range(6f, 12f);
                             Sfx.Flutter();
                         }
@@ -398,7 +399,7 @@ namespace Craquez
                         b.timer -= dt;
                         if (b.state == 1)
                         {
-                            b.vel += (Vector3.up * 0.6f - b.vel * 0.15f) * dt;
+                            b.vel += (Vector3.up * 0.2f - b.vel * 0.1f) * dt;
                             if (b.timer <= 0f) b.state = 2;
                         }
                         else

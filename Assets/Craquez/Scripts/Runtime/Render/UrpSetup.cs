@@ -83,9 +83,9 @@ namespace Craquez
             if (prof.TryGet<Bloom>(out var b))
             {
                 b.intensity.Override(bloom);
-                b.threshold.Override(night ? 0.95f : 1.1f);
+                b.threshold.Override(night ? 1.15f : 1.35f);   // só o que é luz de verdade (refletores, LED) brilha
                 b.scatter.Override(0.65f);
-                b.clamp.Override(6f);   // limita o brilho de um pixel só (sem "pontos de luz" estourados)
+                b.clamp.Override(4f);   // limita o brilho de um pixel só (sem "pontos de luz" estourados)
                 b.highQualityFiltering.Override(!Application.isMobilePlatform);
             }
             // cel shading: tonemapping neutro (o ACES lava as cores chapadas) e cor mais viva

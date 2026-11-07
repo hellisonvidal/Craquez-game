@@ -1074,12 +1074,31 @@ namespace Craquez
             float mx = hl + 25f, mz = hw + 25f;
             k.Quad(new Vector3(-mx, 0, -mz), new Vector3(-mx, 0, mz), new Vector3(mx, 0, mz), new Vector3(mx, 0, -mz), new Vector2(0, 0), new Vector2(mx / 3f, mz / 3f));
             k.Object("Chão", ground, v.root, false);
-            // linhas pintadas (gastas)
+            // quadra pintada no chão (piso de quadra poliesportiva gasto), com áreas e marcas
+            if (!sand && !grassy)
+            {
+                Color[] courtC = { new Color(0.16f, 0.4f, 0.55f), new Color(0.55f, 0.22f, 0.2f), new Color(0.2f, 0.45f, 0.3f), new Color(0.32f, 0.34f, 0.5f) };
+                var court = new MeshKit();
+                court.Quad(new Vector3(-hl, 0.004f, -hw), new Vector3(-hl, 0.004f, hw), new Vector3(hl, 0.004f, hw), new Vector3(hl, 0.004f, -hw), new Vector2(0, 0), new Vector2(hl / 3f, hw / 3f));
+                court.Object("Quadra pintada", Gfx.LitN(courtC[variant % courtC.Length], Gfx.Asphalt(256, Color.white, variant + 300, 0.35f), Gfx.AsphaltNormal, 0.15f, 0.6f), v.root, false);
+            }
             var lines = new MeshKit();
-            lines.Strip(new Vector3(-hl, 0, -hw), new Vector3(hl, 0, -hw), 0.1f);
-            lines.Strip(new Vector3(-hl, 0, hw), new Vector3(hl, 0, hw), 0.1f);
-            lines.Strip(new Vector3(0, 0, -hw), new Vector3(0, 0, hw), 0.1f);
-            lines.Arc(Vector3.zero, sim.mode.centerR, 0.1f, 0, Mathf.PI * 2, 40);
+            float lw = 0.08f;
+            lines.Strip(new Vector3(-hl, 0, -hw), new Vector3(hl, 0, -hw), lw);
+            lines.Strip(new Vector3(-hl, 0, hw), new Vector3(hl, 0, hw), lw);
+            lines.Strip(new Vector3(-hl, 0, -hw), new Vector3(-hl, 0, hw), lw);
+            lines.Strip(new Vector3(hl, 0, -hw), new Vector3(hl, 0, hw), lw);
+            lines.Strip(new Vector3(0, 0, -hw), new Vector3(0, 0, hw), lw);
+            lines.Arc(Vector3.zero, sim.mode.centerR, lw, 0, Mathf.PI * 2, 40);
+            lines.Disc(Vector3.zero, 0.14f, 10);
+            // áreas em meia-lua e marca do pênalti (como numa quadra de verdade)
+            float areaR = Mathf.Min(3f, hw * 0.45f);
+            foreach (float sx in new[] { -1f, 1f })
+            {
+                var gc0 = new Vector3(sx * hl, 0, 0);
+                lines.Arc(gc0, areaR, lw, sx > 0 ? Mathf.PI * 0.5f : -Mathf.PI * 0.5f, sx > 0 ? Mathf.PI * 1.5f : Mathf.PI * 0.5f, 24);
+                lines.Disc(new Vector3(sx * (hl - areaR - 1f), 0, 0), 0.12f, 10);
+            }
             if (variant == 10)
             {
                 // estacionamento: vagas pintadas em volta da "quadra"
@@ -1089,21 +1108,54 @@ namespace Craquez
                     lines.Strip(new Vector3(i * 2.6f, 0, -hw - 6f), new Vector3(i * 2.6f, 0, -hw - 1.2f), 0.12f);
                 }
             }
-            lines.Object("Pintura", Gfx.Lit(dirt ? new Color(0.92f, 0.88f, 0.8f) : variant == 10 ? new Color(0.95f, 0.85f, 0.25f) : new Color(0.9f, 0.88f, 0.75f), null, 0.05f), v.root, false);
+            lines.Object("Pintura", Gfx.Lit(dirt ? new Color(0.92f, 0.88f, 0.8f) : variant == 10 ? new Color(0.95f, 0.85f, 0.25f) : new Color(0.92f, 0.9f, 0.82f), null, 0.05f), v.root, false);
             Goals(v, sim, hl, true);
-            // muretas (a bola bate e volta) e cenário
-            var wallC = new[] { new Color(0.75f, 0.4f, 0.3f), new Color(0.85f, 0.75f, 0.55f), new Color(0.4f, 0.55f, 0.75f), new Color(0.7f, 0.7f, 0.72f) };
-            // mureta grafitada (cores do bairro por cima do reboco)
-            var wall = Gfx.Lit(Color.Lerp(wallC[variant % 4], Color.white, 0.55f), StreetProps.Graffiti(variant * 31 + 5), 0.1f);
-            var w = new MeshKit();
-            bool cage = variant == 4 || variant == 9;   // alambrado (gaiola alta / quadra do conjunto)
-            float wh = variant == 4 ? 4.5f : variant == 9 ? 3f : variant == 8 ? 3.2f : variant == 11 ? 0.5f : 1.0f, t = 0.25f;
-            w.Box(new Vector3(0, wh / 2, hw + t / 2 + 0.05f), new Vector3(hl * 2 + 0.6f, wh, t), 2f);
-            w.Box(new Vector3(0, wh / 2, -hw - t / 2 - 0.05f), new Vector3(hl * 2 + 0.6f, wh, t), 2f);
-            // (sem mureta nas linhas de fundo: atrás dos gols fica aberto)
-            v.wallH = cage ? 9f : wh;
+            // laterais: placas de publicidade (comércio do bairro, marcas fictícias) — a bola bate e volta
+            string[] ads = { "BAR DO ZÉ", "AÇAÍ DA VILA", "OFICINA 10", "PADARIA PÃO QUENTE", "ACADEMIA FORÇA", "MERCADINHO BOM PREÇO", "GÁS RÁPIDO", "BARBEARIA DO TOM", "LANCHE 24H", "CRAQUEZ" };
+            Color[] adC = { new Color(0.85f, 0.15f, 0.15f), new Color(0.45f, 0.15f, 0.55f), new Color(0.1f, 0.3f, 0.65f), new Color(0.95f, 0.75f, 0.2f), new Color(0.1f, 0.1f, 0.12f),
+                            new Color(0.1f, 0.55f, 0.25f), new Color(0.95f, 0.45f, 0.1f), new Color(0.15f, 0.15f, 0.2f), new Color(0.9f, 0.85f, 0.75f), new Color(0.05f, 0.45f, 0.85f) };
+            var adTex = AdBoards(ads, adC, variant);
+            var boardMat = Gfx.Lit(Color.white, adTex, 0.25f);
+            var boards = new MeshKit();
+            var backs = new MeshKit();
+            float boardH = 1.0f, bt = 0.12f, zb = hw + 0.12f, len = hl * 2f + 0.6f;
+            float uLen = len / (ads.Length * 4.2f);   // cada placa com ~4 m
+            foreach (float sz in new[] { -1f, 1f })
+            {
+                float z = sz * zb;
+                var a0 = new Vector3(-len / 2, 0, z);
+                var a1 = new Vector3(len / 2, 0, z);
+                float off = sz > 0 ? 0f : 0.37f;
+                // face virada para o campo
+                if (sz > 0) boards.Quad(a0, a0 + Vector3.up * boardH, a1 + Vector3.up * boardH, a1, new Vector2(off, 0), new Vector2(off + uLen, 1));
+                else boards.Quad(a1, a1 + Vector3.up * boardH, a0 + Vector3.up * boardH, a0, new Vector2(off, 0), new Vector2(off + uLen, 1));
+                backs.Box(new Vector3(0, boardH / 2, z + sz * bt / 2), new Vector3(len, boardH, bt));
+                for (float x = -len / 2; x <= len / 2 + 0.01f; x += 4.2f) backs.Box(new Vector3(x, boardH / 2, z + sz * (bt + 0.04f)), new Vector3(0.08f, boardH, 0.08f));
+            }
+            boards.Object("Placas de publicidade", boardMat, v.root, false);
+            backs.Object("Estrutura das placas", Gfx.Lit(new Color(0.22f, 0.23f, 0.26f), null, 0.4f, 0.5f), v.root, true);
+            bool cage = variant == 4 || variant == 9;   // gaiola alta / quadra do conjunto: tela acima das placas
+            float wh = variant == 4 ? 4.5f : variant == 9 ? 3f : 1.0f;
+            if (cage)
+            {
+                var net = new MeshKit();
+                foreach (float sz in new[] { -1f, 1f })
+                {
+                    float z = sz * (zb + 0.2f);
+                    net.Quad(new Vector3(-len / 2, boardH, z), new Vector3(-len / 2, wh, z), new Vector3(len / 2, wh, z), new Vector3(len / 2, boardH, z), new Vector2(0, 0), new Vector2(len / 1.2f, (wh - boardH) / 1.2f));
+                }
+                net.Object("Alambrado", Gfx.Cutout(new Color(0.6f, 0.62f, 0.65f), Gfx.Net(128, 10, 1.2f), 0.4f), v.root, false);
+            }
+            if (variant == 8)
+            {
+                // beco: o muro grafitado alto continua atrás das placas
+                var wall = Gfx.Lit(new Color(0.85f, 0.8f, 0.75f), StreetProps.Graffiti(variant * 31 + 5), 0.1f);
+                var bw = new MeshKit();
+                bw.Box(new Vector3(0, 1.6f, hw + 0.9f), new Vector3(len, 3.2f, 0.25f), 2f);
+                bw.Object("Muro grafitado", wall, v.root, true);
+            }
+            v.wallH = 9f;   // ninguém senta nas placas
             v.noDog = variant == 3 || variant == 5;   // terraço e telhado: sem cachorro
-            w.Object("Mureta", cage ? Gfx.Cutout(new Color(0.6f, 0.62f, 0.65f), Gfx.Net(128, 10, 1.2f), 0.4f) : wall, v.root, !cage);
             // prédios / casas ao redor
             var bmat = new[]
             {
@@ -1208,6 +1260,44 @@ namespace Craquez
             v.tunnel = new Vector3(0, 0, -(hw + 2f));
             v.standDist = 2f;
             return v;
+        }
+
+        /// <summary>
+        /// Lona das placas de publicidade da rua: anúncios fictícios do comércio do bairro, cada um
+        /// com fundo, faixa de cor e texto ajustado à largura; bordas e um pouco de desgaste.
+        /// </summary>
+        static Texture2D AdBoards(string[] texts, Color[] colors, int seed)
+        {
+            int W = 2048, H = 96;
+            var t = Gfx.Tex(W, H, true, TextureWrapMode.Repeat);
+            var px = new Color32[W * H];
+            int seg = W / texts.Length;
+            for (int i = 0; i < texts.Length; i++)
+            {
+                var bg = colors[i % colors.Length];
+                var fg = bg.grayscale > 0.55f ? new Color(0.08f, 0.08f, 0.12f) : Color.white;
+                var stripe = Color.Lerp(bg, fg, 0.35f);
+                int hText = Mathf.Max(14, Mathf.Min(H - 34, (seg - 24) * 7 / Mathf.Max(1, texts[i].Length * 6)));
+                var g = Glyphs.Render(texts[i], hText);
+                int gw = g.GetLength(0), gh = g.GetLength(1);
+                int gx0 = i * seg + (seg - gw) / 2, gy0 = (H - gh) / 2 + 4;
+                for (int y = 0; y < H; y++)
+                    for (int x = 0; x < seg; x++)
+                    {
+                        int X = i * seg + x;
+                        int lx = X - gx0, ly = y - gy0;
+                        bool on = lx >= 0 && ly >= 0 && lx < gw && ly < gh && g[lx, ly];
+                        Color c = on ? fg : (y < 14 ? stripe : bg);
+                        if (x < 3 || x > seg - 4 || y < 3 || y > H - 4) c = new Color(0.9f, 0.9f, 0.9f);   // borda da lona
+                        float n = Gfx.VNoise(X / 7f, y / 7f, W / 7, seed + 11) * 0.12f;   // desgaste
+                        c *= 0.92f + n;
+                        c.a = 1f;
+                        px[y * W + X] = c;
+                    }
+            }
+            t.SetPixels32(px);
+            t.Apply(true);
+            return t;
         }
 
         static Texture2D Windows(System.Random rng, bool night)

@@ -60,6 +60,7 @@ namespace Craquez
             content.anchorMin = new Vector2(0, 1);
             content.anchorMax = new Vector2(1, 1);
             content.pivot = new Vector2(0.5f, 1);
+            content.sizeDelta = new Vector2(0f, content.sizeDelta.y);   // mesma largura da área visível (antes sobravam 100 px, cortando o texto)
             UiKit.VList(content, spacing, 0, false);
             content.gameObject.AddComponent<ContentSizeFitter>().verticalFit = ContentSizeFitter.FitMode.PreferredSize;
             scroll.viewport = view;
@@ -341,6 +342,7 @@ namespace Craquez
             shelf.anchorMin = new Vector2(0, 1);
             shelf.anchorMax = new Vector2(1, 1);
             shelf.pivot = new Vector2(0.5f, 1);
+            shelf.sizeDelta = new Vector2(0f, shelf.sizeDelta.y);
             shelf.gameObject.AddComponent<ContentSizeFitter>().verticalFit = ContentSizeFitter.FitMode.PreferredSize;
             scroll.viewport = view;
             scroll.content = shelf;

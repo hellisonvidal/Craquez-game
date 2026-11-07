@@ -49,13 +49,13 @@ namespace Craquez
             sh.position = new Vector3(0, y + (field ? 6f : 3f), 0);
             sh.boxThickness = new Vector3(0.05f, 1f, 0.05f);   // só a "casca" (onde fica a torcida)
             var em = _flashes.emission;
-            em.rateOverTime = night ? 18f : 4f;
+            em.rateOverTime = 0f;
             // ola: emissor que percorre o anel soltando "braços" (partículas que sobem e caem)
             _wave = Particles("Ola", Color.white, 0.32f, 0.55f, quality >= 1 ? 2500 : 1200);
             var wm = _wave.main;
             wm.startSpeed = new ParticleSystem.MinMaxCurve(2.5f, 4.5f);
             wm.gravityModifier = 0.9f;
-            wm.startColor = new ParticleSystem.MinMaxGradient(home.c1, Color.Lerp(home.c2, Color.white, 0.4f));
+            wm.startColor = new ParticleSystem.MinMaxGradient(home.c1 * 0.8f, home.c2 * 0.7f);   // (sem branco: não vira ponto de luz)
             var ws = _wave.shape;
             ws.shapeType = ParticleSystemShapeType.Box;
             ws.scale = new Vector3(3f, 0.5f, field ? 12f : 5f);
@@ -159,12 +159,12 @@ namespace Craquez
         {
             switch (what)
             {
-                case "goal": _hype = 1.6f; _flashes.Emit(220); break;
-                case "shot": _hype = Mathf.Max(_hype, 0.6f); _flashes.Emit(40); break;
+                case "goal": _hype = 1.6f; break;
+                case "shot": _hype = Mathf.Max(_hype, 0.6f); break;
                 case "save": _hype = Mathf.Max(_hype, 0.5f); Sfx.Ooh(); break;
                 case "skill": _hype = Mathf.Max(_hype, 0.35f); break;
                 case "foul": _hype = Mathf.Max(_hype, 0.25f); break;
-                case "silence": _hype = 0f; _flashes.Emit(30); break;   // gol do visitante: arquibancada parada
+                case "silence": _hype = 0f; break;   // gol do visitante: arquibancada parada
             }
         }
 
@@ -173,8 +173,9 @@ namespace Craquez
             float dt = Time.deltaTime;
             _t += dt;
             _hype = Mathf.MoveTowards(_hype, 0f, dt * 0.4f);
+            // (sem flashes de câmera: os pontinhos brancos piscando pareciam defeito de imagem)
             var em = _flashes.emission;
-            em.rateOverTime = (_night ? 18f : 4f) + _hype * 60f;
+            em.rateOverTime = 0f;
             // ola: só com a bola no meio-campo, dá uma volta inteira
             if (_waveT < 0f)
             {

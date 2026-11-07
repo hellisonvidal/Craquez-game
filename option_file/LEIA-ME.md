@@ -6,9 +6,10 @@
 |---|---|
 | `ligas` | ligas e a lista de times de cada uma (referência) |
 | `teams` | cada time: `name`, `short`, uniformes (`kits`: cores `#RRGGBB`, `pattern`, mangas, acabamento), estádio (`stadium`: nome, capacidade, porte) e elenco (`players`: nome, número, posição, nacionalidade, geral 30–99, características) |
+| `competicoes` | as 55 competições (torneios, ligas e copas nacionais): `nome` e `descricao` editáveis, troféu (`trofeu` 0–14, `cor_trofeu`, `cor_detalhe`); modalidade, formato, participantes e ligas/continentes de origem como referência |
 | `bolas` | os 37 modelos de bola (campo e futsal): nome e cores |
 | `chuteiras` | os 16 modelos de chuteira: nome e cores (base, detalhe, sola, travas) |
-| `locais` | nomes dos estádios, ginásios de futsal, campos de society e ruas |
+| `locais` | nomes dos 15 estádios, ginásios de futsal, campos de society e ruas |
 
 ## Como usar
 

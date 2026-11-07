@@ -152,6 +152,8 @@ namespace Craquez
         {
             // Android: ao voltar de outro app as barras do sistema reaparecem
             if (focus && Application.isMobilePlatform && !Screen.fullScreen && ShotTour.Dir == null) GoFullscreen();
+            // voltou das configurações do Android (acesso aos arquivos): redesenha os lugares
+            if (focus && _browsing) ShowBrowse(null);
         }
 
         void Update()
@@ -200,6 +202,7 @@ namespace Craquez
         /// </summary>
         RectTransform Page(string crumb = null)
         {
+            _browsing = false;
             Sfx.MenuMusic(true);
             ClearCover();
             UiKit.Clear(_root);
@@ -555,6 +558,8 @@ namespace Craquez
         }
 
         /// <summary>Menu principal: Jogar, Competições, Mural de Troféus e Configurações.</summary>
+        static Texture2D _settingsArt;
+
         void ShowModes()
         {
             StopAttract();
@@ -569,7 +574,7 @@ namespace Craquez
             BigCard(grid, "COMPETIÇÕES", Competitions.All.Length + " COMPETIÇÕES", "Ligas, copas e torneios de seleções", TrophyArt.Texture(wc.trophy, wc.c1, wc.c2, 512), 1f, new Color(0.98f, 0.7f, 0.15f), ShowCompetitions);
             var lc = Competitions.All[4];
             BigCard(grid, "MURAL DE TROFÉUS", titles + (titles == 1 ? " TÍTULO" : " TÍTULOS"), "As suas conquistas", TrophyArt.Texture(lc.trophy, lc.c1, lc.c2, 512, titles == 0), 1f, new Color(0.85f, 0.55f, 0.2f), ShowTrophyWall);
-            BigCard(grid, "CONFIGURAÇÕES", "OPÇÕES", "Som, câmera, gráficos e option file", ModeArt(MenuArt.Kind.Futsal), 512f / 560f, new Color(0.35f, 0.5f, 0.9f), ShowOptions);
+            BigCard(grid, "CONFIGURAÇÕES", "OPÇÕES", "Som, câmera, gráficos e option file", _settingsArt ??= MenuArt.SettingsArt(), 512f / 560f, new Color(0.35f, 0.5f, 0.9f), ShowOptions);
             UiKit.Select(play);
         }
 
@@ -1016,6 +1021,7 @@ namespace Craquez
             content.anchorMin = new Vector2(0, 1);
             content.anchorMax = new Vector2(1, 1);
             content.pivot = new Vector2(0.5f, 1);
+            content.sizeDelta = new Vector2(0f, content.sizeDelta.y);   // mesma largura da área visível (antes sobravam 100 px, cortando o texto)
             UiKit.VList(content, 6, 0, false);
             content.gameObject.AddComponent<ContentSizeFitter>().verticalFit = ContentSizeFitter.FitMode.PreferredSize;
             scroll.viewport = view;
@@ -1100,6 +1106,7 @@ namespace Craquez
         void ShowBrowse(string dir)
         {
             var root = Page("OPÇÕES  ›  OPTION FILE");
+            _browsing = dir == null;
             _back = () => { if (dir == null) ShowOptions(); else ShowBrowse(Parent(dir)); };
             Title(root, "CARREGAR OPTION FILE", dir ?? "Escolha onde procurar o arquivo .json");
             var listBg = UiKit.Panel(root).rectTransform.Place(0, 0, 1, 1, 90, 200, 90, 250);
@@ -1110,6 +1117,7 @@ namespace Craquez
             content.anchorMin = new Vector2(0, 1);
             content.anchorMax = new Vector2(1, 1);
             content.pivot = new Vector2(0.5f, 1);
+            content.sizeDelta = new Vector2(0f, content.sizeDelta.y);   // mesma largura da área visível (antes sobravam 100 px, cortando o texto)
             UiKit.VList(content, 6, 0, false);
             content.gameObject.AddComponent<ContentSizeFitter>().verticalFit = ContentSizeFitter.FitMode.PreferredSize;
             scroll.viewport = view;
@@ -1134,6 +1142,8 @@ namespace Craquez
             }
             if (dir == null)
             {
+                if (!AndroidFilesAllowed())
+                    Row("<color=#f5c518>!</color>  <b>Permitir acesso aos arquivos</b>   <color=#8fa3bf>necessário para achar o .json em Downloads, Documentos...</color>", new Color(0.55f, 0.38f, 0.06f), () => { AndroidAskFiles(); });
                 foreach (var (n, p) in BrowseRoots()) { string pp = p; Row("<color=#f5c518>›</color>  " + n + "   <color=#8fa3bf>" + p + "</color>", Theme.PanelLight, () => ShowBrowse(pp)); }
                 if (PlayerPrefs.GetString(OptionKey, "") != "")
                     Row("↺  Voltar ao option file padrão", new Color(0.4f, 0.16f, 0.18f), () =>
@@ -1180,6 +1190,57 @@ namespace Craquez
             foreach (var t in content.GetComponentsInChildren<Text>()) t.supportRichText = true;
             UiKit.Select(first);
         }
+
+        /// <summary>Android 11+: "acesso a todos os arquivos"; antes disso, a permissão de leitura.</summary>
+        static bool AndroidFilesAllowed()
+        {
+#if UNITY_ANDROID && !UNITY_EDITOR
+            try
+            {
+                using (var ver = new AndroidJavaClass("android.os.Build$VERSION"))
+                {
+                    if (ver.GetStatic<int>("SDK_INT") >= 30)
+                        using (var env = new AndroidJavaClass("android.os.Environment")) return env.CallStatic<bool>("isExternalStorageManager");
+                }
+                return UnityEngine.Android.Permission.HasUserAuthorizedPermission(UnityEngine.Android.Permission.ExternalStorageRead);
+            }
+            catch { return true; }
+#else
+            return true;
+#endif
+        }
+
+        static void AndroidAskFiles()
+        {
+#if UNITY_ANDROID && !UNITY_EDITOR
+            try
+            {
+                int sdk;
+                using (var ver = new AndroidJavaClass("android.os.Build$VERSION")) sdk = ver.GetStatic<int>("SDK_INT");
+                if (sdk < 30) { UnityEngine.Android.Permission.RequestUserPermission(UnityEngine.Android.Permission.ExternalStorageRead); return; }
+                using (var player = new AndroidJavaClass("com.unity3d.player.UnityPlayer"))
+                using (var activity = player.GetStatic<AndroidJavaObject>("currentActivity"))
+                using (var uriClass = new AndroidJavaClass("android.net.Uri"))
+                {
+                    AndroidJavaObject intent;
+                    try
+                    {
+                        var uri = uriClass.CallStatic<AndroidJavaObject>("parse", "package:" + Application.identifier);
+                        intent = new AndroidJavaObject("android.content.Intent", "android.settings.MANAGE_APP_ALL_FILES_ACCESS_PERMISSION", uri);
+                        activity.Call("startActivity", intent);
+                    }
+                    catch
+                    {
+                        intent = new AndroidJavaObject("android.content.Intent", "android.settings.MANAGE_ALL_FILES_ACCESS_PERMISSION");
+                        activity.Call("startActivity", intent);
+                    }
+                }
+            }
+            catch (System.Exception e) { Debug.LogWarning("permissão de arquivos: " + e.Message); }
+#endif
+        }
+
+        bool _browsing;
 
         static string Parent(string dir)
         {
@@ -1246,8 +1307,8 @@ namespace Craquez
             // coluna 1: jogo e som
             UiKit.Panel(root).rectTransform.Place(0, 0, 0.48f, 1, 74, 178, 0, 262);
             UiKit.Panel(root).rectTransform.Place(0.5f, 0, 1, 1, 0, 178, 74, 262);
-            var list = UiKit.Rect(root, "geral").Place(0, 0, 0.48f, 1, 90, 190, 16, 274);
-            UiKit.VList(list, 6, 0, false);
+            // colunas com rolagem: em qualquer tela todas as opções ficam ao alcance
+            var list = Scroll(UiKit.Rect(root, "geral").Place(0, 0, 0.48f, 1, 76, 180, 2, 264), 6f);
             UiKit.Label(list, "JOGO", 26, Theme.Head, Theme.Accent).gameObject.AddComponent<LayoutElement>().minHeight = 34;
             var vols = new List<string>();
             for (int i = 0; i <= 10; i++) vols.Add(i * 10 + "%");
@@ -1277,8 +1338,7 @@ namespace Craquez
                 St();
             }, 26, new Color(0.4f, 0.12f, 0.15f)), 50, 50);
             // coluna 2: gráficos (no PC, tudo ajustável; no celular, o essencial)
-            var gfx = UiKit.Rect(root, "gráficos").Place(0.5f, 0, 1, 1, 16, 190, 90, 274);
-            UiKit.VList(gfx, 6, 0, false);
+            var gfx = Scroll(UiKit.Rect(root, "gráficos").Place(0.5f, 0, 1, 1, 2, 180, 76, 264), 6f);
             UiKit.Label(gfx, "GRÁFICOS", 26, Theme.Head, Theme.Accent).gameObject.AddComponent<LayoutElement>().minHeight = 34;
             UiKit.Size(UiKit.Cycler(gfx, "Predefinição", Settings.QualityNames, Mathf.Min(Settings.Quality, Settings.QualityNames.Length - 1), i => { Settings.Quality = i; Apply(); }), 50, 50);
             if (!Application.isMobilePlatform)

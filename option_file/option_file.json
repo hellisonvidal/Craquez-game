@@ -114989,6 +114989,952 @@
       ]
     }
   },
+  "competicoes": [
+    {
+      "id": "copa_mundo",
+      "nome": "Copa do Mundo Craquez",
+      "descricao": "As 16 melhores seleções: grupos e mata-mata",
+      "grupo": "Torneios",
+      "modalidade": "Campo",
+      "selecoes": true,
+      "formato": "grupos e mata-mata",
+      "participantes": 16,
+      "ligas": [],
+      "continentes": [],
+      "trofeu": 0,
+      "cor_trofeu": "#fac740",
+      "cor_detalhe": "#1a8c4c"
+    },
+    {
+      "id": "copa_america",
+      "nome": "Copa das Américas",
+      "descricao": "Seleções das Américas: 2 grupos e semifinais",
+      "grupo": "Torneios",
+      "modalidade": "Campo",
+      "selecoes": true,
+      "formato": "grupos e mata-mata",
+      "participantes": 8,
+      "ligas": [],
+      "continentes": [
+        "América do Sul",
+        "América do Norte e Central"
+      ],
+      "trofeu": 1,
+      "cor_trofeu": "#dbe0eb",
+      "cor_detalhe": "#2659bf"
+    },
+    {
+      "id": "eurocopa",
+      "nome": "Eurocopa Craquez",
+      "descricao": "16 seleções europeias: grupos e mata-mata",
+      "grupo": "Torneios",
+      "modalidade": "Campo",
+      "selecoes": true,
+      "formato": "grupos e mata-mata",
+      "participantes": 16,
+      "ligas": [],
+      "continentes": [
+        "Europa"
+      ],
+      "trofeu": 2,
+      "cor_trofeu": "#dbe0eb",
+      "cor_detalhe": "#1a338c"
+    },
+    {
+      "id": "afro_asiatica",
+      "nome": "Copa Afro-Asiática",
+      "descricao": "Seleções da África, Ásia e Oceania em mata-mata",
+      "grupo": "Torneios",
+      "modalidade": "Campo",
+      "selecoes": true,
+      "formato": "mata-mata",
+      "participantes": 8,
+      "ligas": [],
+      "continentes": [
+        "África",
+        "Ásia e Oceania"
+      ],
+      "trofeu": 3,
+      "cor_trofeu": "#fac740",
+      "cor_detalhe": "#bf331f"
+    },
+    {
+      "id": "liga_campeoes",
+      "nome": "Liga dos Campeões Craquez",
+      "descricao": "Os 16 maiores clubes da Europa",
+      "grupo": "Torneios",
+      "modalidade": "Campo",
+      "selecoes": false,
+      "formato": "grupos e mata-mata",
+      "participantes": 16,
+      "ligas": [
+        "ita",
+        "eng",
+        "esp",
+        "fra",
+        "ned",
+        "por",
+        "rus",
+        "ukr"
+      ],
+      "continentes": [],
+      "trofeu": 4,
+      "cor_trofeu": "#dbe0eb",
+      "cor_detalhe": "#141a59"
+    },
+    {
+      "id": "libertadores",
+      "nome": "Copa Libertadores Craquez",
+      "descricao": "Os 16 maiores clubes da América do Sul",
+      "grupo": "Torneios",
+      "modalidade": "Campo",
+      "selecoes": false,
+      "formato": "grupos e mata-mata",
+      "participantes": 16,
+      "ligas": [
+        "bra",
+        "arg",
+        "uru",
+        "per",
+        "chi",
+        "ecu"
+      ],
+      "continentes": [],
+      "trofeu": 5,
+      "cor_trofeu": "#dbe0eb",
+      "cor_detalhe": "#d9b233"
+    },
+    {
+      "id": "brasileirao",
+      "nome": "Brasileirão Craquez",
+      "descricao": "Série A em pontos corridos (turno único)",
+      "grupo": "Torneios",
+      "modalidade": "Campo",
+      "selecoes": false,
+      "formato": "pontos corridos",
+      "participantes": 20,
+      "ligas": [
+        "bra"
+      ],
+      "continentes": [],
+      "trofeu": 6,
+      "cor_trofeu": "#fac740",
+      "cor_detalhe": "#0d8c40"
+    },
+    {
+      "id": "copa_brasil",
+      "nome": "Copa do Brasil Craquez",
+      "descricao": "16 clubes das Séries A e B no mata-mata",
+      "grupo": "Torneios",
+      "modalidade": "Campo",
+      "selecoes": false,
+      "formato": "mata-mata",
+      "participantes": 16,
+      "ligas": [
+        "bra",
+        "brb"
+      ],
+      "continentes": [],
+      "trofeu": 7,
+      "cor_trofeu": "#fac740",
+      "cor_detalhe": "#1a4cb2"
+    },
+    {
+      "id": "sul_americana",
+      "nome": "Copa Sul-Americana Craquez",
+      "descricao": "16 clubes de Argentina, Uruguai, Peru, Chile e Equador",
+      "grupo": "Torneios",
+      "modalidade": "Campo",
+      "selecoes": false,
+      "formato": "mata-mata",
+      "participantes": 16,
+      "ligas": [
+        "arg",
+        "uru",
+        "per",
+        "chi",
+        "ecu"
+      ],
+      "continentes": [],
+      "trofeu": 8,
+      "cor_trofeu": "#dbe0eb",
+      "cor_detalhe": "#1a7359"
+    },
+    {
+      "id": "mundial_clubes",
+      "nome": "Mundial de Clubes Craquez",
+      "descricao": "Os 8 melhores clubes do mundo",
+      "grupo": "Torneios",
+      "modalidade": "Campo",
+      "selecoes": false,
+      "formato": "mata-mata",
+      "participantes": 8,
+      "ligas": [],
+      "continentes": [],
+      "trofeu": 9,
+      "cor_trofeu": "#fac740",
+      "cor_detalhe": "#d91f26"
+    },
+    {
+      "id": "supercopa",
+      "nome": "Supercopa dos Gigantes",
+      "descricao": "Os 4 clubes mais fortes: semifinal e final",
+      "grupo": "Torneios",
+      "modalidade": "Campo",
+      "selecoes": false,
+      "formato": "mata-mata",
+      "participantes": 4,
+      "ligas": [],
+      "continentes": [],
+      "trofeu": 10,
+      "cor_trofeu": "#d1854c",
+      "cor_detalhe": "#1f1f24"
+    },
+    {
+      "id": "mundial_futsal",
+      "nome": "Copa do Mundo de Futsal",
+      "descricao": "8 seleções de futsal: grupos e mata-mata",
+      "grupo": "Torneios",
+      "modalidade": "Futsal",
+      "selecoes": true,
+      "formato": "grupos e mata-mata",
+      "participantes": 8,
+      "ligas": [],
+      "continentes": [],
+      "trofeu": 11,
+      "cor_trofeu": "#fac740",
+      "cor_detalhe": "#f2731a"
+    },
+    {
+      "id": "liga_futsal",
+      "nome": "Liga Nacional de Futsal Craquez",
+      "descricao": "Pontos corridos com os 16 clubes",
+      "grupo": "Torneios",
+      "modalidade": "Futsal",
+      "selecoes": false,
+      "formato": "pontos corridos",
+      "participantes": 16,
+      "ligas": [
+        "fbr"
+      ],
+      "continentes": [],
+      "trofeu": 12,
+      "cor_trofeu": "#dbe0eb",
+      "cor_detalhe": "#e63340"
+    },
+    {
+      "id": "copa_society",
+      "nome": "Copa Society Craquez",
+      "descricao": "8 clubes no society, mata-mata",
+      "grupo": "Torneios",
+      "modalidade": "Society",
+      "selecoes": false,
+      "formato": "mata-mata",
+      "participantes": 8,
+      "ligas": [
+        "bra"
+      ],
+      "continentes": [],
+      "trofeu": 13,
+      "cor_trofeu": "#d1854c",
+      "cor_detalhe": "#33a64c"
+    },
+    {
+      "id": "torneio_rua",
+      "nome": "Torneio de Rua Craquez",
+      "descricao": "8 times na rua, mata-mata",
+      "grupo": "Torneios",
+      "modalidade": "Rua",
+      "selecoes": false,
+      "formato": "mata-mata",
+      "participantes": 8,
+      "ligas": [],
+      "continentes": [],
+      "trofeu": 14,
+      "cor_trofeu": "#dbe0eb",
+      "cor_detalhe": "#f2bf1a"
+    },
+    {
+      "id": "liga_esp",
+      "nome": "La Liga",
+      "descricao": "Campeonato em pontos corridos com os 20 times",
+      "grupo": "Ligas",
+      "modalidade": "Campo",
+      "selecoes": false,
+      "formato": "pontos corridos",
+      "participantes": 20,
+      "ligas": [
+        "esp"
+      ],
+      "continentes": [],
+      "trofeu": 3,
+      "cor_trofeu": "#fac740",
+      "cor_detalhe": "#bf1f26"
+    },
+    {
+      "id": "liga_arg",
+      "nome": "Liga Argentina",
+      "descricao": "Campeonato em pontos corridos com os 30 times",
+      "grupo": "Ligas",
+      "modalidade": "Campo",
+      "selecoes": false,
+      "formato": "pontos corridos",
+      "participantes": 30,
+      "ligas": [
+        "arg"
+      ],
+      "continentes": [],
+      "trofeu": 10,
+      "cor_trofeu": "#dbe0eb",
+      "cor_detalhe": "#1a4cb2"
+    },
+    {
+      "id": "liga_chi",
+      "nome": "Liga Chilena",
+      "descricao": "Campeonato em pontos corridos com os 16 times",
+      "grupo": "Ligas",
+      "modalidade": "Campo",
+      "selecoes": false,
+      "formato": "pontos corridos",
+      "participantes": 16,
+      "ligas": [
+        "chi"
+      ],
+      "continentes": [],
+      "trofeu": 2,
+      "cor_trofeu": "#fac740",
+      "cor_detalhe": "#1a8c4c"
+    },
+    {
+      "id": "liga_fes",
+      "nome": "Liga de Futsal (ESP)",
+      "descricao": "Campeonato em pontos corridos com os 16 times",
+      "grupo": "Ligas de futsal",
+      "modalidade": "Futsal",
+      "selecoes": false,
+      "formato": "pontos corridos",
+      "participantes": 16,
+      "ligas": [
+        "fes"
+      ],
+      "continentes": [],
+      "trofeu": 9,
+      "cor_trofeu": "#dbe0eb",
+      "cor_detalhe": "#8c33a6"
+    },
+    {
+      "id": "liga_fpt",
+      "nome": "Liga de Futsal (POR)",
+      "descricao": "Campeonato em pontos corridos com os 12 times",
+      "grupo": "Ligas de futsal",
+      "modalidade": "Futsal",
+      "selecoes": false,
+      "formato": "pontos corridos",
+      "participantes": 12,
+      "ligas": [
+        "fpt"
+      ],
+      "continentes": [],
+      "trofeu": 1,
+      "cor_trofeu": "#fac740",
+      "cor_detalhe": "#e6801a"
+    },
+    {
+      "id": "liga_ecu",
+      "nome": "Liga Equatoriana",
+      "descricao": "Campeonato em pontos corridos com os 16 times",
+      "grupo": "Ligas",
+      "modalidade": "Campo",
+      "selecoes": false,
+      "formato": "pontos corridos",
+      "participantes": 16,
+      "ligas": [
+        "ecu"
+      ],
+      "continentes": [],
+      "trofeu": 8,
+      "cor_trofeu": "#dbe0eb",
+      "cor_detalhe": "#1a8ca6"
+    },
+    {
+      "id": "liga_ned",
+      "nome": "Liga Holandesa",
+      "descricao": "Campeonato em pontos corridos com os 18 times",
+      "grupo": "Ligas",
+      "modalidade": "Campo",
+      "selecoes": false,
+      "formato": "pontos corridos",
+      "participantes": 18,
+      "ligas": [
+        "ned"
+      ],
+      "continentes": [],
+      "trofeu": 0,
+      "cor_trofeu": "#fac740",
+      "cor_detalhe": "#33333d"
+    },
+    {
+      "id": "liga_per",
+      "nome": "Liga Peruana",
+      "descricao": "Campeonato em pontos corridos com os 18 times",
+      "grupo": "Ligas",
+      "modalidade": "Campo",
+      "selecoes": false,
+      "formato": "pontos corridos",
+      "participantes": 18,
+      "ligas": [
+        "per"
+      ],
+      "continentes": [],
+      "trofeu": 14,
+      "cor_trofeu": "#fac740",
+      "cor_detalhe": "#bf1f26"
+    },
+    {
+      "id": "liga_por",
+      "nome": "Liga Portuguesa",
+      "descricao": "Campeonato em pontos corridos com os 18 times",
+      "grupo": "Ligas",
+      "modalidade": "Campo",
+      "selecoes": false,
+      "formato": "pontos corridos",
+      "participantes": 18,
+      "ligas": [
+        "por"
+      ],
+      "continentes": [],
+      "trofeu": 6,
+      "cor_trofeu": "#dbe0eb",
+      "cor_detalhe": "#1a4cb2"
+    },
+    {
+      "id": "liga_rus",
+      "nome": "Liga Russa",
+      "descricao": "Campeonato em pontos corridos com os 16 times",
+      "grupo": "Ligas",
+      "modalidade": "Campo",
+      "selecoes": false,
+      "formato": "pontos corridos",
+      "participantes": 16,
+      "ligas": [
+        "rus"
+      ],
+      "continentes": [],
+      "trofeu": 13,
+      "cor_trofeu": "#fac740",
+      "cor_detalhe": "#1a8c4c"
+    },
+    {
+      "id": "liga_sau",
+      "nome": "Liga Saudita",
+      "descricao": "Campeonato em pontos corridos com os 18 times",
+      "grupo": "Ligas",
+      "modalidade": "Campo",
+      "selecoes": false,
+      "formato": "pontos corridos",
+      "participantes": 18,
+      "ligas": [
+        "sau"
+      ],
+      "continentes": [],
+      "trofeu": 5,
+      "cor_trofeu": "#dbe0eb",
+      "cor_detalhe": "#8c33a6"
+    },
+    {
+      "id": "liga_ukr",
+      "nome": "Liga Ucraniana",
+      "descricao": "Campeonato em pontos corridos com os 16 times",
+      "grupo": "Ligas",
+      "modalidade": "Campo",
+      "selecoes": false,
+      "formato": "pontos corridos",
+      "participantes": 16,
+      "ligas": [
+        "ukr"
+      ],
+      "continentes": [],
+      "trofeu": 12,
+      "cor_trofeu": "#fac740",
+      "cor_detalhe": "#e6801a"
+    },
+    {
+      "id": "liga_uru",
+      "nome": "Liga Uruguaia",
+      "descricao": "Campeonato em pontos corridos com os 16 times",
+      "grupo": "Ligas",
+      "modalidade": "Campo",
+      "selecoes": false,
+      "formato": "pontos corridos",
+      "participantes": 16,
+      "ligas": [
+        "uru"
+      ],
+      "continentes": [],
+      "trofeu": 4,
+      "cor_trofeu": "#dbe0eb",
+      "cor_detalhe": "#1a8ca6"
+    },
+    {
+      "id": "liga_fra",
+      "nome": "Ligue 1",
+      "descricao": "Campeonato em pontos corridos com os 18 times",
+      "grupo": "Ligas",
+      "modalidade": "Campo",
+      "selecoes": false,
+      "formato": "pontos corridos",
+      "participantes": 18,
+      "ligas": [
+        "fra"
+      ],
+      "continentes": [],
+      "trofeu": 11,
+      "cor_trofeu": "#fac740",
+      "cor_detalhe": "#33333d"
+    },
+    {
+      "id": "liga_mls",
+      "nome": "MLS",
+      "descricao": "Campeonato em pontos corridos com os 30 times",
+      "grupo": "Ligas",
+      "modalidade": "Campo",
+      "selecoes": false,
+      "formato": "pontos corridos",
+      "participantes": 30,
+      "ligas": [
+        "mls"
+      ],
+      "continentes": [],
+      "trofeu": 3,
+      "cor_trofeu": "#dbe0eb",
+      "cor_detalhe": "#d9b226"
+    },
+    {
+      "id": "liga_eng",
+      "nome": "Premier League",
+      "descricao": "Campeonato em pontos corridos com os 20 times",
+      "grupo": "Ligas",
+      "modalidade": "Campo",
+      "selecoes": false,
+      "formato": "pontos corridos",
+      "participantes": 20,
+      "ligas": [
+        "eng"
+      ],
+      "continentes": [],
+      "trofeu": 10,
+      "cor_trofeu": "#fac740",
+      "cor_detalhe": "#bf1f26"
+    },
+    {
+      "id": "liga_far",
+      "nome": "Primera A Futsal (ARG)",
+      "descricao": "Campeonato em pontos corridos com os 12 times",
+      "grupo": "Ligas de futsal",
+      "modalidade": "Futsal",
+      "selecoes": false,
+      "formato": "pontos corridos",
+      "participantes": 12,
+      "ligas": [
+        "far"
+      ],
+      "continentes": [],
+      "trofeu": 2,
+      "cor_trofeu": "#dbe0eb",
+      "cor_detalhe": "#1a4cb2"
+    },
+    {
+      "id": "liga_fit",
+      "nome": "Serie A Futsal (ITA)",
+      "descricao": "Campeonato em pontos corridos com os 14 times",
+      "grupo": "Ligas de futsal",
+      "modalidade": "Futsal",
+      "selecoes": false,
+      "formato": "pontos corridos",
+      "participantes": 14,
+      "ligas": [
+        "fit"
+      ],
+      "continentes": [],
+      "trofeu": 1,
+      "cor_trofeu": "#dbe0eb",
+      "cor_detalhe": "#8c33a6"
+    },
+    {
+      "id": "liga_ita",
+      "nome": "Série A Itália",
+      "descricao": "Campeonato em pontos corridos com os 20 times",
+      "grupo": "Ligas",
+      "modalidade": "Campo",
+      "selecoes": false,
+      "formato": "pontos corridos",
+      "participantes": 20,
+      "ligas": [
+        "ita"
+      ],
+      "continentes": [],
+      "trofeu": 8,
+      "cor_trofeu": "#fac740",
+      "cor_detalhe": "#e6801a"
+    },
+    {
+      "id": "liga_brb",
+      "nome": "Série B Brasil",
+      "descricao": "Campeonato em pontos corridos com os 20 times",
+      "grupo": "Ligas",
+      "modalidade": "Campo",
+      "selecoes": false,
+      "formato": "pontos corridos",
+      "participantes": 20,
+      "ligas": [
+        "brb"
+      ],
+      "continentes": [],
+      "trofeu": 0,
+      "cor_trofeu": "#dbe0eb",
+      "cor_detalhe": "#1a8ca6"
+    },
+    {
+      "id": "copa_es",
+      "nome": "Copa da Espanha",
+      "descricao": "Mata-mata com 16 times do país",
+      "grupo": "Copas nacionais",
+      "modalidade": "Campo",
+      "selecoes": false,
+      "formato": "mata-mata",
+      "participantes": 16,
+      "ligas": [
+        "esp"
+      ],
+      "continentes": [],
+      "trofeu": 6,
+      "cor_trofeu": "#dbe0eb",
+      "cor_detalhe": "#bf1f26"
+    },
+    {
+      "id": "copa_ar",
+      "nome": "Copa da Argentina",
+      "descricao": "Mata-mata com 16 times do país",
+      "grupo": "Copas nacionais",
+      "modalidade": "Campo",
+      "selecoes": false,
+      "formato": "mata-mata",
+      "participantes": 16,
+      "ligas": [
+        "arg"
+      ],
+      "continentes": [],
+      "trofeu": 2,
+      "cor_trofeu": "#fac740",
+      "cor_detalhe": "#1a4cb2"
+    },
+    {
+      "id": "copa_cl",
+      "nome": "Copa do Chile",
+      "descricao": "Mata-mata com 16 times do país",
+      "grupo": "Copas nacionais",
+      "modalidade": "Campo",
+      "selecoes": false,
+      "formato": "mata-mata",
+      "participantes": 16,
+      "ligas": [
+        "chi"
+      ],
+      "continentes": [],
+      "trofeu": 13,
+      "cor_trofeu": "#dbe0eb",
+      "cor_detalhe": "#1a8c4c"
+    },
+    {
+      "id": "copa_fes",
+      "nome": "Copa da Espanha de Futsal",
+      "descricao": "Mata-mata com 16 times do país",
+      "grupo": "Copas de futsal",
+      "modalidade": "Futsal",
+      "selecoes": false,
+      "formato": "mata-mata",
+      "participantes": 16,
+      "ligas": [
+        "fes"
+      ],
+      "continentes": [],
+      "trofeu": 9,
+      "cor_trofeu": "#fac740",
+      "cor_detalhe": "#8c33a6"
+    },
+    {
+      "id": "copa_fpt",
+      "nome": "Taça de Portugal de Futsal",
+      "descricao": "Mata-mata com 8 times do país",
+      "grupo": "Copas de futsal",
+      "modalidade": "Futsal",
+      "selecoes": false,
+      "formato": "mata-mata",
+      "participantes": 8,
+      "ligas": [
+        "fpt"
+      ],
+      "continentes": [],
+      "trofeu": 5,
+      "cor_trofeu": "#dbe0eb",
+      "cor_detalhe": "#e6801a"
+    },
+    {
+      "id": "copa_ec",
+      "nome": "Copa do Equador",
+      "descricao": "Mata-mata com 16 times do país",
+      "grupo": "Copas nacionais",
+      "modalidade": "Campo",
+      "selecoes": false,
+      "formato": "mata-mata",
+      "participantes": 16,
+      "ligas": [
+        "ecu"
+      ],
+      "continentes": [],
+      "trofeu": 1,
+      "cor_trofeu": "#fac740",
+      "cor_detalhe": "#1a8ca6"
+    },
+    {
+      "id": "copa_nl",
+      "nome": "Copa da Holanda",
+      "descricao": "Mata-mata com 16 times do país",
+      "grupo": "Copas nacionais",
+      "modalidade": "Campo",
+      "selecoes": false,
+      "formato": "mata-mata",
+      "participantes": 16,
+      "ligas": [
+        "ned"
+      ],
+      "continentes": [],
+      "trofeu": 12,
+      "cor_trofeu": "#dbe0eb",
+      "cor_detalhe": "#33333d"
+    },
+    {
+      "id": "copa_fbr",
+      "nome": "Copa do Brasil de Futsal",
+      "descricao": "Mata-mata com 16 times do país",
+      "grupo": "Copas de futsal",
+      "modalidade": "Futsal",
+      "selecoes": false,
+      "formato": "mata-mata",
+      "participantes": 16,
+      "ligas": [
+        "fbr"
+      ],
+      "continentes": [],
+      "trofeu": 8,
+      "cor_trofeu": "#fac740",
+      "cor_detalhe": "#d9b226"
+    },
+    {
+      "id": "copa_pe",
+      "nome": "Copa do Peru",
+      "descricao": "Mata-mata com 16 times do país",
+      "grupo": "Copas nacionais",
+      "modalidade": "Campo",
+      "selecoes": false,
+      "formato": "mata-mata",
+      "participantes": 16,
+      "ligas": [
+        "per"
+      ],
+      "continentes": [],
+      "trofeu": 4,
+      "cor_trofeu": "#dbe0eb",
+      "cor_detalhe": "#bf1f26"
+    },
+    {
+      "id": "copa_pt",
+      "nome": "Taça de Portugal",
+      "descricao": "Mata-mata com 16 times do país",
+      "grupo": "Copas nacionais",
+      "modalidade": "Campo",
+      "selecoes": false,
+      "formato": "mata-mata",
+      "participantes": 16,
+      "ligas": [
+        "por"
+      ],
+      "continentes": [],
+      "trofeu": 0,
+      "cor_trofeu": "#fac740",
+      "cor_detalhe": "#1a4cb2"
+    },
+    {
+      "id": "copa_ru",
+      "nome": "Copa da Rússia",
+      "descricao": "Mata-mata com 16 times do país",
+      "grupo": "Copas nacionais",
+      "modalidade": "Campo",
+      "selecoes": false,
+      "formato": "mata-mata",
+      "participantes": 16,
+      "ligas": [
+        "rus"
+      ],
+      "continentes": [],
+      "trofeu": 11,
+      "cor_trofeu": "#dbe0eb",
+      "cor_detalhe": "#1a8c4c"
+    },
+    {
+      "id": "copa_sa",
+      "nome": "Copa da Arábia Saudita",
+      "descricao": "Mata-mata com 16 times do país",
+      "grupo": "Copas nacionais",
+      "modalidade": "Campo",
+      "selecoes": false,
+      "formato": "mata-mata",
+      "participantes": 16,
+      "ligas": [
+        "sau"
+      ],
+      "continentes": [],
+      "trofeu": 7,
+      "cor_trofeu": "#fac740",
+      "cor_detalhe": "#8c33a6"
+    },
+    {
+      "id": "copa_ua",
+      "nome": "Copa da Ucrânia",
+      "descricao": "Mata-mata com 16 times do país",
+      "grupo": "Copas nacionais",
+      "modalidade": "Campo",
+      "selecoes": false,
+      "formato": "mata-mata",
+      "participantes": 16,
+      "ligas": [
+        "ukr"
+      ],
+      "continentes": [],
+      "trofeu": 3,
+      "cor_trofeu": "#dbe0eb",
+      "cor_detalhe": "#e6801a"
+    },
+    {
+      "id": "copa_uy",
+      "nome": "Copa do Uruguai",
+      "descricao": "Mata-mata com 16 times do país",
+      "grupo": "Copas nacionais",
+      "modalidade": "Campo",
+      "selecoes": false,
+      "formato": "mata-mata",
+      "participantes": 16,
+      "ligas": [
+        "uru"
+      ],
+      "continentes": [],
+      "trofeu": 14,
+      "cor_trofeu": "#fac740",
+      "cor_detalhe": "#1a8ca6"
+    },
+    {
+      "id": "copa_fr",
+      "nome": "Copa da França",
+      "descricao": "Mata-mata com 16 times do país",
+      "grupo": "Copas nacionais",
+      "modalidade": "Campo",
+      "selecoes": false,
+      "formato": "mata-mata",
+      "participantes": 16,
+      "ligas": [
+        "fra"
+      ],
+      "continentes": [],
+      "trofeu": 10,
+      "cor_trofeu": "#dbe0eb",
+      "cor_detalhe": "#33333d"
+    },
+    {
+      "id": "copa_us",
+      "nome": "Copa dos Estados Unidos",
+      "descricao": "Mata-mata com 16 times do país",
+      "grupo": "Copas nacionais",
+      "modalidade": "Campo",
+      "selecoes": false,
+      "formato": "mata-mata",
+      "participantes": 16,
+      "ligas": [
+        "mls"
+      ],
+      "continentes": [],
+      "trofeu": 6,
+      "cor_trofeu": "#fac740",
+      "cor_detalhe": "#d9b226"
+    },
+    {
+      "id": "copa_en",
+      "nome": "Copa da Inglaterra",
+      "descricao": "Mata-mata com 16 times do país",
+      "grupo": "Copas nacionais",
+      "modalidade": "Campo",
+      "selecoes": false,
+      "formato": "mata-mata",
+      "participantes": 16,
+      "ligas": [
+        "eng"
+      ],
+      "continentes": [],
+      "trofeu": 2,
+      "cor_trofeu": "#dbe0eb",
+      "cor_detalhe": "#bf1f26"
+    },
+    {
+      "id": "copa_far",
+      "nome": "Copa da Argentina de Futsal",
+      "descricao": "Mata-mata com 8 times do país",
+      "grupo": "Copas de futsal",
+      "modalidade": "Futsal",
+      "selecoes": false,
+      "formato": "mata-mata",
+      "participantes": 8,
+      "ligas": [
+        "far"
+      ],
+      "continentes": [],
+      "trofeu": 13,
+      "cor_trofeu": "#fac740",
+      "cor_detalhe": "#1a4cb2"
+    },
+    {
+      "id": "copa_fit",
+      "nome": "Copa da Itália de Futsal",
+      "descricao": "Mata-mata com 8 times do país",
+      "grupo": "Copas de futsal",
+      "modalidade": "Futsal",
+      "selecoes": false,
+      "formato": "mata-mata",
+      "participantes": 8,
+      "ligas": [
+        "fit"
+      ],
+      "continentes": [],
+      "trofeu": 5,
+      "cor_trofeu": "#fac740",
+      "cor_detalhe": "#8c33a6"
+    },
+    {
+      "id": "copa_it",
+      "nome": "Copa da Itália",
+      "descricao": "Mata-mata com 16 times do país",
+      "grupo": "Copas nacionais",
+      "modalidade": "Campo",
+      "selecoes": false,
+      "formato": "mata-mata",
+      "participantes": 16,
+      "ligas": [
+        "ita"
+      ],
+      "continentes": [],
+      "trofeu": 1,
+      "cor_trofeu": "#dbe0eb",
+      "cor_detalhe": "#e6801a"
+    }
+  ],
   "bolas": [
     {
       "indice": 0,

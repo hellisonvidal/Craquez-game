@@ -364,10 +364,10 @@ namespace Craquez.Sim
             {
                 using (var r = new StreamReader(path))
                 {
-                    var buf = new char[8192];
+                    var buf = new char[65536];
                     int n = r.Read(buf, 0, buf.Length);
                     var head = new string(buf, 0, n);
-                    return head.TrimStart().StartsWith("{") && (head.Contains("craquez-option-file") || head.Contains("\"teams\"") || head.Contains("\"bolas\"") || head.Contains("\"locais\""));
+                    return head.TrimStart().StartsWith("{") && (head.Contains("craquez-option-file") || head.Contains("\"teams\"") || head.Contains("\"bolas\"") || head.Contains("\"locais\"") || head.Contains("\"ligas\"") || head.Contains("\"chuteiras\"") || head.Contains("\"competicoes\""));
                 }
             }
             catch { return false; }

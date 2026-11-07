@@ -13,7 +13,7 @@ namespace Craquez
     {
         static string Hex(Color c) => Teams.Hex(c);
 
-        /// <summary>Seções extras: "bolas", "chuteiras" e "locais".</summary>
+        /// <summary>Seções extras: "competicoes", "bolas", "chuteiras" e "locais".</summary>
         public static Dictionary<string, object> Sections()
         {
             var balls = new List<object>();
@@ -39,8 +39,22 @@ namespace Craquez
             }
             var stadiums = new List<object>();
             foreach (var m in VenueBuilder.StadiumModels) stadiums.Add(m.name);
+            // competições: torneios, ligas e copas nacionais (nome e descrição editáveis)
+            Competitions.Refresh();
+            var comps = new List<object>();
+            foreach (var d in Competitions.All)
+                comps.Add(new Dictionary<string, object>
+                {
+                    ["id"] = d.id, ["nome"] = d.name, ["descricao"] = d.desc, ["grupo"] = d.category,
+                    ["modalidade"] = GameModes.DisplayName(d.mode), ["selecoes"] = d.national,
+                    ["formato"] = d.format == CompFormat.League ? "pontos corridos" : d.format == CompFormat.GroupsKnockout ? "grupos e mata-mata" : "mata-mata",
+                    ["participantes"] = d.size,
+                    ["ligas"] = new List<object>(d.leagues), ["continentes"] = new List<object>(d.continents),
+                    ["trofeu"] = d.trophy, ["cor_trofeu"] = Hex(d.c1), ["cor_detalhe"] = Hex(d.c2),
+                });
             return new Dictionary<string, object>
             {
+                ["competicoes"] = comps,
                 ["bolas"] = balls,
                 ["chuteiras"] = boots,
                 ["locais"] = new Dictionary<string, object>
@@ -83,8 +97,20 @@ namespace Craquez
             System.Array.Copy(_societyDefaults, VenueBuilder.SocietyNames, _societyDefaults.Length);
             System.Array.Copy(_streetDefaults, VenueBuilder.StreetNames, _streetDefaults.Length);
 
+            Competitions.Refresh();   // (nomes originais; o option file muda por cima)
             var doc = Teams.OptionDoc;
             if (doc == null) return;
+            foreach (var o in MiniJson.L(doc, "competicoes") ?? new List<object>())
+            {
+                var d = Competitions.Find(MiniJson.S(o, "id", ""));
+                if (d == null) continue;
+                if (MiniJson.S(o, "nome", "") is string n && n != "") d.name = n;
+                if (MiniJson.S(o, "descricao", "") is string ds && ds != "") d.desc = ds;
+                d.c1 = C(o, "cor_trofeu", d.c1);
+                d.c2 = C(o, "cor_detalhe", d.c2);
+                int tr = MiniJson.I(o, "trofeu", -1);
+                if (tr >= 0) d.trophy = tr;
+            }
             Color C(object o, string k, Color def) => MiniJson.S(o, k, "") is string s && s.Length >= 6 ? Teams.Col(s, def) : def;
             foreach (var o in MiniJson.L(doc, "bolas") ?? new List<object>())
             {

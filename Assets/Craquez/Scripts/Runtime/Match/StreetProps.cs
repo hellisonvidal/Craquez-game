@@ -144,6 +144,20 @@ namespace Craquez
                         for (int j = 0; j < 4; j++) cars[(i + j) % 3].Box(new Vector3(x + 0.8f + j * 1.1f, 2.1f, oz + 2f), new Vector3(0.6f, 0.8f, 0.04f));
                     }
                     break;
+                case 12: // porto: frades de amarração, paletes e boias (nada de árvore no cais)
+                    for (int i = 0; i < 6; i++)
+                    {
+                        var p = new Vector3(-ox - 2.5f, 0, -hw * 0.75f + i * hw * 0.3f);
+                        tires.Cylinder(p, p + Vector3.up * 0.55f, 0.22f, 10);
+                        tires.Cylinder(p + Vector3.up * 0.55f, p + Vector3.up * 0.65f, 0.3f, 10);
+                    }
+                    for (int i = 0; i < 4; i++)
+                    {
+                        var p = new Vector3(ox + 2f + (i % 2) * 1.4f, 0, -2f + (i / 2) * 2.2f);
+                        for (int h = 0; h < 2 + i % 2; h++) wood.Box(p + Vector3.up * (0.08f + h * 0.16f), new Vector3(1.2f, 0.14f, 1f));
+                    }
+                    for (int i = 0; i < 3; i++) cars[i].Cylinder(new Vector3(-ox - 4f, 0.4f, -3f + i * 3f), new Vector3(-ox - 4f, 0.4f + 0.3f, -3f + i * 3f), 0.45f, 12);
+                    break;
                 default:
                     for (int i = 0; i < 4; i++) Tree(new Vector3(-ox - 3f, 0, -hw * 0.5f + i * hw * 0.5f), 5f + R() * 3f);
                     for (int i = 0; i < 4; i++) Tree(new Vector3(ox + 3f, 0, -hw * 0.5f + i * hw * 0.5f), 5f + R() * 3f);

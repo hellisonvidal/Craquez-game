@@ -237,6 +237,57 @@ namespace Craquez.UI
             return c;
         }
 
+        /// <summary>Arte do cartão Configurações: engrenagens, controles deslizantes e chaves.</summary>
+        public static Texture2D SettingsArt(int w = 512, int h = 560) => Tex(SettingsPixels(w, h), w, h);
+
+        public static Color32[] SettingsPixels(int w, int h)
+        {
+            var px = new Color32[w * h];
+            float Gear(float x, float y, float cx, float cy, float R, int teeth, float rot)
+            {
+                float dx = x - cx, dy = y - cy, d = Mathf.Sqrt(dx * dx + dy * dy);
+                float a = Mathf.Atan2(dy, dx) + rot;
+                float tooth = Mathf.Clamp01((Mathf.Cos(a * teeth) - 0.1f) * 4f);
+                float outer = R + R * 0.16f * tooth;
+                return Mathf.Max(d - outer, R * 0.42f - d);   // < 0 dentro (com o furo no meio)
+            }
+            var accent = new Color(0.16f, 0.62f, 1f);
+            for (int y = 0; y < h; y++)
+                for (int x = 0; x < w; x++)
+                {
+                    float u = (x + 0.5f) / w, v = (y + 0.5f) / h;
+                    // fundo: azul-noite com brilho no alto
+                    Color c = Color.Lerp(new Color(0.03f, 0.05f, 0.12f), new Color(0.08f, 0.16f, 0.34f), v);
+                    c += new Color(0.1f, 0.2f, 0.35f) * Mathf.Exp(-((u - 0.62f) * (u - 0.62f) + (v - 0.72f) * (v - 0.72f)) * 9f);
+                    float fx = u * w, fy = v * h;
+                    // engrenagens
+                    float g1 = Gear(fx, fy, w * 0.62f, h * 0.66f, w * 0.22f, 10, 0.2f);
+                    float g2 = Gear(fx, fy, w * 0.3f, h * 0.84f, w * 0.12f, 8, 0.6f);
+                    foreach (var g in new[] { g1, g2 })
+                    {
+                        if (g < 0f)
+                        {
+                            float shade = Mathf.Clamp01(0.75f + (fy / h - 0.6f) * 0.8f - (fx / w - 0.5f) * 0.3f);
+                            c = Color.Lerp(new Color(0.55f, 0.62f, 0.72f), new Color(0.88f, 0.92f, 0.98f), shade);
+                            if (g > -3f) c *= 0.7f;   // borda
+                        }
+                        else if (g < 3f) c = Color.Lerp(c, new Color(0.02f, 0.03f, 0.06f), 0.8f);
+                    }
+                    // três controles deslizantes
+                    for (int i = 0; i < 3; i++)
+                    {
+                        float ly = h * (0.18f + i * 0.11f), lx0 = w * 0.12f, lx1 = w * 0.88f;
+                        float knob = w * (0.3f + 0.22f * i);
+                        if (fx > lx0 && fx < lx1 && Mathf.Abs(fy - ly) < 5f) c = fx < knob ? accent : new Color(0.25f, 0.3f, 0.42f);
+                        float kd = Mathf.Sqrt((fx - knob) * (fx - knob) + (fy - ly) * (fy - ly));
+                        if (kd < 15f) c = kd < 12f ? Color.white : accent * 0.7f;
+                    }
+                    c.a = 1f;
+                    px[y * w + x] = c;
+                }
+            return px;
+        }
+
         static float Hash01(int a, int b)
         {
             uint h = (uint)(a * 374761393 + b * 668265263);

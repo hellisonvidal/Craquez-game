@@ -8,6 +8,16 @@ Jogo de futebol feito 100% com inteligência artificial, **gratuito**. Android, 
 - **Linux**: `Craquez-v2.1.0-Linux.tar.gz` → extraia e rode `./Craquez` (ou `./instalar.sh` para o atalho no menu)
 
 ### Novidades
+- **Ruas mais realistas**: quadra pintada no chão com linhas completas, áreas em meia-lua e marcas;
+  as muretas grafitadas das laterais viraram **placas de publicidade** de comércios fictícios do
+  bairro; no porto, frades de amarração, paletes e boias no lugar das árvores.
+- **Sem pontos brilhantes**: tirados os flashes de câmera da torcida (pontinhos brancos piscando);
+  os pombos são foscos e voam para fora do campo; o brilho (bloom) só pega luzes de verdade.
+- **Option file no Android**: botão "Permitir acesso aos arquivos" (Android 11+ exige liberar o
+  acesso para ler o .json de Downloads/Documentos); listas sem texto cortado e configurações com
+  rolagem para todas as opções aparecerem em qualquer tela.
+- **Option file com as competições** (nome, descrição e troféu editáveis).
+- **Cartão de Configurações** com arte própria (engrenagens e controles).
 - **Menu principal** em quatro cartões: Jogar, Competições, Mural de Troféus e Configurações.
 - **Mais competições**: além dos 15 torneios, cada liga do jogo é um campeonato em pontos corridos
   e cada país tem a sua copa nacional em mata-mata (campo e futsal), cada uma com o seu troféu.
