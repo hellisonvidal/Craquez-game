@@ -26,6 +26,7 @@ namespace Craquez
         float _crowdT, _crowdHype, _silence;
         CrowdFx _crowd;
         AthleteView _referee;
+        public VenueLife life;
         bool _night;
 
         public void Build(MatchSim s, MatchConfig c, Camera camera)
@@ -51,6 +52,7 @@ namespace Craquez
             var parent = new GameObject("Atletas").transform;
             parent.SetParent(transform, false);
             if (s.mode.id != GameModes.Street) _crowd = CrowdFx.Create(transform, s, venue, kits[0], kits[1], _night, q, c.teamA, c.teamB);
+            life = VenueLife.Create(transform, s, venue, kits[0], kits[1], home, away, _night, q, cam, c.venue);
             AthleteFactory.IndoorShoes = c.mode == GameModes.Futsal;
             foreach (var p in s.players)
             {
@@ -326,6 +328,7 @@ namespace Craquez
         void OnEvent(SimEvent e)
         {
             if (e.id >= 0 && e.id < athletes.Count) athletes[e.id].OnEvent(e);
+            life?.OnEvent(e);
             switch (e.type)
             {
                 case "kick":

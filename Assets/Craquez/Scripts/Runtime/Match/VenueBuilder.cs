@@ -16,9 +16,17 @@ namespace Craquez
         public Vector3 tunnel;
         public string name = "";
         public float standDist = 12f;
+        // vida do cenário (VenueLife)
+        public float wallH = 1f;            // altura da mureta (rua): baixa = gente sentada nela
+        public bool outdoor = true;         // ao ar livre (pombos)
+        public bool noDog;                  // sem cachorro (terraço, telhado, porto...)
+        public Vector3 boardPos, boardRight = Vector3.right;   // placar eletrônico
+        public Vector2 boardSize;           // (0 = sem placar)
+        public bool boardPost;              // placar em postes
+        public readonly List<Material> neonMats = new List<Material>();   // luzes que pulsam (e piscam no gol)
     }
 
-    /// <summary>Constrói estádios, 13 quadras de futsal, 4 campos de society e 14 ruas, tudo procedural.</summary>
+    /// <summary>Constrói estádios, 15 quadras de futsal, 10 campos de society e 15 ruas, tudo procedural.</summary>
     public static class VenueBuilder
     {
         public static readonly string[] FutsalNames =
@@ -26,12 +34,18 @@ namespace Craquez
             "Ginásio Municipal", "Arena Coberta", "Quadra do Clube", "Ginásio Universitário",
             "Arena Neon", "Quadra da Escola", "Ginásio Olímpico", "Ginásio Antigo (tacos)",
             "Ginásio do Bairro", "Arena Laranja", "Pavilhão Azul e Branco", "Ginásio de Treino", "Arena Vermelha",
+            "Ginásio Poliesportivo", "Arena Roxa",
         };
-        public static readonly string[] SocietyNames = { "Society Coberto do Clube", "Arena Society Central", "Campo Society do Bairro", "Complexo Society Premium" };
+        public static readonly string[] SocietyNames =
+        {
+            "Society Coberto do Clube", "Arena Society Central", "Campo Society do Bairro", "Complexo Society Premium",
+            "Society da Praia", "Society na Cobertura", "Arena Society Neon", "Society da Chácara", "Society do Condomínio", "Society Gramado Natural",
+        };
         public static readonly string[] StreetNames =
         {
             "Entre Prédios", "Morro", "Praia", "Terraço", "Gaiola", "Telhado", "Sob o Viaduto", "Praça",
             "Beco Grafitado", "Quadra do Conjunto", "Estacionamento", "Campinho de Terra", "Porto", "Vila Colorida",
+            "Linha do Trem",
         };
 
         // ------------------------------------------------------------------ campo
@@ -611,8 +625,9 @@ namespace Craquez
             float hl = sim.halfLen, hw = sim.halfW;
             var grassTex = Gfx.Grass(512, Color.white, variant + 50);
             // grama sintética: verde vivo, mas não "limão" (o pós-processamento ainda satura)
-            var turf = Gfx.LitN(new Color(0.33f, 0.62f, 0.27f), grassTex, Gfx.GrassNormal, 0.25f, 0.5f);
-            var turf2 = Gfx.LitN(new Color(0.29f, 0.55f, 0.24f), grassTex, Gfx.GrassNormal, 0.25f, 0.5f);
+            bool natural = variant == 9;
+            var turf = Gfx.LitN(natural ? new Color(0.27f, 0.52f, 0.22f) : new Color(0.33f, 0.62f, 0.27f), grassTex, Gfx.GrassNormal, natural ? 0.12f : 0.25f, natural ? 0.8f : 0.5f);
+            var turf2 = Gfx.LitN(natural ? new Color(0.22f, 0.44f, 0.18f) : new Color(0.29f, 0.55f, 0.24f), grassTex, Gfx.GrassNormal, natural ? 0.12f : 0.25f, natural ? 0.8f : 0.5f);
             if (variant == 0)
             {
                 var vi = new Venue { root = new GameObject("Society").transform, name = SocietyNames[0] };
@@ -642,8 +657,11 @@ namespace Craquez
             var ground = new MeshKit();
             float gx = hl + 40f, gz = hw + 40f;
             ground.Quad(new Vector3(-gx, -0.01f, -gz), new Vector3(-gx, -0.01f, gz), new Vector3(gx, -0.01f, gz), new Vector3(gx, -0.01f, -gz), new Vector2(0, 0), new Vector2(gx / 4f, gz / 4f));
-            var groundC = variant == 2 ? new Color(0.5f, 0.42f, 0.32f) : new Color(0.42f, 0.44f, 0.47f);
-            ground.Object("Entorno", Gfx.Lit(groundC, Gfx.Asphalt(256, Color.white, variant + 70, 0.2f), 0.2f), v.root, false);
+            var groundC = variant == 2 ? new Color(0.5f, 0.42f, 0.32f) : variant == 4 ? new Color(0.93f, 0.84f, 0.62f) : variant == 5 ? new Color(0.62f, 0.62f, 0.6f)
+                : variant == 6 ? new Color(0.1f, 0.1f, 0.12f) : variant == 7 ? new Color(0.42f, 0.5f, 0.3f) : variant == 8 ? new Color(0.78f, 0.72f, 0.64f)
+                : variant == 9 ? new Color(0.35f, 0.5f, 0.28f) : new Color(0.42f, 0.44f, 0.47f);
+            var groundT = variant == 4 || variant == 7 || variant == 9 ? Gfx.Grass(256, Color.white, variant + 70) : Gfx.Asphalt(256, Color.white, variant + 70, variant == 8 ? 0.05f : 0.2f);
+            ground.Object("Entorno", Gfx.Lit(groundC, groundT, variant == 6 ? 0.5f : 0.15f), v.root, false);
             Lines(v, sim, hl, hw);
             Goals(v, sim, hl, true);
             // alambrado: postes + tela (baixo do lado da câmera para não tapar o jogo)
@@ -661,8 +679,8 @@ namespace Craquez
             FenceSide(new Vector3(fx, 0, fz), new Vector3(fx, 0, -fz), 6f);
             FenceSide(new Vector3(-fx, 0, -fz), new Vector3(-fx, 0, fz), 6f);
             FenceSide(new Vector3(fx, 0, -fz), new Vector3(-fx, 0, -fz), 1.2f);
-            posts.Object("Postes do alambrado", Gfx.Lit(new Color(0.55f, 0.58f, 0.6f), null, 0.5f, 0.6f), v.root, false);
-            fence.Object("Alambrado", Gfx.Transparent(new Color(0.75f, 0.78f, 0.8f, 0.85f), Gfx.Net(128, 18f, 1.6f)), v.root, false);
+            posts.Object("Postes do alambrado", Gfx.Lit(variant == 7 ? new Color(0.5f, 0.35f, 0.2f) : variant == 6 ? new Color(0.15f, 0.15f, 0.18f) : new Color(0.55f, 0.58f, 0.6f), null, 0.5f, variant == 7 ? 0f : 0.6f), v.root, false);
+            fence.Object("Alambrado", Gfx.Transparent(variant == 6 ? new Color(0.3f, 0.3f, 0.36f, 0.85f) : new Color(0.75f, 0.78f, 0.8f, 0.85f), Gfx.Net(128, 18f, 1.6f)), v.root, false);
             // refletores nas quinas
             var poles = new MeshKit();
             var lampMk = new MeshKit();
@@ -708,6 +726,12 @@ namespace Craquez
             club.Box(new Vector3(fx + 8f, 1.6f, 0), new Vector3(6f, 3.2f, 12f), 2f);
             club.Box(new Vector3(fx + 8f, 3.35f, 0), new Vector3(7f, 0.3f, 13f));
             club.Object("Clube", Gfx.Character(variant == 3 ? new Color(0.15f, 0.18f, 0.25f) : new Color(0.85f, 0.75f, 0.55f), null, 0.3f), v.root, true);
+            SocietyScenes.Build(v, hl, hw, fx, fz, variant, night, quality, homeKit, awayKit);
+            // placar eletrônico em postes, no canto do lado de lá
+            v.boardPos = new Vector3(-hl * 0.72f, 3.3f, fz + 0.9f);
+            v.boardRight = Vector3.right;
+            v.boardSize = new Vector2(4.2f, 1.05f);
+            v.boardPost = true;
             v.tunnel = new Vector3(0, 0, -(hw + 2f));
             v.standDist = 3f;
             return v;
@@ -748,6 +772,8 @@ namespace Craquez
                 (new Color(0.88f, 0.7f, 0.46f), new Color(0.06f, 0.16f, 0.42f), 0),    // pavilhão: madeira clara + azul-marinho
                 (new Color(0.42f, 0.44f, 0.48f), new Color(0.1f, 0.1f, 0.12f), 1),     // treino: sintético cinza + preto
                 (new Color(0.7f, 0.12f, 0.14f), new Color(0.12f, 0.12f, 0.14f), 1),    // arena vermelha
+                (new Color(0.95f, 0.78f, 0.2f), new Color(0.1f, 0.3f, 0.65f), 1),     // poliesportivo: amarelo + azul
+                (new Color(0.42f, 0.2f, 0.62f), new Color(0.14f, 0.08f, 0.22f), 1),   // arena roxa
             };
             return pal[Mathf.Abs(variant) % pal.Length];
         }
@@ -917,6 +943,14 @@ namespace Craquez
             var cm = Gfx.Cutout(Color.white, crowd, 0.5f, 0.05f);
             v.crowdMats.Add(cm);
             ppl.Object("Torcida dos fundos", cm, v.root, false);
+            // mesa do anotador entre os bancos, com o placar eletrônico (placar e tempo reais)
+            var table = new MeshKit();
+            table.Box(new Vector3(0, 0.4f, hw + 3.1f), new Vector3(3.2f, 0.8f, 0.8f));
+            table.Object("Mesa do anotador", Gfx.Lit(new Color(0.16f, 0.18f, 0.24f), null, 0.4f), v.root, true);
+            v.boardPos = new Vector3(0, 1.32f, hw + 3.05f);
+            v.boardRight = Vector3.right;
+            v.boardSize = new Vector2(2.8f, 0.7f);
+            v.outdoor = false;
             // bancos de reservas do outro lado (cobertos, com cadeiras nas cores dos times)
             var bench = new MeshKit();
             var seatsA = new MeshKit();
@@ -1022,6 +1056,8 @@ namespace Craquez
             w.Box(new Vector3(0, wh / 2, -hw - t / 2 - 0.05f), new Vector3(hl * 2 + 0.6f, wh, t), 2f);
             w.Box(new Vector3(hl + t / 2 + 0.05f, wh / 2, 0), new Vector3(t, wh, hw * 2), 2f);
             w.Box(new Vector3(-hl - t / 2 - 0.05f, wh / 2, 0), new Vector3(t, wh, hw * 2), 2f);
+            v.wallH = cage ? 9f : wh;
+            v.noDog = variant == 3 || variant == 5;   // terraço e telhado: sem cachorro
             w.Object("Mureta", cage ? Gfx.Cutout(new Color(0.6f, 0.62f, 0.65f), Gfx.Net(128, 10, 1.2f), 0.4f) : wall, v.root, !cage);
             // prédios / casas ao redor
             var bmat = new[]
@@ -1029,7 +1065,7 @@ namespace Craquez
                 Gfx.Lit(new Color(0.85f, 0.55f, 0.4f), Windows(rng, night), 0.2f), Gfx.Lit(new Color(0.65f, 0.75f, 0.85f), Windows(rng, night), 0.2f),
                 Gfx.Lit(new Color(0.9f, 0.85f, 0.6f), Windows(rng, night), 0.2f), Gfx.Lit(new Color(0.55f, 0.85f, 0.6f), Windows(rng, night), 0.2f),
             };
-            if (variant != 2 && variant != 7 && variant != 11 && variant != 12)
+            if (variant != 2 && variant != 7 && variant != 11 && variant != 12 && variant != 14)
             {
                 // beco: prédios colados; conjunto: blocos iguais em fileira; vila: casinhas baixas coloridas
                 int n = variant == 1 ? 40 : variant == 13 ? 30 : variant == 9 ? 12 : 18;
@@ -1096,14 +1132,7 @@ namespace Craquez
                 for (int i = -2; i <= 2; i++) via.Box(new Vector3(i * 25f, 4.2f, 9f), new Vector3(2.2f, 8.4f, 2.2f), 4f);
                 via.Object("Viaduto", Gfx.Lit(new Color(0.6f, 0.6f, 0.62f), Gfx.Asphalt(256, Color.white, 77, 0.6f), 0.1f), v.root, true);
             }
-            // gente assistindo na beira
-            var crowd = Gfx.CrowdTex(1024, 128, homeKit.c1, homeKit.c2, awayKit.c1, variant * 13, 0.6f);
-            // (no beco e no conjunto a galera fica um pouco mais para fora, atrás do muro/alambrado)
-            var cm = Gfx.Cutout(Color.white, crowd, 0.1f, 0.05f);
-            v.crowdMats.Add(cm);
-            var ppl = new MeshKit();
-            ppl.Quad(new Vector3(-hl, 0, -hw - 1.6f), new Vector3(-hl, 1.8f, -hw - 1.6f), new Vector3(hl, 1.8f, -hw - 1.6f), new Vector3(hl, 0, -hw - 1.6f), new Vector2(0, 0), new Vector2(hl / 8f, 0.25f));
-            ppl.Object("Galera", cm, v.root, false);
+            // (a galera de fora é feita um por um em VenueLife: acompanha o lance e comemora)
             // postes de luz
             var poles = new MeshKit();
             var lampM = Gfx.Emissive(Color.white, night ? new Color(5, 4.5f, 3.5f) : Color.black);
@@ -1130,6 +1159,7 @@ namespace Craquez
             poles.Object("Postes", Gfx.Lit(new Color(0.3f, 0.3f, 0.32f), null, 0.4f, 0.5f), v.root, true);
             lamps.Object("Lâmpadas", lampM, v.root, false);
             StreetProps.Build(v, hl, hw, variant, night, quality);
+            if (variant == 14) SocietyScenes.Railway(v, hl, hw, night, quality);
             v.tunnel = new Vector3(0, 0, -(hw + 2f));
             v.standDist = 2f;
             return v;

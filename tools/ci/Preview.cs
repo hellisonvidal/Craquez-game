@@ -46,6 +46,13 @@ public static class P {
       Console.WriteLine("option file gravado");
       return;
     }
+    if (a.Length > 1 && a[1] == "torcida") {
+      var px = Craquez.VenueLife.FanPixels(new Color(0.85f, 0.1f, 0.12f), Color.white, new Color(0.1f, 0.3f, 0.8f), new Color(1f, 0.85f, 0.1f));
+      var bg = new Color32[px.Length];
+      for (int i = 0; i < px.Length; i++) { var c = px[i]; bg[i] = c.a > 0 ? c : new Color32(120, 140, 120, 255); }
+      Png(Path.Combine(dir, "torcida.png"), bg, 1024, 256);
+      return;
+    }
     int n = Craquez.BallCatalog.All.Length, cell = 200, cols = 8, rows = (n + cols - 1) / cols;
     int W = cols * cell, H = rows * cell; var sheet = new Color32[W * H];
     for (int i = 0; i < sheet.Length; i++) sheet[i] = new Color32(40, 46, 58, 255);

@@ -36,7 +36,16 @@ namespace Craquez.UI
                 // estádios com pista de atletismo aparecem com o entorno vermelho
                 surround = variant > 0 && variant < VenueBuilder.StadiumModels.Length && VenueBuilder.StadiumModels[variant].track ? new Color(0.62f, 0.24f, 0.16f) : new Color(0.16f, 0.34f, 0.12f);
             }
-            else if (mode == GameModes.Society) { floor = new Color(0.36f, 0.7f, 0.28f); floor2 = new Color(0.3f, 0.6f, 0.24f); surround = new Color(0.38f, 0.4f, 0.44f); kind = 0; }
+            else if (mode == GameModes.Society)
+            {
+                floor = new Color(0.36f, 0.7f, 0.28f); floor2 = new Color(0.3f, 0.6f, 0.24f); kind = 0;
+                // entorno de cada society (praia, laje, neon, chácara, condomínio, gramado natural)
+                Color[] sr = { new Color(0.38f, 0.4f, 0.44f), new Color(0.38f, 0.4f, 0.44f), new Color(0.5f, 0.42f, 0.32f), new Color(0.38f, 0.4f, 0.44f),
+                               new Color(0.93f, 0.84f, 0.62f), new Color(0.62f, 0.62f, 0.6f), new Color(0.1f, 0.1f, 0.14f), new Color(0.42f, 0.5f, 0.3f),
+                               new Color(0.78f, 0.72f, 0.64f), new Color(0.35f, 0.5f, 0.28f) };
+                surround = sr[Mathf.Abs(variant) % sr.Length];
+                if (variant == 9) { floor = new Color(0.3f, 0.58f, 0.24f); floor2 = new Color(0.25f, 0.5f, 0.2f); }
+            }
             else if (futsal)
             {
                 var pp = VenueBuilder.FutsalPalette(variant);

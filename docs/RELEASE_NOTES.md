@@ -8,6 +8,24 @@ Jogo de futebol feito 100% com inteligência artificial, **gratuito**. Android, 
 - **Linux**: `Craquez-v2.1.0-Linux.tar.gz` → extraia e rode `./Craquez` (ou `./instalar.sh` para o atalho no menu)
 
 ### Novidades
+- **Chutes e passes no tempo certo**: na preparação a bola é trazida ao pé de chute e o corpo vira
+  para o alvo (o chute não sai mais torto por causa do corpo atravessado); o instante em que o pé
+  encontra a bola é medido em cada animação e cai exatamente na saída da bola.
+- **Atletas mais realistas**: luz suave com volume nos músculos, pele com tom quente na transição
+  luz/sombra, brilho acetinado no uniforme, contorno mais fino; cintura mais fina, ombros e coxas
+  mais definidos, quadril mais estreito, cabeça proporcional.
+- **Pausa**: os atletas ficam parados exatamente na pose e no lugar em que estavam (e a pausa durante
+  a comemoração do gol volta para a comemoração).
+- **Menus de seleção sem bandeiras**: escudos desenhados com as cores de cada time (seleções também).
+- **Torcedores na rua**: gente do lado de fora (em pé, sentada na mureta, crianças) que acompanha o
+  lance com o olhar, se agita nos chutes e pula com os braços para cima no gol do seu time.
+- **Cenários vivos**: pombos que levantam voo quando a bola ou os jogadores chegam perto (e voltam
+  depois), vira-lata caramelo que acompanha o jogo e late no gol, placar eletrônico com o placar e o
+  tempo reais (mesa do anotador no futsal e em postes no society), luzes de neon que piscam no gol,
+  fotógrafos agachados atrás dos gols e gandulas no campo.
+- **Novos locais**: mais 6 campos de society (praia, cobertura de prédio, arena neon, chácara,
+  condomínio e gramado natural), mais 2 ginásios de futsal (poliesportivo e arena roxa) e mais 1 rua
+  (linha do trem, com trilhos, trem parado e plataforma); bar com mesas e guarda-sóis nos society.
 - **Ícone novo**: o jogador da capa fazendo uma bicicleta, com a bola e o estádio iluminado.
 - **Pontos de luz corrigidos**: pixels inválidos não explodem mais no brilho (bloom limitado), e o
   reflexo especular só aparece em materiais bem lisos.

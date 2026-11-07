@@ -19,6 +19,7 @@ namespace Craquez
         AudioClip _boo, _drums;
         AudioSource _drumSrc;
         float _drumTarget;
+        AudioClip _flutter, _bark;
         AudioClip _ui, _move, _kick, _kickHard, _whistle, _whistleLong, _whistleEnd, _net, _post, _crowdLoop, _cheer, _ooh, _chantLoop, _thud;
         float _crowdTarget = 0.35f, _chantTarget;
 
@@ -51,6 +52,8 @@ namespace Craquez
             _whistleEnd = Whistle3(rng);
             _net = Noise(0.5f, 0.35f, 900f, rng, decay: 6f);
             _post = Metal(rng);
+            _flutter = Flutter(rng);
+            _bark = Bark(rng);
             AudioClip R(string n) => Resources.Load<AudioClip>("Audio/" + n);
             _crowdLoop = R("crowd_loop") ?? CrowdLoop(rng, 6f, 0.5f);
             _chantLoop = Chant(rng);
@@ -137,6 +140,10 @@ namespace Craquez
         public static void WhistleEnd() => Play(_i?._whistleEnd, 0.65f);
         public static void Net() => Play(_i?._net, 0.6f);
         public static void Post() => Play(_i?._post, 0.7f);
+        /// <summary>Bater de asas (pombos levantando voo).</summary>
+        public static void Flutter() => Play(_i?._flutter, 0.22f, 0.85f + Random.value * 0.3f);
+        /// <summary>Latido (vira-lata da rua).</summary>
+        public static void Bark() => Play(_i?._bark, 0.4f, 0.9f + Random.value * 0.2f);
         /// <summary>
         /// Sem torcida (society e rua): nenhum som de multidão — ambiente, canto, batucada,
         /// gol, aplauso, vaia e "uuh" ficam mudos; só bola, apito, rede e trave.
@@ -246,6 +253,43 @@ namespace Craquez
             da.CopyTo(d, da.Length + gap);
             db.CopyTo(d, da.Length * 2 + gap * 2);
             return Make("whistle3", d);
+        }
+
+        static AudioClip Flutter(System.Random r)
+        {
+            // rajadas de ruído abafado a ~13 batidas por segundo, sumindo
+            int n = (int)(0.7f * Rate);
+            var d = new float[n];
+            float lp = 0, k = 1f - Mathf.Exp(-2 * Mathf.PI * 1400f / Rate);
+            for (int i = 0; i < n; i++)
+            {
+                float t = i / (float)Rate;
+                lp += ((float)(r.NextDouble() * 2 - 1) - lp) * k;
+                float beat = Mathf.Pow(Mathf.Max(0f, Mathf.Sin(t * 13f * Mathf.PI * 2f)), 3f);
+                d[i] = lp * beat * Mathf.Exp(-t * 3.5f) * 2.2f;
+            }
+            return Make("flutter", d);
+        }
+
+        static AudioClip Bark(System.Random r)
+        {
+            // dois "au" curtos: tom que cai, com aspereza
+            int n = (int)(0.42f * Rate);
+            var d = new float[n];
+            float ph = 0;
+            for (int i = 0; i < n; i++)
+            {
+                float t = i / (float)Rate;
+                float tt = t < 0.16f ? t : t - 0.24f;
+                if (tt < 0f || tt > 0.14f) continue;
+                float u = tt / 0.14f;
+                float f = Mathf.Lerp(620f, 380f, u);
+                ph += 2 * Mathf.PI * f / Rate;
+                float env = Mathf.Min(1f, u * 25f) * (1f - u) * (1f - u);
+                float v = Mathf.Sin(ph) + 0.5f * Mathf.Sin(ph * 2f) + 0.3f * Mathf.Sin(ph * 3.01f) + (float)(r.NextDouble() * 2 - 1) * 0.35f;
+                d[i] = Mathf.Clamp(v * 0.6f, -1f, 1f) * env * 0.7f;
+            }
+            return Make("bark", d);
         }
 
         static AudioClip Noise(float dur, float vol, float cutoff, System.Random r, float decay)

@@ -115530,13 +115530,21 @@
       "Arena Laranja",
       "Pavilhão Azul e Branco",
       "Ginásio de Treino",
-      "Arena Vermelha"
+      "Arena Vermelha",
+      "Ginásio Poliesportivo",
+      "Arena Roxa"
     ],
     "society": [
       "Society Coberto do Clube",
       "Arena Society Central",
       "Campo Society do Bairro",
-      "Complexo Society Premium"
+      "Complexo Society Premium",
+      "Society da Praia",
+      "Society na Cobertura",
+      "Arena Society Neon",
+      "Society da Chácara",
+      "Society do Condomínio",
+      "Society Gramado Natural"
     ],
     "rua": [
       "Entre Prédios",
@@ -115552,7 +115560,8 @@
       "Estacionamento",
       "Campinho de Terra",
       "Porto",
-      "Vila Colorida"
+      "Vila Colorida",
+      "Linha do Trem"
     ]
   }
 }
