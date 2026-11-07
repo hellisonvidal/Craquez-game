@@ -27,7 +27,7 @@ namespace Craquez
     }
 
     /// <summary>Constrói estádios, 15 quadras de futsal, 10 campos de society e 15 ruas, tudo procedural.</summary>
-    public static class VenueBuilder
+    public static partial class VenueBuilder
     {
         public static readonly string[] FutsalNames =
         {
@@ -54,6 +54,8 @@ namespace Craquez
         {
             ("Estádio do mandante", 0, 0, false), ("Arena Metropolitana", 3, 0, false), ("Estádio Estadual", 3, 2, true), ("Estádio Municipal", 2, 1, false),
             ("Campo do Bairro", 1, 0, false), ("Estádio Caldeirão da Vila", 3, 3, false), ("Estádio Olímpico Nacional", 3, 1, true),
+            ("Arena do Litoral", 3, 1, false), ("Estádio da Serra", 2, 0, false), ("Arena Imperial", 3, 2, false), ("Estádio Centenário", 2, 1, true),
+            ("Arena do Deserto", 3, 3, false), ("Estádio Ribeirinho", 2, 0, false), ("Arena Futuro", 3, 2, false), ("Estádio Alpino", 1, 3, false),
         };
 
         public static Venue Stadium(MatchSim sim, TeamData home, TeamData away, Kit homeKit, Kit awayKit, bool night, int quality, Transform parent, int model = 0)
@@ -71,13 +73,19 @@ namespace Craquez
             Lines(v, sim, hl, hw);
             Goals(v, sim, hl, true);
             Boards(v, hl, hw, home, away);
-            Stands(v, hl, hw, tier, home, away, homeKit, awayKit, night, quality);
-            Floodlights(v, hl, hw, tier, night);
+            var st = StyleOf(model, home.stadium.tier);
+            Stands(v, hl, hw, st, home, away, homeKit, awayKit, night, quality);
+            StandBand(v, hl, hw, st, night);
+            if (st.roof == 3) Arch(v, hl, hw, st);
+            if (st.fence) PitchFence(v, hl, hw);
+            if (st.lights == 0) Floodlights(v, hl, hw, tier, night, st);
+            else StyledLights(v, hl, hw, st, night);
             Dugouts(v, hl, hw);
             CornerFlags(v, hl, hw, homeKit.c1);
             Pitchside(v, hl, hw, home, away, homeKit, night, quality);
-            Screens(v, hl, hw, tier, home, away);
-            if (quality >= 1) City(v, hl, hw, tier, night, seed);
+            if (st.ends) Screens(v, hl, hw, tier, home, away);
+            if (st.scene == 0) { if (quality >= 1) City(v, hl, hw, tier, night, seed); }
+            else Scenery(v, hl, hw, st, night, seed, quality);
             v.tunnel = new Vector3(0, 0, -(hw + 6f));
             return v;
         }
@@ -467,16 +475,17 @@ namespace Craquez
         }
 
         /// <summary>Arquibancadas em degraus com torcida, cobertura nos estádios maiores.</summary>
-        static void Stands(Venue v, float hl, float hw, int tier, TeamData home, TeamData away, Kit homeKit, Kit awayKit, bool night, int quality)
+        static void Stands(Venue v, float hl, float hw, StadiumStyle style, TeamData home, TeamData away, Kit homeKit, Kit awayKit, bool night, int quality)
         {
-            int rows = tier == 1 ? 14 : tier == 2 ? 26 : 40;
+            int rows = style.rows;
+            int tier = rows <= 16 ? 1 : rows <= 30 ? 2 : 3;
             float step = 0.8f, rise = 0.42f;
             float gapX = 9f, gapZ = 7.5f;
             int tw = quality >= 2 ? 2048 : 1024;
-            var crowd = Gfx.CrowdTex(tw, 512, homeKit.c1, homeKit.c2, awayKit.c1, (int)(home.name.GetHashCode() & 0xFFFF), tier == 1 ? 0.75f : 0.93f);
+            var crowd = Gfx.CrowdTex(tw, 512, homeKit.c1, homeKit.c2, awayKit.c1, (int)(home.name.GetHashCode() & 0xFFFF), style.occupancy, style.seats.a > 0f ? style.seats : (Color?)null);
             var mat = Gfx.Lit(Color.white, crowd, 0.05f);
             v.crowdMats.Add(mat);
-            var concrete = Gfx.Lit(new Color(0.55f, 0.56f, 0.6f), Gfx.Asphalt(256, Color.white, 11, 0.05f), 0.15f);
+            var concrete = Gfx.Lit(style.structure.a > 0f ? style.structure : new Color(0.55f, 0.56f, 0.6f), Gfx.Asphalt(256, Color.white, 11, 0.05f), 0.15f);
             // torcedores em pé: silhuetas recortadas sobre cada fileira (dá volume à arquibancada)
             var people = Gfx.CrowdPeople(quality >= 2 ? 2048 : 1024, 64, homeKit.c1, homeKit.c2, awayKit.c1, (int)(home.name.GetHashCode() & 0xFFFF) + 1);
             var peopleMat = Gfx.Cutout(Color.white, people, 0.5f, 0.05f);
@@ -486,6 +495,7 @@ namespace Craquez
             {
                 // lado 0 é o da câmera de TV: lá só há a pista e os bancos (a arquibancada tapava o campo)
                 if (side == 0) continue;
+                if (side >= 2 && !style.ends) continue;   // estádio só com as laterais: atrás dos gols, aberto
                 bool longSide = side < 2;
                 float len = longSide ? (hl + gapX) * 2f : (hw + gapZ) * 2f;
                 float dist = longSide ? hw + gapZ : hl + gapX;
@@ -524,7 +534,7 @@ namespace Craquez
                 float yaw = side == 0 ? 0 : side == 1 ? 180 : side == 2 ? 90 : -90;
                 go.transform.localRotation = Quaternion.Euler(0, yaw, 0);
                 gb.transform.localRotation = Quaternion.Euler(0, yaw, 0);
-                if (tier >= 2)
+                if (style.roof >= 2 || (style.roof == 1 && (side == 1 || tier >= 3)))
                 {
                     var roof = new MeshKit();
                     float ry = topY + 6f;
@@ -532,13 +542,47 @@ namespace Craquez
                     for (float x = -len / 2; x <= len / 2 + 0.1f; x += len / 6f)
                         roof.Cylinder(new Vector3(x, 0, -far - 0.5f), new Vector3(x, ry, -far - 0.5f), 0.35f, 8);
                     // parte de baixo da cobertura recebe a luz refletida do campo (sem breu sobre a torcida)
-                    var gr = roof.Object("Cobertura " + side, Gfx.Emissive(new Color(0.85f, 0.86f, 0.9f), night ? new Color(0.1f, 0.1f, 0.11f) : new Color(0.16f, 0.17f, 0.18f)), v.root, true);
+                    var gr = roof.Object("Cobertura " + side, Gfx.Emissive(style.roofC.a > 0f ? style.roofC : new Color(0.85f, 0.86f, 0.9f), night ? new Color(0.1f, 0.1f, 0.11f) : new Color(0.16f, 0.17f, 0.18f)), v.root, true);
                     gr.transform.localRotation = Quaternion.Euler(0, yaw, 0);
                 }
             }
-            // cantos: blocos de concreto preenchendo
+            // cantos: blocos de concreto preenchendo (bacia: com torcida e cobertura)
+            if (!style.ends) return;
             for (int c = 0; c < 2; c++)   // só os cantos do fundo (os da frente tapariam a câmera)
             {
+                if (style.corners)
+                {
+                    // canto em degraus com torcida, ligando a lateral ao fundo
+                    float sxc = c % 2 == 0 ? 1 : -1;
+                    var ck = new MeshKit();
+                    var cb = new MeshKit();
+                    for (int r = 0; r < rows; r++)
+                    {
+                        float y0 = 1.1f + r * rise, y1 = y0 + rise;
+                        float dx = hl + gapX + r * step, dz = hw + gapZ + r * step;
+                        // diagonal do canto: de (dx, dz - 0) até (dx - 0, dz)
+                        if (r == 0) continue;
+                        var P = new Vector3(sxc * (hl + gapX - 0.2f), y0, dz);          // lado da lateral
+                        var Q = new Vector3(sxc * dx, y0, hw + gapZ - 0.2f);            // lado do fundo
+                        var uv = RowUV(r, r * step * 1.41f, tw, 512);
+                        // espelho virado para o campo (ordem dos vértices depende do canto)
+                        if (sxc > 0) ck.Quad(Q, P, P + Vector3.up * rise, Q + Vector3.up * rise, uv.a, uv.b);
+                        else ck.Quad(P, Q, Q + Vector3.up * rise, P + Vector3.up * rise, uv.a, uv.b);
+                        var P2 = P + new Vector3(0, rise, step);
+                        var Q2 = Q + new Vector3(sxc * step, rise, 0);
+                        cb.Quad(P + Vector3.up * rise, Q + Vector3.up * rise, Q2, P2);
+                        cb.Quad(P2, Q2, Q + Vector3.up * rise, P + Vector3.up * rise);
+                    }
+                    ck.Object("Torcida do canto " + c, mat, v.root, false);
+                    cb.Object("Degraus do canto " + c, concrete, v.root, false);
+                    if (style.roof >= 2)
+                    {
+                        var rk = new MeshKit();
+                        float ry = 1.1f + rows * rise + 6f;
+                        rk.Box(new Vector3(sxc * (hl + gapX + rows * step * 0.5f), ry, hw + gapZ + rows * step * 0.5f), new Vector3(rows * step * 1.1f, 0.6f, rows * step * 1.1f));
+                        rk.Object("Cobertura do canto " + c, Gfx.Emissive(style.roofC, night ? new Color(0.1f, 0.1f, 0.11f) : new Color(0.16f, 0.17f, 0.18f)), v.root, true);
+                    }
+                }
                 var k = new MeshKit();
                 float sx = c % 2 == 0 ? 1 : -1, sz = 1;
                 float cx = (hl + gapX + rows * step * 0.5f) * sx, cz = (hw + gapZ + rows * step * 0.5f) * sz;
@@ -547,8 +591,9 @@ namespace Craquez
             }
         }
 
-        static void Floodlights(Venue v, float hl, float hw, int tier, bool night)
+        static void Floodlights(Venue v, float hl, float hw, int tier, bool night, StadiumStyle st = default)
         {
+            if (st.rows > 0) tier = st.rows <= 16 ? 1 : st.rows <= 30 ? 2 : 3;
             var poleMat = Gfx.Lit(new Color(0.5f, 0.52f, 0.55f), null, 0.4f, 0.6f);
             var lampMat = Gfx.Emissive(Color.white, night ? new Color(6f, 6f, 5.5f) : new Color(0.6f, 0.6f, 0.6f));
             float h = 30f + tier * 8f;
@@ -1054,8 +1099,7 @@ namespace Craquez
             float wh = variant == 4 ? 4.5f : variant == 9 ? 3f : variant == 8 ? 3.2f : variant == 11 ? 0.5f : 1.0f, t = 0.25f;
             w.Box(new Vector3(0, wh / 2, hw + t / 2 + 0.05f), new Vector3(hl * 2 + 0.6f, wh, t), 2f);
             w.Box(new Vector3(0, wh / 2, -hw - t / 2 - 0.05f), new Vector3(hl * 2 + 0.6f, wh, t), 2f);
-            w.Box(new Vector3(hl + t / 2 + 0.05f, wh / 2, 0), new Vector3(t, wh, hw * 2), 2f);
-            w.Box(new Vector3(-hl - t / 2 - 0.05f, wh / 2, 0), new Vector3(t, wh, hw * 2), 2f);
+            // (sem mureta nas linhas de fundo: atrás dos gols fica aberto)
             v.wallH = cage ? 9f : wh;
             v.noDog = variant == 3 || variant == 5;   // terraço e telhado: sem cachorro
             w.Object("Mureta", cage ? Gfx.Cutout(new Color(0.6f, 0.62f, 0.65f), Gfx.Net(128, 10, 1.2f), 0.4f) : wall, v.root, !cage);

@@ -30,6 +30,8 @@ namespace Craquez.UI
             bool field = mode == GameModes.Field, futsal = mode == GameModes.Futsal;
             Color floor, floor2, surround;
             int kind;   // 0 grama, 1 madeira, 2 sintético, 3 asfalto, 4 tacos
+            var sty = VenueBuilder.StyleOf(variant, 2);
+            int cut = field ? VenueBuilder.StadiumModels[Mathf.Clamp(variant, 0, VenueBuilder.StadiumModels.Length - 1)].cut : 0;
             if (field)
             {
                 floor = new Color(0.2f, 0.5f, 0.16f); floor2 = new Color(0.24f, 0.58f, 0.19f); kind = 0;
@@ -74,6 +76,8 @@ namespace Craquez.UI
                             c = q < bh ? new Color(0.36f, 0.34f, 0.4f) * (0.8f + 0.2f * Hash01(Mathf.FloorToInt(u * 9f), 3)) : Color.Lerp(new Color(0.55f, 0.75f, 0.95f), new Color(0.3f, 0.5f, 0.85f), q);
                             if (q < bh && Mathf.Repeat(u * 60f, 1f) < 0.4f && Mathf.Repeat(q * 18f, 1f) < 0.45f) c = Color.Lerp(c, new Color(1f, 0.9f, 0.6f), 0.5f);
                         }
+                        else if (field)
+                            c = StadiumBack(sty, home, u, q, variant);
                         else
                         {
                             var stand = Color.Lerp(new Color(0.16f, 0.18f, 0.24f), new Color(0.08f, 0.09f, 0.13f), q);
@@ -98,7 +102,14 @@ namespace Craquez.UI
                         c = inside ? floor : surround;
                         if (inside)
                         {
-                            if (kind == 0 && Mathf.Repeat(pu * 10f, 1f) < 0.5f) c = floor2;
+                            if (kind == 0)
+                            {
+                                // corte da grama do estádio: listras, listras largas, xadrez, xadrez miúdo
+                                float nU = cut == 1 ? 6f : cut == 3 ? 14f : 10f, nZ = cut == 2 ? 5f : cut == 3 ? 8f : 0f;
+                                bool a = Mathf.Repeat(pu * nU, 1f) < 0.5f;
+                                if (nZ > 0f) a ^= Mathf.Repeat(pz * nZ, 1f) < 0.5f;
+                                if (a) c = floor2;
+                            }
                             if (kind == 1) c *= 0.9f + 0.1f * Mathf.Sin(pz * 160f) * Mathf.Sin(pu * 7f);
                             if (kind == 4) c *= (Mathf.Repeat((pu * 30f + pz * 30f), 1f) < 0.5f) == (Mathf.Repeat((pu * 30f - pz * 30f), 1f) < 0.5f) ? 1f : 0.85f;
                             if (kind == 3) c *= 0.92f + 0.08f * Hash01(x / 3, y / 3);
@@ -123,6 +134,107 @@ namespace Craquez.UI
                     px[y * w + x] = c;
                 }
             return px;
+        }
+
+        /// <summary>
+        /// Fundo do desenho de cada estádio (u 0..1 na largura, q 0..1 da linha do gramado ao alto):
+        /// céu, entorno (cidade, mar, montanhas, deserto, árvores, neve), arquibancada na altura e na
+        /// cor do estádio, faixa de camarotes, cobertura, arco e refletores.
+        /// </summary>
+        static Color StadiumBack(StadiumStyle st, Color home, float u, float q, int variant)
+        {
+            // céu
+            Color c = Color.Lerp(new Color(0.62f, 0.8f, 0.96f), new Color(0.3f, 0.52f, 0.86f), q);
+            // entorno ao fundo
+            float hz = 0.42f;   // altura do horizonte do entorno
+            switch (st.scene)
+            {
+                case 0:
+                {
+                    float bh = 0.25f + 0.5f * Hash01(Mathf.FloorToInt(u * 26f), 11);
+                    if (q < hz + bh * 0.45f) c = Color.Lerp(new Color(0.5f, 0.54f, 0.62f), new Color(0.38f, 0.42f, 0.5f), Hash01(Mathf.FloorToInt(u * 26f), 5));
+                    break;
+                }
+                case 1: case 5:
+                {
+                    float th = hz + 0.08f + 0.06f * Mathf.Sin(u * 40f) * Mathf.Sin(u * 13f);
+                    if (q < th) c = new Color(0.2f, 0.42f, 0.2f) * (0.85f + 0.15f * Hash01(Mathf.FloorToInt(u * 60f), 2));
+                    break;
+                }
+                case 2:
+                    if (q < hz + 0.06f) c = new Color(0.12f, 0.45f, 0.65f) * (0.9f + 0.1f * Mathf.Sin(u * 90f));
+                    break;
+                case 3: case 6:
+                {
+                    float m = hz + 0.38f * Mathf.Abs(Mathf.Sin(u * 5.5f + 0.6f)) * (0.6f + 0.4f * Mathf.Sin(u * 2.3f));
+                    bool snowy = st.scene == 6 ? q > m - 0.1f && m > hz + 0.12f : q > m - 0.04f && m > hz + 0.3f;
+                    if (q < m) c = snowy ? new Color(0.95f, 0.96f, 1f) : (st.scene == 6 ? new Color(0.5f, 0.55f, 0.64f) : new Color(0.35f, 0.45f, 0.38f)) * (0.9f + 0.1f * Mathf.Sin(u * 50f));
+                    break;
+                }
+                case 4:
+                {
+                    float d = hz + 0.1f * (0.5f + 0.5f * Mathf.Sin(u * 9f));
+                    if (q < d) c = new Color(0.9f, 0.74f, 0.5f) * (0.92f + 0.08f * Mathf.Sin(u * 30f));
+                    break;
+                }
+            }
+            // arquibancada: altura pelas fileiras; sem fundo atrás dos gols, só no meio
+            float sh = Mathf.Clamp(st.rows / 46f, 0.18f, 1f) * 0.7f;
+            float x0 = st.ends ? 0f : 0.14f, x1 = st.ends ? 1f : 0.86f;
+            if (st.ends && !st.corners) { x0 = 0.03f; x1 = 0.97f; }
+            bool inStand = u > x0 && u < x1 && q < sh;
+            float roofH = st.roof > 0 ? 0.07f : 0f;
+            if (inStand)
+            {
+                float rq = q / sh;
+                var seat = st.seats.a > 0f ? st.seats : new Color(0.16f, 0.18f, 0.24f);
+                c = Color.Lerp(seat, seat * 0.6f, rq);
+                float row = Mathf.Repeat(rq * st.rows * 0.5f, 1f), col = Mathf.Repeat(u * 110f, 1f);
+                if (row < 0.55f && col < 0.6f)
+                {
+                    float r = Hash01(Mathf.FloorToInt(u * 110f), Mathf.FloorToInt(rq * st.rows * 0.5f) + variant * 7);
+                    if (r < st.occupancy) c = r < st.occupancy * 0.55f ? home : r < st.occupancy * 0.8f ? Color.white * 0.85f : Color.Lerp(seat, new Color(0.55f, 0.48f, 0.4f), 0.6f);
+                }
+                if (row > 0.85f) c = Color.Lerp(c, st.structure, 0.6f);
+                // faixa de camarotes / LED
+                if (st.band.a > 0f && Mathf.Abs(rq - 0.5f) < 0.045f) c = st.led ? st.band * 1.25f : st.band;
+            }
+            // cobertura
+            if (st.roof > 0 && u > x0 - 0.01f && u < x1 + 0.01f && q >= sh && q < sh + roofH && (st.roof >= 2 || (u > 0.15f && u < 0.85f)))
+                c = Color.Lerp(st.roofC, st.roofC * 0.7f, (q - sh) / roofH);
+            // arco
+            if (st.roof == 3)
+            {
+                float ax = (u - 0.5f) * 2f;
+                float ay = sh + roofH + 0.3f * Mathf.Sqrt(Mathf.Max(0f, 1f - ax * ax * 1.05f));
+                if (Mathf.Abs(q - ay) < 0.012f && Mathf.Abs(ax) < 0.97f) c = new Color(0.95f, 0.95f, 0.97f);
+            }
+            // refletores
+            if (st.lights == 0)
+            {
+                foreach (float tx in new[] { 0.06f, 0.94f })
+                {
+                    float top = Mathf.Min(0.97f, sh + 0.32f);
+                    if (Mathf.Abs(u - tx) < 0.005f && q < top) c = new Color(0.55f, 0.57f, 0.6f);
+                    if (Mathf.Abs(u - tx) < 0.03f && q > top - 0.05f && q < top + 0.01f) c = Mathf.Repeat(u * 300f, 1f) < 0.6f ? new Color(1f, 1f, 0.92f) : new Color(0.3f, 0.3f, 0.32f);
+                }
+            }
+            else if (st.lights == 1)
+            {
+                if (q > sh + roofH * 0.1f && q < sh + roofH * 0.35f && u > x0 && u < x1 && Mathf.Repeat(u * 40f, 1f) < 0.35f) c = new Color(1f, 1f, 0.9f);
+            }
+            else
+            {
+                for (int i = 0; i < 3; i++)
+                {
+                    float tx = 0.2f + i * 0.3f, top = sh + 0.18f;
+                    if (Mathf.Abs(u - tx) < 0.003f && q < top) c = new Color(0.55f, 0.57f, 0.6f);
+                    if (Mathf.Abs(u - tx) < 0.018f && q > top - 0.03f && q < top) c = new Color(1f, 1f, 0.92f);
+                }
+            }
+            // alambrado na frente
+            if (st.fence && q < 0.14f && (Mathf.Repeat(u * 140f + q * 60f, 1f) < 0.12f || Mathf.Repeat(u * 140f - q * 60f, 1f) < 0.12f)) c = Color.Lerp(c, new Color(0.8f, 0.82f, 0.85f), 0.6f);
+            return c;
         }
 
         static float Hash01(int a, int b)

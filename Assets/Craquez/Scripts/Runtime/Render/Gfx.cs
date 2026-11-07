@@ -390,7 +390,7 @@ namespace Craquez
         }
 
         /// <summary>Arquibancada lotada: "pixels" de gente com camisas nas cores do time e da torcida rival.</summary>
-        public static Texture2D CrowdTex(int w, int h, Color home, Color home2, Color away, int seed, float occupancy = 0.92f)
+        public static Texture2D CrowdTex(int w, int h, Color home, Color home2, Color away, int seed, float occupancy = 0.92f, Color? seatColor = null)
         {
             var t = Tex(w, h, true);
             var px = new Color32[w * h];
@@ -404,7 +404,7 @@ namespace Craquez
                     Color shirt = awaySide ? away : (r < 0.55f ? home : r < 0.8f ? home2 : Color.HSVToRGB(Hash(cx, cy, seed + 5), 0.3f, 0.8f));
                     Color skin = Color.Lerp(new Color(0.36f, 0.22f, 0.15f), new Color(0.95f, 0.78f, 0.65f), Hash(cx, cy, seed + 2));
                     Color hair = Color.Lerp(new Color(0.05f, 0.04f, 0.03f), new Color(0.5f, 0.35f, 0.2f), Hash(cx, cy, seed + 3) * 0.6f);
-                    Color seat = new Color(0.18f, 0.2f, 0.25f);
+                    Color seat = seatColor ?? new Color(0.18f, 0.2f, 0.25f);
                     for (int y = 0; y < cell; y++)
                         for (int x = 0; x < cell; x++)
                         {

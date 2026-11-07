@@ -45,6 +45,8 @@ namespace Craquez
             if (!ShotTour.Requested()) GoFullscreen();   // (o servidor gráfico virtual do CI não suporta trocar de modo)
             Screen.sleepTimeout = SleepTimeout.NeverSleep;
             Sfx.Init();
+            Teams.CustomOptionFile = PlayerPrefs.GetString(OptionKey, "");
+            if (Teams.CustomOptionFile != "") Teams.Reload();
             OptionFile.Apply();   // bolas, chuteiras e nomes dos locais do option file (os times o banco já aplica)
             UrpSetup.Quality(Settings.Quality);
             Gfx.ToonLook(false);
@@ -586,7 +588,7 @@ namespace Craquez
             GL.Clear(true, true, Color.black);
             // fundo: a ilustração do modo, escurecida
             Graphics.DrawTexture(new Rect(0, -H * 0.1f, W, W * 560f / 512f), bg, new Rect(0, 0, 1, 1), 0, 0, 0, 0, new Color(0.28f, 0.3f, 0.38f, 1f));
-            // seis escudos em duas fileiras (sem bandeiras)
+            // seis bandeiras em duas fileiras (só nas seleções)
             var lgs = LeaguesFor(mode, national);
             var ids = new List<int>();
             foreach (var l in lgs) for (int i = 0; i < l.count && ids.Count < 6; i++) { ids.Add(l.first + i); if (!national) break; }
@@ -594,8 +596,10 @@ namespace Craquez
             for (int i = 0; i < ids.Count; i++)
             {
                 float cx = W * (0.2f + 0.3f * (i % 3)), cy = H * (i < 3 ? 0.3f : 0.66f);
-                var sp = Crest.Badge(ids[i]);   // escudos desenhados, sem bandeiras
-                if (sp != null) Graphics.DrawTexture(new Rect(cx - 70, cy - 70, 140, 140), sp.texture, TexRect(sp), 0, 0, 0, 0);
+                // seleções: bandeiras dos países; clubes: só a ilustração (sem escudos)
+                if (!national) break;
+                var flag = Crest.CountryTex(Teams.Get(ids[i]).iso);
+                if (flag != null) Graphics.DrawTexture(new Rect(cx - 82, cy - 55, 164, 110), flag);
             }
             GL.PopMatrix();
             var tex = new Texture2D(W, H, TextureFormat.RGBA32, false);
@@ -792,6 +796,27 @@ namespace Craquez
             Title(root, _cfg.national ? "ESCOLHA DAS SELEÇÕES" : "ESCOLHA DOS TIMES", null);
             bool futsal = _cfg.mode == GameModes.Futsal;
             var lgs = LeaguesFor(_cfg.mode, _cfg.national);
+            // grupos para escolher: as ligas (clubes) ou os continentes (seleções, com "Todas" pelo ranking)
+            var groups = new List<(string name, List<int> ids)>();
+            if (_cfg.national)
+            {
+                var all = new List<int>();
+                foreach (var l in lgs) for (int i = 0; i < l.count; i++) all.Add(l.first + i);
+                all.Sort((x, y) => Teams.Get(x).rank.CompareTo(Teams.Get(y).rank));
+                groups.Add(("Todas (ranking)", all));
+                foreach (var c in Teams.Continents)
+                {
+                    var ids = all.FindAll(i => Teams.Continent(Teams.Get(i).iso) == c);
+                    if (ids.Count > 0) groups.Add((c, ids));
+                }
+            }
+            else
+                foreach (var l in lgs)
+                {
+                    var ids = new List<int>();
+                    for (int i = 0; i < l.count; i++) ids.Add(l.first + i);
+                    groups.Add((l.name, ids));
+                }
             Selectable first = null;
             for (int side = 0; side < 2; side++)
             {
@@ -799,15 +824,22 @@ namespace Craquez
                 var col = UiKit.Panel(root).rectTransform.Place(s == 0 ? 0 : 0.5f, 0, s == 0 ? 0.5f : 1, 1, s == 0 ? 90 : 30, 200, s == 0 ? 30 : 90, 200);
                 var head = UiKit.Label(col, s == 0 ? "CASA" : "VISITANTE", 34, Theme.Head, Theme.Accent, TextAnchor.MiddleLeft);
                 head.rectTransform.Place(0, 1, 1, 1, 30, -60, 30, 10);
-                var crest = UiKit.Image(col, Color.white, null, "escudo");
-                crest.rectTransform.At(0, 1, 170, 170, 30, -70);
-                crest.preserveAspect = true;
+                // seleções: a bandeira do país; clubes: sem escudo
+                Image flag = null;
+                float tx = 30f;
+                if (_cfg.national)
+                {
+                    flag = UiKit.Image(col, Color.white, null, "bandeira");
+                    flag.rectTransform.At(0, 1, 170, 128, 30, -86);
+                    flag.preserveAspect = true;
+                    tx = 220f;
+                }
                 var name = UiKit.Label(col, "", 46, Theme.HeadItalic, Theme.Text);
-                name.rectTransform.Place(0, 1, 1, 1, 220, -150, 250, 70);
+                name.rectTransform.Place(0, 1, 1, 1, tx, -150, 250, 70);
                 var info = UiKit.Label(col, "", 22, Theme.Body, Theme.TextDim);
-                info.rectTransform.Place(0, 1, 1, 1, 220, -250, 250, 150);
+                info.rectTransform.Place(0, 1, 1, 1, tx, -250, 250, 150);
                 var kitRow = UiKit.Rect(col, "uniforme").Place(0, 1, 1, 1, 30, -300, 250, 250);
-                // prévia do uniforme estendido (camisa, calção, meiões e chuteiras)
+                // prévia do uniforme (camisa, calção e meiões)
                 var pv = UiKit.Image(col, new Color(0, 0, 0, 0.35f), Theme.Round, "prévia").rectTransform.At(1, 1, 210, 300, -20, -16);
                 pv.gameObject.AddComponent<RectMask2D>();
                 var pvImg = UiKit.Rect(pv, "img").Place(0, 0, 1, 1).gameObject.AddComponent<RawImage>();
@@ -821,12 +853,12 @@ namespace Craquez
                 void Refresh()
                 {
                     var t = Teams.Get(Team());
-                    crest.sprite = Crest.Badge(Team());
+                    if (flag != null) { flag.sprite = Crest.Country(t.iso); flag.enabled = flag.sprite != null; }
                     name.text = t.name;
                     int ovr = 0;
                     foreach (var r in t.roster) ovr += r.ovr;
                     ovr = t.roster.Count > 0 ? ovr / t.roster.Count : Mathf.RoundToInt(t.rating * 100);
-                    info.text = (t.IsNational ? "Ranking Craquez  #" + t.rank : t.league) + "\nGeral " + ovr + "  •  " + (string.IsNullOrEmpty(t.stadium.name) ? "" : t.stadium.name + (t.stadium.cap > 0 ? " (" + t.stadium.cap.ToString("N0") + ")" : ""));
+                    info.text = (t.IsNational ? Teams.Continent(t.iso) + "  •  Ranking Craquez  #" + t.rank : t.league) + "\nGeral " + ovr + "  •  " + (string.IsNullOrEmpty(t.stadium.name) ? "" : t.stadium.name + (t.stadium.cap > 0 ? " (" + t.stadium.cap.ToString("N0") + ")" : ""));
                     UiKit.Clear(kitRow);
                     int kIdx = s == 0 ? _cfg.kitA : (_cfg.kitB < 0 ? 0 : _cfg.kitB);
                     var k = t.kits[Mathf.Clamp(kIdx, 0, t.kits.Count - 1)];
@@ -841,26 +873,28 @@ namespace Craquez
                         x += 56;
                     }
                 }
-                var lgNames = new List<string>();
-                foreach (var l in lgs) lgNames.Add(l.name);
-                int lgIdx = Mathf.Max(0, lgs.FindIndex(l => l.first <= Team() && Team() < l.first + l.count));
-                List<string> TeamNames(League l)
+                var gNames = new List<string>();
+                foreach (var g in groups) gNames.Add(g.name);
+                int gIdx = Mathf.Max(0, groups.FindIndex(g => g.ids.Contains(Team())));
+                if (_cfg.national) gIdx = 0;
+                List<string> TeamNames(List<int> ids)
                 {
                     var n = new List<string>();
-                    for (int i = 0; i < l.count; i++) n.Add(Teams.Get(l.first + i).name);
+                    foreach (var id in ids) n.Add(Teams.Get(id).name);
                     return n;
                 }
-                var lgC = UiKit.Cycler(list, "Liga", lgNames, lgIdx, i =>
+                var lgC = UiKit.Cycler(list, _cfg.national ? "Continente" : "Liga", gNames, gIdx, i =>
                 {
-                    SetTeam(lgs[i].first + (s == 1 && lgs[i].count > 1 ? 1 : 0));
-                    teamC.SetOptions(TeamNames(lgs[i]), Team() - lgs[i].first);
+                    var ids = groups[i].ids;
+                    if (!ids.Contains(Team())) SetTeam(ids[s == 1 && ids.Count > 1 ? 1 : 0]);
+                    teamC.SetOptions(TeamNames(ids), Mathf.Max(0, ids.IndexOf(Team())));
                     Refresh();
                 });
                 UiKit.Size(lgC, 70, 70);
-                if (lgs.Count == 1) lgC.gameObject.SetActive(false);   // seleções: uma "liga" só
-                teamC = UiKit.Cycler(list, "Time", TeamNames(lgs[lgIdx]), Team() - lgs[lgIdx].first, i =>
+                if (groups.Count == 1) lgC.gameObject.SetActive(false);
+                teamC = UiKit.Cycler(list, _cfg.national ? "Seleção" : "Time", TeamNames(groups[gIdx].ids), Mathf.Max(0, groups[gIdx].ids.IndexOf(Team())), i =>
                 {
-                    SetTeam(lgs[lgC.Index].first + i);
+                    SetTeam(groups[lgC.Index].ids[i]);
                     Refresh();
                 });
                 UiKit.Size(teamC, 70, 70);
@@ -875,7 +909,7 @@ namespace Craquez
                 var tac = UiKit.Button(col, "Táticas e elenco", () => ShowTactics(s), 30);
                 tac.GetComponent<RectTransform>().Place(0, 0, 1, 0, 24, 30, 24, -110);
                 Refresh();
-                if (first == null) first = lgs.Count == 1 ? (Selectable)teamC : lgC;
+                if (first == null) first = groups.Count == 1 ? (Selectable)teamC : lgC;
             }
             var play = UiKit.Button(root, "JOGAR  ›", StartMatch, 44, new Color(0.85f, 0.14f, 0.18f));
             play.GetComponent<RectTransform>().At(1, 0, 420, 100, -90, 70);
@@ -1010,6 +1044,146 @@ namespace Craquez
             UiKit.Select(fc);
         }
 
+        // ------------------------------------------------------------ option file: navegador de pastas
+        const string OptionKey = "option_file_path";
+
+        static void ReloadOptionFile()
+        {
+            Teams.CustomOptionFile = PlayerPrefs.GetString(OptionKey, "");
+            Teams.Reload();
+            OptionFile.Apply();
+            BallCatalog.ClearCache();
+        }
+
+        /// <summary>Pastas iniciais: a do último arquivo, a do jogo, a de dados e a pessoal.</summary>
+        static List<(string name, string path)> BrowseRoots()
+        {
+            var l = new List<(string, string)>();
+            void Add(string n, string p)
+            {
+                try { if (!string.IsNullOrEmpty(p) && System.IO.Directory.Exists(p) && !l.Exists(x => x.Item2 == p)) l.Add((n, p)); } catch { }
+            }
+            string last = PlayerPrefs.GetString(OptionKey, "");
+            if (last != "") Add("Último usado", System.IO.Path.GetDirectoryName(last));
+            Add("Pasta do jogo", System.IO.Path.Combine(System.IO.Path.GetDirectoryName(Application.dataPath) ?? ".", "option_file"));
+            Add("Dados do jogo", Application.persistentDataPath);
+            Add("Pessoal", System.Environment.GetFolderPath(System.Environment.SpecialFolder.UserProfile));
+            Add("Downloads", System.IO.Path.Combine(System.Environment.GetFolderPath(System.Environment.SpecialFolder.UserProfile), "Downloads"));
+            Add("Área de trabalho", System.Environment.GetFolderPath(System.Environment.SpecialFolder.DesktopDirectory));
+            Add("Documentos", System.Environment.GetFolderPath(System.Environment.SpecialFolder.MyDocuments));
+            if (Application.platform == RuntimePlatform.Android)
+            {
+                Add("Armazenamento", "/storage/emulated/0");
+                Add("Downloads", "/storage/emulated/0/Download");
+            }
+            try { foreach (var d in System.IO.DriveInfo.GetDrives()) if (d.IsReady) Add("Unidade " + d.Name, d.RootDirectory.FullName); } catch { }
+            return l;
+        }
+
+        /// <summary>Navegador de pastas para escolher o option file (.json). dir nulo = lugares.</summary>
+        void ShowBrowse(string dir)
+        {
+            var root = Page("OPÇÕES  ›  OPTION FILE");
+            _back = () => { if (dir == null) ShowOptions(); else ShowBrowse(Parent(dir)); };
+            Title(root, "CARREGAR OPTION FILE", dir ?? "Escolha onde procurar o arquivo .json");
+            var listBg = UiKit.Panel(root).rectTransform.Place(0, 0, 1, 1, 90, 200, 90, 250);
+            var scroll = listBg.gameObject.AddComponent<ScrollRect>();
+            var view = UiKit.Rect(listBg, "view").Place(0, 0, 1, 1, 14, 14, 14, 14);
+            view.gameObject.AddComponent<RectMask2D>();
+            var content = UiKit.Rect(view, "conteudo");
+            content.anchorMin = new Vector2(0, 1);
+            content.anchorMax = new Vector2(1, 1);
+            content.pivot = new Vector2(0.5f, 1);
+            UiKit.VList(content, 6, 0, false);
+            content.gameObject.AddComponent<ContentSizeFitter>().verticalFit = ContentSizeFitter.FitMode.PreferredSize;
+            scroll.viewport = view;
+            scroll.content = content;
+            scroll.horizontal = false;
+            Selectable first = null;
+            void Row(string text, Color bg, System.Action act)
+            {
+                var b = UiKit.Button(content, text, act, 26, bg);
+                var lbl = b.GetComponentInChildren<Text>();
+                lbl.font = Theme.Body;
+                lbl.alignment = TextAnchor.MiddleLeft;
+                UiKit.Size(b, 58, 58);
+                if (first == null) first = b;
+            }
+            if (dir == null)
+            {
+                foreach (var (n, p) in BrowseRoots()) { string pp = p; Row("<color=#f5c518>›</color>  " + n + "   <color=#8fa3bf>" + p + "</color>", Theme.PanelLight, () => ShowBrowse(pp)); }
+                if (PlayerPrefs.GetString(OptionKey, "") != "")
+                    Row("↺  Voltar ao option file padrão", new Color(0.4f, 0.16f, 0.18f), () =>
+                    {
+                        PlayerPrefs.DeleteKey(OptionKey);
+                        ReloadOptionFile();
+                        ShowOptions();
+                    });
+            }
+            else
+            {
+                string up = Parent(dir);
+                if (up != null) Row("‹  ..  (pasta acima)", new Color(0.12f, 0.16f, 0.3f), () => ShowBrowse(up));
+                else Row("‹  Lugares", new Color(0.12f, 0.16f, 0.3f), () => ShowBrowse(null));
+                string[] dirs = new string[0], files = new string[0];
+                string err = null;
+                try
+                {
+                    dirs = System.IO.Directory.GetDirectories(dir);
+                    files = System.IO.Directory.GetFiles(dir, "*.json");
+                }
+                catch (System.Exception e) { err = e is System.UnauthorizedAccessException ? "Sem permissão para abrir esta pasta" : e.Message; }
+                System.Array.Sort(dirs, System.StringComparer.OrdinalIgnoreCase);
+                System.Array.Sort(files, System.StringComparer.OrdinalIgnoreCase);
+                // arquivos primeiro (é o que se procura), depois as pastas (sem as ocultas)
+                foreach (var f in files)
+                {
+                    string ff = f;
+                    long kb = 0;
+                    try { kb = new System.IO.FileInfo(f).Length / 1024; } catch { }
+                    Row("<color=#3ddc84>•</color>  <b>" + System.IO.Path.GetFileName(f) + "</b>   <color=#8fa3bf>" + kb + " KB</color>", new Color(0.1f, 0.34f, 0.22f), () => LoadOptionFile(ff));
+                }
+                foreach (var d in dirs)
+                {
+                    string name = System.IO.Path.GetFileName(d);
+                    if (name.StartsWith(".")) continue;
+                    string dd = d;
+                    Row("<color=#f5c518>›</color>  " + name + "/", Theme.PanelLight, () => ShowBrowse(dd));
+                }
+                if (err != null) UiKit.Size(UiKit.Label(content, err, 24, Theme.Body, Theme.Hot), 50, 50);
+                else if (files.Length == 0 && dirs.Length == 0) UiKit.Size(UiKit.Label(content, "Pasta vazia", 24, Theme.Body, Theme.TextDim), 50, 50);
+            }
+            foreach (var t in content.GetComponentsInChildren<Text>()) t.supportRichText = true;
+            UiKit.Select(first);
+        }
+
+        static string Parent(string dir)
+        {
+            try { var p = System.IO.Directory.GetParent(dir); return p?.FullName; } catch { return null; }
+        }
+
+        void LoadOptionFile(string path)
+        {
+            string prev = PlayerPrefs.GetString(OptionKey, "");
+            PlayerPrefs.SetString(OptionKey, path);
+            PlayerPrefs.Save();
+            ReloadOptionFile();
+            if (Teams.OptionDoc == null || Teams.OptionFilePath != path)
+            {
+                // arquivo inválido: volta ao anterior e avisa
+                if (prev == "") PlayerPrefs.DeleteKey(OptionKey); else PlayerPrefs.SetString(OptionKey, prev);
+                ReloadOptionFile();
+                var r = Page("OPÇÕES  ›  OPTION FILE");
+                _back = () => ShowBrowse(System.IO.Path.GetDirectoryName(path));
+                Title(r, "ARQUIVO INVÁLIDO", System.IO.Path.GetFileName(path) + " não é um option file do Craquez");
+                var ok = UiKit.Button(r, "Voltar", () => ShowBrowse(System.IO.Path.GetDirectoryName(path)), 34);
+                ok.GetComponent<RectTransform>().At(0.5f, 0.5f, 360, 90, 0, 0);
+                UiKit.Select(ok);
+                return;
+            }
+            ShowOptions();
+        }
+
         // ------------------------------------------------------------ opções
         System.Collections.Generic.Dictionary<string, object> _optSnap;
 
@@ -1063,10 +1237,10 @@ namespace Craquez
             var status = UiKit.Label(list, "", 20, Theme.Body, Theme.TextDim);
             status.gameObject.AddComponent<LayoutElement>().minHeight = 92;
             void St() => status.text = "OPTION FILE  •  times alterados: " + Teams.OverrideCount + "\n" +
-                                       System.IO.Path.Combine(Application.persistentDataPath, "option_file");
+                                       (Teams.OptionFilePath != "" ? Teams.OptionFilePath : "nenhum carregado");
             St();
-            UiKit.Size(UiKit.Button(list, "Exportar modelo do option file", () => { status.text = "Modelo gravado em:\n" + OptionFile.Export(); }, 26), 50, 50);
-            UiKit.Size(UiKit.Button(list, "Recarregar option file", () => { Teams.Reload(); OptionFile.Apply(); BallCatalog.ClearCache(); St(); }, 26), 50, 50);
+            UiKit.Size(UiKit.Button(list, "Carregar option file…", () => ShowBrowse(null), 26), 50, 50);
+            UiKit.Size(UiKit.Button(list, "Recarregar option file", () => { ReloadOptionFile(); St(); }, 26), 50, 50);
             // coluna 2: gráficos (no PC, tudo ajustável; no celular, o essencial)
             var gfx = UiKit.Rect(root, "gráficos").Place(0.5f, 0, 1, 1, 16, 190, 90, 274);
             UiKit.VList(gfx, 6, 0, false);

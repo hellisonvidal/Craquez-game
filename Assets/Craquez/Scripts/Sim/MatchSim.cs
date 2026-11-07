@@ -2742,13 +2742,7 @@ namespace Craquez.Sim
                         Emit("post", kind: "bar");
                         continue;
                     }
-                    if (mode.walls)
-                    {
-                        ball.pos.x = line - side * r;
-                        ball.vel.x *= -mode.wallBounce;
-                        Emit("wall");
-                        continue;
-                    }
+                    // (rua: sem mureta nas linhas de fundo — a bola sai e vira tiro de meta ou escanteio)
                     OutGoalLine(side);
                     return;
                 }

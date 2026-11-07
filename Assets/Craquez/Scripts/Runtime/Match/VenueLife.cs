@@ -11,7 +11,6 @@ namespace Craquez
     ///   • pombos que levantam voo quando a bola ou os jogadores chegam perto e voltam depois;
     ///   • um vira-lata caramelo que acompanha o lance correndo do lado de fora (ruas);
     ///   • placar eletrônico com o placar e o tempo reais (mesa do futsal, society);
-    ///   • fotógrafos agachados atrás dos gols e gandulas (campo).
     /// Tudo usa Time.deltaTime: na pausa fica parado.
     /// </summary>
     public class VenueLife : MonoBehaviour
@@ -103,20 +102,7 @@ namespace Craquez
             {
                 BuildBoard(v, homeT, awayT, home, away, night);
             }
-            else
-            {
-                // campo: fotógrafos agachados atrás das linhas de fundo e gandulas nas laterais
-                foreach (float sx in new[] { -1f, 1f })
-                {
-                    for (int i = 0; i < 4 + dense * 2; i++)
-                    {
-                        float z = (sim.goalHalf + 2.5f + i * 1.3f + R()) * (i % 2 == 0 ? 1f : -1f);
-                        AddFan(new Vector3(sx * (hl + 2.6f + R() * 0.6f), 0, z), R, rng, crouch: true, team: -2);
-                    }
-                    AddFan(new Vector3(sx * hl * 0.5f, 0, hw + 2.2f), R, rng, team: -3);
-                    AddFan(new Vector3(sx * (hl + 2f), 0, -hw * 0.75f), R, rng, team: -3);
-                }
-            }
+            // (campo: fotógrafos, cinegrafistas e gandulas já ficam na beira do gramado — VenueBuilder.Pitchside)
             if (_fans.Count > 0) BuildFans(home, away, quality);
         }
 

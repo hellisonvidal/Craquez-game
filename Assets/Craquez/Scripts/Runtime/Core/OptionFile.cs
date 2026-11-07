@@ -6,7 +6,7 @@ namespace Craquez
 {
     /// <summary>
     /// Seções do option file que pertencem ao jogo (fora do banco de times): bolas, chuteiras e
-    /// nomes dos locais. Exporta junto com os times (Teams.OptionDocument) e aplica o que o
+    /// nomes dos locais. O documento completo sai junto com os times (Teams.OptionDocument) e aplica o que o
     /// usuário editou em option_file.json.
     /// </summary>
     public static class OptionFile
@@ -56,7 +56,6 @@ namespace Craquez
         /// <summary>Option file completo em JSON (times + seções do jogo).</summary>
         public static string Json() => MiniJson.Write(Teams.OptionDocument(Sections()));
 
-        public static string Export() => Teams.ExportOptionTemplate(Sections());
 
         static readonly Dictionary<int, (string name, Color a, Color b, Color c)> _ballDefaults = new Dictionary<int, (string, Color, Color, Color)>();
         static readonly Dictionary<int, (string name, Color a, Color b, Color c, Color d)> _bootDefaults = new Dictionary<int, (string, Color, Color, Color, Color)>();

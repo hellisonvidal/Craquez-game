@@ -102,6 +102,22 @@ namespace Craquez.Sim
             return 0;
         }
 
+        static readonly Dictionary<string, string> _continent = new Dictionary<string, string>
+        {
+            ["AR"] = "América do Sul", ["BR"] = "América do Sul", ["CL"] = "América do Sul", ["CO"] = "América do Sul", ["EC"] = "América do Sul",
+            ["PE"] = "América do Sul", ["PY"] = "América do Sul", ["UY"] = "América do Sul", ["VE"] = "América do Sul", ["BO"] = "América do Sul",
+            ["US"] = "América do Norte e Central", ["MX"] = "América do Norte e Central", ["CA"] = "América do Norte e Central", ["CR"] = "América do Norte e Central",
+            ["PA"] = "América do Norte e Central", ["JM"] = "América do Norte e Central",
+            ["CI"] = "África", ["CM"] = "África", ["EG"] = "África", ["GH"] = "África", ["MA"] = "África", ["NG"] = "África", ["SN"] = "África", ["TN"] = "África", ["DZ"] = "África",
+            ["AU"] = "Ásia e Oceania", ["IR"] = "Ásia e Oceania", ["JP"] = "Ásia e Oceania", ["KR"] = "Ásia e Oceania", ["SA"] = "Ásia e Oceania", ["KZ"] = "Ásia e Oceania",
+            ["QA"] = "Ásia e Oceania", ["NZ"] = "Ásia e Oceania", ["CN"] = "Ásia e Oceania",
+        };
+
+        /// <summary>Continente (confederação) da seleção pelo código do país; Europa no resto.</summary>
+        public static string Continent(string iso) => !string.IsNullOrEmpty(iso) && _continent.TryGetValue(iso.ToUpperInvariant(), out var c) ? c : "Europa";
+
+        public static readonly string[] Continents = { "América do Sul", "Europa", "África", "América do Norte e Central", "Ásia e Oceania" };
+
         public static Texture2D Crest(int i)
         {
             Ensure();
@@ -332,16 +348,32 @@ namespace Craquez.Sim
             yield return Path.Combine(Application.persistentDataPath, "option_file");
         }
 
+        /// <summary>Option file escolhido no navegador de pastas (tem prioridade sobre as pastas padrão).</summary>
+        public static string CustomOptionFile;
+
+        /// <summary>O arquivo que foi lido (vazio se nenhum).</summary>
+        public static string OptionFilePath { get; private set; } = "";
+
+        static IEnumerable<string> OptionFiles()
+        {
+            if (!string.IsNullOrEmpty(CustomOptionFile)) yield return CustomOptionFile;
+            foreach (var dir in OptionDirs()) yield return Path.Combine(dir, "option_file.json");
+        }
+
         static void ApplyOptionFile()
         {
             OverrideCount = 0;
             OptionDoc = null;
+            OptionFilePath = "";
             _crests.Clear();
             if (SourceOverride != null) return;
-            foreach (var dir in OptionDirs())
+            foreach (var path in OptionFiles())
             {
-                string path = Path.Combine(dir, "option_file.json");
-                if (!File.Exists(path)) continue;
+                bool exists;
+                try { exists = File.Exists(path); } catch { exists = false; }
+                if (!exists) continue;
+                string dir = Path.GetDirectoryName(path) ?? ".";
+                OptionFilePath = path;
                 OptionDir = dir;
                 object doc;
                 try { doc = MiniJson.Parse(File.ReadAllText(path)); }
@@ -452,14 +484,5 @@ namespace Craquez.Sim
             return doc;
         }
 
-        /// <summary>Grava um modelo com tudo para o usuário editar. Retorna o caminho.</summary>
-        public static string ExportOptionTemplate(Dictionary<string, object> extras = null)
-        {
-            string dir = Path.Combine(Application.persistentDataPath, "option_file");
-            Directory.CreateDirectory(Path.Combine(dir, "crests"));
-            string path = Path.Combine(dir, "option_file_modelo.json");
-            File.WriteAllText(path, MiniJson.Write(OptionDocument(extras)));
-            return path;
-        }
     }
 }
