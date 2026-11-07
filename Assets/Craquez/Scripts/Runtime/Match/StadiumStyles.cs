@@ -95,6 +95,176 @@ namespace Craquez
             net.Object("Alambrado", Gfx.Transparent(new Color(0.72f, 0.75f, 0.78f, 0.7f), Gfx.Net(128, 18f, 1.4f)), v.root, false);
         }
 
+        /// <summary>
+        /// Arquitetura de cada estádio: escadas e vomitórios nas arquibancadas, frente da cobertura
+        /// (testeira colorida, treliças, faixa translúcida) e o elemento que marca cada modelo.
+        /// </summary>
+        static void Architecture(Venue v, float hl, float hw, StadiumStyle st, int model, Kit homeKit, bool night, int quality)
+        {
+            const float rise = 0.42f, step = 0.8f, gapX = 9f, gapZ = 7.5f;
+            int rows = st.rows;
+            int tier = rows <= 16 ? 1 : rows <= 30 ? 2 : 3;
+            float topY = 1.1f + rows * rise, ry = topY + 6f;
+            var stairs = new MeshKit();
+            var voms = new MeshKit();
+            var rails = new MeshKit();
+            var fascia = new MeshKit();
+            var truss = new MeshKit();
+            var glass = new MeshKit();
+            Color fasciaC = st.band.a > 0f ? st.band : Color.Lerp(homeKit.c1, Color.black, 0.15f);
+            for (int side = 1; side < 4; side++)
+            {
+                if (side >= 2 && !st.ends) continue;
+                bool longSide = side < 2;
+                float len = longSide ? (hl + gapX) * 2f : (hw + gapZ) * 2f;
+                float dist = longSide ? hw + gapZ : hl + gapX;
+                float far = dist + rows * step;
+                var rot = Quaternion.Euler(0, side == 1 ? 180 : side == 2 ? 90 : -90, 0);
+                Vector3 L(float x, float y, float z) => rot * new Vector3(x, y, z);
+                // escadas a cada ~13 m (degraus claros cortando a torcida) e vomitórios entre elas
+                int nA = Mathf.Max(2, Mathf.RoundToInt(len / 13f));
+                for (int a = 1; a < nA; a++)
+                {
+                    float x = -len / 2 + a * len / nA;
+                    for (int r = 0; r < rows; r++)
+                    {
+                        float y0 = 1.1f + r * rise, d0 = dist + r * step - 0.03f;
+                        stairs.Quad(L(x - 0.6f, y0, -d0), L(x + 0.6f, y0, -d0), L(x + 0.6f, y0 + rise, -d0), L(x - 0.6f, y0 + rise, -d0));
+                        if (r % 2 == 0) rails.Cylinder(L(x - 0.65f, y0 + rise + 0.9f, -d0 - step * 0.5f), L(x - 0.65f, y0 + rise + 0.9f + 0.02f, -d0 - step * 1.5f), 0.025f, 4);
+                    }
+                    if (a % 2 == 1 && rows >= 14)
+                    {
+                        float xm = x + len / nA * 0.5f;
+                        foreach (int rv in rows >= 30 ? new[] { rows / 3, rows * 2 / 3 } : new[] { rows / 3 })
+                        {
+                            float y0 = 1.1f + rv * rise, d0 = dist + rv * step - 0.04f;
+                            voms.Quad(L(xm - 1.3f, y0, -d0), L(xm + 1.3f, y0, -d0), L(xm + 1.3f, y0 + rise * 3.2f, -d0), L(xm - 1.3f, y0 + rise * 3.2f, -d0));
+                            rails.Cylinder(L(xm - 1.4f, y0 + rise * 3.3f, -d0), L(xm + 1.4f, y0 + rise * 3.3f, -d0), 0.04f, 5);
+                        }
+                    }
+                }
+                // cobertura: testeira na frente, treliças por baixo e faixa translúcida
+                bool roofed = st.roof >= 2 || (st.roof == 1 && (side == 1 || tier >= 3));
+                if (roofed)
+                {
+                    float front = dist - rows * step * 0.125f;
+                    float edge = st.roof >= 2 ? front - 4.5f : front;   // anel: beirada translúcida avançando sobre o campo
+                    if (st.roof >= 2)
+                    {
+                        glass.Quad(L(-len / 2, ry, -front), L(len / 2, ry, -front), L(len / 2, ry, -edge), L(-len / 2, ry, -edge));
+                        glass.Quad(L(-len / 2, ry, -edge), L(len / 2, ry, -edge), L(len / 2, ry, -front), L(-len / 2, ry, -front));
+                    }
+                    fascia.Box(L(0, ry - 0.5f, -edge), new Vector3(len, 1.6f, 0.35f));
+                    for (float x = -len / 2 + 4f; x < len / 2; x += 8f)
+                    {
+                        truss.Cylinder(L(x, ry - 0.35f, -edge - 0.3f), L(x, ry - 4.5f, -far - 0.4f), 0.14f, 5);
+                        truss.Cylinder(L(x, ry - 0.35f, -edge - 0.3f), L(x, ry - 0.35f, -far - 0.4f), 0.12f, 5);
+                    }
+                }
+            }
+            var concreteLight = Gfx.Lit(Color.Lerp(st.structure.a > 0f ? st.structure : new Color(0.6f, 0.6f, 0.62f), Color.white, 0.35f), null, 0.15f);
+            stairs.Object("Escadas", concreteLight, v.root, false);
+            voms.Object("Vomitórios", Gfx.Lit(new Color(0.04f, 0.04f, 0.05f), null, 0.05f), v.root, false);
+            rails.Object("Corrimãos", Gfx.Lit(new Color(0.75f, 0.77f, 0.8f), null, 0.5f, 0.7f), v.root, false);
+            var fasciaMat = st.led ? Gfx.Emissive(Color.black, st.band * (night ? 2.5f : 1.6f)) : Gfx.Lit(fasciaC, null, 0.35f);
+            if (st.led) v.neonMats.Add(fasciaMat);
+            fascia.Object("Testeira da cobertura", fasciaMat, v.root, quality >= 1);
+            truss.Object("Treliças", Gfx.Lit(new Color(0.82f, 0.83f, 0.86f), null, 0.4f, 0.6f), v.root, false);
+            glass.Object("Cobertura translúcida", Gfx.Transparent(new Color(0.85f, 0.92f, 1f, 0.35f), null), v.root, false);
+            Signature(v, hl, hw, st, model, homeKit, night, quality, topY, ry);
+        }
+
+        /// <summary>O que torna cada modelo único (pira, torre, fachada de LED, neve, coroa, velas, bandeirões...).</summary>
+        static void Signature(Venue v, float hl, float hw, StadiumStyle st, int model, Kit homeKit, bool night, int quality, float topY, float ry)
+        {
+            float farZ = hw + 7.5f + st.rows * 0.8f, farX = hl + 9f + st.rows * 0.8f;
+            var k = new MeshKit();
+            var accent = new MeshKit();
+            Material mat = Gfx.Lit(new Color(0.9f, 0.9f, 0.92f), null, 0.4f, 0.4f), accentMat = null;
+            switch (model)
+            {
+                case 1:   // Metropolitana: anel de LED branco na beirada e mastros com bandeiras do clube
+                case 5:   // Caldeirão: bandeirões no alto da arquibancada
+                    for (int i = -3; i <= 3; i++)
+                    {
+                        var b = new Vector3(i * hl * 0.28f, topY + (model == 1 ? 6.6f : 0.2f), farZ + 0.5f);
+                        k.Cylinder(b, b + Vector3.up * 7f, 0.08f, 5);
+                        var f0 = b + Vector3.up * 7f;
+                        accent.Quad(f0, f0 + new Vector3(3.2f, -0.2f, 0), f0 + new Vector3(3.2f, -2.2f, 0), f0 + new Vector3(0, -2f, 0));
+                        accent.Quad(f0 + new Vector3(0, -2f, 0), f0 + new Vector3(3.2f, -2.2f, 0), f0 + new Vector3(3.2f, -0.2f, 0), f0);
+                    }
+                    accentMat = Gfx.Lit(homeKit.c1, null, 0.1f);
+                    break;
+                case 2:   // Estadual: marquise de concreto com nervuras (estilo anos 50)
+                    for (float x = -hl - 6f; x <= hl + 6f; x += 6f)
+                        k.Box(new Vector3(x, ry + 1.2f, farZ - st.rows * 0.8f * 0.45f), new Vector3(0.5f, 1.6f, st.rows * 0.8f * 1.1f));
+                    mat = Gfx.Lit(new Color(0.72f, 0.72f, 0.7f), null, 0.1f);
+                    break;
+                case 6:   // Olímpico: pira olímpica atrás de um dos gols
+                {
+                    var b = new Vector3(farX + 14f, 0, -hw * 0.5f);
+                    k.Cylinder(b, b + Vector3.up * 32f, 1.4f, 12);
+                    k.Cylinder(b + Vector3.up * 32f, b + Vector3.up * 33.5f, 3.6f, 16);
+                    for (int i = 0; i < 5; i++)
+                        accent.Cylinder(b + new Vector3(Mathf.Sin(i * 1.3f) * 0.8f, 33.5f, Mathf.Cos(i * 1.3f) * 0.8f), b + new Vector3(Mathf.Sin(i * 1.3f) * 0.3f, 37f + (i % 2) * 1.5f, Mathf.Cos(i * 1.3f) * 0.3f), 1.1f - i * 0.12f, 8);
+                    accentMat = Gfx.Emissive(new Color(1f, 0.55f, 0.1f), new Color(3.5f, 1.4f, 0.3f));
+                    v.neonMats.Add(accentMat);
+                    break;
+                }
+                case 7:   // Litoral: velas brancas sobre a cobertura
+                    for (float x = -hl; x <= hl; x += 11f)
+                    {
+                        var b = new Vector3(x, ry + 0.3f, farZ - st.rows * 0.8f * 0.2f);
+                        k.Quad(b, b + new Vector3(6f, 0, 0), b + new Vector3(1.5f, 9f, 2f), b);
+                        k.Quad(b, b + new Vector3(1.5f, 9f, 2f), b + new Vector3(6f, 0, 0), b);
+                    }
+                    mat = Gfx.Lit(Color.white, null, 0.3f);
+                    break;
+                case 9:   // Imperial: coroa dourada na frente da cobertura
+                    for (float x = -hl - 6f; x <= hl + 6f; x += 4f)
+                        k.Cylinder(new Vector3(x, ry + 0.3f, farZ - st.rows * 0.8f * 1.0f), new Vector3(x, ry + 2.6f + ((int)(x / 4f) % 2 == 0 ? 1.2f : 0f), farZ - st.rows * 0.8f * 1.0f), 0.22f, 6);
+                    mat = Gfx.Lit(new Color(0.95f, 0.75f, 0.25f), null, 0.7f, 0.9f);
+                    break;
+                case 10:  // Centenário: torre de concreto atrás da arquibancada do fundo
+                {
+                    var b = new Vector3(hl * 0.25f, 0, farZ + 9f);
+                    k.Box(b + Vector3.up * 30f, new Vector3(6f, 60f, 6f), 4f);
+                    for (int i = 0; i < 4; i++)
+                        k.Box(b + new Vector3(i < 2 ? (i == 0 ? -3.6f : 3.6f) : 0, 28f, i >= 2 ? (i == 2 ? -3.6f : 3.6f) : 0), new Vector3(i < 2 ? 1.2f : 7f, 56f, i < 2 ? 7f : 1.2f));
+                    k.Box(b + Vector3.up * 61f, new Vector3(8f, 2f, 8f));
+                    mat = Gfx.Lit(new Color(0.78f, 0.74f, 0.66f), Gfx.Asphalt(256, Color.white, 7, 0.06f), 0.1f);
+                    break;
+                }
+                case 11:  // Deserto: painéis de treliça (sombra) acima da arquibancada
+                    for (float x = -hl - 6f; x <= hl + 6f; x += 9f)
+                        accent.Quad(new Vector3(x, topY + 0.5f, farZ + 0.6f), new Vector3(x + 8.4f, topY + 0.5f, farZ + 0.6f), new Vector3(x + 8.4f, topY + 9f, farZ + 0.6f), new Vector3(x, topY + 9f, farZ + 0.6f), new Vector2(0, 0), new Vector2(6, 6));
+                    accentMat = Gfx.Cutout(new Color(0.85f, 0.72f, 0.5f), Gfx.Net(128, 8f, 2.5f), 0.4f);
+                    break;
+                case 13:  // Futuro: fachada de almofadas de LED em volta de todo o estádio
+                {
+                    for (int side = 1; side < 4; side++)
+                    {
+                        bool ls = side == 1;
+                        float len = ls ? (hl + 9f) * 2f + 8f : (hw + 7.5f) * 2f + 8f;
+                        float d = (ls ? farZ : farX) + 1.2f;
+                        var rot = Quaternion.Euler(0, side == 1 ? 180 : side == 2 ? 90 : -90, 0);
+                        for (float x = -len / 2; x < len / 2; x += 4f)
+                            for (float y = 2f; y < ry + 4f; y += 3f)
+                                accent.Quad(rot * new Vector3(x + 3.6f, y, -d), rot * new Vector3(x, y, -d), rot * new Vector3(x, y + 2.6f, -d), rot * new Vector3(x + 3.6f, y + 2.6f, -d));
+                    }
+                    accentMat = Gfx.Emissive(Color.black, (st.band.a > 0f ? st.band : new Color(0.7f, 0.2f, 1f)) * (night ? 1.8f : 0.9f));
+                    v.neonMats.Add(accentMat);
+                    break;
+                }
+                case 14:  // Alpino: neve sobre a cobertura e testeira de madeira
+                    k.Box(new Vector3(0, ry + 0.45f, farZ - st.rows * 0.8f * 0.45f), new Vector3((hl + 9f) * 2f, 0.35f, st.rows * 0.8f * 1.15f));
+                    mat = Gfx.Lit(new Color(0.96f, 0.97f, 1f), null, 0.6f);
+                    break;
+            }
+            if (k.Count > 0) k.Object("Marca do estádio", mat, v.root, quality >= 1);
+            if (accentMat != null) accent.Object("Marca do estádio (destaque)", accentMat, v.root, false);
+        }
+
         /// <summary>Arco sobre a arquibancada do fundo (estádios 3: anel + arco).</summary>
         static void Arch(Venue v, float hl, float hw, StadiumStyle st)
         {

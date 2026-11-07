@@ -80,6 +80,7 @@ namespace Craquez
             var st = StyleOf(model, home.stadium.tier);
             Stands(v, hl, hw, st, home, away, homeKit, awayKit, night, quality);
             StandBand(v, hl, hw, st, night);
+            Architecture(v, hl, hw, st, model, homeKit, night, quality);
             if (st.roof == 3) Arch(v, hl, hw, st);
             if (st.fence) PitchFence(v, hl, hw);
             if (st.lights == 0) Floodlights(v, hl, hw, tier, night, st);

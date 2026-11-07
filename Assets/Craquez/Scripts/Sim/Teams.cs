@@ -416,6 +416,7 @@ namespace Craquez.Sim
                     if (!teams.TryGetValue(t.Key, out var o)) continue;
                     if (MiniJson.S(o, "name", null) is string nm) t.name = nm;
                     if (MiniJson.S(o, "short", null) is string sh) t.shortName = sh;
+                    if (((Dictionary<string, object>)o).ContainsKey("rating")) t.rating = Mathf.Clamp(MiniJson.F(o, "rating", t.rating), 0.3f, 0.99f);
                     var kl = MiniJson.L(o, "kits");
                     if (kl != null)
                     {

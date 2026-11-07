@@ -8,6 +8,33 @@ Jogo de futebol feito 100% com inteligência artificial, **gratuito**. Android, 
 - **Linux**: `Craquez-v2.1.0-Linux.tar.gz` → extraia e rode `./Craquez` (ou `./instalar.sh` para o atalho no menu)
 
 ### Novidades
+- **Intervalo de verdade**: apito, plano aberto do estádio, varredura de transmissão e a tela do
+  intervalo com placar, posse de bola e finalizações; dali dá para abrir as **substituições**, as
+  táticas e as configurações antes de começar o 2º tempo (os atletas voltam descansados).
+- **Substituições** (no intervalo e na pausa): 5 trocas no campo; no futsal, society e rua as
+  trocas são livres. Quem entra aparece com o próprio nome, número e cara.
+- **Gol sem cortes, com a rede balançando**: a bola segue depois da linha, estufa o fundo da rede
+  (que cede e devolve só um pouco) e cai lá dentro; a câmera sai da jogada, acompanha a bola na rede
+  e desliza até o autor do gol comemorando. Replay e tomada final entram por varredura, sem corte seco.
+- **Torcida mais viva**: torcedores de alturas e corpos diferentes (crianças também), bonés,
+  camisas listradas quando o time joga de listras, cachecol esticado acima da cabeça; a arquibancada
+  pula em grupos fora de sincronia e levanta os braços no gol do mandante; faixas de torcida
+  penduradas na mureta.
+- **Estádios mais bonitos e únicos**: escadas e vomitórios nas arquibancadas, corrimãos, cobertura
+  com testeira na cor do clube (ou de LED), treliças e beirada translúcida. Cada modelo tem a sua
+  marca: pira olímpica no Olímpico Nacional, torre de concreto no Centenário, fachada de LED na
+  Arena Futuro, neve na cobertura do Alpino, coroa dourada na Imperial, velas brancas no Litoral,
+  bandeirões no Caldeirão e na Metropolitana, marquise com nervuras no Estadual e painéis de sombra
+  no Deserto.
+- **Sair do jogo**: botão "SAIR DO JOGO" no menu principal (e no voltar do menu), com confirmação.
+- **Trilha nova na abertura e nos menus**: rock pesado original (guitarras distorcidas, riff em
+  palm mute, bateria com bumbo duplo e solo no refrão), composta e sintetizada por código.
+- **Sem o logo antigo** na barra dos menus.
+- **Rua**: no lugar das placas de publicidade, placas brancas baixas e separadas.
+- **Uniformes mais fiéis**: 64 clubes corrigidos (Série B, MLS, Uruguai, Peru, Chile, Equador,
+  Arábia Saudita, Rússia e Ucrânia, além de Botafogo, Vasco, Santos e Mirassol na Série A).
+- **Option file**: cada jogador aceita atributos (`a` = velocidade, aceleração, chute, passe,
+  controle, defesa) e características (`traits`), além de nome, número, posição e geral.
 - **Ruas mais realistas**: quadra pintada no chão com linhas completas, áreas em meia-lua e marcas;
   as muretas grafitadas das laterais viraram **placas de publicidade** de comércios fictícios do
   bairro; no porto, frades de amarração, paletes e boias no lugar das árvores.
