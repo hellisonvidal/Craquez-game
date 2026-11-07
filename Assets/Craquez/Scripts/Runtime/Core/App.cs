@@ -353,16 +353,12 @@ namespace Craquez
             grad.raycastTarget = false;
             var glow = UiKit.Image(_root, new Color(0.16f, 0.62f, 1f, 0.25f), Theme.Soft, "brilho").rectTransform.At(0.5f, 0.6f, 1500, 900);
             var logoBox = UiKit.Rect(full, "capa").Place(0, 0, 1, 1);
-            float aspect = Screen.width / (float)Mathf.Max(1, Screen.height);
-            var wide = Resources.Load<Texture2D>("UI/capa_wide");
-            bool useWide = wide != null && aspect >= 1.6f;
-            if (!useWide) CoverBackdrop(logoBox, 0.45f);
+            // a arte sempre cobre a tela toda (sem faixas): versão larga em telas largas, 3:2 em
+            // tablets; a escolha acompanha a tela se a janela mudar de tamanho (ex.: ao entrar em tela cheia)
             var cover = UiKit.Rect(logoBox, "imagem").Place(0, 0, 1, 1).gameObject.AddComponent<RawImage>();
             cover.raycastTarget = false;
-            cover.texture = useWide ? wide : Resources.Load<Texture2D>("UI/capa");
-            var fit = cover.gameObject.AddComponent<AspectRatioFitter>();
-            fit.aspectMode = useWide ? AspectRatioFitter.AspectMode.EnvelopeParent : AspectRatioFitter.AspectMode.FitInParent;
-            fit.aspectRatio = useWide ? wide.width / (float)wide.height : 1.5f;
+            cover.gameObject.AddComponent<AspectRatioFitter>();
+            cover.gameObject.AddComponent<CoverFit>().Apply();
             if (cover.texture == null)
             {
                 cover.enabled = false;
@@ -461,22 +457,6 @@ namespace Craquez
         }
 
         float _titleShownAt;
-
-        /// <summary>Arte da capa cobrindo a área (cortando sobras), escurecida pelo fator dado.</summary>
-        static void CoverBackdrop(RectTransform parent, float bright)
-        {
-            var tex = Resources.Load<Texture2D>("UI/capa");
-            if (tex == null) return;
-            var holder = UiKit.Rect(parent, "capa (fundo)").Place(0, 0, 1, 1);
-            holder.gameObject.AddComponent<RectMask2D>();
-            var img = UiKit.Rect(holder, "img").Place(0, 0, 1, 1).gameObject.AddComponent<RawImage>();
-            img.texture = tex;
-            img.color = new Color(bright, bright, bright * 1.15f, 1f);
-            img.raycastTarget = false;
-            var f = img.gameObject.AddComponent<AspectRatioFitter>();
-            f.aspectMode = AspectRatioFitter.AspectMode.EnvelopeParent;
-            f.aspectRatio = 1.5f;
-        }
 
         // ------------------------------------------------------------ modos
         static readonly Dictionary<MenuArt.Kind, Texture2D> _tileArt = new Dictionary<MenuArt.Kind, Texture2D>();

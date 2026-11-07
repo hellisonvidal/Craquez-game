@@ -1011,6 +1011,37 @@ namespace Craquez.UI
         }
     }
 
+    /// <summary>
+    /// Capa em tela cheia: sempre cobre a tela inteira (corta só as sobras). Em telas a partir
+    /// de ~3:2 usa a arte larga (16:9 exato sem corte; celulares 20:9 com as laterais estendidas);
+    /// em tablets 4:3 usa a arte 3:2. Reavalia quando a resolução muda.
+    /// </summary>
+    public class CoverFit : MonoBehaviour
+    {
+        int _w, _h;
+        static Texture2D _wide, _std;
+
+        public void Apply()
+        {
+            _w = Screen.width; _h = Screen.height;
+            var ri = GetComponent<RawImage>();
+            var fit = GetComponent<AspectRatioFitter>();
+            if (_wide == null) _wide = Resources.Load<Texture2D>("UI/capa_wide");
+            if (_std == null) _std = Resources.Load<Texture2D>("UI/capa");
+            float aspect = _w / (float)Mathf.Max(1, _h);
+            var tex = aspect >= 1.55f && _wide != null ? _wide : _std != null ? _std : _wide;
+            ri.texture = tex;
+            if (tex == null) return;
+            fit.aspectMode = AspectRatioFitter.AspectMode.EnvelopeParent;
+            fit.aspectRatio = tex.width / (float)tex.height;
+        }
+
+        void Update()
+        {
+            if (Screen.width != _w || Screen.height != _h) Apply();
+        }
+    }
+
     /// <summary>Abertura do título: o degradê clareia, a logo cresce e o "toque para iniciar" pulsa.</summary>
     public class TitleFx : MonoBehaviour
     {

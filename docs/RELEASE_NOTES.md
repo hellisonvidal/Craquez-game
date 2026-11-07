@@ -8,6 +8,9 @@ Jogo de futebol feito 100% com inteligência artificial, **gratuito**. Android, 
 - **Linux**: `Craquez-v2.1.0-Linux.tar.gz` → extraia e rode `./Craquez` (ou `./instalar.sh` para o atalho no menu)
 
 ### Novidades
+- **Tela inicial em tela cheia**: a capa cobre a tela inteira em qualquer formato (16:9 sem corte
+  nem laterais borradas; celulares e tablets sem faixas) e se reajusta se a janela mudar; vídeo de
+  abertura refeito a partir da capa nova.
 - **Menus reformulados**: fundo animado (arte da capa com feixes de luz e partículas), transição
   em faixas entre as telas, conteúdo entrando em sequência, trilha de navegação no topo e dicas
   de controle em "teclas" na barra de baixo; painéis e botões com novo acabamento.
