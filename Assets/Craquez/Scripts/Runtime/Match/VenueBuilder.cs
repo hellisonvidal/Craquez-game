@@ -26,7 +26,7 @@ namespace Craquez
             "Ginásio Municipal", "Arena Coberta", "Quadra do Clube", "Ginásio Universitário",
             "Arena Neon", "Quadra da Escola", "Ginásio Olímpico", "Ginásio Antigo (tacos)",
         };
-        public static readonly string[] SocietyNames = { "Society Indoor", "Arena Society", "Society do Bairro", "Society Premium" };
+        public static readonly string[] SocietyNames = { "Society Coberto do Clube", "Arena Society Central", "Campo Society do Bairro", "Complexo Society Premium" };
         public static readonly string[] StreetNames =
         {
             "Entre Prédios", "Morro", "Praia", "Terraço", "Gaiola", "Telhado", "Sob o Viaduto", "Praça",
@@ -36,8 +36,8 @@ namespace Craquez
         /// <summary>Modelos de estádio (0 = o do mandante). cut: 0 listras, 1 listras largas, 2 xadrez, 3 xadrez miúdo.</summary>
         public static readonly (string name, int tier, int cut, bool track)[] StadiumModels =
         {
-            ("Estádio do mandante", 0, 0, false), ("Arena Moderna", 3, 0, false), ("Estádio Clássico", 3, 2, true), ("Estádio Municipal", 2, 1, false),
-            ("Estádio de Bairro", 1, 0, false), ("Caldeirão", 3, 3, false), ("Estádio Olímpico", 3, 1, true),
+            ("Estádio do mandante", 0, 0, false), ("Arena Metropolitana", 3, 0, false), ("Estádio Estadual", 3, 2, true), ("Estádio Municipal", 2, 1, false),
+            ("Campo do Bairro", 1, 0, false), ("Estádio Caldeirão da Vila", 3, 3, false), ("Estádio Olímpico Nacional", 3, 1, true),
         };
 
         public static Venue Stadium(MatchSim sim, TeamData home, TeamData away, Kit homeKit, Kit awayKit, bool night, int quality, Transform parent, int model = 0)

@@ -5,6 +5,7 @@ using UnityEngine;
 using UnityEngine.EventSystems;
 using UnityEngine.InputSystem.UI;
 using UnityEngine.UI;
+using UnityEngine.Video;
 
 namespace Craquez
 {
@@ -115,6 +116,7 @@ namespace Craquez
         void Update()
         {
             if (_introT >= 0f) { UpdateIntro(); return; }
+            if (UpdateIntroVideo()) return;
             if (_pressText != null)
             {
                 float since = Time.unscaledTime - _titleShownAt;
@@ -144,6 +146,7 @@ namespace Craquez
 
         void ClearCover()
         {
+            DestroyIntroVideo();
             if (_cover != null) Destroy(_cover);
             _cover = null;
         }
@@ -342,6 +345,83 @@ namespace Craquez
             var fx = _root.gameObject.AddComponent<TitleFx>();
             fx.Setup(grad, glow.GetComponent<Image>(), logoBox, sub, _pressText);
             _titleShownAt = Time.unscaledTime;
+            if (!_introPlayed) PlayIntroVideo(full);
+        }
+
+        // ------------------------------------------------------------ vídeo de abertura
+        bool _introPlayed;
+        VideoPlayer _video;
+        RawImage _videoImg;
+        RenderTexture _videoRt;
+        float _videoFade = -1f;
+
+        /// <summary>
+        /// Vídeo de abertura (uma vez por sessão) por cima da capa: termina exatamente na arte da
+        /// capa, que fica parada até o jogador apertar um botão. Qualquer botão pula o vídeo.
+        /// </summary>
+        void PlayIntroVideo(RectTransform full)
+        {
+            _introPlayed = true;
+            var clip = Resources.Load<VideoClip>("UI/abertura");
+            if (clip == null || ShotTour.Requested()) return;
+            _videoRt = new RenderTexture((int)clip.width, (int)clip.height, 0, RenderTextureFormat.ARGB32);
+            var holder = UiKit.Rect(full, "vídeo de abertura").Place(0, 0, 1, 1);
+            _videoImg = holder.gameObject.AddComponent<RawImage>();
+            _videoImg.texture = _videoRt;
+            _videoImg.color = Color.black;   // até o primeiro quadro ficar pronto
+            _videoImg.raycastTarget = false;
+            var fit = holder.gameObject.AddComponent<AspectRatioFitter>();
+            fit.aspectMode = AspectRatioFitter.AspectMode.EnvelopeParent;
+            fit.aspectRatio = clip.width / (float)clip.height;
+            _video = holder.gameObject.AddComponent<VideoPlayer>();
+            _video.playOnAwake = false;
+            _video.source = VideoSource.VideoClip;
+            _video.clip = clip;
+            _video.renderMode = VideoRenderMode.RenderTexture;
+            _video.targetTexture = _videoRt;
+            _video.audioOutputMode = VideoAudioOutputMode.None;
+            _video.isLooping = false;
+            _video.waitForFirstFrame = true;
+            _video.prepareCompleted += v => { _videoImg.color = Color.white; v.Play(); };
+            _video.loopPointReached += v => EndIntroVideo();
+            _video.errorReceived += (v, msg) => { Debug.LogWarning("[abertura] " + msg); EndIntroVideo(); };
+            _video.Prepare();
+            if (_pressText != null) _pressText.enabled = false;
+        }
+
+        void EndIntroVideo()
+        {
+            if (_video == null) return;
+            // o último quadro é a própria capa: some num fade curto e a capa parada fica esperando
+            _video.Pause();
+            _videoFade = 0.35f;
+            _titleShownAt = Time.unscaledTime - 1.2f;
+            if (_pressText != null) _pressText.enabled = true;
+        }
+
+        /// <summary>Durante o vídeo, um botão só pula o vídeo (não entra direto nos menus).</summary>
+        bool UpdateIntroVideo()
+        {
+            if (_videoFade >= 0f)
+            {
+                _videoFade -= Time.unscaledDeltaTime;
+                if (_videoImg != null) _videoImg.color = new Color(1, 1, 1, Mathf.Clamp01(_videoFade / 0.35f));
+                if (_videoFade < 0f) DestroyIntroVideo();
+                return false;
+            }
+            if (_video == null) return false;
+            if (InputRouter.AnyPressedThisFrame()) { EndIntroVideo(); return true; }
+            return true;
+        }
+
+        void DestroyIntroVideo()
+        {
+            if (_video != null) Destroy(_video.gameObject);
+            _video = null;
+            _videoImg = null;
+            if (_videoRt != null) { _videoRt.Release(); Destroy(_videoRt); }
+            _videoRt = null;
+            _videoFade = -1f;
         }
 
         float _titleShownAt;
@@ -707,7 +787,7 @@ namespace Craquez
                 UiKit.Size(UiKit.Cycler(list, "Clima dinâmico", new[] { "Ligado", "Desligado" }, _cfg.dynamicWeather ? 0 : 1, i => _cfg.dynamicWeather = i == 0), 60, 60);
             }
             UiKit.Size(UiKit.Cycler(list, "Lado do campo", new[] { "Mandante ataca  ›", "‹  Mandante ataca" }, _cfg.swapSides ? 1 : 0, i => _cfg.swapSides = i == 1), 60, 60);
-            UiKit.Size(UiKit.Cycler(list, "Horário", TodOpts, Mathf.Max(0, System.Array.IndexOf(TodIds, _cfg.timeOfDay)), i => _cfg.timeOfDay = TodIds[i]), 60, 60);
+            UiKit.Size(UiKit.Cycler(list, "Horário", TodOpts, Mathf.Max(0, System.Array.IndexOf(TodIds, _cfg.timeOfDay)), i => { _cfg.timeOfDay = TodIds[i]; _refreshVenue?.Invoke(); }), 60, 60);
             UiKit.Size(UiKit.Cycler(list, "Dificuldade", DiffOpts, Mathf.Max(0, System.Array.IndexOf(DiffVals, _cfg.difficulty)), i => _cfg.difficulty = DiffVals[i]), 60, 60);
             var mins = new List<string>();
             foreach (var m in MinuteOpts) mins.Add(m + " minutos");
@@ -719,14 +799,6 @@ namespace Craquez
                     _cfg.tacticsA = new Tactics();
                     _cfg.tacticsB = new Tactics();
                 }), 60, 60);
-            if (_cfg.mode != GameModes.Field)
-                UiKit.Size(UiKit.Cycler(list, "Local", VenueNames(_cfg.mode), _cfg.venue, i => { _cfg.venue = i; _refreshVenue?.Invoke(); }), 60, 60);
-            else
-            {
-                var sn = new List<string>();
-                foreach (var m in VenueBuilder.StadiumModels) sn.Add(m.name);
-                UiKit.Size(UiKit.Cycler(list, "Estádio", sn, _cfg.stadium, i => { _cfg.stadium = i; _refreshVenue?.Invoke(); }), 60, 60);
-            }
             UiKit.Size(UiKit.Cycler(list, "Câmera", BroadcastCamera.Modes, Settings.Camera, i => Settings.Camera = i), 60, 60);
             UiKit.Size(UiKit.Cycler(list, "Faltas", new[] { "Cena antes da cobrança", "Cobrança rápida" }, _cfg.quickRestarts ? 1 : 0, i => { _cfg.quickRestarts = i == 1; Settings.QuickRestarts = i == 1; }), 60, 60);
             UiKit.Size(UiKit.Cycler(list, "Cerimônia de abertura", new[] { "Mostrar", "Pular" }, _cfg.ceremony ? 0 : 1, i => _cfg.ceremony = i == 0), 60, 60);
@@ -740,12 +812,42 @@ namespace Craquez
             venueName.rectTransform.Place(0, 0, 1, 0.4f, 18, 10, 18, 0);
             UiKit.Shadow(venueName, 3, 0.9f);
             Texture2D venueTex = null;
+            // seletor junto da imagem: setas nas laterais da foto do local
+            int VenueCount() => _cfg.mode == GameModes.Field ? VenueBuilder.StadiumModels.Length : VenueNames(_cfg.mode).Length;
+            int VenueIdx() => _cfg.mode == GameModes.Field ? _cfg.stadium : _cfg.venue;
+            void StepVenue(int d)
+            {
+                int n = VenueCount(), i = ((VenueIdx() + d) % n + n) % n;
+                if (_cfg.mode == GameModes.Field) _cfg.stadium = i; else _cfg.venue = i;
+                Sfx.Move();
+                _refreshVenue?.Invoke();
+            }
+            var prevV = UiKit.Button(vHolder, "‹", () => StepVenue(-1), 60, new Color(0, 0, 0, 0.45f));
+            prevV.GetComponent<RectTransform>().At(0, 0.5f, 76, 120, 10, 0);
+            var nextV = UiKit.Button(vHolder, "›", () => StepVenue(1), 60, new Color(0, 0, 0, 0.45f));
+            nextV.GetComponent<RectTransform>().At(1, 0.5f, 76, 120, -10, 0);
+            var venueCount = UiKit.Label(vHolder, "", 24, Theme.BodyBold, Color.white, TextAnchor.UpperRight);
+            venueCount.rectTransform.Place(0, 0.8f, 1, 1, 18, 0, 18, 12);
+            UiKit.Shadow(venueCount, 2, 0.9f);
             _refreshVenue = () =>
             {
                 if (venueTex != null) Destroy(venueTex);
                 var home = Teams.Get(_cfg.teamA);
-                venueTex = MenuArt.Venue(_cfg.mode, _cfg.mode == GameModes.Field ? _cfg.stadium : _cfg.venue, home != null ? home.c1 : Theme.Accent);
-                venueImg.texture = venueTex;
+                int vi = VenueIdx();
+                bool night = _cfg.timeOfDay == "noite";
+                venueCount.text = (vi + 1) + " / " + VenueCount();
+                var photo = VenuePreview.Cached(_cfg.mode, vi, _cfg.teamA, night);
+                venueTex = photo != null ? null : MenuArt.Venue(_cfg.mode, vi, home != null ? home.c1 : Theme.Accent);
+                venueImg.texture = photo != null ? photo : venueTex;
+                if (photo == null)
+                {
+                    string want = VenuePreview.Key(_cfg.mode, vi, _cfg.teamA, night);
+                    VenuePreview.Request(this, _cfg.mode, vi, _cfg.teamA, _cfg.teamB, night, _cfg.streetPlayers, t =>
+                    {
+                        // só troca se o jogador ainda está neste local
+                        if (venueImg != null && VenuePreview.Key(_cfg.mode, VenueIdx(), _cfg.teamA, _cfg.timeOfDay == "noite") == want) venueImg.texture = t;
+                    });
+                }
                 venueName.text = _cfg.mode != GameModes.Field ? VenueNames(_cfg.mode)[_cfg.venue % VenueNames(_cfg.mode).Length]
                     : _cfg.stadium > 0 ? VenueBuilder.StadiumModels[_cfg.stadium].name
                     : (home != null && !string.IsNullOrEmpty(home.stadium.name) ? home.stadium.name : "Estádio do mandante");
