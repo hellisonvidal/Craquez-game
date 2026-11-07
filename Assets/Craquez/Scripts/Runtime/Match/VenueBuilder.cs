@@ -548,8 +548,16 @@ namespace Craquez
                     float y1 = 1.1f + (r + 1) * rise, d = dist + r * step + step * 0.55f;
                     float off = (r * 0.37f) % 1f;
                     const float hh = 0.85f;
-                    pplG[(r / 2) % 3].Quad(new Vector3(-len / 2, y1, -d), new Vector3(len / 2, y1, -d), new Vector3(len / 2, y1 + hh, -d), new Vector3(-len / 2, y1 + hh, -d),
-                        new Vector2(off, 0f), new Vector2(off + len / (pwT / (phT * 14f / 64f) * 0.55f), 1f));
+                    float uSpan = len / (pwT / (phT * 14f / 64f) * 0.55f);
+                    // os vãos das escadas (mesma conta de Architecture) ficam livres
+                    int nA = Mathf.Max(2, Mathf.RoundToInt(len / 13f));
+                    for (int a = 0; a < nA; a++)
+                    {
+                        float xa = -len / 2 + a * len / nA + (a > 0 ? 0.65f : 0f), xb = -len / 2 + (a + 1) * len / nA - (a < nA - 1 ? 0.65f : 0f);
+                        float ua = off + (xa + len / 2) / len * uSpan, ub = off + (xb + len / 2) / len * uSpan;
+                        pplG[(r / 2) % 3].Quad(new Vector3(xa, y1, -d), new Vector3(xb, y1, -d), new Vector3(xb, y1 + hh, -d), new Vector3(xa, y1 + hh, -d),
+                            new Vector2(ua, 0f), new Vector2(ub, 1f));
+                    }
                 }
                 for (int g = 0; g < 3; g++)
                 {

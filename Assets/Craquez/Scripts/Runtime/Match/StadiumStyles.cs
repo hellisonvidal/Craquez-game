@@ -154,7 +154,7 @@ namespace Craquez
                         glass.Quad(L(-len / 2, ry, -front), L(len / 2, ry, -front), L(len / 2, ry, -edge), L(-len / 2, ry, -edge));
                         glass.Quad(L(-len / 2, ry, -edge), L(len / 2, ry, -edge), L(len / 2, ry, -front), L(-len / 2, ry, -front));
                     }
-                    fascia.Box(L(0, ry - 0.5f, -edge), new Vector3(len, 1.6f, 0.35f));
+                    fascia.Box(L(0, ry - 0.5f, -edge), longSide ? new Vector3(len, 1.6f, 0.35f) : new Vector3(0.35f, 1.6f, len));   // (Box não gira: fundos ao longo de z)
                     for (float x = -len / 2 + 4f; x < len / 2; x += 8f)
                     {
                         truss.Cylinder(L(x, ry - 0.35f, -edge - 0.3f), L(x, ry - 4.5f, -far - 0.4f), 0.14f, 5);

@@ -102,12 +102,12 @@ namespace Craquez
         {
             if (_done) return false;
             _t += dt / Mathf.Max(0.01f, Time.timeScale);   // tempo real (o replay usa câmera lenta)
-            if (skip && _t > 1.2f && _wipeAt < 0f) { _skipping = true; Wipe.Play(_hud.Overlay); _wipeAt = _t; }
+            if (skip && _t > 1.2f && _wipeAt < 0f) { _skipping = true; Wipe.Play(_hud.Overlay, 4200f); _wipeAt = _t; }
             // as trocas de plano acontecem por trás da varredura de transmissão (nunca um corte seco)
-            if (_skipping) { if (_t - _wipeAt > 0.42f) { Finish(); return false; } KeepCurrent(dt); return true; }
+            if (_skipping) { if (_t - _wipeAt > 0.25f) { Finish(); return false; } KeepCurrent(dt); return true; }
             float[] marks = { LiveEnd, ReplayEnd, Length };
             foreach (float m in marks)
-                if (_t > m - 0.42f && _t < m && _wipeMark != m) { _wipeMark = m; Wipe.Play(_hud.Overlay); }
+                if (_t > m - 0.25f && _t < m && _wipeMark != m) { _wipeMark = m; Wipe.Play(_hud.Overlay, 4200f); }
             if (_t < LiveEnd) Live(dt);
             else if (_t < ReplayEnd) Replay(dt);
             else if (_t < Length) Wide();

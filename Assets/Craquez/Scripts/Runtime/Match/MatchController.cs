@@ -460,16 +460,16 @@ namespace Craquez
             if (_htStage == 0 && _htT > 1.6f)
             {
                 _htStage = 1;
-                Wipe.Play(hud.Overlay);   // varredura de transmissão
+                Wipe.Play(hud.Overlay, 4200f);   // varredura de transmissão
                 _htT = 0f;
             }
-            else if (_htStage == 1 && _htT > 0.45f)
+            else if (_htStage == 1 && _htT > 0.25f)
             {
                 _htStage = 2;
                 HalftimeMenu();
                 foreach (Transform c in hud.Overlay) if (c.name == "transição") c.SetAsLastSibling();   // a varredura termina por cima do menu
             }
-            else if (_htStage == 3 && _htT > 0.45f)
+            else if (_htStage == 3 && _htT > 0.25f)
             {
                 // volta para o jogo: o apito do 2º tempo sai logo
                 if (_pauseMenu != null) Destroy(_pauseMenu);
@@ -488,7 +488,7 @@ namespace Craquez
             if (_htStage != 2) return;
             _htStage = 3;
             _htT = 0f;
-            Wipe.Play(hud.Overlay);
+            Wipe.Play(hud.Overlay, 4200f);
             Sfx.Ui();
         }
 

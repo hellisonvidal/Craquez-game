@@ -974,12 +974,13 @@ namespace Craquez.UI
         RectTransform _a, _b;
         float _t;
 
-        public static void Play(Transform overlay)
+        /// <param name="width">largura da faixa principal; "cheia" (≥ 2400) cobre a tela inteira no meio da passagem (troca de plano escondida)</param>
+        public static void Play(Transform overlay, float width = 560f)
         {
             if (overlay == null) return;
             var root = UiKit.Rect(overlay, "transição").Place(0, 0, 1, 1);
             var w = root.gameObject.AddComponent<Wipe>();
-            w._a = Bar(root, new Color(Theme.Accent.r, Theme.Accent.g, Theme.Accent.b, 0.9f), 560);
+            w._a = Bar(root, new Color(Theme.Accent.r, Theme.Accent.g, Theme.Accent.b, width > 1000f ? 1f : 0.9f), width);
             w._b = Bar(root, new Color(Theme.Hot.r, Theme.Hot.g, Theme.Hot.b, 0.85f), 150);
             w.Update();
         }
@@ -998,7 +999,7 @@ namespace Craquez.UI
         void Update()
         {
             _t += Time.unscaledDeltaTime;
-            float W = ((RectTransform)transform).rect.width + 1400f;
+            float W = ((RectTransform)transform).rect.width + 1400f + Mathf.Max(0f, _a.sizeDelta.x - 560f);
             float Ease(float k) { k = Mathf.Clamp01(k); return k < 0.5f ? 4f * k * k * k : 1f - Mathf.Pow(-2f * k + 2f, 3f) / 2f; }
             _a.anchoredPosition = new Vector2(Mathf.Lerp(W * 0.5f, -W * 0.5f, Ease(_t / 0.5f)), 0);
             _b.anchoredPosition = new Vector2(Mathf.Lerp(W * 0.5f + 260f, -W * 0.5f, Ease((_t - 0.05f) / 0.5f)), 0);

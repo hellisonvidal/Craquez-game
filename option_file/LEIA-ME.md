@@ -5,7 +5,7 @@
 | Seção | Conteúdo |
 |---|---|
 | `ligas` | ligas e a lista de times de cada uma (referência) |
-| `teams` | cada time: `name`, `short`, uniformes (`kits`: cores `#RRGGBB`, `pattern`, mangas, acabamento), estádio (`stadium`: nome, capacidade, porte) e elenco (`players`: nome, número, posição, nacionalidade, geral 30–99, características) |
+| `teams` | cada time: `name`, `short`, uniformes (`kits`: cores `#RRGGBB`, `pattern`, mangas, acabamento), estádio (`stadium`: nome, capacidade, porte) e elenco (`players`: `index` no elenco, `n` nome, `num`, `pos` GK/DF/MF/FW, `nat`, `ovr` geral 30–99, `traits` características e, opcional, `a` = atributos [velocidade, aceleração, chute, passe, controle, defesa] de 0 a 1); opcional `rating` (força do time, 0–1, usada nas partidas simuladas) |
 | `competicoes` | as 55 competições (torneios, ligas e copas nacionais): `nome` e `descricao` editáveis, troféu (`trofeu` 0–14, `cor_trofeu`, `cor_detalhe`); modalidade, formato, participantes e ligas/continentes de origem como referência |
 | `bolas` | os 37 modelos de bola (campo e futsal): nome e cores |
 | `chuteiras` | os 16 modelos de chuteira: nome e cores (base, detalhe, sola, travas) |
