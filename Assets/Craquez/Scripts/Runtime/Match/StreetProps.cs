@@ -70,7 +70,7 @@ namespace Craquez
 
             float ox = hl + 4f, oz = hw + 4.5f;
             // lado de fora da mureta: carros e árvores nos fundos e nas cabeceiras (não do lado da câmera)
-            bool city = variant == 0 || variant == 6 || variant == 1;
+            bool city = variant == 0 || variant == 6 || variant == 1 || variant == 8 || variant == 10 || variant == 13;
             if (city)
             {
                 for (int i = 0; i < 4; i++) Car(new Vector3(-hl + 3f + i * (hl * 2f - 6f) / 3f, 0, oz + 1.5f), true, i + variant);
@@ -117,6 +117,23 @@ namespace Craquez
                         misc.Cylinder(new Vector3(ox + 9f + Mathf.Cos(a) * 2.8f, 0.6f, Mathf.Sin(a) * 2.8f), new Vector3(ox + 9f + Mathf.Cos(a) * 2.8f, 3.4f, Mathf.Sin(a) * 2.8f), 0.1f, 6);
                     }
                     leaves.Cylinder(new Vector3(ox + 9f, 3.4f, 0), new Vector3(ox + 9f, 4.4f, 0), 3.4f, 12);
+                    break;
+                case 10: // estacionamento: fileira de carros nas vagas dos dois lados
+                    for (int i = 0; i < 8; i++) Car(new Vector3(-hl + 1.5f + i * 2.6f * 1.5f, 0, -oz - 1.5f), true, i + 3);
+                    break;
+                case 11: // campinho de terra: árvores em volta e bancos de madeira
+                    for (int i = 0; i < 6; i++) Tree(new Vector3(-ox - 4f + i * (ox * 2f + 8f) / 5f, 0, oz + 4f + R() * 3f), 5f + R() * 3f);
+                    for (int i = -1; i <= 1; i += 2) Bench(new Vector3(i * 6f, 0, oz + 0.8f), true);
+                    break;
+                case 9:  // conjunto: bancos e árvores entre os blocos
+                case 13: // vila: varais e árvores
+                    for (int i = 0; i < 4; i++) Tree(new Vector3(-ox - 3f, 0, -hw * 0.5f + i * hw * 0.5f), 4.5f + R() * 2.5f);
+                    for (int i = 0; i < 4; i++)
+                    {
+                        float x = -hl + i * hl * 0.66f;
+                        misc.Cylinder(new Vector3(x, 2.6f, oz + 2f), new Vector3(x + 5f, 2.4f, oz + 2f), 0.015f, 4);
+                        for (int j = 0; j < 4; j++) cars[(i + j) % 3].Box(new Vector3(x + 0.8f + j * 1.1f, 2.1f, oz + 2f), new Vector3(0.6f, 0.8f, 0.04f));
+                    }
                     break;
                 case 1: // morro: varais coloridos entre as casas e árvores
                     for (int i = 0; i < 5; i++) Tree(new Vector3(-ox - 4f - R() * 6f, 0, -hw + i * hw * 0.5f), 5f + R() * 2f);

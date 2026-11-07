@@ -18,18 +18,20 @@ namespace Craquez
         public float standDist = 12f;
     }
 
-    /// <summary>Constrói estádio (3 portes), 8 quadras de futsal e 8 ruas, tudo procedural.</summary>
+    /// <summary>Constrói estádios, 13 quadras de futsal, 4 campos de society e 14 ruas, tudo procedural.</summary>
     public static class VenueBuilder
     {
         public static readonly string[] FutsalNames =
         {
             "Ginásio Municipal", "Arena Coberta", "Quadra do Clube", "Ginásio Universitário",
             "Arena Neon", "Quadra da Escola", "Ginásio Olímpico", "Ginásio Antigo (tacos)",
+            "Ginásio do Bairro", "Arena Laranja", "Pavilhão Azul e Branco", "Ginásio de Treino", "Arena Vermelha",
         };
         public static readonly string[] SocietyNames = { "Society Coberto do Clube", "Arena Society Central", "Campo Society do Bairro", "Complexo Society Premium" };
         public static readonly string[] StreetNames =
         {
             "Entre Prédios", "Morro", "Praia", "Terraço", "Gaiola", "Telhado", "Sob o Viaduto", "Praça",
+            "Beco Grafitado", "Quadra do Conjunto", "Estacionamento", "Campinho de Terra", "Porto", "Vila Colorida",
         };
 
         // ------------------------------------------------------------------ campo
@@ -741,6 +743,11 @@ namespace Craquez
                 (new Color(0.25f, 0.52f, 0.36f), new Color(0.55f, 0.5f, 0.45f), 1),    // quadra de escola
                 (new Color(0.9f, 0.72f, 0.48f), new Color(0.88f, 0.42f, 0.12f), 0),    // olímpico: madeira + laranja
                 (new Color(1f, 0.95f, 0.9f), new Color(0.18f, 0.36f, 0.28f), 3),       // ginásio antigo: tacos + verde-escuro
+                (new Color(0.76f, 0.56f, 0.34f), new Color(0.9f, 0.72f, 0.1f), 0),     // do bairro: madeira média + amarelo
+                (new Color(0.92f, 0.45f, 0.12f), new Color(0.3f, 0.31f, 0.34f), 1),    // arena laranja: sintético laranja + grafite
+                (new Color(0.88f, 0.7f, 0.46f), new Color(0.06f, 0.16f, 0.42f), 0),    // pavilhão: madeira clara + azul-marinho
+                (new Color(0.42f, 0.44f, 0.48f), new Color(0.1f, 0.1f, 0.12f), 1),     // treino: sintético cinza + preto
+                (new Color(0.7f, 0.12f, 0.14f), new Color(0.12f, 0.12f, 0.14f), 1),    // arena vermelha
             };
             return pal[Mathf.Abs(variant) % pal.Length];
         }
@@ -967,15 +974,20 @@ namespace Craquez
         // ------------------------------------------------------------------ rua
         public static Venue Street(MatchSim sim, TeamData home, TeamData away, Kit homeKit, Kit awayKit, int variant, bool night, int quality, Transform parent)
         {
-            variant = Mathf.Abs(variant) % 8;
+            variant = Mathf.Abs(variant) % StreetNames.Length;
             var v = new Venue { root = new GameObject("Rua").transform, name = StreetNames[variant] };
             v.root.SetParent(parent, false);
             float hl = sim.halfLen, hw = sim.halfW;
             var rng = new System.Random(variant * 97 + 3);
             bool sand = variant == 2;
             bool grassy = variant == 7;
-            var groundTex = sand ? Gfx.Grass(256, new Color(0.95f, 0.85f, 0.6f), variant) : grassy ? Gfx.Grass(256, new Color(0.35f, 0.5f, 0.25f), variant) : Gfx.Asphalt(256, Color.white, variant, 0.6f);
-            Color gc = sand ? new Color(0.95f, 0.86f, 0.62f) : grassy ? new Color(0.55f, 0.65f, 0.45f) : variant == 1 ? new Color(0.55f, 0.45f, 0.38f) : new Color(0.42f, 0.42f, 0.45f);
+            bool dirt = variant == 11;            // campinho de terra batida
+            bool concrete = variant == 9 || variant == 12;
+            var groundTex = sand ? Gfx.Grass(256, new Color(0.95f, 0.85f, 0.6f), variant) : grassy ? Gfx.Grass(256, new Color(0.35f, 0.5f, 0.25f), variant)
+                : dirt ? Gfx.Grass(256, new Color(0.62f, 0.44f, 0.3f), variant) : Gfx.Asphalt(256, Color.white, variant, concrete ? 0.25f : 0.6f);
+            Color gc = sand ? new Color(0.95f, 0.86f, 0.62f) : grassy ? new Color(0.55f, 0.65f, 0.45f) : dirt ? new Color(0.72f, 0.52f, 0.36f)
+                : concrete ? new Color(0.62f, 0.62f, 0.6f) : variant == 1 ? new Color(0.55f, 0.45f, 0.38f) : variant == 10 ? new Color(0.3f, 0.3f, 0.33f) : new Color(0.42f, 0.42f, 0.45f);
+            sand |= dirt;   // (relevo e brilho de chão de terra)
             var ground = Gfx.LitN(gc, groundTex, sand || grassy ? Gfx.GrassNormal : Gfx.AsphaltNormal, sand ? 0.05f : 0.2f, 1f);
             v.pitchMat = ground;
             var k = new MeshKit();
@@ -988,40 +1000,88 @@ namespace Craquez
             lines.Strip(new Vector3(-hl, 0, hw), new Vector3(hl, 0, hw), 0.1f);
             lines.Strip(new Vector3(0, 0, -hw), new Vector3(0, 0, hw), 0.1f);
             lines.Arc(Vector3.zero, sim.mode.centerR, 0.1f, 0, Mathf.PI * 2, 40);
-            lines.Object("Pintura", Gfx.Lit(new Color(0.9f, 0.88f, 0.75f), null, 0.05f), v.root, false);
+            if (variant == 10)
+            {
+                // estacionamento: vagas pintadas em volta da "quadra"
+                for (int i = -6; i <= 6; i++)
+                {
+                    lines.Strip(new Vector3(i * 2.6f, 0, hw + 1.2f), new Vector3(i * 2.6f, 0, hw + 6f), 0.12f);
+                    lines.Strip(new Vector3(i * 2.6f, 0, -hw - 6f), new Vector3(i * 2.6f, 0, -hw - 1.2f), 0.12f);
+                }
+            }
+            lines.Object("Pintura", Gfx.Lit(dirt ? new Color(0.92f, 0.88f, 0.8f) : variant == 10 ? new Color(0.95f, 0.85f, 0.25f) : new Color(0.9f, 0.88f, 0.75f), null, 0.05f), v.root, false);
             Goals(v, sim, hl, true);
             // muretas (a bola bate e volta) e cenário
             var wallC = new[] { new Color(0.75f, 0.4f, 0.3f), new Color(0.85f, 0.75f, 0.55f), new Color(0.4f, 0.55f, 0.75f), new Color(0.7f, 0.7f, 0.72f) };
             // mureta grafitada (cores do bairro por cima do reboco)
             var wall = Gfx.Lit(Color.Lerp(wallC[variant % 4], Color.white, 0.55f), StreetProps.Graffiti(variant * 31 + 5), 0.1f);
             var w = new MeshKit();
-            float wh = variant == 4 ? 4.5f : 1.0f, t = 0.25f;
+            bool cage = variant == 4 || variant == 9;   // alambrado (gaiola alta / quadra do conjunto)
+            float wh = variant == 4 ? 4.5f : variant == 9 ? 3f : variant == 8 ? 3.2f : variant == 11 ? 0.5f : 1.0f, t = 0.25f;
             w.Box(new Vector3(0, wh / 2, hw + t / 2 + 0.05f), new Vector3(hl * 2 + 0.6f, wh, t), 2f);
             w.Box(new Vector3(0, wh / 2, -hw - t / 2 - 0.05f), new Vector3(hl * 2 + 0.6f, wh, t), 2f);
             w.Box(new Vector3(hl + t / 2 + 0.05f, wh / 2, 0), new Vector3(t, wh, hw * 2), 2f);
             w.Box(new Vector3(-hl - t / 2 - 0.05f, wh / 2, 0), new Vector3(t, wh, hw * 2), 2f);
-            w.Object("Mureta", variant == 4 ? Gfx.Cutout(new Color(0.6f, 0.62f, 0.65f), Gfx.Net(128, 10, 1.2f), 0.4f) : wall, v.root, variant != 4);
+            w.Object("Mureta", cage ? Gfx.Cutout(new Color(0.6f, 0.62f, 0.65f), Gfx.Net(128, 10, 1.2f), 0.4f) : wall, v.root, !cage);
             // prédios / casas ao redor
             var bmat = new[]
             {
                 Gfx.Lit(new Color(0.85f, 0.55f, 0.4f), Windows(rng, night), 0.2f), Gfx.Lit(new Color(0.65f, 0.75f, 0.85f), Windows(rng, night), 0.2f),
                 Gfx.Lit(new Color(0.9f, 0.85f, 0.6f), Windows(rng, night), 0.2f), Gfx.Lit(new Color(0.55f, 0.85f, 0.6f), Windows(rng, night), 0.2f),
             };
-            if (variant != 2 && variant != 7)
+            if (variant != 2 && variant != 7 && variant != 11 && variant != 12)
             {
-                int n = variant == 1 ? 40 : 18;
+                // beco: prédios colados; conjunto: blocos iguais em fileira; vila: casinhas baixas coloridas
+                int n = variant == 1 ? 40 : variant == 13 ? 30 : variant == 9 ? 12 : 18;
                 var bk = new MeshKit[4];
                 for (int i = 0; i < 4; i++) bk[i] = new MeshKit();
                 for (int i = 0; i < n; i++)
                 {
                     float ang = i / (float)n * Mathf.PI * 2f;
-                    float rad = (variant == 1 ? 34f : 28f) + (float)rng.NextDouble() * 10f;
+                    float rad = (variant == 1 ? 34f : variant == 8 ? 21f : variant == 13 ? 26f : 28f) + (float)rng.NextDouble() * (variant == 8 ? 3f : 10f);
                     var c = new Vector3(Mathf.Cos(ang) * rad * 1.3f, 0, Mathf.Sin(ang) * rad);
-                    float bh = variant == 1 ? 3f + (float)rng.NextDouble() * 4f + Mathf.Max(0, -c.z) * 0.4f : 8f + (float)rng.NextDouble() * 22f;
+                    float bh = variant == 1 ? 3f + (float)rng.NextDouble() * 4f + Mathf.Max(0, -c.z) * 0.4f
+                        : variant == 13 ? 3.5f + (float)rng.NextDouble() * 3.5f
+                        : variant == 9 ? 15f
+                        : variant == 8 ? 14f + (float)rng.NextDouble() * 14f
+                        : 8f + (float)rng.NextDouble() * 22f;
                     float by = variant == 1 ? Mathf.Max(0, -c.z - 10f) * 0.5f : 0f;
                     bk[i % 4].Box(c + Vector3.up * (by + bh / 2), new Vector3(6f + (float)rng.NextDouble() * 6f, bh, 6f + (float)rng.NextDouble() * 4f), 3f);
                 }
                 for (int i = 0; i < 4; i++) bk[i].Object("Prédios " + i, bmat[i], v.root, quality >= 1);
+            }
+            if (variant == 13)
+            {
+                // vila colorida: fachadas em cores fortes por cima dos prédios baixos
+                for (int i = 0; i < 4; i++) bmat[i].SetColor("_BaseColor", new[] { new Color(0.95f, 0.35f, 0.4f), new Color(0.2f, 0.65f, 0.9f), new Color(1f, 0.8f, 0.2f), new Color(0.4f, 0.8f, 0.45f) }[i]);
+            }
+            if (variant == 12)
+            {
+                // porto: mar ao fundo, contêineres empilhados e um guindaste
+                var sea2 = new MeshKit();
+                sea2.Quad(new Vector3(-200, -0.05f, 30), new Vector3(-200, -0.05f, 400), new Vector3(200, -0.05f, 400), new Vector3(200, -0.05f, 30));
+                sea2.Object("Mar", Gfx.Lit(new Color(0.12f, 0.32f, 0.42f), null, 0.6f), v.root, false);
+                var cont = new MeshKit[3];
+                for (int i = 0; i < 3; i++) cont[i] = new MeshKit();
+                for (int i = 0; i < 16; i++)
+                {
+                    float cx = -hl - 4f + (i % 8) * 6.4f, cz = hw + 6f + (i / 8) * 3f;
+                    int stack = 1 + (int)(rng.NextDouble() * 3);
+                    for (int sIdx = 0; sIdx < stack; sIdx++) cont[(i + sIdx) % 3].Box(new Vector3(cx, 1.3f + sIdx * 2.6f, cz), new Vector3(6f, 2.6f, 2.45f), 2f);
+                }
+                Color[] cc = { new Color(0.75f, 0.18f, 0.12f), new Color(0.12f, 0.35f, 0.6f), new Color(0.2f, 0.55f, 0.3f) };
+                for (int i = 0; i < 3; i++) cont[i].Object("Contêineres " + i, Gfx.Lit(cc[i], Gfx.Asphalt(128, Color.white, 90 + i, 0.15f), 0.3f), v.root, true);
+                var crane = new MeshKit();
+                crane.Box(new Vector3(hl + 14f, 12f, hw + 14f), new Vector3(1.2f, 24f, 1.2f));
+                crane.Box(new Vector3(hl + 6f, 23.5f, hw + 14f), new Vector3(20f, 1.2f, 1.2f));
+                crane.Object("Guindaste", Gfx.Lit(new Color(0.95f, 0.75f, 0.1f), null, 0.3f), v.root, true);
+            }
+            if (variant == 11)
+            {
+                // campinho de terra: traves de madeira ao fundo, morro com mato
+                var hill = new MeshKit();
+                hill.Box(new Vector3(0, 3f, hw + 30f), new Vector3(160f, 6f, 20f), 8f);
+                hill.Object("Morro de mato", Gfx.Lit(new Color(0.3f, 0.45f, 0.22f), Gfx.Grass(256, Color.white, 77), 0.1f), v.root, false);
             }
             if (variant == 2)
             {
@@ -1038,6 +1098,7 @@ namespace Craquez
             }
             // gente assistindo na beira
             var crowd = Gfx.CrowdTex(1024, 128, homeKit.c1, homeKit.c2, awayKit.c1, variant * 13, 0.6f);
+            // (no beco e no conjunto a galera fica um pouco mais para fora, atrás do muro/alambrado)
             var cm = Gfx.Cutout(Color.white, crowd, 0.1f, 0.05f);
             v.crowdMats.Add(cm);
             var ppl = new MeshKit();

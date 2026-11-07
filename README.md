@@ -19,7 +19,7 @@ Feito 100% com inteligência artificial, por isso é e sempre será **gratuito**
 | **Bolas** | 30 bolas originais (clássica, espirais, faixas, estrelas, retrô de couro, alta visibilidade para neve...) |
 | **Seleções** | 40 seleções de futebol e 20 de futsal, ordenadas pelo ranking do Craquez (inspirado no da FIFA), com bandeiras e elencos fictícios |
 | **Estádios** | 3 portes (arquibancadas, cobertura, refletores), placas de LED, bancos, bandeirinhas, árbitro, rede que estufa no gol |
-| **Locais** | 8 quadras de futsal fechadas com tela de proteção e 8 ruas (prédios, morro, praia, terraço, gaiola, telhado, viaduto, praça) |
+| **Locais** | 13 quadras de futsal fechadas com tela de proteção, 4 campos de society e 14 ruas (prédios, morro, praia, terraço, gaiola, telhado, viaduto, praça, beco, conjunto, estacionamento, terra, porto, vila) |
 | **Clima e horário** | Sol, nublado, chuva, tempestade com raios, neve; dia, fim de tarde, noite; clima dinâmico que muda durante o jogo e altera a bola |
 | **Imagem** | URP com sombras, bloom, tonemapping ACES e correção de cor; 3 níveis de qualidade (automático por aparelho) |
 | **Ligas 2026/27** | 22 ligas (17 de campo + 5 de futsal), 400 clubes, 60 seleções e 8.120 jogadores com atributos e habilidades únicas. Nomes alterados, sem licença |
