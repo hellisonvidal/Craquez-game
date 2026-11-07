@@ -62,10 +62,10 @@ namespace Craquez.UI
                 if (y > 0.86f && ax < (y - 0.86f) * 0.45f) return 0;   // entre as pernas
                 return 3;
             }
-            // meiões e chuteiras
+            // meiões
             float lx = ax - 0.12f;
             if (y > 1.04f && y < 1.38f && Mathf.Abs(lx) < 0.055f + (1.38f - y) * 0.03f) return 4;
-            if (y >= 1.38f && y < 1.46f && lx > -0.07f && lx < 0.07f + (y - 1.38f) * 1.2f) return 5;
+            // (sem chuteiras: a prévia mostra só o uniforme — camisa, calção e meiões)
             return 0;
         }
 

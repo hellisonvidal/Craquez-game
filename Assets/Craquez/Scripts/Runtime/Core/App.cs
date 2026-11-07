@@ -468,9 +468,61 @@ namespace Craquez
         }
 
         /// <summary>
-        /// Tela de modos: quatro cartões grandes lado a lado (futebol, futsal, society e rua), cada
-        /// um com a sua ilustração, a cor da modalidade e os botões de entrada; opções embaixo.
+        /// Cartão grande clicável (o cartão inteiro é o botão): ilustração com cantos arredondados,
+        /// etiqueta, nome e descrição. Em foco cresce e acende a borda na cor dada.
         /// </summary>
+        Button BigCard(RectTransform parent, string title, string tag, string sub, Texture art, float artAspect, Color accent, System.Action go)
+        {
+            var holder = UiKit.Rect(parent, "cartão " + title);
+            var glow = UiKit.Image(holder, new Color(accent.r, accent.g, accent.b, 0f), Theme.Round, "borda");
+            glow.rectTransform.Place(0, 0, 1, 1, -6, -6, -6, -6);
+            glow.raycastTarget = false;
+            var body = UiKit.Image(holder, Color.white, Theme.PanelSprite, "corpo");
+            body.rectTransform.Place(0, 0, 1, 1);
+            var btn = body.gameObject.AddComponent<Button>();
+            btn.targetGraphic = body;
+            var cb = ColorBlock.defaultColorBlock;
+            cb.normalColor = new Color(0.03f, 0.06f, 0.14f, 0.96f);
+            cb.highlightedColor = cb.selectedColor = new Color(accent.r * 0.25f + 0.03f, accent.g * 0.25f + 0.05f, accent.b * 0.25f + 0.12f, 0.98f);
+            cb.pressedColor = accent;
+            cb.fadeDuration = 0.1f;
+            btn.colors = cb;
+            btn.onClick.AddListener(() => { Sfx.Ui(); go(); });
+            var mask = UiKit.Image(body.transform, Color.white, Theme.Round, "moldura").rectTransform.Place(0, 0.2f, 1, 1, 8, 0, 8, 8);
+            mask.GetComponent<Image>().raycastTarget = false;
+            mask.gameObject.AddComponent<Mask>().showMaskGraphic = false;
+            var artRt = UiKit.Rect(mask, "ilustração").Place(0, 0, 1, 1);
+            var ri = artRt.gameObject.AddComponent<RawImage>();
+            ri.texture = art;
+            ri.raycastTarget = false;
+            var fit = artRt.gameObject.AddComponent<AspectRatioFitter>();
+            fit.aspectMode = AspectRatioFitter.AspectMode.EnvelopeParent;
+            fit.aspectRatio = artAspect;
+            UiKit.Image(mask, new Color(0.03f, 0.06f, 0.14f, 1f), Theme.Fade, "esmaecer").rectTransform.Place(0, 0, 1, 0.45f).GetComponent<Image>().raycastTarget = false;
+            if (!string.IsNullOrEmpty(tag))
+            {
+                var tagRt = UiKit.Image(mask, new Color(accent.r * 0.8f, accent.g * 0.8f, accent.b * 0.8f, 0.95f), Theme.RoundSmall, "etiqueta").rectTransform;
+                tagRt.GetComponent<Image>().raycastTarget = false;
+                var tl = UiKit.Label(tagRt, tag, 22, Theme.Head, Color.white, TextAnchor.MiddleCenter);
+                tagRt.At(0, 1, tl.preferredWidth + 28f, 38, 16, -16);
+                tl.rectTransform.Place(0, 0, 1, 1);
+            }
+            UiKit.Image(body.transform, accent, null, "faixa").rectTransform.At(0, 0.2f, 54, 8, 28, 110).localRotation = Quaternion.Euler(0, 0, 8f);
+            var tt = UiKit.Label(body.transform, title, 64, Theme.HeadItalic, Color.white);
+            tt.rectTransform.Place(0, 0.2f, 1, 0.2f, 24, 24, 12, -104);
+            UiKit.Shadow(tt, 3, 0.8f);
+            UiKit.Label(body.transform, sub, 22, Theme.BodyBold, Theme.TextDim).rectTransform.Place(0, 0, 1, 0.2f, 26, 64, 16, 6);
+            var go2 = UiKit.Label(body.transform, "ENTRAR  ›", 26, Theme.Head, accent, TextAnchor.MiddleRight);
+            go2.rectTransform.Place(0, 0, 1, 0, 20, 14, 24, -54);
+            var card = holder.gameObject.AddComponent<ModeCard>();
+            card.art = artRt;
+            card.glow = glow;
+            card.accent = accent;
+            card.first = btn;
+            return btn;
+        }
+
+        /// <summary>Tela de modos: só a modalidade (quatro cartões); clubes ou seleções vêm depois.</summary>
         void ShowModes()
         {
             StopAttract();
@@ -478,70 +530,95 @@ namespace Craquez
             _back = ShowTitle;
             Title(root, "JOGAR", "Escolha a modalidade");
             var grid = UiKit.Rect(root, "modalidades").Place(0, 0, 1, 1, 90, 186, 90, 272);
-            var hl = UiKit.HList(grid, 30);
-            hl.childForceExpandHeight = true;
-            Button first = null;
-            void Card(string title, string tag, string sub, MenuArt.Kind art, Color accent, (string label, System.Action go)[] actions)
-            {
-                var holder = UiKit.Rect(grid, "modo " + title);
-                // borda acesa (aparece no foco) e corpo do cartão
-                var glow = UiKit.Image(holder, new Color(accent.r, accent.g, accent.b, 0f), Theme.Round, "borda");
-                glow.rectTransform.Place(0, 0, 1, 1, -6, -6, -6, -6);
-                glow.raycastTarget = false;
-                var body = UiKit.Image(holder, new Color(0.03f, 0.06f, 0.14f, 0.96f), Theme.PanelSprite, "corpo");
-                body.rectTransform.Place(0, 0, 1, 1);
-                // ilustração com cantos arredondados
-                var mask = UiKit.Image(body.transform, Color.white, Theme.Round, "moldura").rectTransform.Place(0, 0.24f, 1, 1, 8, 0, 8, 8);
-                mask.gameObject.AddComponent<Mask>().showMaskGraphic = false;
-                var artRt = UiKit.Rect(mask, "ilustração").Place(0, 0, 1, 1);
-                var ri = artRt.gameObject.AddComponent<RawImage>();
-                ri.texture = ModeArt(art);
-                ri.raycastTarget = false;
-                var fit = artRt.gameObject.AddComponent<AspectRatioFitter>();
-                fit.aspectMode = AspectRatioFitter.AspectMode.EnvelopeParent;
-                fit.aspectRatio = 512f / 560f;
-                var fade = UiKit.Image(mask, new Color(0.03f, 0.06f, 0.14f, 1f), Theme.Fade, "esmaecer").rectTransform.Place(0, 0, 1, 0.45f);
-                fade.GetComponent<Image>().raycastTarget = false;
-                // etiqueta (formato) no canto da ilustração
-                var tagRt = UiKit.Image(mask, new Color(accent.r * 0.8f, accent.g * 0.8f, accent.b * 0.8f, 0.95f), Theme.RoundSmall, "formato").rectTransform;
-                var tl = UiKit.Label(tagRt, tag, 22, Theme.Head, Color.white, TextAnchor.MiddleCenter);
-                tagRt.At(0, 1, tl.preferredWidth + 28f, 38, 16, -16);
-                tl.rectTransform.Place(0, 0, 1, 1);
-                // nome e descrição sobre a base da ilustração
-                var stripe = UiKit.Image(body.transform, accent, null, "faixa").rectTransform;
-                stripe.At(0, 0.24f, 54, 8, 28, 104);
-                stripe.localRotation = Quaternion.Euler(0, 0, 8f);
-                var tt = UiKit.Label(body.transform, title, 62, Theme.HeadItalic, Color.white);
-                tt.rectTransform.Place(0, 0.24f, 1, 0.24f, 24, 20, 12, -100);
-                UiKit.Shadow(tt, 3, 0.8f);
-                UiKit.Label(body.transform, sub, 21, Theme.BodyBold, Theme.TextDim).rectTransform.Place(0, 0.24f, 1, 0.24f, 26, -18, 16, -16);
-                // botões
-                var row = UiKit.Rect(body.transform, "botões").Place(0, 0, 1, 0, 16, 18, 16, -96);
-                UiKit.HList(row, 12);
-                var card = holder.gameObject.AddComponent<ModeCard>();
-                card.art = artRt;
-                card.glow = glow;
-                card.accent = accent;
-                Button firstHere = null;
-                foreach (var (label, go) in actions)
-                {
-                    var b = UiKit.Button(row, label, go, 28, new Color(accent.r * 0.45f, accent.g * 0.45f, accent.b * 0.5f + 0.05f));
-                    if (firstHere == null) firstHere = b;
-                }
-                card.first = firstHere;
-                if (first == null) first = firstHere;
-            }
-            Card("FUTEBOL", "11 x 11", "22 ligas  •  400 clubes  •  40 seleções", MenuArt.Kind.Field, new Color(0.13f, 0.77f, 0.37f),
-                new (string, System.Action)[] { ("CLUBES", () => Choose(GameModes.Field, false)), ("SELEÇÕES", () => Choose(GameModes.Field, true)) });
-            Card("FUTSAL", "5 x 5", "5 ligas  •  20 seleções  •  8 ginásios", MenuArt.Kind.Futsal, new Color(0.96f, 0.62f, 0.04f),
-                new (string, System.Action)[] { ("CLUBES", () => Choose(GameModes.Futsal, false)), ("SELEÇÕES", () => Choose(GameModes.Futsal, true)) });
-            Card("SOCIETY", "7 x 7", "Grama sintética  •  4 campos", MenuArt.Kind.Society, new Color(0.02f, 0.71f, 0.83f),
-                new (string, System.Action)[] { ("CLUBES", () => Choose(GameModes.Society, false)), ("SELEÇÕES", () => Choose(GameModes.Society, true)) });
-            Card("RUA", "3 A 5 POR LADO", "Times de rua  •  8 ruas", MenuArt.Kind.Street, new Color(0.93f, 0.28f, 0.6f),
-                new (string, System.Action)[] { ("JOGAR", () => Choose(GameModes.Street, false)) });
+            UiKit.HList(grid, 30).childForceExpandHeight = true;
+            _modeButtons.Clear();
+            var first = _modeButtons[GameModes.Field] = BigCard(grid, "FUTEBOL", "11 x 11", "Campo  •  22 ligas e 40 seleções", ModeArt(MenuArt.Kind.Field), 512f / 560f, new Color(0.13f, 0.77f, 0.37f), () => ShowKind(GameModes.Field));
+            _modeButtons[GameModes.Futsal] = BigCard(grid, "FUTSAL", "5 x 5", "Quadra  •  " + VenueBuilder.FutsalNames.Length + " ginásios", ModeArt(MenuArt.Kind.Futsal), 512f / 560f, new Color(0.96f, 0.62f, 0.04f), () => ShowKind(GameModes.Futsal));
+            _modeButtons[GameModes.Society] = BigCard(grid, "SOCIETY", "7 x 7", "Grama sintética  •  " + VenueBuilder.SocietyNames.Length + " campos", ModeArt(MenuArt.Kind.Society), 512f / 560f, new Color(0.02f, 0.71f, 0.83f), () => ShowKind(GameModes.Society));
+            _modeButtons[GameModes.Street] = BigCard(grid, "RUA", "3 A 5 POR LADO", "Times de rua  •  " + VenueBuilder.StreetNames.Length + " ruas", ModeArt(MenuArt.Kind.Street), 512f / 560f, new Color(0.93f, 0.28f, 0.6f), () => { _lastMode = GameModes.Street; Choose(GameModes.Street, false); });
             var opt = UiKit.Button(root, "⚙  OPÇÕES", ShowOptions, 30, new Color(0.1f, 0.14f, 0.25f));
             opt.GetComponent<RectTransform>().At(0.5f, 0, 380, 80, 0, 92);
-            UiKit.Select(first);
+            UiKit.Select(_lastMode != null && _modeButtons.TryGetValue(_lastMode, out var lb) && lb != null ? lb : first);
+        }
+
+        string _lastMode;
+        readonly Dictionary<string, Button> _modeButtons = new Dictionary<string, Button>();
+
+        /// <summary>Depois da modalidade: clubes ou seleções (dois cartões com escudos e bandeiras).</summary>
+        void ShowKind(string mode)
+        {
+            _lastMode = mode;
+            _cfg.mode = mode;
+            var root = Page("JOGAR  ›  " + GameModes.DisplayName(mode).ToUpperInvariant());
+            _back = ShowModes;
+            Title(root, GameModes.DisplayName(mode).ToUpperInvariant(), "Clubes ou seleções?");
+            var grid = UiKit.Rect(root, "tipo").Place(0.18f, 0, 0.82f, 1, 0, 186, 0, 200);
+            UiKit.HList(grid, 40).childForceExpandHeight = true;
+            var clubs = LeaguesFor(mode, false);
+            var nats = LeaguesFor(mode, true);
+            int nClubs = 0, nNat = 0;
+            foreach (var l in clubs) nClubs += l.count;
+            foreach (var l in nats) nNat += l.count;
+            bool futsal = mode == GameModes.Futsal;
+            var c = BigCard(grid, "CLUBES", clubs.Count + (clubs.Count == 1 ? " LIGA" : " LIGAS"), nClubs + " clubes de " + clubs.Count + " ligas",
+                KindArt(mode, false), 4f / 3f, new Color(0.16f, 0.62f, 1f), () => Choose(mode, false));
+            BigCard(grid, "SELEÇÕES", nNat + " SELEÇÕES", futsal ? "Ranking das seleções de futsal" : "Ordenadas pelo ranking do Craquez",
+                KindArt(mode, true), 4f / 3f, new Color(0.95f, 0.16f, 0.2f), () => Choose(mode, true));
+            UiKit.Select(c);
+        }
+
+        static readonly Dictionary<string, Texture2D> _kindArt = new Dictionary<string, Texture2D>();
+
+        /// <summary>Arte dos cartões clubes/seleções: escudos (ou bandeiras) dos primeiros times sobre a ilustração do modo.</summary>
+        Texture KindArt(string mode, bool national)
+        {
+            string key = mode + national;
+            if (_kindArt.TryGetValue(key, out var t) && t != null) return t;
+            var kind = mode == GameModes.Futsal ? MenuArt.Kind.Futsal : mode == GameModes.Society ? MenuArt.Kind.Society : MenuArt.Kind.Field;
+            var bg = ModeArt(kind);
+            const int W = 640, H = 480;
+            var rt = RenderTexture.GetTemporary(W, H, 0, RenderTextureFormat.ARGB32);
+            var prev = RenderTexture.active;
+            RenderTexture.active = rt;
+            GL.PushMatrix();
+            GL.LoadPixelMatrix(0, W, H, 0);
+            GL.Clear(true, true, Color.black);
+            // fundo: a ilustração do modo, escurecida
+            Graphics.DrawTexture(new Rect(0, -H * 0.1f, W, W * 560f / 512f), bg, new Rect(0, 0, 1, 1), 0, 0, 0, 0, new Color(0.28f, 0.3f, 0.38f, 1f));
+            // seis escudos/bandeiras em duas fileiras
+            var lgs = LeaguesFor(mode, national);
+            var ids = new List<int>();
+            foreach (var l in lgs) for (int i = 0; i < l.count && ids.Count < 6; i++) { ids.Add(l.first + i); if (!national) break; }
+            if (!national) foreach (var l in lgs) for (int i = 1; i < l.count && ids.Count < 6; i++) ids.Add(l.first + i);
+            for (int i = 0; i < ids.Count; i++)
+            {
+                float cx = W * (0.2f + 0.3f * (i % 3)), cy = H * (i < 3 ? 0.3f : 0.66f);
+                if (national)
+                {
+                    var tm = Teams.Get(ids[i]);
+                    var flag = tm != null ? Crest.CountryTex(tm.iso) : null;
+                    if (flag != null) Graphics.DrawTexture(new Rect(cx - 82, cy - 55, 164, 110), flag);
+                }
+                else
+                {
+                    var sp = Crest.Team(ids[i]);
+                    if (sp != null) Graphics.DrawTexture(new Rect(cx - 70, cy - 70, 140, 140), sp.texture, TexRect(sp), 0, 0, 0, 0);
+                }
+            }
+            GL.PopMatrix();
+            var tex = new Texture2D(W, H, TextureFormat.RGBA32, false);
+            tex.ReadPixels(new Rect(0, 0, W, H), 0, 0);
+            tex.Apply();
+            RenderTexture.active = prev;
+            RenderTexture.ReleaseTemporary(rt);
+            _kindArt[key] = tex;
+            return tex;
+        }
+
+        static Rect TexRect(Sprite s)
+        {
+            var r = s.textureRect;
+            return new Rect(r.x / s.texture.width, r.y / s.texture.height, r.width / s.texture.width, r.height / s.texture.height);
         }
 
         void Choose(string mode, bool national)
@@ -603,7 +680,7 @@ namespace Craquez
         void ShowSetup()
         {
             var root = Page(Crumb());
-            _back = ShowModes;
+            _back = () => { if (_cfg.mode == GameModes.Street) ShowModes(); else ShowKind(_cfg.mode); };
             Title(root, (_cfg.mode == GameModes.Street ? "RUA" : (_cfg.national ? "SELEÇÕES" : "CLUBES")) + "  •  " + GameModes.DisplayName(_cfg.mode).ToUpperInvariant(), "Ajuste a partida e escolha os times");
             var listBg = UiKit.Panel(root).rectTransform.Place(0, 0, 0.55f, 1, 74, 140, 0, 262);
             UiKit.Label(listBg, "PARTIDA", 24, Theme.Head, Theme.Accent).rectTransform.Place(0, 1, 1, 1, 24, -40, 24, 8);
@@ -667,6 +744,13 @@ namespace Craquez
             }
             VArrow(0, "‹", -1);
             VArrow(1, "›", 1);
+            // sortear o local
+            var dice = UiKit.Button(vHolder, "SORTEAR", () =>
+            {
+                int n = VenueCount();
+                if (n > 1) StepVenue(1 + Random.Range(0, n - 1));
+            }, 22, new Color(0.02f, 0.04f, 0.1f, 0.7f));
+            dice.GetComponent<RectTransform>().At(0, 1, 140, 40, 12, -12);
             var countChip = UiKit.Image(vHolder, new Color(0.02f, 0.04f, 0.1f, 0.7f), Theme.RoundSmall, "contagem").rectTransform;
             countChip.At(1, 1, 96, 36, -12, -12);
             var venueCount = UiKit.Label(countChip, "", 22, Theme.Head, Color.white, TextAnchor.MiddleCenter);
@@ -811,6 +895,23 @@ namespace Craquez
             }
             var play = UiKit.Button(root, "JOGAR  ›", StartMatch, 44, new Color(0.85f, 0.14f, 0.18f));
             play.GetComponent<RectTransform>().At(1, 0, 420, 100, -90, 70);
+            // sortear os dois times (diferentes), de qualquer liga da modalidade
+            var rnd = UiKit.Button(root, "SORTEAR TIMES", () =>
+            {
+                int total = 0;
+                foreach (var l in lgs) total += l.count;
+                int Pick() { int r = Random.Range(0, total); foreach (var l in lgs) { if (r < l.count) return l.first + r; r -= l.count; } return lgs[0].first; }
+                _cfg.teamA = Pick();
+                int guard = 0;
+                do _cfg.teamB = Pick(); while (_cfg.teamB == _cfg.teamA && guard++ < 20);
+                _cfg.tacticsA = new Tactics();
+                _cfg.tacticsB = new Tactics();
+                _cfg.kitA = 0;
+                _cfg.kitB = -1;
+                _wasMenu = false;   // redesenha a tela sem a varredura
+                ShowTeams();
+            }, 32, new Color(0.1f, 0.14f, 0.25f));
+            rnd.GetComponent<RectTransform>().At(1, 0, 360, 100, -530, 70);
             UiKit.Select(first);
         }
 
