@@ -24,11 +24,15 @@ Jogo de futebol feito 100% com inteligência artificial, **gratuito**. Android, 
 - **Nomes e números sobre os atletas**: etiqueta com o número na cor do time e o sobrenome em cima
   do jogador controlado e de quem está com a bola (ou de todos, ou desligado — em Configurações e
   no menu de pausa).
-- **12 músicas originais** (pop-rock, samba eletrônico, house, reggae, funk, baião, rock...): cada
-  vez que o jogo abre começa uma sorteada e, ao fim, vem outra.
+- **12 músicas originais** (pop-rock, samba eletrônico, house, reggae, funk, baião, rock...) com
+  produção atual: sintetizadores supersaw, piano elétrico em FM, baixo com sub, bateria com palmas e
+  bumbo saturado, reverb, estéreo aberto e sidechain. Cada vez que o jogo abre começa uma sorteada
+  e, ao fim, vem outra.
 - **Locais mais vivos**: câmera aérea em cabos sobre o campo nos estádios, bandeirinhas de
-  escanteio tremulando, varais de bandeirolas no teto dos ginásios, bandeira do clube no mastro do
-  society, pipas no céu, bandeirinhas de festa e varal de roupas nas ruas.
+  escanteio tremulando, bandeira do clube no mastro do society, pipas no céu e varal de roupas nas ruas.
+- **Redes do society** sempre visíveis (desenhadas dos dois lados e por cima do alambrado).
+- **Depois da queda numa falta** o atleta não fica mais com os braços erguidos: apoia as mãos no
+  chão para levantar e os braços descem.
 - **Atletas com corpo firme**: menos inclinação e balanço do tronco nas curvas e arrancadas (o
   tronco inclina a partir do quadril, sem envergar a coluna), camisa e calção sem ondular como
   gelatina e luz com forma mais definida nos músculos.

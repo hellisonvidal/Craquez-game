@@ -7,7 +7,7 @@ uso: python3 tools/audio/menu_tracks.py PASTA [índice]   (gera PASTA/track_XX.w
 """
 import sys, os, wave
 import numpy as np
-from scipy.signal import lfilter, butter, sosfilt
+from scipy.signal import lfilter, butter, sosfilt, fftconvolve
 
 SR = 44100
 
@@ -55,8 +55,9 @@ class Song:
         self.bars = sum(b for _, b in self.sections)
         self.LEN = int(self.bars * self.BAR * SR)
         pad = self.LEN + SR * 3
-        self.tr = {k: np.zeros(pad) for k in ("drums", "bass", "harm", "harm2", "lead")}
+        self.tr = {k: np.zeros(pad) for k in ("drums", "bass", "harm", "harm2", "lead", "leadR")}
         self._ks = {}
+        self.kicks = []
         self.K, self.SN, self.H, self.HO, self.C = self.kit()
 
     # ------------------------------------------------------------ teoria
@@ -84,22 +85,33 @@ class Song:
         return out
 
     def kit(self):
+        """Bateria de produção atual: bumbo com sub e clique saturado, caixa + palmas em camadas, chimbais finos."""
         r = self.rng
         def env(L, k): return np.exp(-np.arange(L) / SR * k)
-        L = int(0.32 * SR); t = np.arange(L) / SR
-        f = 48 + (90 if self.drum in ("house", "funk") else 70) * np.exp(-t * 32)
-        K = np.sin(2 * np.pi * np.cumsum(f) / SR) * env(L, 10) * 0.9
-        L = int(0.25 * SR); t = np.arange(L) / SR
-        SN = (np.sin(2 * np.pi * 195 * t) * env(L, 24) * 0.5 + sosfilt(butter(2, [1700, 8500], btype="bandpass", fs=SR, output="sos"), r.uniform(-1, 1, L)) * env(L, 17)) * 0.6
-        L = int(0.05 * SR)
-        H = sosfilt(sos("highpass", 8000, 4), r.uniform(-1, 1, L)) * env(L, 70) * 0.22
-        L = int(0.22 * SR)
-        HO = sosfilt(sos("highpass", 7500, 4), r.uniform(-1, 1, L)) * env(L, 12) * 0.2
-        L = int(2.0 * SR)
-        C = sosfilt(sos("highpass", 5000, 2), r.uniform(-1, 1, L)) * env(L, 1.8) * 0.28
+        L = int(0.45 * SR); t = np.arange(L) / SR
+        f = 45 + 110 * np.exp(-t * 38)
+        body = np.sin(2 * np.pi * np.cumsum(f) / SR) * env(L, 7)
+        click = sosfilt(sos("bandpass", [2000, 7000]), r.uniform(-1, 1, L)) * env(L, 300) * 0.35
+        K = np.tanh((body + click) * 1.8) * 0.95
+        L = int(0.35 * SR); t = np.arange(L) / SR
+        nz = sosfilt(butter(2, [900, 9000], btype="bandpass", fs=SR, output="sos"), r.uniform(-1, 1, L))
+        snare = np.sin(2 * np.pi * 185 * t) * env(L, 30) * 0.4 + nz * env(L, 14) * 0.8
+        clap = np.zeros(L)
+        for k, d in enumerate((0.0, 0.011, 0.022)):   # palmas: três estalos quase juntos + cauda
+            i = int(d * SR)
+            clap[i:] += sosfilt(sos("bandpass", [1000, 2600]), r.uniform(-1, 1, L - i)) * env(L - i, 60 if k < 2 else 11)
+        SN = np.tanh((snare * 0.7 + clap * 0.6) * 1.5) * 0.7
+        L = int(0.06 * SR)
+        H = sosfilt(sos("highpass", 9000, 4), r.uniform(-1, 1, L)) * env(L, 80) * 0.25
+        L = int(0.3 * SR)
+        HO = sosfilt(sos("highpass", 8000, 4), r.uniform(-1, 1, L)) * env(L, 9) * 0.2
+        L = int(2.5 * SR)
+        C = sosfilt(sos("highpass", 5500, 2), r.uniform(-1, 1, L)) * env(L, 1.5) * 0.25
         return K, SN, H, HO, C
 
     def put(self, name, x, t, g=1.0):
+        if x is self.__dict__.get("K"):
+            self.kicks.append((t, g))
         buf = self.tr[name]
         i = int(t * SR)
         if i >= len(buf) or i < 0:
@@ -107,21 +119,32 @@ class Song:
         m = min(len(x), len(buf) - i)
         buf[i:i + m] += x[:m] * g
 
+    def supersaw(self, f, L, voices=7, spread=0.012):
+        t = np.arange(L) / SR
+        x = np.zeros(L)
+        for v in range(voices):
+            d = (v - (voices - 1) / 2) / ((voices - 1) / 2) * spread
+            ph = (t * f * (1 + d) + self.rng.random()) % 1.0
+            x += 2 * ph - 1
+        return x / voices
+
     def tone(self, n, secs, kind):
         L = int(secs * SR)
         t = np.arange(L) / SR
         f = hz(n)
-        if kind == "synth":   # serra suave com filtro
-            ph = (t * f) % 1.0
-            x = (2 * ph - 1) + 0.5 * (2 * ((t * f * 1.005) % 1.0) - 1)
-            x = sosfilt(sos("lowpass", 1800), x) * 0.5
-            env = np.minimum(1, t * 40) * np.minimum(1, (secs - t) * 10).clip(0)
-        elif kind == "piano":
-            x = sum(np.sin(2 * np.pi * f * h * t) / h ** 1.3 for h in (1, 2, 3, 4))
-            env = np.exp(-t * 2.2) * np.minimum(1, t * 300)
-        elif kind == "keys":  # órgão / piano elétrico
-            x = np.sin(2 * np.pi * f * t) + 0.3 * np.sin(4 * np.pi * f * t) + 0.15 * np.sin(2 * np.pi * f * 3 * t)
-            env = np.minimum(1, t * 20) * np.minimum(1, (secs - t) * 8).clip(0) * (0.75 + 0.25 * np.exp(-t * 3))
+        if kind == "synth":   # pad supersaw com filtro que abre devagar
+            x = self.supersaw(f, L)
+            x = sosfilt(sos("lowpass", 2400), x) * 0.7 + sosfilt(sos("lowpass", 900), x) * 0.3
+            env = np.minimum(1, t * 6) * np.minimum(1, (secs - t) * 6).clip(0)
+        elif kind == "keys":  # piano elétrico (FM, timbre de Rhodes)
+            idx = 2.2 * np.exp(-t * 4) + 0.25
+            x = np.sin(2 * np.pi * f * t + idx * np.sin(2 * np.pi * f * t))
+            x += 0.12 * np.sin(2 * np.pi * f * 14 * t) * np.exp(-t * 18)   # "tine"
+            env = np.exp(-t * 1.6) * np.minimum(1, t * 400) * np.minimum(1, (secs - t) * 12).clip(0)
+        elif kind == "piano":  # piano: parciais levemente inarmônicos, os agudos morrem antes
+            x = sum(np.sin(2 * np.pi * f * h * (1 + 0.0004 * h * h) * t) * np.exp(-t * (1.2 + h * 0.9)) / h ** 1.1 for h in (1, 2, 3, 4, 5, 6))
+            x += sosfilt(sos("highpass", 2000), self.rng.uniform(-1, 1, L)) * np.exp(-t * 80) * 0.05   # martelo
+            env = np.minimum(1, t * 600)
         else:  # pluck
             s = self.string(n + 12, 0.45)[:L]
             return np.pad(s, (0, max(0, L - len(s))))[:L] * np.exp(-t * 3.5) * 0.8
@@ -226,8 +249,11 @@ class Song:
             L = int(dur * E * SR)
             t = np.arange(L) / SR
             n = root - 12 + off
-            x = np.sin(2 * np.pi * hz(n) * t) + 0.3 * np.sin(4 * np.pi * hz(n) * t)
-            x *= np.minimum(1, t * 200) * np.exp(-t * 2.5) * np.minimum(1, (dur * E - t) * 30).clip(0)
+            # sub (seno) + serra filtrada com envelope (baixo de produção atual)
+            saw = 2 * ((t * hz(n)) % 1.0) - 1
+            x = np.sin(2 * np.pi * hz(n) * t) + 0.45 * sosfilt(sos("lowpass", 500), saw) * (0.5 + 0.5 * np.exp(-t * 8))
+            x = np.tanh(x * 1.4)
+            x *= np.minimum(1, t * 200) * np.exp(-t * 1.5) * np.minimum(1, (dur * E - t) * 30).clip(0)
             self.put("bass", sosfilt(sos("lowpass", 700), x) * 0.5, bt + e * E)
 
     def melody(self, t0, bars):
@@ -255,10 +281,16 @@ class Song:
                     n = self.tonic + 24   # resolve na tônica na repetição
                 L = int(d * E * SR)
                 t = np.arange(L) / SR
-                vib = 1 + 0.004 * np.sin(2 * np.pi * 5 * t) * np.clip(t * 2, 0, 1)
-                ph = 2 * np.pi * np.cumsum(hz(n) * vib) / SR
-                x = (np.sin(ph) + 0.3 * np.sin(2 * ph) + 0.12 * np.sin(3 * ph)) * np.minimum(1, t * 30) * np.minimum(1, (d * E - t) * 12).clip(0)
-                self.put("lead", x * 0.2, pos)
+                # lead atual: serras desafinadas filtradas, ataque macio e um vibrato tardio
+                vib = 1 + 0.003 * np.sin(2 * np.pi * 5.2 * t) * np.clip(t * 1.5 - 0.2, 0, 1)
+                fr = hz(n) * vib
+                x = np.zeros(L)
+                for dt_ in (-0.007, 0.0, 0.007):
+                    ph = np.cumsum(fr * (1 + dt_)) / SR + self.rng.random()
+                    x += 2 * (ph % 1.0) - 1
+                x = sosfilt(sos("lowpass", 2600), x / 3) + 0.25 * np.sin(2 * np.pi * np.cumsum(fr) / SR)
+                x *= np.minimum(1, t * 25) * np.minimum(1, (d * E - t) * 10).clip(0)
+                self.put("lead", x * 0.16, pos)
                 pos += d * E
 
     def render(self):
@@ -281,18 +313,44 @@ class Song:
             t += bars * self.BAR
         def norm(x): return x / (np.max(np.abs(x)) + 1e-9)
         tr = self.tr
-        dr = norm(tr["drums"]) * 0.55
-        room = lfilter([1], [1] + [0] * int(0.021 * SR) + [-0.22], dr)
-        ld = norm(tr["lead"]) * 0.3
-        echo = lfilter([1], [1] + [0] * int(self.E * 3 * SR) + [-0.28], ld)
-        h1, h2, bs = norm(tr["harm"]) * 0.34, norm(tr["harm2"]) * 0.26, norm(tr["bass"]) * 0.42
-        L = h1 + h2 * 0.8 + bs + room + echo
-        R = np.roll(h1, int(0.012 * SR)) * 0.9 + h2 + bs + room + np.roll(echo, int(0.011 * SR))
+        n = len(tr["drums"])
+        # sidechain: harmonia e baixo "respiram" a cada bumbo (o bombeado do pop/eletrônico atual)
+        duck = np.ones(n)
+        rel = int(0.22 * SR)
+        shape = 1 - 0.55 * np.exp(-np.arange(rel) / SR / 0.07)
+        for t0, g in self.kicks:
+            i = int(t0 * SR)
+            if i >= n: continue
+            m = min(rel, n - i)
+            duck[i:i + m] = np.minimum(duck[i:i + m], 1 - (1 - shape[:m]) * min(1.0, g))
+        # reverb: sala grande sintética (ruído com decaimento, diferente em cada canal)
+        Lr = int(1.6 * SR)
+        tt = np.arange(Lr) / SR
+        irL = self.rng.normal(0, 1, Lr) * np.exp(-tt * 3.2)
+        irR = self.rng.normal(0, 1, Lr) * np.exp(-tt * 3.2)
+        irL[: int(0.012 * SR)] = 0; irR[: int(0.017 * SR)] = 0
+        irL /= np.sqrt((irL ** 2).sum()); irR /= np.sqrt((irR ** 2).sum())
+        dr = norm(tr["drums"]) * 0.62
+        h1, h2 = norm(tr["harm"]) * 0.3 * duck, norm(tr["harm2"]) * 0.24 * duck
+        bs = norm(sosfilt(sos("lowpass", 900), tr["bass"])) * 0.44 * (0.4 + 0.6 * duck)
+        ld = norm(tr["lead"]) * 0.26
+        dly = int(self.E * 3 * SR)
+        echoL = lfilter([1], [1] + [0] * dly + [-0.3], ld)
+        echoR = np.roll(echoL, int(self.E * SR))
+        send = h2 * 0.8 + ld * 0.9 + sosfilt(sos("highpass", 300), dr) * 0.25 + h1 * 0.3
+        rvL = fftconvolve(send, irL)[:n] * 0.22
+        rvR = fftconvolve(send, irR)[:n] * 0.22
+        # estéreo: harmonias abertas (atraso curto entre canais), baixo e bumbo no centro
+        L = dr + bs + h1 + np.roll(h2, int(0.009 * SR)) + ld + echoL * 0.35 + rvL
+        R = dr + bs + np.roll(h1, int(0.013 * SR)) + h2 + ld + echoR * 0.35 + rvR
         tail = int(3 * SR)
         for ch in (L, R):
             ch[:tail] += ch[self.LEN:self.LEN + tail]
         mix = np.stack([L[:self.LEN], R[:self.LEN]], 1)
-        mix = np.tanh(mix * 1.1) / np.tanh(1.1)
+        # master: brilho (prateleira de agudos) e cola (saturação leve)
+        for c in range(2):
+            mix[:, c] += sosfilt(sos("highpass", 6000), mix[:, c]) * 0.25
+        mix = np.tanh(mix * 1.25) / np.tanh(1.25)
         return mix * 0.85 / np.max(np.abs(mix))
 
 

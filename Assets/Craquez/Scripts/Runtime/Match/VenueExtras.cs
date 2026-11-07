@@ -5,8 +5,7 @@ using UnityEngine;
 namespace Craquez
 {
     /// <summary>
-    /// Elementos animados extras de cada local: câmera aérea em cabos no estádio, bandeirolas no
-    /// teto do ginásio, bandeira no mastro do society, pipas, bandeirinhas de festa e varal na rua.
+    /// Elementos animados extras de cada local: câmera aérea em cabos no estádio, bandeira no mastro do society, pipas e varal na rua.
     /// Tudo leve (poucos vértices, animação por transform ou por vértice com vento).
     /// </summary>
     public class VenueExtras : MonoBehaviour
@@ -28,12 +27,10 @@ namespace Craquez
             float hl = sim.halfLen, hw = sim.halfW;
             string m = sim.mode.id;
             if (m == GameModes.Field) { x.SpiderCam(hl, hw, night); x.CornerFlagCloth(hl, hw, home.c1); }
-            else if (m == GameModes.Futsal || (m == GameModes.Society && variant == 0)) x.Pennants(hl, hw, home, away, 10.5f);
-            else if (m == GameModes.Society) x.MastFlag(new Vector3(-hl - 6f, 0, hw + 7f), home);
+            else if (m == GameModes.Society && variant != 0) x.MastFlag(new Vector3(-hl - 6f, 0, hw + 7f), home);
             else if (m == GameModes.Street)
             {
                 x.Kites(hl, hw, variant);
-                if (variant != 3 && variant != 5) x.Bunting(hl, hw, variant);   // terraço/telhado: sem fios
                 if (variant == 0 || variant == 1 || variant == 8 || variant == 13) x.Clothesline(hl, hw, variant);
             }
             return x;
@@ -75,15 +72,6 @@ namespace Craquez
                     var b = new Vector3(hl * sx, 1.2f, hw * sz);
                     Cloth("Bandeira de escanteio", b, -sx, 0.42f, 0.38f, 4, mat, 0.05f, 6f, 0f);
                 }
-        }
-
-        // ------------------------------------------------------------ ginásio
-        void Pennants(float hl, float hw, Kit home, Kit away, float y)
-        {
-            var cols = new[] { home.c1, home.c2, away.c1, Color.white, new Color(0.98f, 0.8f, 0.15f) };
-            // varais em X pelo teto, fora do placar central
-            foreach (var (a, b) in new[] { (new Vector3(-hl - 6f, y, -hw - 4f), new Vector3(hl + 6f, y, -hw * 0.25f)), (new Vector3(-hl - 6f, y, hw + 4f), new Vector3(hl + 6f, y, hw * 0.25f)) })
-                Bunting(a, b, cols, 0.55f, 0.6f, 1.2f);
         }
 
         // ------------------------------------------------------------ society
@@ -134,14 +122,6 @@ namespace Craquez
             }
         }
 
-        void Bunting(float hl, float hw, int variant)
-        {
-            Color[] festa = { new Color(0.95f, 0.2f, 0.2f), new Color(0.98f, 0.8f, 0.1f), new Color(0.15f, 0.55f, 0.95f), new Color(0.2f, 0.75f, 0.3f), new Color(0.95f, 0.45f, 0.75f), Color.white };
-            float y = 6.5f;
-            Bunting(new Vector3(-hl, y, -hw - 3f), new Vector3(-hl * 0.3f, y, hw + 3f), festa, 0.35f, 0.42f, 0.7f);
-            Bunting(new Vector3(hl * 0.3f, y, -hw - 3f), new Vector3(hl, y, hw + 3f), festa, 0.35f, 0.42f, 0.7f);
-        }
-
         void Clothesline(float hl, float hw, int variant)
         {
             Color[] roupa = { new Color(0.9f, 0.9f, 0.92f), new Color(0.2f, 0.35f, 0.7f), new Color(0.85f, 0.25f, 0.2f), new Color(0.95f, 0.8f, 0.3f), new Color(0.3f, 0.6f, 0.35f) };
@@ -162,34 +142,6 @@ namespace Craquez
         }
 
         // ------------------------------------------------------------ peças reutilizáveis
-        /// <summary>Fileira de bandeirolas triangulares num fio com barriga (catenária) que balança.</summary>
-        void Bunting(Vector3 a, Vector3 b, Color[] cols, float w, float h, float gap)
-        {
-            float len = Vector3.Distance(a, b);
-            int n = Mathf.Max(2, Mathf.FloorToInt(len / gap));
-            var wire = new MeshKit();
-            var flags = new MeshKit();
-            Vector3 Sag(float t) => Vector3.Lerp(a, b, t) - Vector3.up * Mathf.Sin(t * Mathf.PI) * len * 0.06f;
-            for (int i = 0; i < 12; i++) wire.Cylinder(Sag(i / 12f), Sag((i + 1) / 12f), 0.01f, 3);
-            var dir = (b - a).normalized;
-            var byColor = new MeshKit[cols.Length];
-            for (int i = 0; i < n; i++)
-            {
-                var p = Sag((i + 0.5f) / n);
-                var mk = byColor[i % cols.Length] ??= new MeshKit();
-                var l = p - dir * w * 0.5f; var r = p + dir * w * 0.5f; var tip = p - Vector3.up * h;
-                mk.Quad(l, r, tip, tip);
-                mk.Quad(tip, tip, r, l);
-            }
-            wire.Object("Fio", Gfx.Lit(new Color(0.2f, 0.2f, 0.2f), null, 0.1f), transform, false);
-            for (int c = 0; c < cols.Length; c++)
-            {
-                if (byColor[c] == null) continue;
-                var go = byColor[c].Object("Bandeirolas", Gfx.Lit(cols[c], null, 0.15f), transform, false);
-                AddWave(go.GetComponent<MeshFilter>().sharedMesh, 0.05f, 1.4f, a.x * 0.1f + c, 1);
-            }
-        }
-
         /// <summary>Pano preso por uma borda vertical (bandeira), ondula mais na ponta solta.</summary>
         void Cloth(string name, Vector3 pole, float dirX, float w, float h, int seg, Material mat, float amp, float freq, float phase)
         {

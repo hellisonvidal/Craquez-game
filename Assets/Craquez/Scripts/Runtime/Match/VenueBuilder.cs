@@ -1510,7 +1510,12 @@ namespace Craquez
             go.AddComponent<MeshFilter>().sharedMesh = n._mesh;
             var mr = go.AddComponent<MeshRenderer>();
             // translúcida (não recortada): de longe vira um véu branco, como rede de verdade, sem sumir nem serrilhar
-            mr.sharedMaterial = Gfx.Transparent(new Color(1f, 1f, 1f, 0.95f), netTex);
+            var nm = Gfx.Transparent(new Color(1f, 1f, 1f, 0.95f), netTex);
+            // dos dois lados e desenhada depois dos outros transparentes (alambrado, vidros): a
+            // rede não some atrás da tela do society nem quando vista por dentro do gol
+            nm.SetFloat("_Cull", 0f);
+            nm.renderQueue = 3100;
+            mr.sharedMaterial = nm;
             mr.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
             return n;
         }

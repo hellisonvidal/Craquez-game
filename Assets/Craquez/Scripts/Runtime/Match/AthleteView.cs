@@ -259,8 +259,16 @@ namespace Craquez
                 if (up == null || lo == null || hd == null) continue;
                 float s = Mathf.Sign(Vector3.Dot(up.position - (rig.spine != null ? rig.spine.position : transform.position), right));
                 Vector3 dir;
-                if (ph == 3 && knee != null && sfx == hurt) dir = (knee.position - up.position).normalized;   // segura a perna
-                else if (ph >= 3) dir = (transform.up * 0.3f + right * s * 0.8f - transform.forward * 0.4f * fwd).normalized;   // braço apoiado no chão
+                var down = (-transform.up + right * s * 0.12f).normalized;   // braço solto ao lado do corpo
+                if (ph == 0) dir = down;   // já de pé: os braços descem (antes ficavam erguidos enquanto a pose se desfazia)
+                else if (ph == 3 && knee != null && sfx == hurt) dir = (knee.position - up.position).normalized;   // segura a perna
+                else if (ph == 3) dir = (transform.up * 0.3f + right * s * 0.8f - transform.forward * 0.4f * fwd).normalized;   // braço apoiado no chão
+                else if (ph == 4)
+                {
+                    // levantando: empurra o chão com as mãos e depois os braços voltam para baixo
+                    var push = (-Vector3.up * 0.8f + right * s * 0.4f + transform.forward * 0.2f).normalized;
+                    dir = Vector3.Slerp(push, down, Smooth(u * 1.6f));
+                }
                 else if (fwd > 0f) dir = (transform.forward * 0.9f + transform.up * 0.35f + right * s * 0.35f).normalized;  // mãos à frente
                 else dir = (-transform.forward * 0.7f - transform.up * 0.4f + right * s * 0.6f).normalized;             // mãos atrás
                 var cur = lo.position - up.position;
