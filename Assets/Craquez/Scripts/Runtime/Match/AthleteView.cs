@@ -826,6 +826,7 @@ namespace Craquez
 
         // ------------------------------------------------------------ passada desenhada
         float _gPhase, _procW;
+        Vector2 _gDir;
 
         static float G(float u, float c, float w)
         {
@@ -847,13 +848,21 @@ namespace Craquez
             float spd = _animSpd;
             var right = transform.right; var up = transform.up; var fwd = transform.forward;
             var lv = transform.InverseTransformDirection(new Vector3(p.vel.x, 0f, p.vel.y));
-            float forwardness = spd > 0.2f ? Mathf.Clamp01((lv.z / Mathf.Max(0.2f, new Vector2(lv.x, lv.z).magnitude) - 0.45f) / 0.4f) : 1f;
+            // direção do passo no corpo: para a frente, de lado ou de costas (a passada segue o
+            // movimento, o joelho sempre dobra para trás e os braços balançam com as pernas)
+            var mvL = new Vector2(lv.x, lv.z);
+            float mvMag = mvL.magnitude;
+            var mvDir = mvMag > 0.15f ? mvL / mvMag : new Vector2(0f, 1f);
+            _gDir = Vector2.Lerp(_gDir == Vector2.zero ? mvDir : _gDir, mvDir, 1f - Mathf.Exp(-dt * 8f)).normalized;
+            float back = Mathf.Clamp01(-_gDir.y), lateral = Mathf.Abs(_gDir.x);
             float act = anim != null ? anim.ActionWeight : 0f;
             float moving = Mathf.Clamp01((spd - 0.35f) / 0.7f);
-            float want = skip ? 0f : (1f - act) * moving * forwardness;
+            float want = skip ? 0f : (1f - act) * moving;
             _procW = Mathf.MoveTowards(_procW, want, dt * 5f);
             float W = _procW;
-            float run = Mathf.Clamp01((spd - 1.9f) / 2.6f), sprint = Mathf.Clamp01((spd - 5.8f) / 2f);
+            float run = Mathf.Clamp01((spd - 1.9f) / 2.6f), sprint = Mathf.Clamp01((spd - 5.8f) / 2f) * (1f - back) * (1f - lateral);
+            // de costas e de lado: passos mais curtos e baixos
+            float dirAmp = Mathf.Lerp(1f, 0.55f, Mathf.Max(back, lateral * 0.8f));
             // comprimento do ciclo (duas passadas): curto andando, longo no pique; o estilo muda a passada
             float L = (Mathf.Lerp(1.5f, 2.7f, run) + 1.5f * sprint) / Mathf.Max(0.8f, _cadence) * transform.localScale.y;
             _gPhase = Mathf.Repeat(_gPhase + spd / Mathf.Max(0.5f, L) * dt, 1f);
@@ -865,13 +874,13 @@ namespace Craquez
             {
                 float walk = 6.5f + 18.5f * Mathf.Cos(2f * Mathf.PI * u);
                 float runA = 14f + (30f + 10f * sprint) * Mathf.Cos(2f * Mathf.PI * (u - 0.85f));
-                return Mathf.Lerp(walk, runA, run) * legScale;
+                return Mathf.Lerp(walk, runA, run) * legScale * dirAmp;
             }
             float KneeAt(float u)
             {
                 float walk = 4f + 13f * G(u, 0.13f, 0.07f) + 56f * G(u, 0.72f, 0.1f);
                 float runK = 12f + 28f * G(u, 0.15f, 0.08f) + (84f + 26f * sprint) * _knee * G(u, 0.66f, 0.12f);
-                return Mathf.Lerp(walk, runK, run) * Mathf.Lerp(1f, 0.9f, hasBall ? 1f : 0f);
+                return Mathf.Lerp(walk, runK, run) * Mathf.Lerp(1f, 0.9f, hasBall ? 1f : 0f) * Mathf.Lerp(1f, 0.7f, Mathf.Max(back, lateral));
             }
             float uR = _gPhase, uL = Mathf.Repeat(_gPhase + 0.5f, 1f);
             // pelve: gira para o lado da perna que vai à frente; ombros no sentido contrário
@@ -882,7 +891,7 @@ namespace Craquez
             float drop = (G(uR, 0.25f, 0.12f) - G(uL, 0.25f, 0.12f)) * Mathf.Lerp(3f, 1.5f, run);
             _pose.Rotate(rig.pelvis, Quaternion.AngleAxis(drop * W, fwd));
             rig.bones.TryGetValue("spine_01", out var sp1);
-            _pose.Rotate(sp1, Quaternion.AngleAxis((Mathf.Lerp(2f, 7f, run) + 6f * sprint) * W, right));
+            _pose.Rotate(sp1, Quaternion.AngleAxis((Mathf.Lerp(2f, 7f, run) * (1f - back) + 6f * sprint) * W, right));
             for (int side = -1; side <= 1; side += 2)
             {
                 string sfx = side < 0 ? "_l" : "_r";
@@ -896,9 +905,14 @@ namespace Craquez
                 float hip = HipAt(u), knee = KneeAt(u);
                 // + no eixo "right" leva o vetor para trás: flexão (para a frente) é ângulo negativo
                 var lat = right * ps * 0.035f;
-                var thighDir = (Quaternion.AngleAxis(-hip, right) * -up + lat).normalized;
+                // eixo da passada: perpendicular à direção do movimento (de costas, o "para a frente" da perna é para trás)
+                var mvW = (right * _gDir.x + fwd * _gDir.y).normalized;
+                var axis = Vector3.Cross(up, mvW).normalized;   // = right quando anda para a frente
+                if (axis.sqrMagnitude < 1e-4f) axis = right;
+                var thighDir = (Quaternion.AngleAxis(-hip, axis) * -up + lat).normalized;
                 _pose.Rotate(th, Quaternion.Slerp(Quaternion.identity, Quaternion.FromToRotation(cf.position - th.position, thighDir), W));
-                var calfDir = (Quaternion.AngleAxis(-hip + knee, right) * -up + lat * 0.5f).normalized;
+                // o joelho dobra sempre para trás do corpo
+                var calfDir = (Quaternion.AngleAxis(knee, right) * thighDir + lat * 0.5f).normalized;
                 _pose.Rotate(cf, Quaternion.Slerp(Quaternion.identity, Quaternion.FromToRotation(ft.position - cf.position, calfDir), W));
             }
             // braços: cada um acompanha a perna do lado oposto; cotovelo dobra mais correndo
@@ -911,12 +925,14 @@ namespace Craquez
                 if (ua == null || la == null || hd == null) continue;
                 float ps = Mathf.Sign(Vector3.Dot(ua.position - rig.spine.position, right));
                 float uOpp = ps > 0f ? uL : uR;   // braço direito acompanha a perna esquerda
-                float amp = Mathf.Lerp(16f, 38f, run) + 16f * sprint;
+                float amp = (Mathf.Lerp(14f, 30f, run) + 14f * sprint) * Mathf.Lerp(1f, 0.7f, Mathf.Max(back, lateral));
                 amp *= _armAmp * (ps < 0 ? 1f : _armAsym) * (hasBall ? 0.75f : 1f);
                 float swing = Mathf.Lerp(Mathf.Cos(2f * Mathf.PI * uOpp), Mathf.Cos(2f * Mathf.PI * (uOpp - 0.85f)), run) * amp
-                              + Mathf.Lerp(4f, 14f, run) + _armFwd;
-                float elbow = Mathf.Lerp(18f, 82f, run) + 12f * sprint + _elbowStyle * 0.6f + Mathf.Max(0f, swing) * 0.25f;
-                float abd = (_armCarry * 0.7f + 6f + (hasBall ? 10f : 0f));
+                              + Mathf.Lerp(3f, 8f, run) + _armFwd * 0.6f;
+                float elbow = Mathf.Lerp(15f, 75f, run) + 10f * sprint + _elbowStyle * 0.5f + Mathf.Max(0f, swing) * 0.2f;
+                // mão no máximo na altura do peito (nada de braço "para cima")
+                elbow = Mathf.Min(elbow, Mathf.Lerp(70f, 105f, run) + 15f * sprint - swing);
+                float abd = (_armCarry * 0.5f + 5f + (hasBall ? 8f : 0f) + lateral * 6f);
                 var upDir = Quaternion.AngleAxis(-swing, right) * -up;
                 upDir = (Quaternion.AngleAxis(ps * abd, fwd) * upDir).normalized;   // abre para fora do corpo
                 _pose.Rotate(ua, Quaternion.Slerp(Quaternion.identity, Quaternion.FromToRotation(la.position - ua.position, upDir), W));

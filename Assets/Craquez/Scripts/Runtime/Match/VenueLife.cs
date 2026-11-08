@@ -103,7 +103,7 @@ namespace Craquez
                 BuildBoard(v, homeT, awayT, home, away, night);
             }
             // (campo: fotógrafos, cinegrafistas e gandulas já ficam na beira do gramado — VenueBuilder.Pitchside)
-            if (_fans.Count > 0) BuildFans(home, away, quality);
+            if (_fans.Count > 0) BuildFans3D(home, away, homeT, awayT);
         }
 
         void AddFan(Vector3 p, System.Func<float> R, System.Random rng, bool sit = false, bool crouch = false, int team = int.MinValue)
@@ -122,6 +122,23 @@ namespace Craquez
         }
 
         Material _fanMat;
+
+        /// <summary>Galera em 3D (torcedores modelados), em grupos de ~8 que pulam no seu tempo, de frente para o jogo.</summary>
+        void BuildFans3D(Kit home, Kit away, TeamData homeT, TeamData awayT)
+        {
+            var groups = new List<List<FanCrowd.Spot>>();
+            List<FanCrowd.Spot> cur = null;
+            var sorted = new List<Fan>(_fans);
+            sorted.Sort((a, b) => Mathf.Atan2(a.pos.z, a.pos.x).CompareTo(Mathf.Atan2(b.pos.z, b.pos.x)));
+            foreach (var f in sorted)
+            {
+                if (cur == null || cur.Count >= 8) { cur = new List<FanCrowd.Spot>(); groups.Add(cur); }
+                float yaw = Mathf.Atan2(-f.pos.x, -f.pos.z) * Mathf.Rad2Deg;
+                cur.Add(new FanCrowd.Spot { pos = f.pos, yaw = yaw, team = f.team == 0 ? 0 : f.team == 1 ? 1 : 2 });
+            }
+            bool mixed = (homeT != null && homeT.IsNational) || (awayT != null && awayT.IsNational);
+            FanCrowd.Build(transform, Quaternion.identity, groups, home.c1, home.c2, away.c1, away.c2, _fans.Count * 7 + 3, mixed);
+        }
 
         void BuildFans(Kit home, Kit away, int quality)
         {

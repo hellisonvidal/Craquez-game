@@ -571,9 +571,36 @@ namespace Craquez
                 float topY = 1.1f + rows * rise, far = dist + rows * step;
                 back.Quad(new Vector3(-len / 2, 0, -dist + 0.2f), new Vector3(len / 2, 0, -dist + 0.2f), new Vector3(len / 2, 1.1f, -dist + 0.2f), new Vector3(-len / 2, 1.1f, -dist + 0.2f));
                 back.Quad(new Vector3(len / 2, 0, -far), new Vector3(len / 2, topY + 2.5f, -far), new Vector3(-len / 2, topY + 2.5f, -far), new Vector3(-len / 2, 0, -far));
+                // fileiras da frente: torcedores em 3D (modelados, pulando e erguendo os braços por bloco);
+                // as de trás seguem com as silhuetas (economiza no celular)
+                int front3d = Mathf.Min(rows, quality >= 2 ? 10 : quality >= 1 ? 7 : 4);
+                {
+                    var fanGroups = new List<List<FanCrowd.Spot>>();
+                    var frng = new System.Random(pseed * 13 + side * 101);
+                    int nA3 = Mathf.Max(2, Mathf.RoundToInt(len / 13f));
+                    for (int a = 0; a < nA3; a++)
+                    {
+                        var grp = new List<FanCrowd.Spot>();
+                        float xa = -len / 2 + a * len / nA3 + 0.9f, xb = -len / 2 + (a + 1) * len / nA3 - 0.9f;
+                        for (int r = 0; r < front3d; r++)
+                        {
+                            float y1 = 1.1f + (r + 1) * rise, d = dist + r * step + step * 0.5f;
+                            for (float x = xa + (float)frng.NextDouble() * 0.3f; x < xb; x += 0.68f + (float)frng.NextDouble() * 0.12f)
+                            {
+                                if (frng.NextDouble() > style.occupancy) continue;
+                                int team = side == 3 && !mixed ? 1 : 0;
+                                if (mixed && frng.NextDouble() < 0.35) team = 1;
+                                grp.Add(new FanCrowd.Spot { pos = new Vector3(x, y1, -d), yaw = 0f, team = team });
+                            }
+                        }
+                        fanGroups.Add(grp);
+                    }
+                    FanCrowd.Build(v.root, Quaternion.Euler(0, side == 0 ? 0 : side == 1 ? 180 : side == 2 ? 90 : -90, 0), fanGroups,
+                        homeKit.c1, homeKit.c2, awayKit.c1, awayKit.c2, pseed + side * 7, mixed);
+                }
                 // cada grupo de fileiras com o seu material (fase própria do pulo)
                 var pplG = new[] { new MeshKit(), new MeshKit(), new MeshKit() };
-                for (int r = 0; r < rows; r += quality >= 1 ? 1 : 2)
+                for (int r = front3d; r < rows; r += quality >= 1 ? 1 : 2)
                 {
                     float y1 = 1.1f + (r + 1) * rise, d = dist + r * step + step * 0.55f;
                     float off = (r * 0.37f) % 1f;
@@ -945,7 +972,26 @@ namespace Craquez
             var crowd = Gfx.CrowdPeople(1024, 64, homeKit.c1, homeKit.c2, awayKit.c1, variant * 23 + 9, 0f, false, home.IsNational || away.IsNational ? 0.3f : 0f);
             var cm = Gfx.Cutout(Color.white, crowd, 0.5f, 0.05f);
             v.crowdMats.Add(cm);
-            ppl.Object("Galera", cm, v.root, false);
+            // a galera em 3D na arquibancadinha (em pé, pulando nos lances)
+            {
+                var groups = new List<List<FanCrowd.Spot>>();
+                var frng = new System.Random(variant * 41 + 7);
+                bool mixedS = home.IsNational || away.IsNational;
+                for (int bI = 0; bI < 3; bI++)
+                {
+                    var g = new List<FanCrowd.Spot>();
+                    float ga = -hl * 0.6f + hl * 1.2f * bI / 3f + 0.3f, gb = -hl * 0.6f + hl * 1.2f * (bI + 1) / 3f - 0.3f;
+                    for (int r = 0; r < 4; r++)
+                        for (float x = ga; x < gb; x += 0.75f + (float)frng.NextDouble() * 0.5f)
+                        {
+                            if (frng.NextDouble() > 0.6) continue;
+                            int team = bI == 2 && !mixedS ? 1 : mixedS && frng.NextDouble() < 0.4 ? 1 : 0;
+                            g.Add(new FanCrowd.Spot { pos = new Vector3(x, (r + 1) * 0.42f, fz + 1.2f + r * 0.8f + 0.4f), yaw = 180f, team = team });
+                        }
+                    groups.Add(g);
+                }
+                FanCrowd.Build(v.root, Quaternion.identity, groups, homeKit.c1, homeKit.c2, awayKit.c1, awayKit.c2, variant * 13 + 4, mixedS);
+            }
             // cobertura da arquibancadinha (telhas translúcidas sobre pilares) e guarda-corpo
             var cover = new MeshKit();
             var cpost = new MeshKit();
@@ -1194,18 +1240,32 @@ namespace Craquez
                 }
                 st.Object("Torcida", cm, v.root, false);
                 stc.Object("Degraus", concrete, v.root, false);
-                var pg = new[] { new MeshKit(), new MeshKit() };
-                foreach (var (xa, xb) in segs)
-                    for (int r = 0; r < rows; r++)
+                // torcedores 3D em todas as fileiras (blocos de ~10 m, cada um pulando no seu tempo)
+                {
+                    var groups = new List<List<FanCrowd.Spot>>();
+                    var frng = new System.Random(hseed + (sz > 0 ? 3 : 9));
+                    foreach (var (xa, xb) in segs)
                     {
-                        float y1 = 1.0f + (r + 1) * 0.45f, d = (start + r * 0.85f + 0.5f) * sz;
-                        float ua = (r * 0.37f) % 1f, ub = ua + (xb - xa) / 9f;
-                        const float hh = 0.8f;
-                        var A = new Vector3(xa, y1, d); var B = new Vector3(xb, y1, d);
-                        if (sz > 0) pg[r % 2].Quad(B, A, A + Vector3.up * hh, B + Vector3.up * hh, new Vector2(ua, 0f), new Vector2(ub, 1f));
-                        else pg[r % 2].Quad(A, B, B + Vector3.up * hh, A + Vector3.up * hh, new Vector2(ua, 0f), new Vector2(ub, 1f));
+                        int nb = Mathf.Max(1, Mathf.RoundToInt((xb - xa) / 10f));
+                        for (int bI = 0; bI < nb; bI++)
+                        {
+                            var g = new List<FanCrowd.Spot>();
+                            float ga = xa + (xb - xa) * bI / nb + 0.3f, gb = xa + (xb - xa) * (bI + 1) / nb - 0.3f;
+                            for (int r = 0; r < rows; r++)
+                            {
+                                float y1 = 1.0f + (r + 1) * 0.45f, d = (start + r * 0.85f + 0.45f) * sz;
+                                for (float x = ga + (float)frng.NextDouble() * 0.3f; x < gb; x += 0.68f + (float)frng.NextDouble() * 0.12f)
+                                {
+                                    if (frng.NextDouble() > 0.82) continue;
+                                    int team = _mixedCrowd && frng.NextDouble() < 0.35 ? 1 : 0;
+                                    g.Add(new FanCrowd.Spot { pos = new Vector3(x, y1, d), yaw = sz > 0 ? 180f : 0f, team = team });
+                                }
+                            }
+                            groups.Add(g);
+                        }
                     }
-                for (int g = 0; g < 2; g++) pg[g].Object("Torcedores " + (sz > 0 ? "fundo" : "câmera") + " " + g, hMats[g], v.root, false);
+                    FanCrowd.Build(v.root, Quaternion.identity, groups, homeKit.c1, homeKit.c2, awayKit.c1, awayKit.c2, hseed + (sz > 0 ? 1 : 2), _mixedCrowd);
+                }
                 // base e guarda-corpo
                 var front = new MeshKit();
                 front.Box(new Vector3(0, 0.5f, (start - 0.1f) * sz), new Vector3(sx * 2f, 1f, 0.2f), 2f);
@@ -1270,9 +1330,26 @@ namespace Craquez
                     steps.Box(new Vector3(x0 + sx * 0.4f, y0 + 0.22f, 0), new Vector3(0.8f, 0.45f, hw * 1.6f), 2f);
                     var a0 = new Vector3(x0, y0 + 0.45f, -hw * 0.8f);
                     var a1 = new Vector3(x0, y0 + 0.45f, hw * 0.8f);
-                    if (sx > 0) ppl.Quad(a0, a0 + Vector3.up * 1.2f, a1 + Vector3.up * 1.2f, a1, new Vector2(0, 0), new Vector2(hw / 4f, 1));
-                    else ppl.Quad(a1, a1 + Vector3.up * 1.2f, a0 + Vector3.up * 1.2f, a0, new Vector2(0, 0), new Vector2(hw / 4f, 1));
                 }
+            // torcedores 3D atrás dos gols: o setor do visitante (seleções: misturado)
+            {
+                var groups = new List<List<FanCrowd.Spot>>();
+                var frng = new System.Random(variant * 71 + 5);
+                foreach (float sx in new[] { -1f, 1f })
+                    for (int seg = 0; seg < 2; seg++)
+                    {
+                        var g = new List<FanCrowd.Spot>();
+                        for (int r = 0; r < 5; r++)
+                            for (float z = (seg == 0 ? -hw * 0.78f : 0.3f); z < (seg == 0 ? -0.3f : hw * 0.78f); z += 0.7f + (float)frng.NextDouble() * 0.15f)
+                            {
+                                if (frng.NextDouble() > 0.8) continue;
+                                int team = _mixedCrowd ? (frng.NextDouble() < 0.5 ? 0 : 1) : 1;
+                                g.Add(new FanCrowd.Spot { pos = new Vector3(sx * (hl + 4.5f + r * 0.8f + 0.4f), 0.45f * (r + 1), z), yaw = sx > 0 ? -90f : 90f, team = team });
+                            }
+                        groups.Add(g);
+                    }
+                FanCrowd.Build(v.root, Quaternion.identity, groups, home.c1, home.c2, away.c1, away.c2, variant * 19 + 1, _mixedCrowd);
+            }
             steps.Object("Arquibancada dos fundos", wallMat, v.root, quality >= 1);
             // atrás dos gols: o setor do visitante (só com as cores dele); em jogo de seleções, misturado
             var crowd = _mixedCrowd ? Gfx.CrowdPeople(1024, 64, home.c1, home.c2, away.c1, variant * 17 + 3, 0f, false, 0.4f)

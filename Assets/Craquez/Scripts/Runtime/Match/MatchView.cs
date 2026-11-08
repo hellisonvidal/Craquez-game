@@ -105,6 +105,7 @@ namespace Craquez
             weather.pitch2 = venue.pitchMat2;
             UrpSetup.Camera(cam, q);
             Sfx.Crowd(s.mode.id == GameModes.Field ? 0.55f : 0.3f, s.mode.id == GameModes.Field ? 0.25f : 0f);
+            FanCrowd.Hype = 0f; FanCrowd.GoalT = 0f; FanCrowd.GoalTeam = -1;
         }
 
         static Kit KeeperKit(Kit own, Kit other, int t)
@@ -439,6 +440,8 @@ namespace Craquez
                     bcam.Shake(0.12f);
                     break;
                 case "goal":
+                    FanCrowd.GoalTeam = e.team;
+                    FanCrowd.GoalT = 8f;
                     Sfx.Net();
                     // gol do mandante: o estádio explode; do visitante: só o setor visitante comemora
                     bool homeGoal = e.team == 0;
@@ -591,6 +594,9 @@ namespace Craquez
             }
             float quiet = _silence > 0f ? 0.55f : 1f;
             float tense = !homeAttack ? danger * 0.12f : 0f;   // murmúrio quando o visitante ameaça
+            // torcedores 3D: empolgação com o perigo e com a pressão do time da casa
+            FanCrowd.Hype = Mathf.Clamp01(_crowdHype + danger * 0.6f) * quiet;
+            if (FanCrowd.GoalT > 0f) FanCrowd.GoalT -= Time.deltaTime;
             Sfx.Crowd(((sim.mode.id == GameModes.Field ? 0.5f : 0.28f) + _crowdHype * 0.3f + tense) * quiet,
                 sim.mode.id == GameModes.Field ? (0.22f + (homeAttack ? danger * 0.18f : -danger * 0.1f)) * quiet : 0f);
             Sfx.Drums(sim.mode.id == GameModes.Street ? 0f : (0.12f + _crowdHype * 0.3f) * quiet);
