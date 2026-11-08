@@ -678,6 +678,7 @@ namespace Craquez.Sim
                     stateTimer -= DT;
                     AiAll(false);
                     foreach (var p in players) { p.intent *= 0.5f; MovePlayer(p); }
+                    ClampKeepers();
                     StepBallInNet();
                     if (stateTimer <= 0f) ResetForKickoff(kickoffTeam);
                     break;
@@ -774,6 +775,7 @@ namespace Craquez.Sim
             AiAll(false);
             foreach (var p in players) MovePlayer(p);
             ResolveCollisions();
+            ClampKeepers();
             Slides();
             Dribble();
             Possession();
@@ -1544,6 +1546,7 @@ namespace Craquez.Sim
                 MovePlayer(p);
             }
             ResolveCollisions();
+            ClampKeepers();
             // a bola rola solta até parar (sem gol nem lateral: o jogo está parado)
             ball.owner = -1;
             ball.Step(DT, mode);
@@ -1731,8 +1734,40 @@ namespace Craquez.Sim
                     continue;
                 }
                 if (p.isKeeper) AiKeeper(p, frozen);
-                else AiOutfield(p, frozen);
+                else { AiOutfield(p, frozen); AntiSpin(p); }
             }
+        }
+
+        /// <summary>
+        /// Sem jogador rodando: a direção pedida pela IA vira no máximo ~300°/s e, se ela ficar girando
+        /// para o mesmo lado (desvios em espiral em volta de companheiros e alvos que andam), o atleta
+        /// segue reto por um instante em vez de dar a volta.
+        /// </summary>
+        void AntiSpin(SimPlayer p)
+        {
+            var it = p.intent;
+            float mag = it.magnitude;
+            p.aiTurnAcc *= Mathf.Exp(-DT / 1.2f);
+            if (mag < 0.2f || p.aiLastIntent.sqrMagnitude < 0.04f) { p.aiLastIntent = it; return; }
+            if (p.aiStraightT > 0f)
+            {
+                p.aiStraightT -= DT;
+                // segue na direção que já tinha (só corrige devagar)
+                var d0 = V2.RotateToward(p.aiLastIntent.Norm(), it / mag, 1.2f * DT);
+                p.intent = d0 * mag;
+                p.aiLastIntent = p.intent;
+                return;
+            }
+            float ang = Vector2.SignedAngle(p.aiLastIntent, it);
+            float maxStep = 300f * DT;
+            if (Mathf.Abs(ang) > maxStep && Mathf.Abs(ang) < 150f)   // (meia-volta de verdade passa)
+            {
+                p.intent = p.aiLastIntent.Norm().Rotated(Mathf.Sign(ang) * maxStep * Mathf.Deg2Rad) * mag;
+                ang = Mathf.Sign(ang) * maxStep;
+            }
+            p.aiTurnAcc += ang;
+            if (Mathf.Abs(p.aiTurnAcc) > 240f) { p.aiStraightT = 0.9f; p.aiTurnAcc = 0f; }
+            p.aiLastIntent = p.intent;
         }
 
         public Vector2 FormationTarget(SimPlayer p, bool attacking)
@@ -2124,6 +2159,11 @@ namespace Craquez.Sim
                     p.facing = V2.RotateToward(p.facing, (ball.pos - p.position).Norm(), 0.05f);
             }
             else p.intent = (to / d) * Mathf.Clamp(d / (urgent ? 1.2f : mode.id == GameModes.Field ? 4f : 2.4f), 0.15f, 1f);   // quadra: tudo mais perto, chega mais rápido   // indo na bola: chega forte, não freia antes
+            // chegando rápido num alvo que ficou de lado/para trás: freia primeiro (antes ele não
+            // conseguia fazer a curva e ficava orbitando o ponto, rodando sem parar)
+            float v = p.vel.magnitude;
+            if (!urgent && v > 1.4f && d > 0.01f && d < v * v / 5f + 0.6f && Vector2.Dot(p.vel / v, to / d) < 0.55f)
+                p.intent = Vector2.zero;
             float lazy = 1.35f - 0.7f * p.work;   // quem tem mais disposição pega o pique antes
             p.wantSprint = urgent || (d > (p.sprinting ? 7f : 11f) * lazy && p.stamina > 0.25f);
             p.faceBall = !urgent && d < 10f && ball.pos.Dist(p.position) < 35f;
@@ -2624,6 +2664,13 @@ namespace Craquez.Sim
             var faceTarget = p.vel.magnitude > 0.4f ? p.vel : intent;
             if (p.faceBall && !hasBall && !p.sprinting && ctrl[p.team].player != p.id) faceTarget = ball.pos - p.position;
             float turnRate = Mathf.Lerp(11f, 4f, Mathf.Clamp01(p.vel.magnitude / 9f)) * (hasBall ? 0.8f : 1f);
+            // devagar, sem a bola e sem comando: o corpo fica de frente para o jogo (dá passos de lado/de
+            // costas) em vez de seguir a direção de cada empurrãozinho — era isso que fazia o atleta rodar
+            if (!hasBall && ctrl[p.team].player != p.id && p.vel.magnitude < 1.8f && !p.isKeeper)
+            {
+                faceTarget = ball.pos - p.position;
+                turnRate = 4.5f;
+            }
             if (p.shielding && !p.isKeeper)
             {
                 if (hasBall)
@@ -2660,6 +2707,24 @@ namespace Craquez.Sim
             else p.stamina = Mathf.Min(1f, p.stamina + 0.03f * DT);
             p.runPhase += p.vel.magnitude * DT * 2.3f;
             ClampPlayer(p);
+        }
+
+        /// <summary>
+        /// Nenhum goleiro dentro do próprio gol, nem depois das colisões (empurrões de atacantes e
+        /// companheiros podiam jogá-lo para trás da linha, onde ele sumia dentro da rede).
+        /// </summary>
+        void ClampKeepers()
+        {
+            foreach (var p in players)
+            {
+                if (!p.isKeeper) continue;
+                float gx = -halfLen * TeamDir(p.team), inward = -Mathf.Sign(gx);
+                if (Mathf.Abs(p.position.y) < goalHalf + 0.8f && (p.position.x - gx) * inward < 0.25f)
+                {
+                    p.position.x = gx + inward * 0.25f;
+                    if (p.vel.x * inward < 0f) p.vel.x = 0f;
+                }
+            }
         }
 
         void ClampPlayer(SimPlayer p)

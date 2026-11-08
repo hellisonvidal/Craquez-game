@@ -336,7 +336,8 @@ namespace Craquez
             // giro com velocidade angular limitada (mais lento em alta velocidade, como um atleta real)
             float spd = p.vel.magnitude;
             float diff = Mathf.DeltaAngle(_yaw, target);
-            float maxRate = Mathf.Lerp(900f, 340f, Mathf.Clamp01(spd / 8f));
+            // giro do corpo limitado como num atleta de verdade (antes até 900°/s: o corpo "rodava" na hora)
+            float maxRate = Mathf.Lerp(480f, 300f, Mathf.Clamp01(spd / 8f));
             float step = Mathf.Clamp(diff * (1f - Mathf.Exp(-dt * 14f)), -maxRate * dt, maxRate * dt);
             _yaw += step;
             _yawRate = Mathf.Lerp(_yawRate, step / Mathf.Max(1e-4f, dt), 1f - Mathf.Exp(-dt * 8f));

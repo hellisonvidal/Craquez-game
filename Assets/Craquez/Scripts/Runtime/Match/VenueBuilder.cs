@@ -20,6 +20,9 @@ namespace Craquez
         public Vector3 tunnel;
         public string name = "";
         public float standDist = 12f;
+        /// <summary>Arquibancadas para as bandeiras da torcida: fileiras do lado de lá, atrás dos gols (0 = não há) e meia largura do lado de lá.</summary>
+        public int flagRowsLong = 6, flagRowsEnd = 4;
+        public float flagSpanLong;
         // vida do cenário (VenueLife)
         public float wallH = 1f;            // altura da mureta (rua): baixa = gente sentada nela
         public bool outdoor = true;         // ao ar livre (pombos)
@@ -542,6 +545,9 @@ namespace Craquez
             var bannerA = mixed ? null : Gfx.Lit(Color.white, Gfx.Banner(awayKit.c1, awayKit.c2, words[(pseed + 5) % words.Length], pseed + 9), 0.1f);
             v.standDist = gapZ;
             int rowsAll = rows;
+            v.flagRowsLong = rows;
+            v.flagRowsEnd = style.ends ? rows : Mathf.Max(8, rows / 2);
+            v.flagSpanLong = hl + gapX;
             for (int side = 0; side < 4; side++)
             {
                 // estrutura completa: as quatro arquibancadas. A do lado da câmera de TV some sozinha
@@ -1090,6 +1096,7 @@ namespace Craquez
             v.boardPost = true;
             v.tunnel = new Vector3(0, 0, -(hw + 2f));
             v.standDist = 3f;
+            v.flagRowsLong = 4; v.flagRowsEnd = 0; v.flagSpanLong = hl * 0.6f;   // só a arquibancadinha do lado de lá
             Entrance(v, -(hw + 5.2f), homeKit.c1, false, night);
             return v;
         }
@@ -1359,6 +1366,7 @@ namespace Craquez
                 }
             v.tunnel = new Vector3(0, 0, -(hw + 2.5f));
             v.standDist = 3f;
+            v.flagRowsLong = 11; v.flagRowsEnd = 5; v.flagSpanLong = hl + 3f;
             Entrance(v, -(hw + 4.6f), homeKit.c1, false, night);
         }
 

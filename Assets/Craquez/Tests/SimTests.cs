@@ -624,7 +624,7 @@ namespace Craquez.Tests
         [TestCase(GameModes.Futsal)]
         public void PlayersDontRunInCircles(string mode)
         {
-            int loops = 0, samples = 0, floops = 0;
+            int loops = 0, samples = 0, floops = 0, keeperIn = 0;
             for (uint seed = 1; seed <= 3; seed++)
             {
                 var sim = NewMatch(mode, seed);
@@ -644,7 +644,12 @@ namespace Craquez.Tests
                     if (sim.state != MatchState.Playing) continue;
                     foreach (var p in sim.players)
                     {
-                        if (p.isKeeper) continue;
+                        if (p.isKeeper)
+                        {
+                            float gx = -sim.halfLen * sim.TeamDir(p.team);
+                            if (Mathf.Abs(p.position.y) < sim.goalHalf && (p.position.x - gx) * -Mathf.Sign(gx) < 0.1f) keeperIn++;
+                            continue;
+                        }
                         float turn = 0f;
                         if (p.vel.magnitude > 1.2f && prev[p.id].magnitude > 1.2f) turn = Vector2.SignedAngle(prev[p.id], p.vel);
                         prev[p.id] = p.vel;
@@ -652,7 +657,11 @@ namespace Craquez.Tests
                         prevF[p.id] = p.facing;
                         fh[p.id].Enqueue(ft); fsum[p.id] += ft;
                         if (fh[p.id].Count > 120) fsum[p.id] -= fh[p.id].Dequeue();
-                        if (Mathf.Abs(fsum[p.id]) > 330f) { floops++; fh[p.id].Clear(); fsum[p.id] = 0f; }
+                        if (Mathf.Abs(fsum[p.id]) > 330f)
+                        {
+                            floops++; fh[p.id].Clear(); fsum[p.id] = 0f;
+                            if (floops <= 12) System.Console.WriteLine($"   giro: id {p.id} dono {sim.ball.owner == p.id} ctrl {sim.ctrl[p.team].player == p.id} vel {p.vel.magnitude:F1} dBola {p.position.Dist(sim.ball.pos):F1} faceBall {p.faceBall} skill {p.skill} stun {p.stun:F1} receptor {sim.passReceiver == p.id} donoTime {(sim.ball.owner >= 0 ? sim.players[sim.ball.owner].team : -1)} time {p.team}");
+                        }
                         hist[p.id].Enqueue(turn); sum[p.id] += turn;
                         if (hist[p.id].Count > 120) sum[p.id] -= hist[p.id].Dequeue();
                         samples++;
@@ -661,6 +670,7 @@ namespace Craquez.Tests
                 }
             }
             System.Console.WriteLine($"[círculos {mode}] {loops} voltas completas correndo, {floops} giros do corpo, em {samples / 60} s-jogador");
+            Assert.AreEqual(0, keeperIn, "goleiro dentro do próprio gol");
             // (no futsal, quadra pequena, as voltas para marcar/receber são mais comuns)
             Assert.Less(loops, samples / 60 / (mode == GameModes.Field ? 200 : 40), "jogadores correndo em círculos");
         }

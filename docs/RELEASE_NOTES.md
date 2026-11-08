@@ -1,16 +1,26 @@
-## Craquez 2.3.0
+## Craquez 2.3.1
 
 Jogo de futebol feito 100% com inteligência artificial, **gratuito**. Android, Windows e Linux.
 
 ### Downloads
-- **Android**: `Craquez-v2.3.0.apk` (instale permitindo "fontes desconhecidas")
-- **Windows**: `Craquez-v2.3.0-Instalador-Windows.exe` (instalador) ou `Craquez-v2.3.0-Windows.zip` (portátil)
-- **Linux**: `Craquez-v2.3.0-Linux.tar.gz` → extraia e rode `./Craquez` (ou `./instalar.sh` para o atalho no menu)
+- **Android**: `Craquez-v2.3.1.apk` (instale permitindo "fontes desconhecidas")
+- **Windows**: `Craquez-v2.3.1-Instalador-Windows.exe` (instalador) ou `Craquez-v2.3.1-Windows.zip` (portátil)
+- **Linux**: `Craquez-v2.3.1-Linux.tar.gz` → extraia e rode `./Craquez` (ou `./instalar.sh` para o atalho no menu)
 
 ### Novidades
-- **Corrida mais humana**: o braço vai mais para trás do que para a frente, a mão para na altura do
-  peito (antes subia até o rosto, como numa guarda de boxe) e a passada ficou um pouco mais curta.
-- **Proporções**: ombros ~12% mais estreitos e mãos ~25% menores que o modelo original.
+- **Jogadores sem rodar**: quem chega rápido no lugar freia antes de virar (antes ficava orbitando
+  o ponto); devagar e sem a bola, o atleta fica de frente para o jogo e dá passos de lado em vez de
+  girar a cada empurrão; a IA e a condução da CPU não giram mais em espiral; o corpo vira com
+  velocidade de atleta de verdade.
+- **Bandeiras dentro das arquibancadas**: cada uma numa fileira real da arquibancada (nunca além
+  da última) e dentro da largura dela; no society, só na arquibancadinha.
+- **Goleiro não some mais no gol**: além do mergulho, empurrões e colisões também não o jogam
+  para trás da linha (teste automático confere em partidas inteiras).
+- **Corrida**: braço mais para trás que para a frente, mão no máximo na altura do peito; ombros
+  mais estreitos e mãos menores.
+
+## Versão 2.3.0
+
 - **Sem a faixa clara na arquibancada**: a cobertura ficou mais alta e recuada (vista por baixo ela
   virava uma faixa que acompanhava a câmera) e não há mais cobertura do lado da câmera.
 - **Torcida toda em 3D**: todas as fileiras com torcedores modelados (no celular mais fraco, até 16

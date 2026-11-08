@@ -152,7 +152,25 @@ namespace Craquez.Sim
                 if (--_carryT <= 0 || _carry == Vector2.zero) { _carry = BestCarry(sim, p, toGoal.Norm()); _carryT = 12; }
                 var mv = Vector2.Lerp(_carry, toGoal.Norm(), 0.15f).Norm();
                 if (Mathf.Abs(p.position.y) > sim.halfW * 0.85f) mv.y -= Mathf.Sign(p.position.y) * 0.8f;
-                f.move = mv.Norm();
+                // condução sem rodar: a direção vira com limite e, se ficar girando para o mesmo lado
+                // (em volta do marcador), segue para o gol por um instante
+                mv = mv.Norm();
+                if (_lastId != p.id) { _lastId = p.id; _lastMove = Vector2.zero; _spinAcc = 0f; _straightT = 0; }
+                _spinAcc *= Mathf.Exp(-MatchSim.DT / 1.2f);
+                if (_lastMove != Vector2.zero)
+                {
+                    if (_straightT > 0) { _straightT--; mv = Vector2.Lerp(_lastMove, toGoal.Norm(), 0.2f).Norm(); }
+                    else
+                    {
+                        float ang = Vector2.SignedAngle(_lastMove, mv);
+                        float maxStep = 260f * MatchSim.DT;
+                        if (Mathf.Abs(ang) > maxStep && Mathf.Abs(ang) < 150f) { mv = _lastMove.Rotated(Mathf.Sign(ang) * maxStep * Mathf.Deg2Rad); ang = Mathf.Sign(ang) * maxStep; }
+                        _spinAcc += ang;
+                        if (Mathf.Abs(_spinAcc) > 220f) { _straightT = 50; _spinAcc = 0f; _carry = toGoal.Norm(); _carryT = 50; }
+                    }
+                }
+                _lastMove = mv;
+                f.move = mv;
                 if (oppD > 3.5f - p.flair) f.buttons |= InputFrame.Sprint;
                 var sty = StyleOf(p);
                 // improviso: o driblador encara o marcador de mais longe, com o drible preferido (às vezes
@@ -308,6 +326,11 @@ namespace Craquez.Sim
             shield = kind == 3 || kind == 4;
             return kind == 0 ? facing : kind == 1 || kind == 4 ? -facing : perp;
         }
+
+        Vector2 _lastMove;
+        int _lastId = -1;
+        float _spinAcc;
+        int _straightT;
 
         Vector2 BestCarry(MatchSim sim, SimPlayer p, Vector2 toGoal)
         {

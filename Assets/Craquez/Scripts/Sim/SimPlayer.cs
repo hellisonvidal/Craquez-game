@@ -28,6 +28,9 @@ namespace Craquez.Sim
         };
 
         public int id, team, index;
+        /// <summary>Anti-giro da IA: última direção pedida, giro acumulado e tempo de "seguir reto".</summary>
+        public Vector2 aiLastIntent;
+        public float aiTurnAcc, aiStraightT;
         public bool isKeeper;
         public int number = 1;
         public string name = "";

@@ -63,7 +63,13 @@ namespace Craquez
             _nextWave = 50f + Random.value * 40f;
             // bandeiras dos torcedores: agitadas de um lado para o outro (cada uma no seu ritmo, mais
             // forte quando a torcida se empolga), espalhadas pela arquibancada oposta e atrás dos gols
-            int flags = field ? 38 : 16;
+            int flags = field ? 38 : venue.flagRowsEnd == 0 ? 8 : 16;
+            int rowsL = Mathf.Max(1, venue.flagRowsLong), rowsE = venue.flagRowsEnd;
+            float spanL = venue.flagSpanLong > 0f ? venue.flagSpanLong : dx;
+            // frente de cada arquibancada (onde fica a primeira fileira) e altura do primeiro degrau
+            float frontL = sim.halfW + venue.standDist + (field ? 0.4f : 1.3f);
+            float frontE = sim.halfLen + venue.standDist + (field ? 1.9f : 1.6f);
+            float y0 = field ? 1.5f : 1.45f;
             _flags = new FlagWave[flags];
             var rng = new System.Random(_homeTeam * 31 + _awayTeam * 7 + 5);
             for (int i = 0; i < flags; i++)
@@ -72,18 +78,21 @@ namespace Craquez
                 // 70% na arquibancada oposta à câmera; o resto atrás dos gols (não tapam o jogo)
                 Vector3 pos;
                 Quaternion face;
-                int far = Mathf.RoundToInt(flags * 0.7f);
+                int far = rowsE > 0 ? Mathf.RoundToInt(flags * 0.7f) : flags;   // sem arquibancada atrás dos gols: tudo do lado de lá
+                int rowsHere = i < far ? rowsL : rowsE;
                 if (i < far)
                 {
-                    pos = RingAt(0.5f + ((i + 0.5f) / far) * (2f * dx / _ringLen));
+                    // dentro da largura da arquibancada (com folga das pontas)
+                    pos = new Vector3(Mathf.Lerp(spanL, -spanL, (i + 0.5f) / far) * 0.88f, y0, frontL);
                     face = Quaternion.LookRotation(Vector3.forward, Vector3.up);
                 }
                 else
                 {
                     int k2 = i - far, nEnd = flags - far;
                     float sx = k2 % 2 == 0 ? 1f : -1f;
-                    float zz = Mathf.Lerp(-dz * 0.7f, dz * 0.7f, (k2 / 2 + 0.5f) / Mathf.Max(1, (nEnd + 1) / 2));
-                    pos = new Vector3(sx * dx, y, zz);
+                    float zr = field ? dz * 0.7f : sim.halfW * 0.72f;
+                    float zz = Mathf.Lerp(-zr, zr, (k2 / 2 + 0.5f) / Mathf.Max(1, (nEnd + 1) / 2));
+                    pos = new Vector3(sx * frontE, y0, zz);
                     face = Quaternion.LookRotation(new Vector3(sx, 0, 0), Vector3.up);
                 }
                 // clubes: bandeiras do visitante só no setor dele (atrás do gol da direita, +x);
@@ -99,12 +108,14 @@ namespace Craquez
                 if (team >= 0 && (i % 2 == 0 || isAway)) tex = Craquez.UI.Crest.ClubFlag(team, 128, 80);
                 if (tex == null) tex = FlagTex(k, i);
                 // espalhadas pela arquibancada: em fileiras diferentes (frente, meio e fundo) e com sorteio na posição
-                int row = rng.Next(field ? 22 : 6);
-                pos += face * Vector3.forward * (row * 0.8f) + Vector3.up * (row * 0.42f);
-                pos += face * Vector3.right * (((float)rng.NextDouble() - 0.5f) * (field ? 6f : 2.5f));
+                // numa fileira de verdade dessa arquibancada (nunca além da última), com um sorteio lateral pequeno
+                int row = rng.Next(Mathf.Max(1, Mathf.Min(rowsHere - 1, field ? 24 : rowsHere - 1)));
+                float stepR = field ? 0.8f : 0.85f, riseR = field ? 0.42f : 0.45f;
+                pos += face * Vector3.forward * (row * stepR) + Vector3.up * (row * riseR);
+                pos += face * Vector3.right * (((float)rng.NextDouble() - 0.5f) * (field ? 4f : 1.5f));
                 float w = field ? 2.6f + (float)rng.NextDouble() * 1.2f : 1.7f + (float)rng.NextDouble() * 0.6f;
                 float h = w * 0.62f;
-                _flags[i] = FlagWave.Create(transform, pos + Vector3.up * (field ? 1.2f : 0.6f) + face * Vector3.back * 0.6f, face, w, h, h + (field ? 1.6f : 1.0f),
+                _flags[i] = FlagWave.Create(transform, pos + Vector3.up * (field ? 1.2f : 0.6f) + face * Vector3.back * 0.15f, face, w, h, h + (field ? 1.6f : 1.0f),
                     Gfx.Cutout(Color.white, tex, 0.1f, 0.1f), true, rng.Next());
             }
         }
