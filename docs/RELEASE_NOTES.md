@@ -1,13 +1,28 @@
-## Craquez 2.2.0
+## Craquez 2.3.0
 
 Jogo de futebol feito 100% com inteligência artificial, **gratuito**. Android, Windows e Linux.
 
 ### Downloads
-- **Android**: `Craquez-v2.2.0.apk` (instale permitindo "fontes desconhecidas")
-- **Windows**: `Craquez-v2.2.0-Instalador-Windows.exe` (instalador) ou `Craquez-v2.2.0-Windows.zip` (portátil)
-- **Linux**: `Craquez-v2.2.0-Linux.tar.gz` → extraia e rode `./Craquez` (ou `./instalar.sh` para o atalho no menu)
+- **Android**: `Craquez-v2.3.0.apk` (instale permitindo "fontes desconhecidas")
+- **Windows**: `Craquez-v2.3.0-Instalador-Windows.exe` (instalador) ou `Craquez-v2.3.0-Windows.zip` (portátil)
+- **Linux**: `Craquez-v2.3.0-Linux.tar.gz` → extraia e rode `./Craquez` (ou `./instalar.sh` para o atalho no menu)
 
 ### Novidades
+- **Sem a faixa clara na arquibancada**: a cobertura ficou mais alta e recuada (vista por baixo ela
+  virava uma faixa que acompanhava a câmera) e não há mais cobertura do lado da câmera.
+- **Torcida toda em 3D**: todas as fileiras com torcedores modelados (no celular mais fraco, até 16
+  fileiras), pulando e erguendo os braços nos lances, e **ola** em momentos aleatórios, dando a
+  volta no estádio.
+- **Mais bandeiras**, espalhadas por várias fileiras da arquibancada.
+- **Ícone atual no Windows e no Linux** (todos os tamanhos no executável e no instalador; no Linux,
+  o atalho aponta direto para o ícone novo).
+- **Procurar atualizações**: nova aba em Configurações e aviso no menu principal sempre que houver
+  uma versão nova, com botão para baixar.
+- **Braços na corrida refeitos**: balanço a partir do ombro no ritmo da perna oposta, cruzando um
+  pouco à frente do corpo, cotovelo perto de 90° correndo e quase solto andando, ombros acompanhando.
+
+## Versão 2.2.0
+
 - **Jogadores sem roupa em alguns celulares**: corrigido (em telas com pouca precisão de
   profundidade a pele "furava" o uniforme; o tecido agora fica sempre por cima).
 - **Proporções do corpo**: ombros mais baixos e mãos menores.

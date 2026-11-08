@@ -573,6 +573,15 @@ namespace Craquez
             BigCard(grid, "MURAL DE TROFÉUS", titles + (titles == 1 ? " TÍTULO" : " TÍTULOS"), "As suas conquistas", TrophyArt.Texture(lc.trophy, lc.c1, lc.c2, 512, titles == 0), 1f, new Color(0.85f, 0.55f, 0.2f), ShowTrophyWall);
             BigCard(grid, "CONFIGURAÇÕES", "OPÇÕES", "Som, câmera, partida, vídeo e option file", _settingsArt ??= MenuArt.SettingsArt(), 512f / 560f, new Color(0.35f, 0.5f, 0.9f), ShowOptions);
             // sair do jogo sem precisar fechar o app à força (também pelo voltar do menu principal)
+            // aviso de versão nova (a checagem roda sozinha ao abrir o jogo)
+            void Notice()
+            {
+                if (!UpdateCheck.HasUpdate || root == null) return;
+                var nb = UiKit.Button(root, "NOVA VERSÃO " + UpdateCheck.Latest + " DISPONÍVEL  •  BAIXAR", () => Application.OpenURL(UpdateCheck.Url), 26, new Color(0.1f, 0.55f, 0.3f));
+                nb.GetComponent<RectTransform>().At(0, 0, 620, 62, 90, 112);
+            }
+            Notice();
+            UpdateCheck.Auto(this, () => { if (root != null && _root.childCount > 0) Notice(); });
             var quit = UiKit.Button(root, "SAIR DO JOGO", ConfirmQuit, 28, new Color(0.55f, 0.1f, 0.14f));
             quit.GetComponent<RectTransform>().At(1, 0, 300, 62, -90, 112);
             _back = ConfirmQuit;
@@ -1313,7 +1322,7 @@ namespace Craquez
         System.Collections.Generic.Dictionary<string, object> _optSnap;
 
         /// <summary>Abas das configurações (submenus): som, câmera, partida e vídeo.</summary>
-        static readonly string[] OptionTabs = { "SOM", "CÂMERA", "PARTIDA", "VÍDEO", "OPTION FILE" };
+        static readonly string[] OptionTabs = { "SOM", "CÂMERA", "PARTIDA", "VÍDEO", "OPTION FILE", "ATUALIZAÇÕES" };
         static readonly string[] OptionTabInfo =
         {
             "Volume, música dos menus e vibração",
@@ -1321,6 +1330,7 @@ namespace Craquez
             "Nomes dos atletas e cobranças de falta",
             "Qualidade, tela, resolução e efeitos",
             "Times, elencos, uniformes e escudos",
+            "Procurar uma versão nova do jogo",
         };
         int _optTab;
 
@@ -1420,6 +1430,19 @@ namespace Craquez
                         ReloadOptionFile();
                         ShowOptions(4, false);
                     }, 28, new Color(0.4f, 0.12f, 0.15f)));
+                    break;
+                }
+                case 5:
+                {
+                    var msg = UiKit.Label(list, UpdateCheck.Message(), 26, Theme.Body, Theme.Text);
+                    msg.gameObject.AddComponent<LayoutElement>().minHeight = 90;
+                    Add(UiKit.Button(list, "Procurar atualizações", () =>
+                    {
+                        msg.text = "Procurando atualizações…";
+                        UpdateCheck.Check(this, () => ShowOptions(5, false));
+                    }, 28));
+                    if (UpdateCheck.HasUpdate)
+                        Add(UiKit.Button(list, "Baixar a versão " + UpdateCheck.Latest, () => Application.OpenURL(UpdateCheck.Url), 28, new Color(0.1f, 0.55f, 0.3f)));
                     break;
                 }
                 default:

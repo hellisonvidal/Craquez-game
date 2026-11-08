@@ -63,7 +63,7 @@ namespace Craquez
             _nextWave = 50f + Random.value * 40f;
             // bandeiras dos torcedores: agitadas de um lado para o outro (cada uma no seu ritmo, mais
             // forte quando a torcida se empolga), espalhadas pela arquibancada oposta e atrás dos gols
-            int flags = field ? 20 : 9;
+            int flags = field ? 38 : 16;
             _flags = new FlagWave[flags];
             var rng = new System.Random(_homeTeam * 31 + _awayTeam * 7 + 5);
             for (int i = 0; i < flags; i++)
@@ -98,6 +98,10 @@ namespace Craquez
                 Texture2D tex = null;
                 if (team >= 0 && (i % 2 == 0 || isAway)) tex = Craquez.UI.Crest.ClubFlag(team, 128, 80);
                 if (tex == null) tex = FlagTex(k, i);
+                // espalhadas pela arquibancada: em fileiras diferentes (frente, meio e fundo) e com sorteio na posição
+                int row = rng.Next(field ? 22 : 6);
+                pos += face * Vector3.forward * (row * 0.8f) + Vector3.up * (row * 0.42f);
+                pos += face * Vector3.right * (((float)rng.NextDouble() - 0.5f) * (field ? 6f : 2.5f));
                 float w = field ? 2.6f + (float)rng.NextDouble() * 1.2f : 1.7f + (float)rng.NextDouble() * 0.6f;
                 float h = w * 0.62f;
                 _flags[i] = FlagWave.Create(transform, pos + Vector3.up * (field ? 1.2f : 0.6f) + face * Vector3.back * 0.6f, face, w, h, h + (field ? 1.6f : 1.0f),

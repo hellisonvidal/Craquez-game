@@ -67,7 +67,12 @@ namespace Craquez.EditorTools
             var bg = L("craquez_icon_bg");
             if (full == null) { Debug.LogWarning("Ícone não encontrado em " + IconDir); return; }
             PlayerSettings.SetIcons(NamedBuildTarget.Unknown, new[] { full }, IconKind.Any);
-            PlayerSettings.SetIcons(NamedBuildTarget.Standalone, new[] { full }, IconKind.Any);
+            // Windows/Linux: o mesmo ícone em todos os tamanhos (com um só, os tamanhos pequenos —
+            // barra de tarefas, atalhos — ficavam com o ícone padrão)
+            int nStd = PlayerSettings.GetIcons(NamedBuildTarget.Standalone, IconKind.Any).Length;
+            var std = new Texture2D[Mathf.Max(1, nStd)];
+            for (int i = 0; i < std.Length; i++) std[i] = full;
+            PlayerSettings.SetIcons(NamedBuildTarget.Standalone, std, IconKind.Any);
             // Android: todos os tipos (legado, redondo e adaptativo com frente/fundo separados)
             foreach (var kind in PlayerSettings.GetSupportedIconKinds(NamedBuildTarget.Android))
             {

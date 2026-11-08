@@ -23,7 +23,12 @@ namespace Craquez
             public Vector3 pos;     // no referencial do bloco (pés no degrau)
             public float yaw;       // direção para onde olha (graus, em torno de y)
             public int team;        // 0 mandante, 1 visitante, 2 neutro
+            public bool lod;        // longe da câmera: modelo mais simples
         }
+
+        /// <summary>Ola: começa em OlaStart (Time.time) e dá uma volta no estádio a OlaSpeed rad/s.</summary>
+        public static float OlaStart = -100f;
+        public const float OlaSpeed = 0.55f;
 
         // paleta 8x8: 0-1 mandante, 2-3 visitante, 4-7 pele, 8-10 cabelo, 11-13 calças, 14 branco, 15 preto, 16-23 roupas comuns
         static Texture2D Palette(Color h1, Color h2, Color a1, Color a2, List<Craquez.Sim.Kit> hk, List<Craquez.Sim.Kit> ak)
@@ -115,6 +120,15 @@ namespace Craquez
             }
             int skin = 4 + r.Next(4), hair = 8 + r.Next(3), pants = 11 + r.Next(3);
             var p = s.pos;
+            if (s.lod)
+            {
+                // fileiras do fundo: pernas, tronco, cabeça e (vibrando) braços para cima
+                // (as pernas ficam escondidas pela fileira da frente: só tronco, cabeça e braços)
+                b.Box(p + q * new Vector3(0f, 1.0f * hgt, 0f), new Vector3(0.44f, 0.8f * hgt, 0.24f), q, shirt);
+                b.Box(p + q * new Vector3(0f, 1.56f * hgt, 0f), new Vector3(0.22f, 0.26f, 0.22f), q, skin);
+                if (armsUp) b.Box(p + q * new Vector3(0f, 1.75f * hgt, 0.02f), new Vector3(0.62f, 0.5f * hgt, 0.1f), q, skin);
+                return;
+            }
             // pernas e tênis
             b.Box(p + q * new Vector3(0f, 0.42f * hgt, 0f), new Vector3(0.3f, 0.84f * hgt, 0.2f), q, pants);
             b.Box(p + q * new Vector3(0f, 0.04f, 0.04f), new Vector3(0.32f, 0.08f, 0.28f), q, r.NextDouble() < 0.5 ? 14 : 15);
@@ -183,11 +197,31 @@ namespace Craquez
 
         Vector3 _base;
         bool _init;
+        float _angle;   // posição angular do bloco em volta do campo (para a ola)
 
         void Update()
         {
-            if (!_init) { _base = transform.localPosition; _init = true; }
+            if (!_init)
+            {
+                _base = transform.localPosition; _init = true;
+                var c = GetComponent<MeshRenderer>().bounds.center;
+                _angle = Mathf.Atan2(c.z, c.x * 0.7f);
+            }
             float t = Time.time + _phase;
+            // ola: quando a onda passa pelo bloco, todos levantam com os braços para cima
+            float olaT = Time.time - OlaStart;
+            if (olaT >= 0f && olaT * OlaSpeed < Mathf.PI * 2f)
+            {
+                float front = -Mathf.PI + olaT * OlaSpeed;   // a frente da onda dá uma volta completa
+                float d = Mathf.Abs(Mathf.DeltaAngle(_angle * Mathf.Rad2Deg, front * Mathf.Rad2Deg)) * Mathf.Deg2Rad;
+                if (d < 0.22f)
+                {
+                    float k = 1f - d / 0.22f;
+                    transform.localPosition = _base + new Vector3(0f, 0.3f * k, 0f);
+                    if (!_up) { _up = true; _mf.sharedMesh = _cheer; }
+                    return;
+                }
+            }
             float hype = Mathf.Clamp01(Hype);
             if (GoalT > 0f && (GoalTeam == _team || _team == 2)) hype = 1.6f;
             else if (GoalT > 0f) hype = 0.05f;   // torcida rival em silêncio

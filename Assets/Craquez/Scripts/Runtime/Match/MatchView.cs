@@ -106,7 +106,7 @@ namespace Craquez
             weather.pitch2 = venue.pitchMat2;
             UrpSetup.Camera(cam, q);
             Sfx.Crowd(s.mode.id == GameModes.Field ? 0.55f : 0.3f, s.mode.id == GameModes.Field ? 0.25f : 0f);
-            FanCrowd.Hype = 0f; FanCrowd.GoalT = 0f; FanCrowd.GoalTeam = -1;
+            FanCrowd.Hype = 0f; FanCrowd.GoalT = 0f; FanCrowd.GoalTeam = -1; FanCrowd.OlaStart = -100f;
         }
 
         static Kit KeeperKit(Kit own, Kit other, int t)
@@ -598,6 +598,13 @@ namespace Craquez
             // torcedores 3D: empolgação com o perigo e com a pressão do time da casa
             FanCrowd.Hype = Mathf.Clamp01(_crowdHype + danger * 0.6f) * quiet;
             if (FanCrowd.GoalT > 0f) FanCrowd.GoalT -= Time.deltaTime;
+            // ola em momentos aleatórios (bola no meio-campo, jogo rolando)
+            if (_nextOla <= 0f) _nextOla = Time.time + Random.Range(45f, 100f);
+            if (Time.time > _nextOla && sim.state == MatchState.Playing && Mathf.Abs(sim.ball.pos.x) < sim.halfLen * 0.4f && FanCrowd.GoalT <= 0f)
+            {
+                FanCrowd.OlaStart = Time.time;
+                _nextOla = Time.time + Random.Range(70f, 150f);
+            }
             Sfx.Crowd(((sim.mode.id == GameModes.Field ? 0.5f : 0.28f) + _crowdHype * 0.3f + tense) * quiet,
                 sim.mode.id == GameModes.Field ? (0.22f + (homeAttack ? danger * 0.18f : -danger * 0.1f)) * quiet : 0f);
             Sfx.Drums(sim.mode.id == GameModes.Street ? 0f : (0.12f + _crowdHype * 0.3f) * quiet);
@@ -608,6 +615,8 @@ namespace Craquez
                 if (m.HasProperty("_BaseMap")) m.SetTextureOffset("_BaseMap", o);
             }
         }
+
+        float _nextOla;
 
         public Side[] sides = { Side.Player1, Side.Cpu };
 

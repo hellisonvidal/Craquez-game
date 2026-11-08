@@ -859,7 +859,8 @@ namespace Craquez
             float back = Mathf.Clamp01(-_gDir.y), lateral = Mathf.Abs(_gDir.x);
             float act = anim != null ? anim.ActionWeight : 0f;
             float moving = Mathf.Clamp01((spd - 0.35f) / 0.7f);
-            float want = skip ? 0f : (1f - act) * moving;
+            // só as ações grandes (chute, carrinho, drible) tiram a passada; toques curtos não
+            float want = skip ? 0f : (1f - Mathf.Clamp01((act - 0.3f) / 0.4f)) * moving;
             _procW = Mathf.MoveTowards(_procW, want, dt * 5f);
             float W = _procW;
             float run = Mathf.Clamp01((spd - 1.9f) / 2.6f), sprint = Mathf.Clamp01((spd - 5.8f) / 2f) * (1f - back) * (1f - lateral);
@@ -915,28 +916,41 @@ namespace Craquez
                 var calfDir = (Quaternion.AngleAxis(knee, right) * thighDir + lat * 0.5f).normalized;
                 _pose.Rotate(cf, Quaternion.Slerp(Quaternion.identity, Quaternion.FromToRotation(ft.position - cf.position, calfDir), W));
             }
-            // braços: cada um acompanha a perna do lado oposto; cotovelo dobra mais correndo
+            // braços: refeitos como numa corrida de verdade — o braço balança a partir do ombro, no ritmo
+            // da perna oposta, num plano levemente cruzado para dentro do corpo; correndo, o cotovelo fica
+            // perto de 90° (fecha um pouco na ida e abre na volta), a mão vai até a altura do peito na
+            // frente e passa do quadril atrás; andando, o braço vai quase esticado e solto. Os ombros
+            // avançam e recuam junto com o braço.
+            float cross = Mathf.Lerp(4f, 12f, run);
             for (int side = -1; side <= 1; side += 2)
             {
                 string sfx = side < 0 ? "_l" : "_r";
                 rig.bones.TryGetValue("upperarm" + sfx, out var ua);
                 rig.bones.TryGetValue("lowerarm" + sfx, out var la);
                 rig.bones.TryGetValue("hand" + sfx, out var hd);
+                rig.bones.TryGetValue("clavicle" + sfx, out var clv);
                 if (ua == null || la == null || hd == null) continue;
                 float ps = Mathf.Sign(Vector3.Dot(ua.position - rig.spine.position, right));
                 float uOpp = ps > 0f ? uL : uR;   // braço direito acompanha a perna esquerda
-                float amp = (Mathf.Lerp(14f, 30f, run) + 14f * sprint) * Mathf.Lerp(1f, 0.7f, Mathf.Max(back, lateral));
-                amp *= _armAmp * (ps < 0 ? 1f : _armAsym) * (hasBall ? 0.75f : 1f);
-                float swing = Mathf.Lerp(Mathf.Cos(2f * Mathf.PI * uOpp), Mathf.Cos(2f * Mathf.PI * (uOpp - 0.85f)), run) * amp
-                              + Mathf.Lerp(3f, 8f, run) + _armFwd * 0.6f;
-                float elbow = Mathf.Lerp(15f, 75f, run) + 10f * sprint + _elbowStyle * 0.5f + Mathf.Max(0f, swing) * 0.2f;
-                // mão no máximo na altura do peito (nada de braço "para cima")
-                elbow = Mathf.Min(elbow, Mathf.Lerp(70f, 105f, run) + 15f * sprint - swing);
-                float abd = (_armCarry * 0.5f + 5f + (hasBall ? 8f : 0f) + lateral * 6f);
-                var upDir = Quaternion.AngleAxis(-swing, right) * -up;
-                upDir = (Quaternion.AngleAxis(ps * abd, fwd) * upDir).normalized;   // abre para fora do corpo
+                // fase do braço: na corrida o pico à frente vem junto com o joelho oposto no alto
+                float ph = Mathf.Lerp(uOpp, uOpp - 0.85f, run);
+                float c = Mathf.Cos(2f * Mathf.PI * ph);
+                float amp = (Mathf.Lerp(17f, 34f, run) + 12f * sprint) * _armAmp * (ps < 0 ? 1f : _armAsym) * (hasBall ? 0.75f : 1f)
+                            * Mathf.Lerp(1f, 0.65f, Mathf.Max(back, lateral));
+                // para a frente sobe mais do que vai para trás (como no corpo humano)
+                float swing = (c > 0f ? c * amp : c * amp * 0.8f) + Mathf.Lerp(2f, 6f, run) + _armFwd * 0.5f;
+                float elbow = Mathf.Lerp(12f + 10f * Mathf.Max(0f, c), 82f + 12f * c, run) + 8f * sprint + _elbowStyle * 0.4f;
+                elbow = Mathf.Clamp(elbow, 8f, 118f - Mathf.Max(0f, swing) * 0.4f);
+                if (clv != null) _pose.Rotate(clv, Quaternion.AngleAxis(-ps * swing * 0.12f * run * W, up));   // ombro acompanha
+                float abd = _armCarry * 0.45f + 4f + (hasBall ? 7f : 0f) + lateral * 6f;
+                // plano do balanço: gira um pouco para dentro (o braço cruza à frente do corpo)
+                var swingAxis = Quaternion.AngleAxis(ps * cross, up) * right;
+                var upDir = Quaternion.AngleAxis(-swing, swingAxis) * -up;
+                upDir = (Quaternion.AngleAxis(ps * abd, fwd) * upDir).normalized;
                 _pose.Rotate(ua, Quaternion.Slerp(Quaternion.identity, Quaternion.FromToRotation(la.position - ua.position, upDir), W));
-                var loDir = (Quaternion.AngleAxis(-(swing + elbow), right) * -up + right * -ps * 0.12f * run).normalized;   // mãos em direção ao meio do corpo
+                // antebraço: dobra no mesmo plano, com a mão indo em direção ao meio do corpo
+                var loDir = (Quaternion.AngleAxis(-(swing + elbow), swingAxis) * -up).normalized;
+                loDir = (loDir - right * ps * Mathf.Lerp(0.05f, 0.18f, run)).normalized;
                 _pose.Rotate(la, Quaternion.Slerp(Quaternion.identity, Quaternion.FromToRotation(hd.position - la.position, loDir), W));
             }
         }

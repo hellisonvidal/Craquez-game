@@ -104,7 +104,7 @@ namespace Craquez
             const float rise = 0.42f, step = 0.8f, gapX = 9f, gapZ = 7.5f;
             int rows = st.rows;
             int tier = rows <= 16 ? 1 : rows <= 30 ? 2 : 3;
-            float topY = 1.1f + rows * rise, ry = topY + 6f;
+            float topY = 1.1f + rows * rise, ry = topY + 10f;   // (mesma altura da cobertura)
             var stairs = new MeshKit();
             var voms = new MeshKit();
             var rails = new MeshKit();
@@ -147,7 +147,7 @@ namespace Craquez
                 bool roofed = st.roof >= 2 || (st.roof == 1 && (side == 1 || tier >= 3));
                 if (roofed)
                 {
-                    float front = dist - rows * step * 0.125f;
+                    float front = dist + rows * step * 0.41f;   // beirada da cobertura recuada
                     float edge = st.roof >= 2 ? front - 4.5f : front;   // anel: beirada translúcida avançando sobre o campo
                     if (st.roof >= 2)
                     {

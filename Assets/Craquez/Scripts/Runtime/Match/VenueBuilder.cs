@@ -573,16 +573,18 @@ namespace Craquez
                 back.Quad(new Vector3(len / 2, 0, -far), new Vector3(len / 2, topY + 2.5f, -far), new Vector3(-len / 2, topY + 2.5f, -far), new Vector3(-len / 2, 0, -far));
                 // fileiras da frente: torcedores em 3D (modelados, pulando e erguendo os braços por bloco);
                 // as de trás seguem com as silhuetas (economiza no celular)
-                int front3d = Mathf.Min(rows, quality >= 2 ? 10 : quality >= 1 ? 7 : 4);
+                // todas as fileiras em 3D (no celular mais fraco, até 16; o resto com silhuetas)
+                int front3d = Mathf.Min(rows, quality >= 2 ? rows : quality >= 1 ? 26 : 16);
                 {
                     var fanGroups = new List<List<FanCrowd.Spot>>();
                     var frng = new System.Random(pseed * 13 + side * 101);
                     int nA3 = Mathf.Max(2, Mathf.RoundToInt(len / 13f));
                     for (int a = 0; a < nA3; a++)
+                    for (int band = 0; band * 10 < front3d; band++)
                     {
                         var grp = new List<FanCrowd.Spot>();
                         float xa = -len / 2 + a * len / nA3 + 0.9f, xb = -len / 2 + (a + 1) * len / nA3 - 0.9f;
-                        for (int r = 0; r < front3d; r++)
+                        for (int r = band * 10; r < Mathf.Min(front3d, band * 10 + 10); r++)
                         {
                             float y1 = 1.1f + (r + 1) * rise, d = dist + r * step + step * 0.5f;
                             for (float x = xa + (float)frng.NextDouble() * 0.3f; x < xb; x += 0.68f + (float)frng.NextDouble() * 0.12f)
@@ -590,7 +592,7 @@ namespace Craquez
                                 if (frng.NextDouble() > style.occupancy) continue;
                                 int team = side == 3 && !mixed ? 1 : 0;
                                 if (mixed && frng.NextDouble() < 0.35) team = 1;
-                                grp.Add(new FanCrowd.Spot { pos = new Vector3(x, y1, -d), yaw = 0f, team = team });
+                                grp.Add(new FanCrowd.Spot { pos = new Vector3(x, y1, -d), yaw = 0f, team = team, lod = r >= 10 });
                             }
                         }
                         fanGroups.Add(grp);
@@ -640,15 +642,18 @@ namespace Craquez
                 float yaw = side == 0 ? 0 : side == 1 ? 180 : side == 2 ? 90 : -90;
                 go.transform.localRotation = Quaternion.Euler(0, yaw, 0);
                 gb.transform.localRotation = Quaternion.Euler(0, yaw, 0);
-                if (style.roof >= 2 || (style.roof == 1 && (side == 1 || tier >= 3)))
+                // (sem cobertura do lado da câmera: vista por baixo ela virava uma faixa que passava na frente da arquibancada)
+                if (side != 0 && (style.roof >= 2 || (style.roof == 1 && (side == 1 || tier >= 3))))
                 {
+                    // cobertura mais alta e recuada, só sobre o fundo da arquibancada: vista da câmera, a
+                    // parte de baixo não vira mais uma faixa clara tapando a torcida
                     var roof = new MeshKit();
-                    float ry = topY + 6f;
-                    roof.Box(new Vector3(0, ry, -(dist + rows * step * 0.45f)), new Vector3(len, 0.6f, rows * step * 1.15f), 6f);
+                    float ry = topY + 10f;
+                    roof.Box(new Vector3(0, ry, -(dist + rows * step * 0.72f)), new Vector3(len, 0.4f, rows * step * 0.62f), 6f);
                     for (float x = -len / 2; x <= len / 2 + 0.1f; x += len / 6f)
                         roof.Cylinder(new Vector3(x, 0, -far - 0.5f), new Vector3(x, ry, -far - 0.5f), 0.35f, 8);
                     // parte de baixo da cobertura recebe a luz refletida do campo (sem breu sobre a torcida)
-                    var gr = roof.Object("Cobertura " + side, Gfx.Emissive(style.roofC.a > 0f ? style.roofC : new Color(0.85f, 0.86f, 0.9f), night ? new Color(0.1f, 0.1f, 0.11f) : new Color(0.16f, 0.17f, 0.18f)), v.root, true);
+                    var gr = roof.Object("Cobertura " + side, Gfx.Lit((style.roofC.a > 0f ? style.roofC : new Color(0.85f, 0.86f, 0.9f)) * 0.55f, null, 0.2f), v.root, true);
                     gr.transform.localRotation = Quaternion.Euler(0, yaw, 0);
                 }
             }
@@ -684,7 +689,7 @@ namespace Craquez
                     }
                     ck.Object("Torcida do canto " + c, mat, v.root, false);
                     cb.Object("Degraus do canto " + c, concrete, v.root, false);
-                    if (style.roof >= 2)
+                    if (style.roof >= 2 && szc > 0f)
                     {
                         var rk = new MeshKit();
                         float ry = 1.1f + rows * rise + 6f;
