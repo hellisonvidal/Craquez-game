@@ -422,7 +422,7 @@ namespace Craquez
         }
 
         /// <summary>Arquibancada lotada: "pixels" de gente com camisas nas cores do time e da torcida rival.</summary>
-        public static Texture2D CrowdTex(int w, int h, Color home, Color home2, Color away, int seed, float occupancy = 0.92f, Color? seatColor = null)
+        public static Texture2D CrowdTex(int w, int h, Color home, Color home2, Color away, int seed, float occupancy = 0.92f, Color? seatColor = null, float awayShare = 0.18f)
         {
             var t = Tex(w, h, true);
             var px = new Color32[w * h];
@@ -432,7 +432,7 @@ namespace Craquez
                 {
                     float r = Hash(cx, cy, seed);
                     bool empty = Hash(cx, cy, seed + 1) > occupancy;
-                    bool awaySide = cx > (w / cell) * 0.82f;
+                    bool awaySide = cx >= (w / cell) * (1f - awayShare);   // setor do visitante (0 = só mandante, 1 = só visitante)
                     Color shirt = awaySide ? away : (r < 0.55f ? home : r < 0.8f ? home2 : Color.HSVToRGB(Hash(cx, cy, seed + 5), 0.3f, 0.8f));
                     Color skin = Color.Lerp(new Color(0.36f, 0.22f, 0.15f), new Color(0.95f, 0.78f, 0.65f), Hash(cx, cy, seed + 2));
                     Color hair = Color.Lerp(new Color(0.05f, 0.04f, 0.03f), new Color(0.5f, 0.35f, 0.2f), Hash(cx, cy, seed + 3) * 0.6f);
@@ -462,7 +462,7 @@ namespace Craquez
         /// cachecol no pescoço ou esticado acima da cabeça, braços para cima e bandeiras.
         /// <paramref name="cheer"/> 0-1 = quantos estão de braços erguidos (1 = comemoração de gol).
         /// </summary>
-        public static Texture2D CrowdPeople(int w, int h, Color home, Color home2, Color away, int seed, float cheer = 0f, bool stripes = false)
+        public static Texture2D CrowdPeople(int w, int h, Color home, Color home2, Color away, int seed, float cheer = 0f, bool stripes = false, float awayShare = 0.18f)
         {
             var t = Tex(w, h, true);
             var px = new Color32[w * h];
@@ -472,7 +472,7 @@ namespace Craquez
             {
                 float r = Hash(i, 1, seed);
                 if (r > 0.95f) continue;   // lugar vazio
-                bool awaySide = i > n * 0.82f;
+                bool awaySide = i >= n * (1f - awayShare);
                 bool fanShirt = r < 0.8f;
                 Color shirt = awaySide ? away : (r < 0.55f ? home : r < 0.8f ? home2 : Color.HSVToRGB(Hash(i, 5, seed), 0.35f, 0.75f));
                 Color shirt2 = awaySide ? Color.Lerp(away, Color.white, 0.6f) : (shirt == home ? home2 : home);

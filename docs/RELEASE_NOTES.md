@@ -8,6 +8,20 @@ Jogo de futebol feito 100% com inteligência artificial, **gratuito**. Android, 
 - **Linux**: `Craquez-v2.1.0-Linux.tar.gz` → extraia e rode `./Craquez` (ou `./instalar.sh` para o atalho no menu)
 
 ### Novidades
+- **Corrida e caminhada desenhadas**: novo ciclo de passada feito à mão (apoio, impulso e balanço
+  de cada perna, joelho alto no pique, braço acompanhando a perna oposta, giro da pelve e
+  contragiro dos ombros, tronco inclinado conforme a velocidade), no lugar da captura antiga.
+- **Goleiros**: postura de prontidão quando o adversário ataca (base larga, joelhos dobrados, mãos
+  abertas) e mergulho que desliza e para aos poucos ao tocar o chão.
+- **Cada jogador com o seu jeito**: driblador encara de mais longe e usa o seu drible preferido
+  (arrancada, puxada, rolinho, pedalada ou giro), ginga mudando a direção de repente; armador
+  procura mais o passe; finalizador arrisca de mais longe.
+- **Músicas novas** com instrumentos reais (guitarra, baixo, bateria, piano, metais, cordas),
+  humanização e mixagem de estúdio: pop-rock, funk, house, latino, indie, lo-fi, samba-rock,
+  eletrônica, pop-punk e afro-pop.
+- **Torcidas separadas**: o mandante ocupa quase todo o estádio e o visitante tem o seu setor (atrás
+  de um dos gols), com bandeiras e faixas só nas cores dele; em jogos de seleções as torcidas se
+  misturam. Vale também para ginásios e society.
 - **Sem partículas da "ola"**: as bolinhas coloridas que davam a volta no campo (passando na
   frente da câmera) foram retiradas.
 - **Nada na frente do campo**: tudo o que estiver entre a câmera e o gramado e cair sobre ele na

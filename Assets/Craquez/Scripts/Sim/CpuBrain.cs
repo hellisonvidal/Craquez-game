@@ -154,31 +154,33 @@ namespace Craquez.Sim
                 if (Mathf.Abs(p.position.y) > sim.halfW * 0.85f) mv.y -= Mathf.Sign(p.position.y) * 0.8f;
                 f.move = mv.Norm();
                 if (oppD > 3.5f - p.flair) f.buttons |= InputFrame.Sprint;
-                if (opp != null && oppD < 2.6f && _skillCd == 0 && _holdBtn == 0 && p.skill == Skill.None)
+                var sty = StyleOf(p);
+                // improviso: o driblador encara o marcador de mais longe, com o drible preferido (às vezes
+                // outro); o veloz prefere a arrancada; o cauteloso quase não tenta
+                float engage = Mathf.Lerp(2.2f, 3.6f, sty.dribble);
+                if (opp != null && oppD < engage && _skillCd == 0 && _holdBtn == 0 && p.skill == Skill.None)
                 {
                     float ahead = Vector2.Dot((opp.position - p.position).Norm(), p.facing);
-                    if (ahead > 0.3f && Noise(sim, 9) < (0.03f + skill * 0.05f) * (0.4f + p.flair * 1.4f))
+                    if (ahead > 0.3f && Noise(sim, 9) < (0.025f + skill * 0.04f) * (0.25f + sty.dribble * 2.2f))
                     {
-                        var perp = new Vector2(-p.facing.y, p.facing.x);
-                        float r = Noise(sim, 10);
-                        if (r < 0.4f) f.rstick = perp * (Noise(sim, 11) > 0.5f ? 1f : -1f);
-                        else if (r < 0.7f)
-                        {
-                            f.rstick = perp * (Noise(sim, 12) > 0.5f ? 1f : -1f);
-                            f.buttons |= InputFrame.Shield;
-                        }
-                        else if (r < 0.85f) f.rstick = -p.facing;
-                        else
-                        {
-                            f.rstick = -p.facing;
-                            f.buttons |= InputFrame.Shield;
-                        }
-                        _skillCd = 50;
+                        int kind = Noise(sim, 10) < 0.6f ? sty.favorite : (int)(Noise(sim, 11) * 4.99f);
+                        float sd = Vector2.Dot(opp.position - p.position, new Vector2(-p.facing.y, p.facing.x)) > 0f ? -1f : 1f;   // sai pelo lado livre
+                        f.rstick = SkillStick(kind, p.facing, sd, out bool sh);
+                        if (sh) f.buttons |= InputFrame.Shield;
+                        _skillCd = (int)Mathf.Lerp(70f, 35f, sty.dribble);
+                    }
+                    else if (ahead > 0.5f && sty.dribble > 0.55f && Noise(sim, 18) < 0.04f * sty.dribble)
+                    {
+                        // ginga: muda a direção da condução de repente (corte para dentro/para fora)
+                        float sd = Noise(sim, 19) > 0.5f ? 1f : -1f;
+                        _carry = _carry.Rotated(sd * Mathf.Lerp(0.6f, 1.0f, sty.risk));
+                        _carryT = 18;
+                        _skillCd = 25;
                     }
                 }
                 if (_holdBtn == 0 && _cooldown == 0)
                 {
-                    float shootRange = sim.halfLen * Mathf.Lerp(0.4f, 0.55f, skill) * (0.8f + 0.35f * p.shot) * (p.Has(Trait.LongaDistancia) ? 1.2f : 1f);
+                    float shootRange = sim.halfLen * Mathf.Lerp(0.4f, 0.55f, skill) * (0.72f + 0.45f * sty.shooter + 0.15f * sty.risk) * (p.Has(Trait.LongaDistancia) ? 1.2f : 1f);
                     var option = BestOption(sim, p, out float optScore);
                     if (toGoal.magnitude < shootRange && Mathf.Abs(p.position.y) < sim.halfW * 0.7f)
                     {
@@ -191,14 +193,14 @@ namespace Craquez.Sim
                         _finesse = Noise(sim, 13) < 0.25f + skill * 0.2f;
                         if (_finesse) f.buttons |= InputFrame.Finesse;
                     }
-                    else if (option != null && optScore > 2.2f && oppD > 2.2f && Noise(sim, 14) < (0.03f + skill * 0.03f) * (0.6f + p.passing * 0.8f))
+                    else if (option != null && optScore > 2.2f - sty.passer * 0.6f && oppD > 2.2f && Noise(sim, 14) < (0.03f + skill * 0.03f) * (0.4f + sty.passer * 1.2f) * (1.2f - sty.dribble * 0.5f))
                     {
                         // jogada para frente: passe (ou enfiada, se ele está correndo para o espaço) para quem está livre adiante
                         f.move = (option.position - p.position).Norm();
                         bool run = Vector2.Dot(option.vel, new Vector2(dir, 0f)) > 3f;
                         Press(ref f, run && Noise(sim, 16) > 0.4f ? InputFrame.Through : InputFrame.Pass, 8 + (int)(Noise(sim, 17) * 8f));
                     }
-                    else if (oppD < 2.2f && option != null && Noise(sim, 2) < (0.05f + skill * 0.06f) * (1.4f - p.flair * 0.7f))
+                    else if (oppD < 2.2f && option != null && Noise(sim, 2) < (0.05f + skill * 0.06f) * (1.5f - sty.dribble * 0.9f))
                     {
                         // pressionado: toca para o companheiro mais livre (não para uma direção qualquer)
                         f.move = (option.position - p.position).Norm();
@@ -275,6 +277,38 @@ namespace Craquez.Sim
         }
 
         /// <summary>Direção de condução com menos adversários à frente (cone de ~6 m).</summary>
+        /// <summary>Jeito de jogar de cada atleta (vem dos atributos, das habilidades e de um sorteio fixo pelo nome).</summary>
+        struct Style
+        {
+            public float dribble, passer, shooter, risk;
+            public int favorite;   // drible preferido: 0 arrancada, 1 puxada, 2 rolinho, 3 pedalada, 4 giro
+        }
+
+        readonly System.Collections.Generic.Dictionary<int, Style> _styles = new System.Collections.Generic.Dictionary<int, Style>();
+
+        Style StyleOf(SimPlayer p)
+        {
+            if (_styles.TryGetValue(p.id, out var st)) return st;
+            uint h = 2166136261u;   // FNV-1a do nome (determinístico em qualquer plataforma)
+            foreach (char ch in p.name ?? "") { h ^= ch; h *= 16777619u; }
+            h ^= (uint)p.id * 2654435761u;
+            float R(int k) => ((h >> (k * 6)) & 63) / 63f;
+            st.dribble = Mathf.Clamp01(p.flair * 0.75f + (p.Has(Trait.Driblador) ? 0.4f : 0f) + (R(0) - 0.5f) * 0.4f);
+            st.passer = Mathf.Clamp01(p.passing * 0.8f + (p.Has(Trait.Maestro) ? 0.35f : 0f) + (R(1) - 0.5f) * 0.3f);
+            st.shooter = Mathf.Clamp01(p.shot * 0.8f + (p.Has(Trait.Finalizador) ? 0.25f : 0f) + (p.Has(Trait.LongaDistancia) ? 0.25f : 0f) + (R(2) - 0.5f) * 0.3f);
+            st.risk = R(3);
+            st.favorite = p.Has(Trait.Velocista) && R(4) < 0.6f ? 0 : (int)(R(4) * 4.99f);
+            _styles[p.id] = st;
+            return st;
+        }
+
+        static Vector2 SkillStick(int kind, Vector2 facing, float side, out bool shield)
+        {
+            var perp = new Vector2(-facing.y, facing.x) * side;
+            shield = kind == 3 || kind == 4;
+            return kind == 0 ? facing : kind == 1 || kind == 4 ? -facing : perp;
+        }
+
         Vector2 BestCarry(MatchSim sim, SimPlayer p, Vector2 toGoal)
         {
             var best = toGoal;

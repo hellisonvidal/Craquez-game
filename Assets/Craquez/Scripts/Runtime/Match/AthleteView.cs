@@ -683,7 +683,7 @@ namespace Craquez
         {
             if (rig.spine == null || p.down > 0f || p.slide > 0f || (p.isKeeper && (p.saveKind > 0 || p.hold > 0f)) || _celebrate > 0f) return;
             float act = anim != null ? anim.ActionWeight : 0f;
-            float w = 1f - act;
+            float w = (1f - act) * (1f - _procW);   // a passada desenhada (ProcGait) já cuida de braços e pernas
             if (w <= 0.05f) return;
             float spd = _animSpd;
             float run = Mathf.Clamp01((spd - 2f) / 3f), sprint = Mathf.Clamp01((spd - 5.5f) / 2.5f);
@@ -764,6 +764,166 @@ namespace Craquez
         }
 
         float _phaseOff => p != null ? p.id * 1.618f : 0f;
+
+        float _gkReady;
+
+        /// <summary>
+        /// Goleiro em prontidão quando o adversário ataca: base larga, joelhos dobrados, peso na ponta
+        /// dos pés, tronco à frente e mãos abertas na altura da cintura, acompanhando a bola com o corpo.
+        /// </summary>
+        void KeeperReady()
+        {
+            float dt = Time.deltaTime;
+            var sim = view.sim;
+            bool can = p.isKeeper && rig.pelvis != null && rig.spine != null && p.saveKind == 0 && _saveRec <= 0f && p.hold <= 0f && p.down <= 0f;
+            float threat = 0f;
+            if (can)
+            {
+                var goal = new Vector2(-sim.halfLen * sim.TeamDir(p.team), 0f);
+                float d = sim.ball.pos.Dist(goal);
+                bool theirs = sim.ball.owner >= 0 ? sim.players[sim.ball.owner].team != p.team : sim.ball.lastTouchTeam != p.team;
+                threat = theirs ? Mathf.Clamp01(1f - (d - 8f) / (sim.halfLen * 0.55f)) : 0f;
+                threat *= 1f - Mathf.Clamp01((_animSpd - 2.5f) / 2f);   // correndo, não
+                threat *= 1f - (anim != null ? anim.ActionWeight : 0f);
+            }
+            _gkReady = Mathf.MoveTowards(_gkReady, threat, dt * 3f);
+            float w = _gkReady;
+            if (w <= 0.01f) return;
+            var right = transform.right; var up = transform.up; var fwd = transform.forward;
+            float t = Time.time * 2.2f + _phaseOff;
+            float bounce = Mathf.Sin(t * 3f) * 3f * w;   // pequenos ajustes na ponta dos pés
+            for (int side = -1; side <= 1; side += 2)
+            {
+                string sfx = side < 0 ? "_l" : "_r";
+                rig.bones.TryGetValue("thigh" + sfx, out var th);
+                rig.bones.TryGetValue("calf" + sfx, out var cf);
+                var ft = side < 0 ? rig.footL : rig.footR;
+                if (th != null && cf != null && ft != null)
+                {
+                    float ps = Mathf.Sign(Vector3.Dot(th.position - rig.pelvis.position, right));
+                    var lat = right * ps * 0.22f;
+                    var thighDir = (Quaternion.AngleAxis(-(32f + bounce), right) * -up + lat).normalized;
+                    _pose.Rotate(th, Quaternion.Slerp(Quaternion.identity, Quaternion.FromToRotation(cf.position - th.position, thighDir), w));
+                    var calfDir = (Quaternion.AngleAxis(-(32f + bounce) + 62f, right) * -up + lat * 0.6f).normalized;
+                    _pose.Rotate(cf, Quaternion.Slerp(Quaternion.identity, Quaternion.FromToRotation(ft.position - cf.position, calfDir), w));
+                }
+                rig.bones.TryGetValue("upperarm" + sfx, out var ua);
+                rig.bones.TryGetValue("lowerarm" + sfx, out var la);
+                rig.bones.TryGetValue("hand" + sfx, out var hd);
+                if (ua != null && la != null && hd != null)
+                {
+                    float ps = Mathf.Sign(Vector3.Dot(ua.position - rig.spine.position, right));
+                    var upDir = (Quaternion.AngleAxis(ps * 38f, fwd) * (Quaternion.AngleAxis(-28f, right) * -up)).normalized;
+                    _pose.Rotate(ua, Quaternion.Slerp(Quaternion.identity, Quaternion.FromToRotation(la.position - ua.position, upDir), w));
+                    var loDir = (Quaternion.AngleAxis(-75f, right) * -up + right * ps * 0.25f).normalized;   // palmas para a frente, mãos abertas
+                    _pose.Rotate(la, Quaternion.Slerp(Quaternion.identity, Quaternion.FromToRotation(hd.position - la.position, loDir), w));
+                }
+            }
+            rig.bones.TryGetValue("spine_01", out var sp1);
+            _pose.Rotate(sp1, Quaternion.AngleAxis(16f * w, right));
+            _pose.Rotate(rig.spine, Quaternion.AngleAxis(6f * w, right));
+        }
+
+        // ------------------------------------------------------------ passada desenhada
+        float _gPhase, _procW;
+
+        static float G(float u, float c, float w)
+        {
+            float d = Mathf.Repeat(u - c + 0.5f, 1f) - 0.5f;   // distância circular na fase
+            return Mathf.Exp(-d * d / (2f * w * w));
+        }
+
+        /// <summary>
+        /// Ciclo de caminhada/corrida desenhado à mão (não a captura): para cada perna, a flexão do quadril
+        /// e do joelho ao longo da passada (apoio, impulso, balanço), mais o braço do lado oposto, o giro
+        /// da pelve e o contragiro dos ombros. Andar → trotar → correr → pique é uma mistura contínua,
+        /// e a fase anda com a velocidade real (o pé não escorrega). Só para a frente; de costas e de
+        /// lado fica a captura.
+        /// </summary>
+        void ProcGait()
+        {
+            float dt = Time.deltaTime;
+            bool skip = rig.spine == null || rig.pelvis == null || p.down > 0f || p.slide > 0f || (p.isKeeper && (p.saveKind > 0 || p.hold > 0f || _saveRec > 0f)) || _celebrate > 0f;
+            float spd = _animSpd;
+            var right = transform.right; var up = transform.up; var fwd = transform.forward;
+            var lv = transform.InverseTransformDirection(new Vector3(p.vel.x, 0f, p.vel.y));
+            float forwardness = spd > 0.2f ? Mathf.Clamp01((lv.z / Mathf.Max(0.2f, new Vector2(lv.x, lv.z).magnitude) - 0.45f) / 0.4f) : 1f;
+            float act = anim != null ? anim.ActionWeight : 0f;
+            float moving = Mathf.Clamp01((spd - 0.35f) / 0.7f);
+            float want = skip ? 0f : (1f - act) * moving * forwardness;
+            _procW = Mathf.MoveTowards(_procW, want, dt * 5f);
+            float W = _procW;
+            float run = Mathf.Clamp01((spd - 1.9f) / 2.6f), sprint = Mathf.Clamp01((spd - 5.8f) / 2f);
+            // comprimento do ciclo (duas passadas): curto andando, longo no pique; o estilo muda a passada
+            float L = (Mathf.Lerp(1.5f, 2.7f, run) + 1.5f * sprint) / Mathf.Max(0.8f, _cadence) * transform.localScale.y;
+            _gPhase = Mathf.Repeat(_gPhase + spd / Mathf.Max(0.5f, L) * dt, 1f);
+            if (W <= 0.01f) return;
+            bool hasBall = view.sim.ball.owner == p.id;
+            float legScale = hasBall ? 0.85f : 1f;
+            // quadris e joelhos das duas pernas (direita = fase, esquerda = fase + meio ciclo)
+            float HipAt(float u)
+            {
+                float walk = 6.5f + 18.5f * Mathf.Cos(2f * Mathf.PI * u);
+                float runA = 14f + (30f + 10f * sprint) * Mathf.Cos(2f * Mathf.PI * (u - 0.85f));
+                return Mathf.Lerp(walk, runA, run) * legScale;
+            }
+            float KneeAt(float u)
+            {
+                float walk = 4f + 13f * G(u, 0.13f, 0.07f) + 56f * G(u, 0.72f, 0.1f);
+                float runK = 12f + 28f * G(u, 0.15f, 0.08f) + (84f + 26f * sprint) * _knee * G(u, 0.66f, 0.12f);
+                return Mathf.Lerp(walk, runK, run) * Mathf.Lerp(1f, 0.9f, hasBall ? 1f : 0f);
+            }
+            float uR = _gPhase, uL = Mathf.Repeat(_gPhase + 0.5f, 1f);
+            // pelve: gira para o lado da perna que vai à frente; ombros no sentido contrário
+            float pelvisYaw = (HipAt(uR) - HipAt(uL)) * Mathf.Lerp(0.12f, 0.16f, run) * 0.5f;
+            _pose.Rotate(rig.pelvis, Quaternion.AngleAxis(-pelvisYaw * W, up));
+            _pose.Rotate(rig.spine, Quaternion.AngleAxis(pelvisYaw * 1.6f * _twist * W, up));
+            // queda lateral da pelve (lado da perna em balanço desce um pouco) e inclinação para a frente
+            float drop = (G(uR, 0.25f, 0.12f) - G(uL, 0.25f, 0.12f)) * Mathf.Lerp(3f, 1.5f, run);
+            _pose.Rotate(rig.pelvis, Quaternion.AngleAxis(drop * W, fwd));
+            rig.bones.TryGetValue("spine_01", out var sp1);
+            _pose.Rotate(sp1, Quaternion.AngleAxis((Mathf.Lerp(2f, 7f, run) + 6f * sprint) * W, right));
+            for (int side = -1; side <= 1; side += 2)
+            {
+                string sfx = side < 0 ? "_l" : "_r";
+                rig.bones.TryGetValue("thigh" + sfx, out var th);
+                rig.bones.TryGetValue("calf" + sfx, out var cf);
+                var ft = side < 0 ? rig.footL : rig.footR;
+                if (th == null || cf == null || ft == null) continue;
+                // lado físico pela posição do osso (não pelo nome)
+                float ps = Mathf.Sign(Vector3.Dot(th.position - rig.pelvis.position, right));
+                float u = ps > 0f ? uR : uL;
+                float hip = HipAt(u), knee = KneeAt(u);
+                // + no eixo "right" leva o vetor para trás: flexão (para a frente) é ângulo negativo
+                var lat = right * ps * 0.035f;
+                var thighDir = (Quaternion.AngleAxis(-hip, right) * -up + lat).normalized;
+                _pose.Rotate(th, Quaternion.Slerp(Quaternion.identity, Quaternion.FromToRotation(cf.position - th.position, thighDir), W));
+                var calfDir = (Quaternion.AngleAxis(-hip + knee, right) * -up + lat * 0.5f).normalized;
+                _pose.Rotate(cf, Quaternion.Slerp(Quaternion.identity, Quaternion.FromToRotation(ft.position - cf.position, calfDir), W));
+            }
+            // braços: cada um acompanha a perna do lado oposto; cotovelo dobra mais correndo
+            for (int side = -1; side <= 1; side += 2)
+            {
+                string sfx = side < 0 ? "_l" : "_r";
+                rig.bones.TryGetValue("upperarm" + sfx, out var ua);
+                rig.bones.TryGetValue("lowerarm" + sfx, out var la);
+                rig.bones.TryGetValue("hand" + sfx, out var hd);
+                if (ua == null || la == null || hd == null) continue;
+                float ps = Mathf.Sign(Vector3.Dot(ua.position - rig.spine.position, right));
+                float uOpp = ps > 0f ? uL : uR;   // braço direito acompanha a perna esquerda
+                float amp = Mathf.Lerp(16f, 38f, run) + 16f * sprint;
+                amp *= _armAmp * (ps < 0 ? 1f : _armAsym) * (hasBall ? 0.75f : 1f);
+                float swing = Mathf.Lerp(Mathf.Cos(2f * Mathf.PI * uOpp), Mathf.Cos(2f * Mathf.PI * (uOpp - 0.85f)), run) * amp
+                              + Mathf.Lerp(4f, 14f, run) + _armFwd;
+                float elbow = Mathf.Lerp(18f, 82f, run) + 12f * sprint + _elbowStyle * 0.6f + Mathf.Max(0f, swing) * 0.25f;
+                float abd = (_armCarry * 0.7f + 6f + (hasBall ? 10f : 0f));
+                var upDir = Quaternion.AngleAxis(-swing, right) * -up;
+                upDir = (Quaternion.AngleAxis(ps * abd, fwd) * upDir).normalized;   // abre para fora do corpo
+                _pose.Rotate(ua, Quaternion.Slerp(Quaternion.identity, Quaternion.FromToRotation(la.position - ua.position, upDir), W));
+                var loDir = (Quaternion.AngleAxis(-(swing + elbow), right) * -up + right * -ps * 0.12f * run).normalized;   // mãos em direção ao meio do corpo
+                _pose.Rotate(la, Quaternion.Slerp(Quaternion.identity, Quaternion.FromToRotation(hd.position - la.position, loDir), W));
+            }
+        }
         float _thighL, _thighR;
         Vector3 _localVel;
 
@@ -858,6 +1018,8 @@ namespace Craquez
                 _pose.Rotate(rig.spine, Quaternion.AngleAxis(_accLean * 0.2f, ax));
             }
             ArmsDown();
+            ProcGait();
+            KeeperReady();
             Gait();
             ReceiveLeg();
             KickBody();

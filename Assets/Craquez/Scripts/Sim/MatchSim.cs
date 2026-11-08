@@ -2563,7 +2563,8 @@ namespace Craquez.Sim
             {
                 // no ar: o impulso do mergulho segue (balístico) e freia ao cair no chão; sem "correr" deitado
                 float u = 1f - p.saveT / Mathf.Max(0.01f, p.saveTotal);
-                float drag = u < 0.45f ? 0.4f : 9f;
+                // voo quase sem freio; ao tocar o chão, desliza e para aos poucos (antes parava de uma vez)
+                float drag = Mathf.Lerp(0.3f, 6.5f, Mathf.SmoothStep(0f, 1f, Mathf.Clamp01((u - 0.38f) / 0.3f)));
                 p.vel -= p.vel * Mathf.Min(1f, drag * DT);
                 p.position += p.vel * DT;
                 return;

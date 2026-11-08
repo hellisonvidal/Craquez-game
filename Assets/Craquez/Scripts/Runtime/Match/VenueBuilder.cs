@@ -499,30 +499,47 @@ namespace Craquez
             float step = 0.8f, rise = 0.42f;
             float gapX = 9f, gapZ = 7.5f;
             int tw = quality >= 2 ? 2048 : 1024;
-            var crowd = Gfx.CrowdTex(tw, 512, homeKit.c1, homeKit.c2, awayKit.c1, (int)(home.name.GetHashCode() & 0xFFFF), style.occupancy, style.seats.a > 0f ? style.seats : (Color?)null);
+            // torcida: o mandante ocupa quase tudo; o visitante fica num setor só dele (a arquibancada
+            // atrás do gol da direita). Em jogo de seleções, as torcidas se misturam.
+            bool mixed = home.IsNational || away.IsNational;
+            float share = mixed ? 0.3f : 0f;
+            var crowd = Gfx.CrowdTex(tw, 512, homeKit.c1, homeKit.c2, awayKit.c1, (int)(home.name.GetHashCode() & 0xFFFF), style.occupancy, style.seats.a > 0f ? style.seats : (Color?)null, share);
             var mat = Gfx.Lit(Color.white, crowd, 0.05f);
+            var crowdAway = mixed ? crowd : Gfx.CrowdTex(tw, 512, awayKit.c1, awayKit.c2, awayKit.c1, (int)(away.name.GetHashCode() & 0xFFFF), style.occupancy * 0.85f, style.seats.a > 0f ? style.seats : (Color?)null, 0f);
+            var matAway = mixed ? mat : Gfx.Lit(Color.white, crowdAway, 0.05f);
+            if (!mixed) v.crowdMats.Add(matAway);
             v.crowdMats.Add(mat);
             var concrete = Gfx.Lit(style.structure.a > 0f ? style.structure : new Color(0.55f, 0.56f, 0.6f), Gfx.Asphalt(256, Color.white, 11, 0.05f), 0.15f);
             // torcedores em pé: silhuetas recortadas sobre cada fileira (dá volume à arquibancada)
             bool striped = homeKit.pattern == 1 || homeKit.pattern == 5 || homeKit.pattern == 2;
             int pseed = (int)(home.name.GetHashCode() & 0xFFFF) + 1;
             int pwT = quality >= 2 ? 2048 : 1024, phT = quality >= 1 ? 96 : 64;
-            var people = Gfx.CrowdPeople(pwT, phT, homeKit.c1, homeKit.c2, awayKit.c1, pseed, 0f, striped);
-            var cheerTex = Gfx.CrowdPeople(pwT, phT, homeKit.c1, homeKit.c2, awayKit.c1, pseed, 1f, striped);
+            var people = Gfx.CrowdPeople(pwT, phT, homeKit.c1, homeKit.c2, awayKit.c1, pseed, 0f, striped, share);
+            var cheerTex = Gfx.CrowdPeople(pwT, phT, homeKit.c1, homeKit.c2, awayKit.c1, pseed, 1f, striped, share);
+            bool stripedA = awayKit.pattern == 1 || awayKit.pattern == 5 || awayKit.pattern == 2;
+            var peopleA = mixed ? people : Gfx.CrowdPeople(pwT, phT, awayKit.c1, awayKit.c2, awayKit.c1, pseed + 7, 0f, stripedA, 0f);
+            var cheerA = mixed ? cheerTex : Gfx.CrowdPeople(pwT, phT, awayKit.c1, awayKit.c2, awayKit.c1, pseed + 7, 1f, stripedA, 0f);
             // três grupos de fileiras, cada um pulando no seu tempo (nada de arquibancada inteira em uníssono)
             var peopleMats = new Material[3];
+            var peopleMatsA = new Material[3];
             for (int g = 0; g < 3; g++)
             {
                 peopleMats[g] = Gfx.Cutout(Color.white, people, 0.5f, 0.05f);
                 v.crowdMats.Add(peopleMats[g]);
                 v.crowdPhase[peopleMats[g]] = g * 2.1f;
                 v.crowdCheer.Add((peopleMats[g], people, cheerTex));
+                if (mixed) { peopleMatsA[g] = peopleMats[g]; continue; }
+                peopleMatsA[g] = Gfx.Cutout(Color.white, peopleA, 0.5f, 0.05f);
+                v.crowdMats.Add(peopleMatsA[g]);
+                v.crowdPhase[peopleMatsA[g]] = g * 1.7f + 0.5f;
+                v.crowdCheer.Add((peopleMatsA[g], peopleA, cheerA));
             }
             // faixas de torcida penduradas na mureta da frente
             string[] words = { "VAMOS", "SEMPRE", "GARRA", "AVANTE", "TORCIDA", "JUNTOS", "RAIZ", "VIBRA" };
             var bannerMats = new Material[3];
             for (int b = 0; b < 3; b++)
                 bannerMats[b] = Gfx.Lit(Color.white, Gfx.Banner(b == 1 ? homeKit.c2 : homeKit.c1, b == 1 ? homeKit.c1 : homeKit.c2, words[(pseed + b * 3) % words.Length], pseed + b), 0.1f);
+            var bannerA = mixed ? null : Gfx.Lit(Color.white, Gfx.Banner(awayKit.c1, awayKit.c2, words[(pseed + 5) % words.Length], pseed + 9), 0.1f);
             v.standDist = gapZ;
             int rowsAll = rows;
             for (int side = 0; side < 4; side++)
@@ -574,7 +591,7 @@ namespace Craquez
                 }
                 for (int g = 0; g < 3; g++)
                 {
-                    var gp = pplG[g].Object("Torcedores " + side + "." + g, peopleMats[g], v.root, false);
+                    var gp = pplG[g].Object("Torcedores " + side + "." + g, side == 3 ? peopleMatsA[g] : peopleMats[g], v.root, false);
                     gp.transform.localRotation = Quaternion.Euler(0, side == 0 ? 0 : side == 1 ? 180 : side == 2 ? 90 : -90, 0);
                 }
                 // faixas: panos de 7 m presos na mureta (abaixo da primeira fileira)
@@ -588,10 +605,10 @@ namespace Craquez
                 }
                 for (int b = 0; b < 3; b++)
                 {
-                    var gbn = ban[b].Object("Faixas " + side + "." + b, bannerMats[b], v.root, false);
+                    var gbn = ban[b].Object("Faixas " + side + "." + b, side == 3 && bannerA != null ? bannerA : bannerMats[b], v.root, false);
                     gbn.transform.localRotation = Quaternion.Euler(0, side == 0 ? 0 : side == 1 ? 180 : side == 2 ? 90 : -90, 0);
                 }
-                var go = k.Object("Torcida " + side, mat, v.root, quality >= 2);
+                var go = k.Object("Torcida " + side, side == 3 ? matAway : mat, v.root, quality >= 2);
                 var gb = back.Object("Estrutura " + side, concrete, v.root, quality >= 1);
                 float yaw = side == 0 ? 0 : side == 1 ? 180 : side == 2 ? 90 : -90;
                 go.transform.localRotation = Quaternion.Euler(0, yaw, 0);
@@ -685,6 +702,9 @@ namespace Craquez
             band.Box(new Vector3(0, top - 1.1f, -front + 0.1f), new Vector3(W, 1.6f, 0.5f));
             band.Object("Faixa da tribuna", Gfx.Lit(homeKit.c1, null, 0.3f), v.root, false);
         }
+
+        /// <summary>Jogo de seleções: torcidas misturadas (nos clubes, cada uma no seu setor).</summary>
+        static bool _mixedCrowd;
 
         static void Floodlights(Venue v, float hl, float hw, int tier, bool night, StadiumStyle st = default)
         {
@@ -922,7 +942,7 @@ namespace Craquez
                 ppl.Quad(new Vector3(-hl * 0.6f, y0 + 0.42f, z0 + 0.3f), new Vector3(-hl * 0.6f, y0 + 1.6f, z0 + 0.3f), new Vector3(hl * 0.6f, y0 + 1.6f, z0 + 0.3f), new Vector3(hl * 0.6f, y0 + 0.42f, z0 + 0.3f), new Vector2(0, 0), new Vector2(hl / 5f, 1));
             }
             steps.Object("Arquibancada", Gfx.Lit(new Color(0.62f, 0.63f, 0.66f), Gfx.Asphalt(256, Color.white, 81, 0.05f), 0.15f), v.root, quality >= 1);
-            var crowd = Gfx.CrowdPeople(1024, 64, homeKit.c1, homeKit.c2, awayKit.c1, variant * 23 + 9);
+            var crowd = Gfx.CrowdPeople(1024, 64, homeKit.c1, homeKit.c2, awayKit.c1, variant * 23 + 9, 0f, false, home.IsNational || away.IsNational ? 0.3f : 0f);
             var cm = Gfx.Cutout(Color.white, crowd, 0.5f, 0.05f);
             v.crowdMats.Add(cm);
             ppl.Object("Galera", cm, v.root, false);
@@ -1053,6 +1073,7 @@ namespace Craquez
         static void BuildFutsalHall(Venue v, MatchSim sim, TeamData home, TeamData away, Kit homeKit, Kit awayKit, (Color court, Color surround, int kind) pp, Material courtMat, Material surMat, int variant, bool night, int quality)
         {
             float hl = sim.halfLen, hw = sim.halfW;
+            _mixedCrowd = home.IsNational || away.IsNational;
             v.pitchMat = courtMat;
             v.pitchMat2 = surMat;
             var k = new MeshKit();
@@ -1124,15 +1145,15 @@ namespace Craquez
             }
             steel.Object("Estrutura metálica", Gfx.Lit(new Color(0.45f, 0.47f, 0.5f), null, 0.5f, 0.7f), v.root, false);
             // arquibancadas laterais (lado da câmera mais baixa)
-            var crowd = Gfx.CrowdTex(1024, 256, homeKit.c1, homeKit.c2, awayKit.c1, variant * 31, 0.85f);
+            var crowd = Gfx.CrowdTex(1024, 256, homeKit.c1, homeKit.c2, awayKit.c1, variant * 31, 0.85f, null, _mixedCrowd ? 0.3f : 0f);
             var cm = Gfx.Lit(Color.white, crowd, 0.05f);
             v.crowdMats.Add(cm);
             var concrete = Gfx.Lit(new Color(0.6f, 0.61f, 0.64f), Gfx.Asphalt(256, Color.white, 13, 0.05f), 0.15f);
             // torcedores de verdade (silhuetas recortadas em pé, pulando nos lances) sobre os degraus
             bool stripedH = homeKit.pattern == 1 || homeKit.pattern == 5 || homeKit.pattern == 2;
             int hseed = variant * 37 + 3;
-            var hPeople = Gfx.CrowdPeople(1024, quality >= 1 ? 96 : 64, homeKit.c1, homeKit.c2, awayKit.c1, hseed, 0f, stripedH);
-            var hCheer = Gfx.CrowdPeople(1024, quality >= 1 ? 96 : 64, homeKit.c1, homeKit.c2, awayKit.c1, hseed, 1f, stripedH);
+            var hPeople = Gfx.CrowdPeople(1024, quality >= 1 ? 96 : 64, homeKit.c1, homeKit.c2, awayKit.c1, hseed, 0f, stripedH, _mixedCrowd ? 0.3f : 0f);
+            var hCheer = Gfx.CrowdPeople(1024, quality >= 1 ? 96 : 64, homeKit.c1, homeKit.c2, awayKit.c1, hseed, 1f, stripedH, _mixedCrowd ? 0.3f : 0f);
             var hMats = new Material[2];
             for (int g = 0; g < 2; g++)
             {
@@ -1253,7 +1274,9 @@ namespace Craquez
                     else ppl.Quad(a1, a1 + Vector3.up * 1.2f, a0 + Vector3.up * 1.2f, a0, new Vector2(0, 0), new Vector2(hw / 4f, 1));
                 }
             steps.Object("Arquibancada dos fundos", wallMat, v.root, quality >= 1);
-            var crowd = Gfx.CrowdPeople(1024, 64, home.c1, home.c2, away.c1, variant * 17 + 3);
+            // atrás dos gols: o setor do visitante (só com as cores dele); em jogo de seleções, misturado
+            var crowd = _mixedCrowd ? Gfx.CrowdPeople(1024, 64, home.c1, home.c2, away.c1, variant * 17 + 3, 0f, false, 0.4f)
+                                    : Gfx.CrowdPeople(1024, 64, away.c1, away.c2, away.c1, variant * 17 + 3, 0f, false, 0f);
             var cm = Gfx.Cutout(Color.white, crowd, 0.5f, 0.05f);
             v.crowdMats.Add(cm);
             ppl.Object("Torcida dos fundos", cm, v.root, false);

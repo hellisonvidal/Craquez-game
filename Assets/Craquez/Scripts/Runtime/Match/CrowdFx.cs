@@ -86,7 +86,13 @@ namespace Craquez
                     pos = new Vector3(sx * dx, y, zz);
                     face = Quaternion.LookRotation(new Vector3(sx, 0, 0), Vector3.up);
                 }
-                bool isAway = i % 3 == 2;
+                // clubes: bandeiras do visitante só no setor dele (atrás do gol da direita, +x);
+                // seleções: torcidas misturadas
+                var ht = _homeTeam >= 0 ? Teams.Get(_homeTeam) : null;
+                var at = _awayTeam >= 0 ? Teams.Get(_awayTeam) : null;
+                bool mixed = (ht != null && ht.IsNational) || (at != null && at.IsNational);
+                bool awayEnd = i >= far && pos.x > 0f;
+                bool isAway = mixed ? i % 3 == 2 : awayEnd;
                 var k = isAway ? away : home;
                 int team = isAway ? _awayTeam : _homeTeam;
                 Texture2D tex = null;
