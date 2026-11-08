@@ -175,7 +175,8 @@ namespace Craquez
             if (_waveT < 0f)
             {
                 _nextWave -= dt;
-                if (_nextWave <= 0f && Mathf.Abs(_sim.ball.pos.x) < _sim.halfLen * 0.4f && _sim.state == MatchState.Playing)
+                // (ola desligada: as partículas coloridas davam a volta no campo passando na frente da câmera)
+                if (false && _nextWave <= 0f && Mathf.Abs(_sim.ball.pos.x) < _sim.halfLen * 0.4f && _sim.state == MatchState.Playing)
                 {
                     _waveT = 0f;
                     _nextWave = 70f + Random.value * 60f;
