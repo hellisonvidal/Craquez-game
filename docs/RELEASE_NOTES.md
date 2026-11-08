@@ -11,7 +11,7 @@ Jogo de futebol feito 100% com inteligência artificial, **gratuito**. Android, 
 - **Escanteios de verdade**: bola parada no canto; cobrança com cruzamento na área (força escolhe
   primeiro ou segundo pau) ou toque curto para o companheiro que vem buscar. A área já aparece
   ocupada (atacantes nos seus lugares, marcadores colados).
-- **Cena da cobrança**: no escanteio, na falta e no tiro de meta o cobrador vai andando até a bola
+- **Cena da cobrança**: no escanteio, na falta, no tiro de meta e no pênalti o cobrador vai andando até a bola
   parada antes de cobrar (no escanteio, com câmera de fora do campo, atrás da bandeirinha).
 - **Saída de bola na marca central**: a bola fica exatamente no centro até o toque.
 - **Defesas do goleiro**: a ponta dos dedos desvia a bola na direção do contato (para fora, rente

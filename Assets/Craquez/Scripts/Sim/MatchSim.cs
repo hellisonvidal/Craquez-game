@@ -572,6 +572,7 @@ namespace Craquez.Sim
                 from = to + new Vector2(0f, -Mathf.Sign(to.y) * 6f) + new Vector2(-Mathf.Sign(to.x) * 1.5f, 0f);
             }
             else if (kind == "goalkick") from = to - f * 3.5f + new Vector2(0f, side * 1.5f);
+            else if (kind == "penalty") from = to - f * 4.5f + new Vector2(0f, side * 1.2f);
             else from = to - f * 4.5f + new Vector2(-f.y, f.x) * side * 2.2f;
             from.x = Mathf.Clamp(from.x, -halfLen + 0.4f, halfLen - 0.4f);
             from.y = Mathf.Clamp(from.y, -halfW + 0.4f, halfW - 0.4f);
@@ -1623,6 +1624,10 @@ namespace Craquez.Sim
             protectT = 999f;
             state = MatchState.Restart;
             stateTimer = 1.4f;
+            // o batedor vem da entrada da área até a bola
+            walkUpTaker = -1;
+            BeginWalkUp(taker, "penalty");
+            if (walkUpTaker >= 0) stateTimer += WalkUpTime;
             Emit("whistle", t, -1, "penalty");
         }
 
