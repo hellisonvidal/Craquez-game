@@ -8,6 +8,9 @@ Jogo de futebol feito 100% com inteligência artificial, **gratuito**. Android, 
 - **Linux**: `Craquez-v2.3.0-Linux.tar.gz` → extraia e rode `./Craquez` (ou `./instalar.sh` para o atalho no menu)
 
 ### Novidades
+- **Corrida mais humana**: o braço vai mais para trás do que para a frente, a mão para na altura do
+  peito (antes subia até o rosto, como numa guarda de boxe) e a passada ficou um pouco mais curta.
+- **Proporções**: ombros ~12% mais estreitos e mãos ~25% menores que o modelo original.
 - **Sem a faixa clara na arquibancada**: a cobertura ficou mais alta e recuada (vista por baixo ela
   virava uma faixa que acompanhava a câmera) e não há mais cobertura do lado da câmera.
 - **Torcida toda em 3D**: todas as fileiras com torcedores modelados (no celular mais fraco, até 16

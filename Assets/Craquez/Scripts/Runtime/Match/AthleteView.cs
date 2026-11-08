@@ -877,7 +877,7 @@ namespace Craquez
             {
                 float walk = 6.5f + 18.5f * Mathf.Cos(2f * Mathf.PI * u);
                 float runA = 14f + (30f + 10f * sprint) * Mathf.Cos(2f * Mathf.PI * (u - 0.85f));
-                return Mathf.Lerp(walk, runA, run) * legScale * dirAmp;
+                return Mathf.Lerp(walk, runA * 0.88f, run) * legScale * dirAmp;
             }
             float KneeAt(float u)
             {
@@ -935,13 +935,16 @@ namespace Craquez
                 // fase do braço: na corrida o pico à frente vem junto com o joelho oposto no alto
                 float ph = Mathf.Lerp(uOpp, uOpp - 0.85f, run);
                 float c = Mathf.Cos(2f * Mathf.PI * ph);
-                float amp = (Mathf.Lerp(17f, 34f, run) + 12f * sprint) * _armAmp * (ps < 0 ? 1f : _armAsym) * (hasBall ? 0.75f : 1f)
+                float amp = (Mathf.Lerp(16f, 30f, run) + 10f * sprint) * Mathf.Min(_armAmp, 1.1f) * (ps < 0 ? 1f : _armAsym) * (hasBall ? 0.75f : 1f)
                             * Mathf.Lerp(1f, 0.65f, Mathf.Max(back, lateral));
-                // para a frente sobe mais do que vai para trás (como no corpo humano)
-                float swing = (c > 0f ? c * amp : c * amp * 0.8f) + Mathf.Lerp(2f, 6f, run) + _armFwd * 0.5f;
-                float elbow = Mathf.Lerp(12f + 10f * Mathf.Max(0f, c), 82f + 12f * c, run) + 8f * sprint + _elbowStyle * 0.4f;
-                elbow = Mathf.Clamp(elbow, 8f, 118f - Mathf.Max(0f, swing) * 0.4f);
-                if (clv != null) _pose.Rotate(clv, Quaternion.AngleAxis(-ps * swing * 0.12f * run * W, up));   // ombro acompanha
+                // correndo, o braço vai mais para trás do que para a frente (o cotovelo passa do tronco
+                // atrás; na frente a mão para na altura do peito); andando, balanço simétrico e solto
+                float fwdK = Mathf.Lerp(0.9f, 0.55f, run), backK = Mathf.Lerp(0.9f, 1.05f, run);
+                float swing = (c > 0f ? c * amp * fwdK : c * amp * backK) + Mathf.Lerp(0f, -4f, run) + _armFwd * 0.3f;
+                float elbow = Mathf.Lerp(14f + 8f * Mathf.Max(0f, c), 80f + 8f * c, run) + 6f * sprint + _elbowStyle * 0.3f;
+                // a mão nunca passa da altura do peito (antebraço no máximo ~20° acima da horizontal)
+                elbow = Mathf.Clamp(elbow, 8f, 110f - swing);
+                if (clv != null) _pose.Rotate(clv, Quaternion.AngleAxis(-ps * swing * 0.08f * run * W, up));   // ombro acompanha
                 float abd = _armCarry * 0.45f + 4f + (hasBall ? 7f : 0f) + lateral * 6f;
                 // plano do balanço: gira um pouco para dentro (o braço cruza à frente do corpo)
                 var swingAxis = Quaternion.AngleAxis(ps * cross, up) * right;
@@ -1130,8 +1133,21 @@ namespace Craquez
             _shadow.localScale = new Vector3(0.9f, 1.15f, 1f);
         }
 
+        Transform _uaL, _uaR;
+        Vector3 _uaLBase, _uaRBase;
+
+        /// <summary>Ombros mais estreitos: aproxima a articulação do ombro do pescoço (~12%).</summary>
+        void NarrowShoulders()
+        {
+            if (_uaL == null && rig.bones.TryGetValue("upperarm_l", out _uaL)) _uaLBase = _uaL.localPosition;
+            if (_uaR == null && rig.bones.TryGetValue("upperarm_r", out _uaR)) _uaRBase = _uaR.localPosition;
+            if (_uaL != null) _uaL.localPosition = _uaLBase * 0.88f;
+            if (_uaR != null) _uaR.localPosition = _uaRBase * 0.88f;
+        }
+
         void LateUpdate()
         {
+            if (rig != null) NarrowShoulders();
             if (p != null && rig != null)
             {
                 // ações (cortes, fintas, giro) mantêm um pouco do balanço do quadril; locomoção, nada
