@@ -487,6 +487,13 @@ namespace Craquez.Sim
                     p.vel = Vector2.zero;
                     p.facing = (ball.pos - p.position).Norm();
                 }
+            // ninguém fica fora do campo no reinício (quem caiu ou correu para fora volta para dentro)
+            foreach (var p in players)
+            {
+                if (p == taker || p.sentOff) continue;
+                p.position.x = Mathf.Clamp(p.position.x, -halfLen + 0.4f, halfLen - 0.4f);
+                p.position.y = Mathf.Clamp(p.position.y, -halfW + 0.4f, halfW - 0.4f);
+            }
             wallIds.Clear();
             if (cut && kind == "freekick" && !noWallKick) FreeKickWall(t, spot);
             foreach (var p in players)

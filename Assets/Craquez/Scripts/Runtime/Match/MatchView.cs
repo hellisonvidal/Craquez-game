@@ -334,7 +334,13 @@ namespace Craquez
         /// <summary>Após cada passo da simulação.</summary>
         public void OnTick()
         {
-            foreach (var a in athletes) a.OnTick();
+            foreach (var a in athletes)
+            {
+                // expulso vai para o vestiário: some do campo (antes ficava parado/caído do lado de fora)
+                bool show = !a.p.sentOff;
+                if (a.gameObject.activeSelf != show) { a.gameObject.SetActive(show); if (show) a.Snap(); }
+                if (show) a.OnTick();
+            }
             RefereeStep();
             _ballPrev = _ballCur;
             _ballCur = new Vector3(sim.ball.pos.x, sim.ball.z + sim.ball.radius, sim.ball.pos.y);

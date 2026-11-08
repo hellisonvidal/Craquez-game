@@ -8,6 +8,11 @@ Jogo de futebol feito 100% com inteligência artificial, **gratuito**. Android, 
 - **Linux**: `Craquez-v2.1.0-Linux.tar.gz` → extraia e rode `./Craquez` (ou `./instalar.sh` para o atalho no menu)
 
 ### Novidades
+- **Nada na frente do campo**: tudo o que estiver entre a câmera e o gramado e cair sobre ele na
+  tela (placas, letreiro e porta dos vestiários, túnel, arquibancada e tribuna da frente) some,
+  em todos os estádios, ginásios, society e ruas.
+- **Ninguém fora do campo**: o expulso vai para o vestiário (some do campo) e, em todo reinício,
+  quem caiu ou correu para fora volta para dentro das linhas.
 - **Visão livre**: placas, alambrados, guarda-corpos e arquibancadas do lado da câmera agora somem
   sempre que tapam qualquer pedaço do campo visível (antes só o ponto da bola era testado, e o que
   dava a volta no campo nunca sumia).

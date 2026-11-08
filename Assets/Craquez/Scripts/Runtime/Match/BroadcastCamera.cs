@@ -148,13 +148,27 @@ namespace Craquez
                     var vp = cam.WorldToViewportPoint(g);
                     if (vp.z > 0f && vp.x > -0.05f && vp.x < 1.05f && vp.y > -0.05f && vp.y < 1.05f) _tList.Add(g);
                 }
+            // retângulo do campo na tela e a profundidade do ponto do campo mais perto da câmera:
+            // qualquer coisa inteira antes do campo que caia sobre ele na tela está na frente
+            var fwd = cam.transform.forward;
+            float dmin = float.MaxValue;
+            float sx0 = 1f, sy0 = 1f, sx1 = 0f, sy1 = 0f;
+            for (int k = 0; k < 4; k++)
+            {
+                var fc = new Vector3((k & 1) == 0 ? -hl : hl, 0f, (k & 2) == 0 ? -hw : hw);
+                dmin = Mathf.Min(dmin, Vector3.Dot(fc - c, fwd));
+                var vp = cam.WorldToViewportPoint(fc);
+                if (vp.z <= 0f) { sx0 = 0f; sy0 = 0f; sx1 = 1f; sy1 = 1f; continue; }
+                sx0 = Mathf.Min(sx0, vp.x); sy0 = Mathf.Min(sy0, vp.y); sx1 = Mathf.Max(sx1, vp.x); sy1 = Mathf.Max(sy1, vp.y);
+            }
+            sx0 = Mathf.Max(sx0, 0f); sy0 = Mathf.Max(sy0, 0f); sx1 = Mathf.Min(sx1, 1f); sy1 = Mathf.Min(sy1, 1f);
             for (int i = 0; i < _occ.Count; i++)
             {
                 var r = _occ[i];
                 if (r == null) continue;
                 var b = r.bounds;
-                bool block = false;
-                foreach (var t in _tList)
+                bool block = InFrontOfField(b, c, fwd, dmin, sx0, sy0, sx1, sy1);
+                if (!block) foreach (var t in _tList)
                 {
                     var d = t - c;
                     float len = d.magnitude;
@@ -162,11 +176,37 @@ namespace Craquez
                     if (b.Contains(c) || (b.IntersectRay(new Ray(c, d / len), out float hit) && hit < len - 0.5f)) { block = true; break; }
                 }
                 // colado na câmera (poste, mureta, alambrado) também some
-                if (!block && b.SqrDistance(c) < 16f) block = true;
+                if (!block && b.SqrDistance(c) < 25f) block = true;
                 if (block == _occHidden[i]) continue;
                 _occHidden[i] = block;
                 r.shadowCastingMode = block ? UnityEngine.Rendering.ShadowCastingMode.ShadowsOnly : _occMode[i];
             }
+        }
+
+        readonly Vector3[] _corners = new Vector3[8];
+
+        /// <summary>
+        /// O objeto está inteiro entre a câmera e o campo (mais perto que o ponto do campo mais próximo)
+        /// e, na tela, cai sobre o campo? Então tapa o jogo (placa, letreiro, porta, arquibancada da frente).
+        /// </summary>
+        bool InFrontOfField(Bounds b, Vector3 c, Vector3 fwd, float dmin, float sx0, float sy0, float sx1, float sy1)
+        {
+            var mn = b.min; var mx = b.max;
+            float dmax = float.MinValue, x0 = 2f, y0 = 2f, x1 = -1f, y1 = -1f;
+            bool any = false;
+            for (int k = 0; k < 8; k++)
+            {
+                var p = new Vector3((k & 1) == 0 ? mn.x : mx.x, (k & 2) == 0 ? mn.y : mx.y, (k & 4) == 0 ? mn.z : mx.z);
+                dmax = Mathf.Max(dmax, Vector3.Dot(p - c, fwd));
+                var vp = cam.WorldToViewportPoint(p);
+                if (vp.z <= 0.05f) continue;
+                any = true;
+                x0 = Mathf.Min(x0, vp.x); y0 = Mathf.Min(y0, vp.y); x1 = Mathf.Max(x1, vp.x); y1 = Mathf.Max(y1, vp.y);
+            }
+            if (!any || dmax > dmin + 0.3f) return false;
+            // sobreposição real com o campo na tela (não só encostando na borda)
+            float ox = Mathf.Min(x1, sx1) - Mathf.Max(x0, sx0), oy = Mathf.Min(y1, sy1) - Mathf.Max(y0, sy0);
+            return ox > 0.005f && oy > 0.005f;
         }
 
         void LateUpdate()
