@@ -8,6 +8,22 @@ Jogo de futebol feito 100% com inteligência artificial, **gratuito**. Android, 
 - **Linux**: `Craquez-v2.1.0-Linux.tar.gz` → extraia e rode `./Craquez` (ou `./instalar.sh` para o atalho no menu)
 
 ### Novidades
+- **Movimentação refeita**: cada atleta tem o seu jeito de correr (ritmo da passada, braços mais
+  soltos ou contidos, giro dos ombros, joelho alto); no pique o braço bombeia com o cotovelo a ~90°
+  e o joelho sobe; conduzindo a bola, passadas mais curtas e rápidas com os braços abertos; na
+  freada, passos curtos; andando, braços relaxados. Parado esperando o reinício, de vez em quando
+  mãos na cintura (cansado, mãos nos joelhos). A animação usa o deslocamento real do atleta:
+  ninguém mais "corre sem sair do lugar".
+- **Câmera "Aberta Aproximada"**: alta como a transmissão aberta (vê a jogada e o posicionamento),
+  mas fechada na bola, com os atletas grandes o bastante para ver os detalhes.
+- **Jogo mais rápido**: a partida roda 18% mais rápido que o tempo real (bola, atletas e animações).
+- **Faltas e reinícios com a bola parada**: quem precisa respeitar a distância ou esbarra em alguém
+  para de verdade (sem correr no lugar até a bola rolar).
+- **Reposição do goleiro**: só entrega para quem está livre e com a linha do passe livre; sem
+  opção, espera alguém se desmarcar (até 4 s no futsal) ou dá o chutão — não rola mais a bola no pé
+  do adversário (em teste: 11 de 12 reposições chegaram ao companheiro).
+- **Postura tática**: zaga e meio-campo alinhados em linhas no campo; companheiros desviam prevendo
+  a corrida um do outro e mantêm mais distância (menos contato entre jogadores do mesmo time).
 - **Lateral do futsal e do society**: com os pés, bola parada na linha e sempre um passe para um
   companheiro (chute vira passe); no futsal, 4 segundos para cobrar, senão a bola vai para o
   adversário. Os companheiros se oferecem para o passe em vez de correr para a área.

@@ -352,6 +352,9 @@ namespace Craquez
         /// Atualiza a locomoção. speed em m/s; fwd/side = velocidade no referencial do corpo (m/s);
         /// guard = postura de marcação (contenção).
         /// </summary>
+        /// <summary>Ritmo das passadas (1 = natural; >1 passadas mais curtas e rápidas, como conduzindo a bola).</summary>
+        public float cadence = 1f;
+
         public void Tick(float dt, float speed, float fwd, float side, bool guard)
         {
             if (!_valid) return;
@@ -404,7 +407,7 @@ namespace Craquez
                 if (!_locoP[i].IsValid() || _locoW[i] <= 0f) continue;
                 float len = (float)_locoP[i].GetAnimationClip().length;
                 // ritmo casado com a velocidade (pés sem patinar), dentro de limites naturais
-                float rate = (i == IIdle || speed < 0.2f) ? _idleRate : Mathf.Clamp(speed / _locoSpeed[i], 0.7f, 1.65f);
+                float rate = (i == IIdle || speed < 0.2f) ? _idleRate : Mathf.Clamp(speed / _locoSpeed[i] * cadence, 0.7f, 1.8f);
                 cyclesPerSec += _locoW[i] * rate / Mathf.Max(0.1f, len);
                 wsum += _locoW[i];
             }

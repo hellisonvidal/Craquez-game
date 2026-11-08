@@ -59,6 +59,8 @@ namespace Craquez.Sim
         public float sentOffT;
         /// <summary>Goleiro lendo um chute: desloca em passadas laterais (não corre).</summary>
         public bool keeperSet;
+        /// <summary>Há quanto tempo o goleiro está com a bola nas mãos (espera alguém se desmarcar).</summary>
+        public float heldT;
         public float saveT, saveTotal, saveSide, saveH, saveDist;
 
         public float windup, windupTotal, windupPower;

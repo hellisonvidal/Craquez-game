@@ -11,12 +11,12 @@ namespace Craquez
     /// </summary>
     public class BroadcastCamera : MonoBehaviour
     {
-        public enum Kind { Tv, TvClose, Wide, Tactical, PlayerSide, Behind, Shoulder, Pitchside, Dynamic, BehindGoal, Drone }
+        public enum Kind { Tv, TvClose, Wide, Tactical, PlayerSide, Behind, Shoulder, Pitchside, Dynamic, BehindGoal, Drone, WideClose }
         public static readonly string[] Modes =
         {
             "TV", "TV Próxima", "Transmissão Aberta", "Alta (tática)",
             "Perto do Jogador", "Atrás do Jogador", "Ombro (bem perto)", "Rente ao Gramado",
-            "Dinâmica", "Atrás do Gol", "Drone",
+            "Dinâmica", "Atrás do Gol", "Drone", "Aberta Aproximada",
         };
         /// <summary>Índices antigos (versão 2.0) -> novos, para manter a escolha salva.</summary>
         public static int FromOld(int old) => old switch { 0 => 0, 1 => 1, 2 => 3, 3 => 5, 4 => 8, 5 => 7, 6 => 9, 7 => 10, 9 => 2, _ => 0 };
@@ -203,6 +203,9 @@ namespace Craquez
                 case Kind.Tactical: height = field ? 42f : 20f; back = field ? 36f : 18f; fov = 38f; break;
                 case Kind.Pitchside: height = field ? 2.6f : 2.1f; back = field ? 10f : 5f; fov = 46f; break;
                 case Kind.Wide: height = field ? 30f : 14f; back = field ? 58f : 24f; fov = 34f; break;   // o campo todo
+                // aberta aproximada: alta como a aberta (vê a jogada e o posicionamento), mas fechada
+                // na bola — atletas grandes o bastante para ver os detalhes
+                case Kind.WideClose: height = field ? 21f : 11f; back = field ? 40f : 18f; fov = field ? 24f : 30f; break;
                 default: height = field ? 18f : 10f; back = field ? 38f : 16f; fov = field ? 31f : 38f; break;
             }
             height *= zk;

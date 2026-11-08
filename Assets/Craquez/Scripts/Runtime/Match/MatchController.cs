@@ -14,6 +14,8 @@ namespace Craquez
     {
         enum Phase { Ceremony, Playing, Paused, Ended, Goal, Halftime }
 
+        /// <summary>Ritmo da partida: o jogo todo (simulação, animações, bola) roda um pouco mais rápido que o tempo real.</summary>
+        public const float GameSpeed = 1.18f;
         public MatchConfig cfg;
         public MatchSim sim;
         public MatchView view;
@@ -41,6 +43,7 @@ namespace Craquez
         {
             cfg = c;
             _cam = cam;
+            Time.timeScale = attract ? 1f : GameSpeed;
             var ta = Teams.Get(c.teamA);
             var tb = Teams.Get(c.teamB);
             sim = new MatchSim();
@@ -612,7 +615,7 @@ namespace Craquez
         void Resume()
         {
             if (_pauseMenu != null) Destroy(_pauseMenu);
-            Time.timeScale = 1f;
+            Time.timeScale = MatchController.GameSpeed;
             view.Freeze(false);
             _phase = _beforePause;
             if (_touch) _touch.gameObject.SetActive(true);
@@ -656,7 +659,7 @@ namespace Craquez
 
         void OnDestroy()
         {
-            Time.timeScale = 1f;
+            Time.timeScale = 1f;   // menus em tempo real
         }
     }
 }

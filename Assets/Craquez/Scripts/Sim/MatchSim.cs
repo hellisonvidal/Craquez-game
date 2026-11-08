@@ -1567,6 +1567,13 @@ namespace Craquez.Sim
             float dir = TeamDir(p.team);
             float bxRel = ball.pos.x * dir;
             float baseX = p.basePos.x * halfLen;
+            if (mode.id == GameModes.Field && !p.isKeeper)
+            {
+                // linhas: zaga e meio alinhados na mesma altura (linha de 4 de verdade); laterais sobem um pouco no ataque
+                bool wide = Mathf.Abs(p.basePos.y) > 0.55f;
+                if (p.basePos.x <= -0.55f) baseX = -0.7f * halfLen + (attacking && wide ? halfLen * 0.12f : 0f);
+                else if (p.basePos.x <= 0.05f) baseX = -0.28f * halfLen + (p.basePos.x - (-0.28f)) * halfLen * 0.25f;
+            }
             // o bloco inteiro sobe e desce com a bola (ataque abre, defesa fecha)
             bool field = mode.id == GameModes.Field;
             float tx = baseX * (field ? 0.5f : 0.68f) + bxRel * (field ? 0.62f : 0.42f) + (attacking ? halfLen * 0.26f : -halfLen * 0.08f);
@@ -1950,7 +1957,11 @@ namespace Craquez.Sim
                 if (!frozen && p.hold > 0f)
                 {
                     p.hold -= DT;
-                    if (p.hold <= 0f) KeeperDistribute(p);
+                    p.heldT += DT;
+                    // ninguém livre: espera mais um pouco (até 4 s no futsal, 5 s nos outros)
+                    float maxHold = mode.id == GameModes.Futsal ? 3.6f : 5f;
+                    if (p.hold <= 0f && !KeeperDistribute(p, p.heldT >= maxHold)) p.hold = 0.3f;
+                    if (ball.owner != p.id) p.heldT = 0f;
                 }
                 else if (!frozen && state == MatchState.Playing) Pass(p, new Vector2(dir, 0), 0.5f, false, true);
                 return;
@@ -2113,37 +2124,67 @@ namespace Craquez.Sim
         /// mãos (rolada rasteira no curto, por cima no médio); ninguém livre ou longe = chutão de
         /// bate-pronto para o ataque (no futsal só com as mãos, como na regra).
         /// </summary>
-        void KeeperDistribute(SimPlayer p)
+        /// <summary>Menor distância de um adversário à linha do passe (quem pode cortar no caminho).</summary>
+        float LaneFree(int team, Vector2 from, Vector2 to)
+        {
+            var d = to - from;
+            float L = d.magnitude;
+            if (L < 0.1f) return 99f;
+            var u = d / L;
+            float best = 99f;
+            foreach (var o in players)
+            {
+                if (o.team == team || o.sentOff) continue;
+                float t = Vector2.Dot(o.position - from, u);
+                if (t < 1f || t > L + 1.5f) continue;
+                float side = Mathf.Abs(Vector2.Dot(o.position - from, new Vector2(-u.y, u.x)));
+                // quem está mais perto da linha e mais perto do passador chega antes da bola
+                best = Mathf.Min(best, side - Mathf.Max(0f, (L - t) * 0.04f));
+            }
+            return best;
+        }
+
+        /// <summary>
+        /// Reposição do goleiro: só entrega para quem está livre E com a linha do passe livre
+        /// (nada de rolar a bola no pé do adversário). Ninguém livre: chutão para o mais
+        /// adiantado (campo/society) ou, no futsal, o menos marcado mesmo que seja para o lado.
+        /// </summary>
+        bool KeeperDistribute(SimPlayer p, bool force = true)
         {
             float dir = TeamDir(p.team);
             bool field = mode.id == GameModes.Field;
             bool canPunt = mode.id != GameModes.Futsal;
             float throwMax = field ? 30f : mode.id == GameModes.Futsal ? halfLen * 1.4f : 20f;
-            SimPlayer best = null, far = null;
-            float bestS = float.MinValue, farS = float.MinValue;
+            float needFree = field ? 4.5f : 2.6f, needLane = field ? 2.2f : 1.5f;
+            SimPlayer best = null, far = null, safest = null;
+            float bestS = float.MinValue, farS = float.MinValue, safeS = float.MinValue;
             foreach (var m in players)
             {
-                if (m.team != p.team || m == p) continue;
+                if (m.team != p.team || m == p || m.sentOff) continue;
                 float free = float.MaxValue;
-                foreach (var o in players) if (o.team != p.team) free = Mathf.Min(free, o.position.Dist(m.position));
+                foreach (var o in players) if (o.team != p.team && !o.sentOff) free = Mathf.Min(free, o.position.Dist(m.position));
                 float d = m.position.Dist(p.position);
                 float ahead = (m.position.x - p.position.x) * dir;
+                float lane = LaneFree(p.team, p.position, m.position);
+                float safe = Mathf.Min(free, lane * 1.6f);
+                if (ahead > 0.5f && safe > safeS) { safeS = safe; safest = m; }
                 if (ahead < 2f) continue;   // nunca para trás nem para o lado colado no gol
-                // arremesso: livre e ao alcance da mão
-                if (d < throwMax)
+                if (d < throwMax && free > needFree && lane > needLane)
                 {
-                    float sc = Mathf.Min(free, 10f) - d * 0.08f + ahead * 0.03f + rng.Range(0f, 1.5f);
-                    if (free > (field ? 3.5f : 2.2f) && sc > bestS) { bestS = sc; best = m; }
+                    float sc = Mathf.Min(free, 10f) + Mathf.Min(lane, 6f) * 0.5f - d * 0.06f + ahead * 0.04f + rng.Range(0f, 1.2f);
+                    if (sc > bestS) { bestS = sc; best = m; }
                 }
-                // chutão: o mais adiantado (e menos marcado)
-                float fs = ahead * 0.1f + Mathf.Min(free, 6f) * 0.4f + rng.Range(0f, 1f);
+                // chutão: o mais adiantado e menos marcado
+                float fs = ahead * 0.1f + Mathf.Min(free, 8f) * 0.5f + rng.Range(0f, 1f);
                 if (fs > farS) { farS = fs; far = m; }
             }
-            bool punt = canPunt && (best == null || rng.Chance(field ? 0.25f : 0.15f));
-            if (!punt && best == null) best = far;
-            if (punt) Punt(p, far);
-            else if (best != null) KeeperThrow(p, best);
+            if (best == null && !force) return false;   // espera alguém se desmarcar
+            bool punt = canPunt && (best == null || rng.Chance(field ? 0.2f : 0.12f));
+            if (punt && far != null) { Punt(p, far); return true; }
+            if (best == null) best = safest ?? far;
+            if (best != null) KeeperThrow(p, best);
             else Pass(p, new Vector2(dir, rng.Range(-0.3f, 0.3f)), 0.75f, false, true);
+            return true;
         }
 
         /// <summary>Arremesso do goleiro com as mãos (rasteiro no curto, por cima no médio).</summary>
@@ -2303,13 +2344,14 @@ namespace Craquez.Sim
             // desvia de quem está perto (não se trombam nem se empurram disputando o mesmo lugar)
             if (!hasBall && !p.isKeeper && ctrl[p.team].player != p.id && p.id != passReceiver && !(setPiece && !kickIn))
             {
-                float R = mode.id == GameModes.Field ? 2.6f : 1.6f;
+                float R = mode.id == GameModes.Field ? 3.2f : 2.0f;
                 var sep = Vector2.zero;
                 foreach (var m in players)
                 {
-                    if (m == p || m.team != p.team) continue;
-                    var d = p.position - m.position;
-                    float l = d.magnitude;
+                    if (m == p || m.team != p.team || m.sentOff) continue;
+                    // prevê ~0,35 s à frente: desvia antes de cruzar a corrida do companheiro
+                    var d = (p.position + p.vel * 0.35f) - (m.position + m.vel * 0.35f);
+                    float l = Mathf.Min(d.magnitude, (p.position - m.position).magnitude + 0.5f);
                     // quem está com a bola ou sob controle do jogador não desvia: os outros abrem mais espaço para ele
                     bool lead = m.id == ball.owner || ctrl[m.team].player == m.id;
                     float rr = lead ? R * 1.5f : R;
@@ -2438,14 +2480,25 @@ namespace Craquez.Sim
             {
                 // respeitam a distância até a cobrança
                 var d = p.position - setPieceSpot;
-                if (d.magnitude < mode.restartDist - 0.2f) p.position = setPieceSpot + (d.magnitude > 0.1f ? d.normalized : new Vector2(TeamDir(setPieceTeam), 0f)) * (mode.restartDist - 0.2f);
+                if (d.magnitude < mode.restartDist - 0.2f)
+                {
+                    var outN = d.magnitude > 0.1f ? d.normalized : new Vector2(TeamDir(setPieceTeam), 0f);
+                    p.position = setPieceSpot + outN * (mode.restartDist - 0.2f);
+                    float vin = Vector2.Dot(p.vel, -outN);
+                    if (vin > 0f) p.vel += outN * vin;   // parado na distância, sem correr no lugar
+                }
             }
             if (kickoffPass && kickoffKicker >= 0 && p.team != players[kickoffKicker].team)
             {
                 // adversários fora do círculo central até a bola rolar
                 float rr = mode.centerR + 0.3f;
                 if (p.position.magnitude < rr)
+                {
                     p.position = p.position.magnitude > 0.1f ? p.position.normalized * rr : new Vector2(-TeamDir(p.team) * rr, 0f);
+                    var on = p.position.normalized;
+                    float vin = Vector2.Dot(p.vel, -on);
+                    if (vin > 0f) p.vel += on * vin;
+                }
             }
             float m = mode.runMargin, r = SimPlayer.Radius;
             p.position.x = Mathf.Clamp(p.position.x, -halfLen - m + r, halfLen + m - r);
@@ -2518,6 +2571,11 @@ namespace Craquez.Sim
                         else if (b.isKeeper && !a.isKeeper) wa = b.hold > 0f ? 1f : 0.8f;
                         a.position -= push * 2f * wa;
                         b.position += push * 2f * (1f - wa);
+                        // ninguém fica "correndo parado" empurrando o outro: some a velocidade contra o contato
+                        var nn = d / l;
+                        float va = Vector2.Dot(a.vel, nn), vb = Vector2.Dot(b.vel, -nn);
+                        if (va > 0f) a.vel -= nn * va * (a.team == b.team ? 1f : 0.6f);
+                        if (vb > 0f) b.vel += nn * vb * (a.team == b.team ? 1f : 0.6f);
                     }
                 }
             }

@@ -621,6 +621,40 @@ namespace Craquez.Tests
             Assert.AreNotEqual(off.id, sim.ball.owner);
         }
 
+        /// <summary>Reposição do goleiro: a bola chega a um companheiro (não no pé do adversário).</summary>
+        [TestCase("field")]
+        [TestCase("futsal")]
+        public void KeeperDistributionReachesTeammate(string mode)
+        {
+            int ok = 0, total = 0;
+            for (uint seed = 1; seed <= 12; seed++)
+            {
+                var sim = NewMatch(mode, seed);
+                var a = new CpuBrain(0, 0.7f); var b = new CpuBrain(1, 0.7f);
+                for (int i = 0; i < 60 * 6; i++) sim.Step(new[] { a.MakeInput(sim), b.MakeInput(sim) });
+                sim.kickoffPass = false;
+                var gk = sim.players.Find(x => x.team == 0 && x.isKeeper);
+                sim.state = MatchState.Playing;
+                sim.ball.owner = gk.id; gk.hold = 1.2f; gk.heldT = 0f;
+                sim.ball.pos = gk.position; sim.ball.vel = Vector2.zero;
+                bool released = false;
+                for (int i = 0; i < 60 * 9; i++)
+                {
+                    sim.Step(new[] { a.MakeInput(sim), b.MakeInput(sim) });
+                    if (!released && sim.ball.owner != gk.id) released = true;
+                    if (released && sim.ball.owner >= 0 && sim.ball.owner != gk.id)
+                    {
+                        total++;
+                        if (sim.players[sim.ball.owner].team == 0) ok++;
+                        break;
+                    }
+                }
+            }
+            System.Console.WriteLine($"[reposição {mode}] {ok}/{total} para o companheiro");
+            Assert.Greater(total, 2);
+            Assert.GreaterOrEqual(ok / (float)total, 0.75f, "o goleiro entrega a bola ao adversário");
+        }
+
         [Test] public void JsonRoundTrip()
         {
             var o = MiniJson.Parse("{\"a\": [1, 2.5, \"x\\n\"], \"b\": {\"c\": true, \"d\": null}}");

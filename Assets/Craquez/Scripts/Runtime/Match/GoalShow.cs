@@ -265,7 +265,7 @@ namespace Craquez
             if (!_wide)
             {
                 _wide = true;
-                Time.timeScale = 1f;
+                Time.timeScale = MatchController.GameSpeed;
                 RestoreLive();
                 _view.SnapAll();
                 foreach (var a in _view.athletes)
@@ -306,7 +306,7 @@ namespace Craquez
 
         void Finish()
         {
-            Time.timeScale = 1f;
+            Time.timeScale = MatchController.GameSpeed;
             RestoreLive();
             _sim.events.Clear();
             _view.SnapAll();
