@@ -92,7 +92,8 @@ namespace Craquez
             if (st.scene == 0) { if (quality >= 1) City(v, hl, hw, tier, night, seed); }
             else Scenery(v, hl, hw, st, night, seed, quality);
             v.tunnel = new Vector3(0, 0, -(hw + 6f));
-            Entrance(v, v.tunnel.z - 3.5f, homeKit.c1, true, night);
+            // os vestiários ficam no térreo da tribuna central (fachada alinhada com a frente da arquibancada)
+            Entrance(v, -(hw + 7.5f - 0.35f), homeKit.c1, true, night);
             return v;
         }
 
@@ -516,11 +517,13 @@ namespace Craquez
             for (int b = 0; b < 3; b++)
                 bannerMats[b] = Gfx.Lit(Color.white, Gfx.Banner(b == 1 ? homeKit.c2 : homeKit.c1, b == 1 ? homeKit.c1 : homeKit.c2, words[(pseed + b * 3) % words.Length], pseed + b), 0.1f);
             v.standDist = gapZ;
+            int rowsAll = rows;
             for (int side = 0; side < 4; side++)
             {
-                // lado 0 é o da câmera de TV: lá só há a pista e os bancos (a arquibancada tapava o campo)
-                if (side == 0) continue;
-                if (side >= 2 && !style.ends) continue;   // estádio só com as laterais: atrás dos gols, aberto
+                // estrutura completa: as quatro arquibancadas. A do lado da câmera de TV some sozinha
+                // quando tapa a visão (BroadcastCamera.SetOccluders) e aparece nas outras câmeras e cenas.
+                // Estádios "só laterais" ganham arquibancadas menores atrás dos gols.
+                rows = side >= 2 && !style.ends ? Mathf.Max(8, rowsAll / 2) : rowsAll;
                 bool longSide = side < 2;
                 float len = longSide ? (hl + gapX) * 2f : (hw + gapZ) * 2f;
                 float dist = longSide ? hw + gapZ : hl + gapX;
@@ -598,10 +601,13 @@ namespace Craquez
                     gr.transform.localRotation = Quaternion.Euler(0, yaw, 0);
                 }
             }
-            // cantos: blocos de concreto preenchendo (bacia: com torcida e cobertura)
-            if (!style.ends) return;
-            for (int c = 0; c < 2; c++)   // só os cantos do fundo (os da frente tapariam a câmera)
+            rows = rowsAll;
+            // tribuna central do lado da câmera: vestiários embaixo, camarotes e imprensa em cima
+            Pavilion(v, hl, hw, gapZ, rows, step, rise, style, homeKit, night, quality);
+            // cantos: os quatro fechados (bacia: com torcida e cobertura; os outros, blocos de concreto)
+            for (int c = 0; c < 4; c++)
             {
+                float szc = c < 2 ? 1f : -1f;
                 if (style.corners)
                 {
                     // canto em degraus com torcida, ligando a lateral ao fundo
@@ -614,13 +620,13 @@ namespace Craquez
                         float dx = hl + gapX + r * step, dz = hw + gapZ + r * step;
                         // diagonal do canto: de (dx, dz - 0) até (dx - 0, dz)
                         if (r == 0) continue;
-                        var P = new Vector3(sxc * (hl + gapX - 0.2f), y0, dz);          // lado da lateral
-                        var Q = new Vector3(sxc * dx, y0, hw + gapZ - 0.2f);            // lado do fundo
+                        var P = new Vector3(sxc * (hl + gapX - 0.2f), y0, szc * dz);          // lado da lateral
+                        var Q = new Vector3(sxc * dx, y0, szc * (hw + gapZ - 0.2f));            // lado do fundo
                         var uv = RowUV(r, r * step * 1.41f, tw, 512);
                         // espelho virado para o campo (ordem dos vértices depende do canto)
-                        if (sxc > 0) ck.Quad(Q, P, P + Vector3.up * rise, Q + Vector3.up * rise, uv.a, uv.b);
+                        if (sxc * szc > 0) ck.Quad(Q, P, P + Vector3.up * rise, Q + Vector3.up * rise, uv.a, uv.b);
                         else ck.Quad(P, Q, Q + Vector3.up * rise, P + Vector3.up * rise, uv.a, uv.b);
-                        var P2 = P + new Vector3(0, rise, step);
+                        var P2 = P + new Vector3(0, rise, szc * step);
                         var Q2 = Q + new Vector3(sxc * step, rise, 0);
                         cb.Quad(P + Vector3.up * rise, Q + Vector3.up * rise, Q2, P2);
                         cb.Quad(P2, Q2, Q + Vector3.up * rise, P + Vector3.up * rise);
@@ -631,16 +637,46 @@ namespace Craquez
                     {
                         var rk = new MeshKit();
                         float ry = 1.1f + rows * rise + 6f;
-                        rk.Box(new Vector3(sxc * (hl + gapX + rows * step * 0.5f), ry, hw + gapZ + rows * step * 0.5f), new Vector3(rows * step * 1.1f, 0.6f, rows * step * 1.1f));
+                        rk.Box(new Vector3(sxc * (hl + gapX + rows * step * 0.5f), ry, szc * (hw + gapZ + rows * step * 0.5f)), new Vector3(rows * step * 1.1f, 0.6f, rows * step * 1.1f));
                         rk.Object("Cobertura do canto " + c, Gfx.Emissive(style.roofC, night ? new Color(0.1f, 0.1f, 0.11f) : new Color(0.16f, 0.17f, 0.18f)), v.root, true);
                     }
                 }
                 var k = new MeshKit();
-                float sx = c % 2 == 0 ? 1 : -1, sz = 1;
+                float sx = c % 2 == 0 ? 1 : -1, sz = szc;
                 float cx = (hl + gapX + rows * step * 0.5f) * sx, cz = (hw + gapZ + rows * step * 0.5f) * sz;
                 k.Box(new Vector3(cx, (1.1f + rows * rise) * 0.5f, cz), new Vector3(rows * step, 1.1f + rows * rise, rows * step), 4f);
                 k.Object("Canto " + c, concrete, v.root, quality >= 1);
             }
+        }
+
+        /// <summary>
+        /// Prédio central do lado da câmera (onde fica o túnel): vestiários no térreo, faixa de camarotes
+        /// envidraçados, cabine de imprensa e o nome do estádio no alto. Ocupa o vão no meio da arquibancada.
+        /// </summary>
+        static void Pavilion(Venue v, float hl, float hw, float gapZ, int rows, float step, float rise, StadiumStyle st, Kit homeKit, bool night, int quality)
+        {
+            float W = 26f, front = hw + gapZ - 0.3f, back = hw + gapZ + rows * step + 1.5f;
+            float top = 1.1f + rows * rise + 3.2f;
+            var body = new MeshKit();
+            body.Box(new Vector3(0, top / 2f, -(front + back) / 2f), new Vector3(W, top, back - front), 3f);
+            // laje entre os andares (sombra marcada na fachada)
+            for (float y = 7f; y < top - 2f; y += 4.2f)
+                body.Box(new Vector3(0, y, -front + 0.25f), new Vector3(W + 0.4f, 0.35f, 0.6f));
+            // pilares da fachada
+            for (int i = 0; i <= 6; i++)
+                body.Box(new Vector3(-W / 2f + i * W / 6f, top / 2f, -front + 0.3f), new Vector3(0.6f, top, 0.7f));
+            var structure = st.structure.a > 0f ? st.structure : new Color(0.55f, 0.56f, 0.6f);
+            body.Object("Tribuna central", Gfx.Lit(Color.Lerp(structure, Color.white, 0.12f), Gfx.Asphalt(256, Color.white, 29, 0.04f), 0.25f), v.root, quality >= 1);
+            // camarotes e imprensa: faixas de vidro iluminadas (à noite, acesas)
+            var glass = new MeshKit();
+            for (float y = 7.35f; y < top - 2.6f; y += 4.2f)
+                glass.Quad(new Vector3(-W / 2f + 0.4f, y, -front + 0.02f), new Vector3(-W / 2f + 0.4f, y + 3.4f, -front + 0.02f), new Vector3(W / 2f - 0.4f, y + 3.4f, -front + 0.02f), new Vector3(W / 2f - 0.4f, y, -front + 0.02f));
+            var glow = night ? new Color(1f, 0.9f, 0.7f) * 0.55f : new Color(0.06f, 0.1f, 0.15f);
+            glass.Object("Camarotes", Gfx.Emissive(new Color(0.12f, 0.2f, 0.3f), glow), v.root, false);
+            // faixa na cor do clube e o nome no alto da tribuna
+            var band = new MeshKit();
+            band.Box(new Vector3(0, top - 1.1f, -front + 0.1f), new Vector3(W, 1.6f, 0.5f));
+            band.Object("Faixa da tribuna", Gfx.Lit(homeKit.c1, null, 0.3f), v.root, false);
         }
 
         static void Floodlights(Venue v, float hl, float hw, int tier, bool night, StadiumStyle st = default)
@@ -734,7 +770,7 @@ namespace Craquez
             // túnel inflável/sanfonado: arcos na cor do time, aberto do lado do campo
             var tun = new MeshKit();
             var ribs = new MeshKit();
-            float tl = 4.8f, r = doorW / 2 + 0.2f;   // (termina antes das placas)
+            float tl = 2.6f, r = doorW / 2 + 0.2f;   // (termina antes das placas)
             int seg = 10;
             for (int i = 0; i < seg; i++)
             {
@@ -1055,18 +1091,30 @@ namespace Craquez
             {
                 var st = new MeshKit();
                 var stc = new MeshKit();
-                int rows = sz > 0 ? 11 : 4;
+                // lado da câmera também com arquibancada (some quando tapa a visão), com o vão da
+                // porta dos vestiários no meio
+                int rows = sz > 0 ? 11 : 7;
                 float start = hw + 4.2f, sx = hl + 3f;
-                for (int r = 0; r < rows; r++)
+                var segs = sz > 0 ? new[] { (-sx, sx) } : new[] { (-sx, -4.6f), (4.6f, sx) };
+                foreach (var (xa, xb) in segs)
+                    for (int r = 0; r < rows; r++)
+                    {
+                        float y0 = 1.0f + r * 0.45f, y1 = y0 + 0.45f, d0 = start + r * 0.85f, d1 = d0 + 0.85f;
+                        var A = new Vector3(xa, y0, d0 * sz); var B = new Vector3(xb, y0, d0 * sz);
+                        var C = new Vector3(xb, y1, d0 * sz); var Dd = new Vector3(xa, y1, d0 * sz);
+                        var ruv = RowUV(r, xb - xa, 1024, 256);
+                        if (sz > 0) st.Quad(B, A, Dd, C, ruv.a, ruv.b);
+                        else st.Quad(A, B, C, Dd, ruv.a, ruv.b);
+                        var E = new Vector3(xa, y1, d1 * sz); var F = new Vector3(xb, y1, d1 * sz);
+                        if (sz > 0) stc.Quad(Dd, E, F, C); else stc.Quad(C, F, E, Dd);   // piso dos degraus voltado para cima
+                    }
+                if (sz < 0)
                 {
-                    float y0 = 1.0f + r * 0.45f, y1 = y0 + 0.45f, d0 = start + r * 0.85f, d1 = d0 + 0.85f;
-                    var A = new Vector3(-sx, y0, d0 * sz); var B = new Vector3(sx, y0, d0 * sz);
-                    var C = new Vector3(sx, y1, d0 * sz); var Dd = new Vector3(-sx, y1, d0 * sz);
-                    var ruv = RowUV(r, sx * 2f, 1024, 256);
-                    if (sz > 0) st.Quad(B, A, Dd, C, ruv.a, ruv.b);
-                    else st.Quad(A, B, C, Dd, ruv.a, ruv.b);
-                    var E = new Vector3(-sx, y1, d1 * sz); var F = new Vector3(sx, y1, d1 * sz);
-                    if (sz > 0) stc.Quad(Dd, E, F, C); else stc.Quad(C, F, E, Dd);   // piso dos degraus voltado para cima
+                    // laterais do vão (paredes de concreto dos dois lados da porta) e a laje por cima
+                    float far = start + rows * 0.85f, topY = 1.0f + rows * 0.45f;
+                    foreach (float ex in new[] { -4.6f, 4.6f })
+                        stc.Box(new Vector3(ex, topY / 2f, -(start + far) / 2f), new Vector3(0.3f, topY, far - start));
+                    stc.Box(new Vector3(0, topY - 0.2f, -(start + far) / 2f - 0.6f), new Vector3(9.5f, 0.4f, far - start - 1.2f));
                 }
                 st.Object("Torcida", cm, v.root, false);
                 stc.Object("Degraus", concrete, v.root, false);

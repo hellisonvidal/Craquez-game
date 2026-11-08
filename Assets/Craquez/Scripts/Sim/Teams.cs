@@ -458,15 +458,38 @@ namespace Craquez.Sim
                         }
                     }
                     string crest = MiniJson.S(o, "crest", "");
-                    if (crest != "" && File.Exists(Path.Combine(dir, crest)))
+                    byte[] png = null;
+                    if (crest.StartsWith("data:image"))
                     {
-                        var tex = new Texture2D(2, 2);
-                        if (tex.LoadImage(File.ReadAllBytes(Path.Combine(dir, crest)))) _crests[i] = tex;
+                        // escudo embutido no próprio option file (um arquivo só, sem a pasta crests/)
+                        int comma = crest.IndexOf(',');
+                        try { if (comma > 0) png = System.Convert.FromBase64String(crest.Substring(comma + 1)); } catch { png = null; }
+                    }
+                    else if (crest != "")
+                    {
+                        try { if (File.Exists(Path.Combine(dir, crest))) png = File.ReadAllBytes(Path.Combine(dir, crest)); } catch { png = null; }
+                    }
+                    if (png != null)
+                    {
+                        var tex = new Texture2D(2, 2, TextureFormat.RGBA32, true) { wrapMode = TextureWrapMode.Clamp };
+                        if (tex.LoadImage(png)) _crests[i] = tex;
                     }
                     OverrideCount++;
                 }
                 return;
             }
+        }
+
+        /// <summary>Ordena índices de times pelo nome (ordem alfabética, sem diferenciar acentos/maiúsculas).</summary>
+        public static void SortByName(List<int> ids)
+        {
+            var cmp = System.Globalization.CultureInfo.InvariantCulture.CompareInfo;
+            const System.Globalization.CompareOptions o = System.Globalization.CompareOptions.IgnoreCase | System.Globalization.CompareOptions.IgnoreNonSpace;
+            ids.Sort((a, b) =>
+            {
+                int c = cmp.Compare(Get(a)?.name ?? "", Get(b)?.name ?? "", o);
+                return c != 0 ? c : a.CompareTo(b);
+            });
         }
 
         /// <summary>
@@ -476,15 +499,21 @@ namespace Craquez.Sim
         public static Dictionary<string, object> OptionDocument(Dictionary<string, object> extras = null)
         {
             Ensure();
+            // times em ordem alfabética dentro de cada liga
             var leagues = new List<object>();
+            var order = new List<TeamData>();
             foreach (var lg in _leagues)
             {
+                var idx = new List<int>();
+                for (int i = 0; i < lg.count; i++) idx.Add(lg.first + i);
+                SortByName(idx);
                 var ids = new List<object>();
-                for (int i = 0; i < lg.count; i++) ids.Add(_flat[lg.first + i].Key);
+                foreach (int i in idx) { ids.Add(_flat[i].Key); order.Add(_flat[i]); }
                 leagues.Add(new Dictionary<string, object> { ["id"] = lg.id, ["name"] = lg.name, ["teams"] = ids });
             }
+            foreach (var t in _flat) if (!order.Contains(t)) order.Add(t);
             var teams = new Dictionary<string, object>();
-            foreach (var t in _flat)
+            foreach (var t in order)
             {
                 var kits = new List<object>();
                 foreach (var k in t.kits)

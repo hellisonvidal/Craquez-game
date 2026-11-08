@@ -369,7 +369,7 @@ namespace Craquez
             dim.rectTransform.Place(0, 0, 1, 1);
             _pauseMenu = dim.gameObject;
             var panel = UiKit.Panel(dim.transform).rectTransform.At(0.5f, 0.5f, 860, 900);
-            string title = page == 0 ? "PAUSA" : page == 1 ? "CONFIGURAÇÕES" : "EQUIPES";
+            string title = page == 0 ? "PAUSA" : page == 1 ? "CONFIGURAÇÕES" : page == 11 ? "CÂMERA" : page == 12 ? "SOM" : page == 13 ? "JOGO E GRÁFICOS" : "EQUIPES";
             UiKit.Label(panel, title, 60, Theme.HeadItalic, Theme.Accent, TextAnchor.MiddleCenter).rectTransform.Place(0, 1, 1, 1, 0, -110, 0, 20);
             var list = UiKit.Rect(panel, "lista").Place(0, 0, 1, 1, 50, 120, 50, 130);
             UiKit.VList(list, 12, 0, false);
@@ -378,7 +378,7 @@ namespace Craquez
             {
                 first = UiKit.Button(list, "Continuar", Resume);
                 UiKit.Size(first, 76, 76);
-                UiKit.Size(UiKit.Button(list, "Configurações gerais", () => PausePage(1)), 76, 76);
+                UiKit.Size(UiKit.Button(list, "Configurações", () => PausePage(1)), 76, 76);
                 UiKit.Size(UiKit.Button(list, "Equipes e táticas", () => PausePage(2)), 76, 76);
                 UiKit.Size(UiKit.Button(list, "Substituições", () => SubsPage(-1)), 76, 76);
                 UiKit.Size(UiKit.Button(list, "Reiniciar partida", () => { Resume(); onRestart?.Invoke(cfg); }), 76, 76);
@@ -389,18 +389,37 @@ namespace Craquez
             }
             else if (page == 1)
             {
+                // submenus das configurações
+                first = UiKit.Button(list, "Câmera", () => PausePage(11));
+                UiKit.Size(first, 76, 76);
+                UiKit.Size(UiKit.Button(list, "Som e vibração", () => PausePage(12)), 76, 76);
+                UiKit.Size(UiKit.Button(list, "Jogo e gráficos", () => PausePage(13)), 76, 76);
+                UiKit.Size(UiKit.Button(list, "‹  Voltar", MenuHome), 76, 76);
+            }
+            else if (page == 11)
+            {
                 first = UiKit.Cycler(list, "Câmera", BroadcastCamera.OfferedNames, BroadcastCamera.ToOffered(view.bcam.mode), i => { view.bcam.mode = BroadcastCamera.FromOffered(i); Settings.Camera = view.bcam.mode; });
                 UiKit.Size(first, 72, 72);
                 UiKit.Size(UiKit.Cycler(list, "Zoom", BroadcastCamera.Zooms, view.bcam.zoom + 2, i => { view.bcam.zoom = i - 2; Settings.CameraZoom = i - 2; }), 72, 72);
-                UiKit.Size(UiKit.Cycler(list, "Gráficos", Settings.QualityNames, Settings.Quality, i => { Settings.Quality = i; UrpSetup.Quality(i); UrpSetup.Camera(_cam, i); }), 72, 72);
+                UiKit.Size(UiKit.Button(list, "‹  Voltar", () => PausePage(1)), 72, 72);
+            }
+            else if (page == 12)
+            {
                 var vols = new List<string>();
                 for (int i = 0; i <= 10; i++) vols.Add(i * 10 + "%");
-                UiKit.Size(UiKit.Cycler(list, "Volume", vols, Mathf.RoundToInt(Settings.Volume * 10), i => Settings.Volume = i / 10f), 72, 72);
-                UiKit.Size(UiKit.Cycler(list, "Nomes dos atletas", Settings.PlayerTagNames, Settings.PlayerTags, i => Settings.PlayerTags = i), 72, 72);
+                first = UiKit.Cycler(list, "Volume", vols, Mathf.RoundToInt(Settings.Volume * 10), i => Settings.Volume = i / 10f);
+                UiKit.Size(first, 72, 72);
                 UiKit.Size(UiKit.Cycler(list, "Vibração", new[] { "Ligada", "Desligada" }, Settings.Vibration ? 0 : 1, i => Settings.Vibration = i == 0), 72, 72);
+                UiKit.Size(UiKit.Button(list, "‹  Voltar", () => PausePage(1)), 72, 72);
+            }
+            else if (page == 13)
+            {
+                first = UiKit.Cycler(list, "Nomes dos atletas", Settings.PlayerTagNames, Settings.PlayerTags, i => Settings.PlayerTags = i);
+                UiKit.Size(first, 72, 72);
+                UiKit.Size(UiKit.Cycler(list, "Gráficos", Settings.QualityNames, Settings.Quality, i => { Settings.Quality = i; UrpSetup.Quality(i); UrpSetup.Camera(_cam, i); }), 72, 72);
                 if (cfg.mode != GameModes.Futsal)
                     UiKit.Size(UiKit.Cycler(list, "Clima dinâmico", new[] { "Ligado", "Desligado" }, view.weather.dynamic ? 0 : 1, i => view.weather.dynamic = i == 0), 72, 72);
-                UiKit.Size(UiKit.Button(list, "‹  Voltar", MenuHome), 72, 72);
+                UiKit.Size(UiKit.Button(list, "‹  Voltar", () => PausePage(1)), 72, 72);
             }
             else
             {
@@ -529,7 +548,7 @@ namespace Craquez
             UiKit.Size(go, 84, 84);
             UiKit.Size(UiKit.Button(list, "Substituições", () => SubsPage(-1)), 76, 76);
             UiKit.Size(UiKit.Button(list, "Equipes e táticas", () => PausePage(2)), 76, 76);
-            UiKit.Size(UiKit.Button(list, "Configurações gerais", () => PausePage(1)), 76, 76);
+            UiKit.Size(UiKit.Button(list, "Configurações", () => PausePage(1)), 76, 76);
             UiKit.Select(go);
         }
 

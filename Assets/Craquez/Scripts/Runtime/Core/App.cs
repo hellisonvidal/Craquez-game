@@ -554,8 +554,8 @@ namespace Craquez
             return btn;
         }
 
-        /// <summary>Menu principal: Jogar, Competições, Mural de Troféus e Configurações.</summary>
-        static Texture2D _settingsArt;
+        /// <summary>Menu principal: Jogar, Competições (com o mural de troféus), Option file e Configurações.</summary>
+        static Texture2D _settingsArt, _optionArt;
 
         void ShowModes()
         {
@@ -568,10 +568,9 @@ namespace Craquez
             var wc = Competitions.All[0];
             int titles = Trophies().Count;
             var play = BigCard(grid, "JOGAR", "AMISTOSO", "Campo, futsal, society e rua", ModeArt(MenuArt.Kind.Field), 512f / 560f, new Color(0.13f, 0.77f, 0.37f), ShowPlay);
-            BigCard(grid, "COMPETIÇÕES", Competitions.All.Length + " COMPETIÇÕES", "Ligas, copas e torneios de seleções", TrophyArt.Texture(wc.trophy, wc.c1, wc.c2, 512), 1f, new Color(0.98f, 0.7f, 0.15f), ShowCompetitions);
-            var lc = Competitions.All[4];
-            BigCard(grid, "MURAL DE TROFÉUS", titles + (titles == 1 ? " TÍTULO" : " TÍTULOS"), "As suas conquistas", TrophyArt.Texture(lc.trophy, lc.c1, lc.c2, 512, titles == 0), 1f, new Color(0.85f, 0.55f, 0.2f), ShowTrophyWall);
-            BigCard(grid, "CONFIGURAÇÕES", "OPÇÕES", "Som, câmera, gráficos e option file", _settingsArt ??= MenuArt.SettingsArt(), 512f / 560f, new Color(0.35f, 0.5f, 0.9f), ShowOptions);
+            BigCard(grid, "COMPETIÇÕES", titles > 0 ? titles + (titles == 1 ? " TÍTULO" : " TÍTULOS") : Competitions.All.Length + " COMPETIÇÕES", "Ligas, copas, seleções e mural de troféus", TrophyArt.Texture(wc.trophy, wc.c1, wc.c2, 512), 1f, new Color(0.98f, 0.7f, 0.15f), ShowCompetitions);
+            BigCard(grid, "OPTION FILE", Teams.OverrideCount > 0 ? Teams.OverrideCount + " TIMES EDITADOS" : "ORIGINAL", "Times, elencos, uniformes e escudos", _optionArt ??= MenuArt.Venue(GameModes.Field, 2, new Color(0.55f, 0.35f, 0.95f), 640, 560), 640f / 560f, new Color(0.62f, 0.4f, 0.98f), ShowOptionFile);
+            BigCard(grid, "CONFIGURAÇÕES", "OPÇÕES", "Som, câmera, partida e vídeo", _settingsArt ??= MenuArt.SettingsArt(), 512f / 560f, new Color(0.35f, 0.5f, 0.9f), ShowOptions);
             // sair do jogo sem precisar fechar o app à força (também pelo voltar do menu principal)
             var quit = UiKit.Button(root, "SAIR DO JOGO", ConfirmQuit, 28, new Color(0.55f, 0.1f, 0.14f));
             quit.GetComponent<RectTransform>().At(1, 0, 300, 62, -90, 112);
@@ -870,6 +869,7 @@ namespace Craquez
                 {
                     var ids = new List<int>();
                     for (int i = 0; i < l.count; i++) ids.Add(l.first + i);
+                    Teams.SortByName(ids);   // ordem alfabética dentro da liga
                     groups.Add((l.name, ids));
                 }
             Selectable first = null;
@@ -883,6 +883,11 @@ namespace Craquez
                 float tx = 30f;
                 var name = UiKit.Label(col, "", 46, Theme.HeadItalic, Theme.Text);
                 name.rectTransform.Place(0, 1, 1, 1, tx, -150, 250, 70);
+                // escudo: só o que vem do option file (escudo real); sem ele, nada
+                var crestImg = UiKit.Image(col, Color.white, null, "escudo");
+                crestImg.rectTransform.At(0, 1, 84, 84, 30, -66);
+                crestImg.preserveAspect = true;
+                crestImg.raycastTarget = false;
                 var info = UiKit.Label(col, "", 22, Theme.Body, Theme.TextDim);
                 info.rectTransform.Place(0, 1, 1, 1, tx, -250, 250, 150);
                 var kitRow = UiKit.Rect(col, "uniforme").Place(0, 1, 1, 1, 30, -300, 250, 250);
@@ -901,6 +906,10 @@ namespace Craquez
                 {
                     var t = Teams.Get(Team());
                     name.text = t.name;
+                    var ct = Teams.Crest(Team());
+                    crestImg.gameObject.SetActive(ct != null);
+                    if (ct != null) crestImg.sprite = Craquez.UI.Crest.Badge(Team());
+                    name.rectTransform.Place(0, 1, 1, 1, ct != null ? tx + 100f : tx, -150, 250, 70);
                     int ovr = 0;
                     foreach (var r in t.roster) ovr += r.ovr;
                     ovr = t.roster.Count > 0 ? ovr / t.roster.Count : Mathf.RoundToInt(t.rating * 100);
@@ -1132,9 +1141,9 @@ namespace Craquez
         /// <summary>Navegador de pastas para escolher o option file (.json). dir nulo = lugares.</summary>
         void ShowBrowse(string dir)
         {
-            var root = Page("OPÇÕES  ›  OPTION FILE");
+            var root = Page("OPTION FILE  ›  CARREGAR");
             _browsing = dir == null;
-            _back = () => { if (dir == null) ShowOptions(); else ShowBrowse(Parent(dir)); };
+            _back = () => { if (dir == null) ShowOptionFile(); else ShowBrowse(Parent(dir)); };
             Title(root, "CARREGAR OPTION FILE", dir ?? "Escolha onde procurar o arquivo .json");
             var listBg = UiKit.Panel(root).rectTransform.Place(0, 0, 1, 1, 90, 200, 90, 250);
             var scroll = listBg.gameObject.AddComponent<ScrollRect>();
@@ -1177,7 +1186,7 @@ namespace Craquez
                     {
                         PlayerPrefs.DeleteKey(OptionKey);
                         ReloadOptionFile();
-                        ShowOptions();
+                        ShowOptionFile();
                     });
             }
             else
@@ -1288,7 +1297,7 @@ namespace Craquez
                 if (prev == "") PlayerPrefs.DeleteKey(OptionKey); else PlayerPrefs.SetString(OptionKey, prev);
                 PlayerPrefs.SetInt(OptionOffKey, prevOff);
                 ReloadOptionFile();
-                var r = Page("OPÇÕES  ›  OPTION FILE");
+                var r = Page("OPTION FILE  ›  CARREGAR");
                 _back = () => ShowBrowse(System.IO.Path.GetDirectoryName(path));
                 Title(r, "ARQUIVO INVÁLIDO", System.IO.Path.GetFileName(path) + " não é um option file do Craquez");
                 var ok = UiKit.Button(r, "Voltar", () => ShowBrowse(System.IO.Path.GetDirectoryName(path)), 34);
@@ -1296,17 +1305,31 @@ namespace Craquez
                 UiKit.Select(ok);
                 return;
             }
-            ShowOptions();
+            ShowOptionFile();
         }
 
         // ------------------------------------------------------------ opções
         System.Collections.Generic.Dictionary<string, object> _optSnap;
 
-        void ShowOptions()
+        /// <summary>Abas das configurações (submenus): som, câmera, partida e vídeo.</summary>
+        static readonly string[] OptionTabs = { "SOM", "CÂMERA", "PARTIDA", "VÍDEO" };
+        static readonly string[] OptionTabInfo =
         {
-            var root = Page("OPÇÕES");
+            "Volume, música dos menus e vibração",
+            "Câmera da partida e zoom",
+            "Nomes dos atletas e cobranças de falta",
+            "Qualidade, tela, resolução e efeitos",
+        };
+        int _optTab;
+
+        void ShowOptions() => ShowOptions(0, true);
+
+        void ShowOptions(int tab, bool fresh)
+        {
+            _optTab = Mathf.Clamp(tab, 0, OptionTabs.Length - 1);
+            var root = Page("CONFIGURAÇÕES  ›  " + OptionTabs[_optTab]);
             // as mudanças aparecem na hora (prévia); SALVAR guarda, CANCELAR (ou voltar) desfaz tudo
-            _optSnap = Settings.Snapshot();
+            if (fresh || _optSnap == null) _optSnap = Settings.Snapshot();
             void Apply() { UrpSetup.Quality(Settings.Quality); UrpSetup.Camera(cam, Settings.Quality); }
             void Cancel()
             {
@@ -1317,71 +1340,114 @@ namespace Craquez
                 Apply();
                 if (screen) GoFullscreen();
                 Sfx.MenuMusic(true);
+                _optSnap = null;
                 ShowModes();
             }
             void Save()
             {
                 PlayerPrefs.Save();
-                _optSnap = Settings.Snapshot();
+                _optSnap = null;
                 ShowModes();
             }
             _back = Cancel;
-            Title(root, "OPÇÕES", "As mudanças aparecem na hora: SALVAR guarda, CANCELAR desfaz");
+            Title(root, "CONFIGURAÇÕES", "As mudanças aparecem na hora: SALVAR guarda, CANCELAR desfaz");
             var save = UiKit.Button(root, "SALVAR", Save, 34, new Color(0.1f, 0.6f, 0.3f));
             save.GetComponent<RectTransform>().At(1, 0, 260, 80, -74, 82);
             var cancel = UiKit.Button(root, "CANCELAR", Cancel, 34, new Color(0.6f, 0.14f, 0.18f));
             cancel.GetComponent<RectTransform>().At(1, 0, 260, 80, -350, 82);
-            // coluna 1: jogo e som
-            UiKit.Panel(root).rectTransform.Place(0, 0, 0.48f, 1, 74, 178, 0, 262);
-            UiKit.Panel(root).rectTransform.Place(0.5f, 0, 1, 1, 0, 178, 74, 262);
-            // colunas com rolagem: em qualquer tela todas as opções ficam ao alcance
-            var list = Scroll(UiKit.Rect(root, "geral").Place(0, 0, 0.48f, 1, 76, 180, 2, 264), 6f);
-            UiKit.Label(list, "JOGO", 26, Theme.Head, Theme.Accent).gameObject.AddComponent<LayoutElement>().minHeight = 34;
-            var vols = new List<string>();
-            for (int i = 0; i <= 10; i++) vols.Add(i * 10 + "%");
-            var first = UiKit.Cycler(list, "Volume", vols, Mathf.RoundToInt(Settings.Volume * 10), i => Settings.Volume = i / 10f);
-            UiKit.Size(first, 50, 50);
-            if (Application.isMobilePlatform)
-                UiKit.Size(UiKit.Cycler(list, "Vibração", new[] { "Ligada", "Desligada" }, Settings.Vibration ? 0 : 1, i => Settings.Vibration = i == 0), 50, 50);
-                UiKit.Size(UiKit.Cycler(list, "Nomes dos atletas", Settings.PlayerTagNames, Settings.PlayerTags, i => Settings.PlayerTags = i), 50, 50);
-            string[] mus = { "Desligada", "20%", "40%", "60%", "80%", "100%" };
-            int mi = Settings.Music ? Mathf.Clamp(Mathf.RoundToInt(Settings.MusicVolume * 5f), 1, 5) : 0;
-            UiKit.Size(UiKit.Cycler(list, "Música dos menus", mus, mi, i => { Settings.Music = i > 0; if (i > 0) Settings.MusicVolume = i / 5f; Sfx.MenuMusic(true); }), 50, 50);
-            UiKit.Size(UiKit.Cycler(list, "Câmera", BroadcastCamera.OfferedNames, BroadcastCamera.ToOffered(Settings.Camera), i => Settings.Camera = BroadcastCamera.FromOffered(i)), 50, 50);
-            UiKit.Size(UiKit.Cycler(list, "Zoom da câmera", BroadcastCamera.Zooms, Settings.CameraZoom + 2, i => Settings.CameraZoom = i - 2), 50, 50);
-            UiKit.Size(UiKit.Cycler(list, "Faltas", new[] { "Cena antes da cobrança", "Cobrança rápida" }, Settings.QuickRestarts ? 1 : 0, i => { Settings.QuickRestarts = i == 1; _cfg.quickRestarts = i == 1; }), 50, 50);
-            var status = UiKit.Label(list, "", 20, Theme.Body, Theme.TextDim);
-            status.gameObject.AddComponent<LayoutElement>().minHeight = 92;
-            void St() => status.text = "OPTION FILE  •  times alterados: " + Teams.OverrideCount + "\n" +
-                                       (Teams.OptionFilePath != "" ? Teams.OptionFilePath : "nenhum carregado");
-            St();
-            UiKit.Size(UiKit.Button(list, "Carregar option file…", () => ShowBrowse(null), 26), 50, 50);
-            UiKit.Size(UiKit.Button(list, "Remover option file", () =>
+            // coluna da esquerda: os submenus; à direita, as opções do submenu escolhido
+            UiKit.Panel(root).rectTransform.Place(0, 0, 0.3f, 1, 74, 178, 0, 262);
+            UiKit.Panel(root).rectTransform.Place(0.32f, 0, 1, 1, 0, 178, 74, 262);
+            var tabs = UiKit.Rect(root, "submenus").Place(0, 0, 0.3f, 1, 92, 196, 18, 280);
+            UiKit.VList(tabs, 12, 0, false);
+            Selectable tabSel = null;
+            for (int k = 0; k < OptionTabs.Length; k++)
             {
-                // volta aos dados originais do jogo (até carregar outro arquivo)
+                int kk = k;
+                bool on = k == _optTab;
+                var b = UiKit.Button(tabs, (on ? "›  " : "") + OptionTabs[k], () => { if (kk != _optTab) ShowOptions(kk, false); }, 30, on ? new Color(0.16f, 0.42f, 0.85f) : Theme.PanelLight);
+                UiKit.Size(b, 84, 84);
+                var lbl = b.GetComponentInChildren<Text>();
+                lbl.alignment = TextAnchor.MiddleLeft;
+                lbl.rectTransform.Place(0, 0, 1, 1, 24, 0, 12, 0);
+                if (on) tabSel = b;
+            }
+            UiKit.Label(tabs, OptionTabInfo[_optTab], 20, Theme.Body, Theme.TextDim).gameObject.AddComponent<LayoutElement>().minHeight = 60;
+            var list = Scroll(UiKit.Rect(root, "opções").Place(0.32f, 0, 1, 1, 2, 180, 76, 264), 6f);
+            UiKit.Label(list, OptionTabs[_optTab], 26, Theme.Head, Theme.Accent).gameObject.AddComponent<LayoutElement>().minHeight = 34;
+            Selectable first = null;
+            Selectable Add(Selectable c) { UiKit.Size(c, 56, 56); if (first == null) first = c; return c; }
+            switch (_optTab)
+            {
+                case 0:
+                {
+                    var vols = new List<string>();
+                    for (int i = 0; i <= 10; i++) vols.Add(i * 10 + "%");
+                    Add(UiKit.Cycler(list, "Volume", vols, Mathf.RoundToInt(Settings.Volume * 10), i => Settings.Volume = i / 10f));
+                    string[] mus = { "Desligada", "20%", "40%", "60%", "80%", "100%" };
+                    int mi = Settings.Music ? Mathf.Clamp(Mathf.RoundToInt(Settings.MusicVolume * 5f), 1, 5) : 0;
+                    Add(UiKit.Cycler(list, "Música dos menus", mus, mi, i => { Settings.Music = i > 0; if (i > 0) Settings.MusicVolume = i / 5f; Sfx.MenuMusic(true); }));
+                    if (Application.isMobilePlatform)
+                        Add(UiKit.Cycler(list, "Vibração", new[] { "Ligada", "Desligada" }, Settings.Vibration ? 0 : 1, i => Settings.Vibration = i == 0));
+                    break;
+                }
+                case 1:
+                    Add(UiKit.Cycler(list, "Câmera", BroadcastCamera.OfferedNames, BroadcastCamera.ToOffered(Settings.Camera), i => Settings.Camera = BroadcastCamera.FromOffered(i)));
+                    Add(UiKit.Cycler(list, "Zoom da câmera", BroadcastCamera.Zooms, Settings.CameraZoom + 2, i => Settings.CameraZoom = i - 2));
+                    break;
+                case 2:
+                    Add(UiKit.Cycler(list, "Nomes dos atletas", Settings.PlayerTagNames, Settings.PlayerTags, i => Settings.PlayerTags = i));
+                    Add(UiKit.Cycler(list, "Faltas", new[] { "Cena antes da cobrança", "Cobrança rápida" }, Settings.QuickRestarts ? 1 : 0, i => { Settings.QuickRestarts = i == 1; _cfg.quickRestarts = i == 1; }));
+                    break;
+                default:
+                    // no PC, tudo ajustável; no celular, o essencial
+                    Add(UiKit.Cycler(list, "Predefinição", Settings.QualityNames, Mathf.Min(Settings.Quality, Settings.QualityNames.Length - 1), i => { Settings.Quality = i; Apply(); }));
+                    if (!Application.isMobilePlatform)
+                    {
+                        Add(UiKit.Cycler(list, "Modo de tela", Settings.DisplayNames, Settings.Display, i => { Settings.Display = i; GoFullscreen(); }));
+                        var rn = ResolutionNames(out var rk);
+                        Add(UiKit.Cycler(list, "Resolução", rn, Mathf.Max(0, rk.IndexOf(Settings.ResolutionWH)), i => { Settings.ResolutionWH = rk[i]; GoFullscreen(); }));
+                        Add(UiKit.Cycler(list, "Sincronia vertical", Settings.VSyncNames, Settings.VSync, i => { Settings.VSync = i; Apply(); }));
+                    }
+                    Add(UiKit.Cycler(list, "Limite de quadros", Settings.FpsNames, Settings.FpsCap, i => { Settings.FpsCap = i; Apply(); }));
+                    Add(UiKit.Cycler(list, "Escala de render", Settings.RenderScaleNames, Settings.RenderScale, i => { Settings.RenderScale = i; Apply(); }));
+                    Add(UiKit.Cycler(list, "Antisserrilhado", Settings.AaNames, Settings.Antialias, i => { Settings.Antialias = i; Apply(); }));
+                    Add(UiKit.Cycler(list, "Sombras", Settings.ShadowNames, Settings.Shadows, i => { Settings.Shadows = i; Apply(); }));
+                    Add(UiKit.Cycler(list, "Texturas", Settings.TextureNames, Settings.Textures, i => { Settings.Textures = i; Apply(); }));
+                    break;
+            }
+            UiKit.Select(fresh ? first : (tabSel ?? first));
+        }
+
+        /// <summary>Option file (banco de dados): o que está carregado, carregar outro ou voltar ao original.</summary>
+        void ShowOptionFile()
+        {
+            var root = Page("OPTION FILE");
+            _back = ShowModes;
+            Title(root, "OPTION FILE", "Nomes, uniformes, elencos, estádios e escudos dos times");
+            UiKit.Panel(root).rectTransform.Place(0, 0, 1, 1, 90, 200, 90, 250);
+            var list = UiKit.Rect(root, "opções").Place(0, 0, 1, 1, 120, 230, 120, 280);
+            UiKit.VList(list, 14, 0, false);
+            int crests = 0;
+            for (int i = 0; i < Teams.Count; i++) if (Teams.Crest(i) != null) crests++;
+            var status = UiKit.Label(list, "", 28, Theme.Body, Theme.Text);
+            status.gameObject.AddComponent<LayoutElement>().minHeight = 150;
+            status.text = (Teams.OptionFilePath != "" ? "<b>Carregado:</b>  " + Teams.OptionFilePath : "<b>Nenhum option file carregado</b> (dados originais do jogo)") +
+                          "\nTimes alterados: " + Teams.OverrideCount + "   •   Escudos: " + crests +
+                          "\n<color=#8fa3bf>Os times aparecem em ordem alfabética dentro de cada liga.</color>";
+            status.supportRichText = true;
+            var load = UiKit.Button(list, "Carregar option file…", () => ShowBrowse(null), 30);
+            UiKit.Size(load, 80, 80);
+            UiKit.Size(UiKit.Button(list, "Remover option file (voltar ao original)", () =>
+            {
                 PlayerPrefs.DeleteKey(OptionKey);
                 PlayerPrefs.SetInt(OptionOffKey, 1);
                 PlayerPrefs.Save();
                 ReloadOptionFile();
-                St();
-            }, 26, new Color(0.4f, 0.12f, 0.15f)), 50, 50);
-            // coluna 2: gráficos (no PC, tudo ajustável; no celular, o essencial)
-            var gfx = Scroll(UiKit.Rect(root, "gráficos").Place(0.5f, 0, 1, 1, 2, 180, 76, 264), 6f);
-            UiKit.Label(gfx, "GRÁFICOS", 26, Theme.Head, Theme.Accent).gameObject.AddComponent<LayoutElement>().minHeight = 34;
-            UiKit.Size(UiKit.Cycler(gfx, "Predefinição", Settings.QualityNames, Mathf.Min(Settings.Quality, Settings.QualityNames.Length - 1), i => { Settings.Quality = i; Apply(); }), 50, 50);
-            if (!Application.isMobilePlatform)
-            {
-                UiKit.Size(UiKit.Cycler(gfx, "Modo de tela", Settings.DisplayNames, Settings.Display, i => { Settings.Display = i; GoFullscreen(); }), 50, 50);
-                var rn = ResolutionNames(out var rk);
-                UiKit.Size(UiKit.Cycler(gfx, "Resolução", rn, Mathf.Max(0, rk.IndexOf(Settings.ResolutionWH)), i => { Settings.ResolutionWH = rk[i]; GoFullscreen(); }), 50, 50);
-                UiKit.Size(UiKit.Cycler(gfx, "Sincronia vertical", Settings.VSyncNames, Settings.VSync, i => { Settings.VSync = i; Apply(); }), 50, 50);
-            }
-            UiKit.Size(UiKit.Cycler(gfx, "Limite de quadros", Settings.FpsNames, Settings.FpsCap, i => { Settings.FpsCap = i; Apply(); }), 50, 50);
-            UiKit.Size(UiKit.Cycler(gfx, "Escala de render", Settings.RenderScaleNames, Settings.RenderScale, i => { Settings.RenderScale = i; Apply(); }), 50, 50);
-            UiKit.Size(UiKit.Cycler(gfx, "Antisserrilhado", Settings.AaNames, Settings.Antialias, i => { Settings.Antialias = i; Apply(); }), 50, 50);
-            UiKit.Size(UiKit.Cycler(gfx, "Sombras", Settings.ShadowNames, Settings.Shadows, i => { Settings.Shadows = i; Apply(); }), 50, 50);
-            UiKit.Size(UiKit.Cycler(gfx, "Texturas", Settings.TextureNames, Settings.Textures, i => { Settings.Textures = i; Apply(); }), 50, 50);
-            UiKit.Select(first);
+                ShowOptionFile();
+            }, 30, new Color(0.4f, 0.12f, 0.15f)), 80, 80);
+            UiKit.Size(UiKit.Button(list, "‹  Voltar", ShowModes, 30), 80, 80);
+            UiKit.Select(load);
         }
 
         // ------------------------------------------------------------ partida

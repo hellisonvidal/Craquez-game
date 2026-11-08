@@ -76,6 +76,13 @@ namespace Craquez
                 UiKit.Size(b, 74, 74);
                 first = b;
             }
+            {
+                // submenu: o mural com as conquistas fica dentro de Competições
+                var wall = UiKit.Button(content, "›  MURAL DE TROFÉUS   <color=#8fa3bf>" + won.Count + (won.Count == 1 ? " título" : " títulos") + "</color>", ShowTrophyWall, 30, new Color(0.45f, 0.3f, 0.08f));
+                wall.GetComponentInChildren<Text>().supportRichText = true;
+                UiKit.Size(wall, 74, 74);
+                if (first == null) first = wall;
+            }
             string cat = null;
             foreach (var d in Competitions.All)
             {
@@ -314,7 +321,7 @@ namespace Craquez
         void ShowTrophyWall()
         {
             var root = Page("MURAL DE TROFÉUS");
-            _back = ShowModes;
+            _back = ShowCompetitions;
             var won = Trophies();
             Title(root, "MURAL DE TROFÉUS", won.Count == 0 ? "Vença uma competição para pôr o primeiro troféu na estante" : won.Count + (won.Count == 1 ? " troféu conquistado" : " troféus conquistados"));
             var area = UiKit.Rect(root, "estante").Place(0, 0, 1, 1, 90, 120, 90, 250);
