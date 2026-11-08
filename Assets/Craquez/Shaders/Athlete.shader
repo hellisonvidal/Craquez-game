@@ -20,6 +20,10 @@ Shader "Craquez/Athlete"
         [HideInInspector] _SrcBlend("__src", Float) = 1
         [HideInInspector] _DstBlend("__dst", Float) = 0
         [HideInInspector] _ZWrite("__zw", Float) = 1
+        // deslocamento de profundidade do tecido sobre a pele: em telas com profundidade de 16 bits
+        // (alguns celulares) a pele "furava" o uniforme e o atleta parecia sem roupa
+        [HideInInspector] _ZOffF("__zoff", Float) = 0
+        [HideInInspector] _ZOffU("__zoffu", Float) = 0
     }
 
     SubShader
@@ -33,6 +37,7 @@ Shader "Craquez/Athlete"
             Tags { "LightMode" = "UniversalForward" }
             Cull [_Cull]
             ZWrite [_ZWrite]
+            Offset [_ZOffF], [_ZOffU]
             Blend [_SrcBlend] [_DstBlend]
 
             HLSLPROGRAM
@@ -98,6 +103,7 @@ Shader "Craquez/Athlete"
             Name "DepthOnly"
             Tags { "LightMode" = "DepthOnly" }
             ZWrite On
+            Offset [_ZOffF], [_ZOffU]
             ColorMask R
             Cull [_Cull]
 

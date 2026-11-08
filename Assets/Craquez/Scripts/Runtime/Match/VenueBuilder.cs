@@ -801,9 +801,34 @@ namespace Craquez
             wall.Box(new Vector3(0, doorH + 0.25f, frontZ + 0.7f), new Vector3(doorW + 1.6f, 0.22f, 1.6f));
             wall.Object("Vestiários", Gfx.Lit(new Color(0.62f, 0.63f, 0.66f), Gfx.Asphalt(256, Color.white, 23, 0.04f), 0.2f), v.root, true);
             // boca do túnel (escura) e faixa de vidro das janelas
+            // vão da porta com o corredor iluminado lá dentro (dá a ideia de profundidade: os atletas
+            // saem de algum lugar) e as duas folhas da porta abertas para fora, presas no batente
             var dark = new MeshKit();
-            dark.Quad(new Vector3(-doorW / 2, 0, frontZ + 0.01f), new Vector3(-doorW / 2, doorH, frontZ + 0.01f), new Vector3(doorW / 2, doorH, frontZ + 0.01f), new Vector3(doorW / 2, 0, frontZ + 0.01f));
-            dark.Object("Boca do túnel", Gfx.Lit(new Color(0.03f, 0.03f, 0.035f), null, 0.05f), v.root, false);
+            dark.Quad(new Vector3(-doorW / 2, 0, frontZ + 0.01f), new Vector3(-doorW / 2, doorH, frontZ + 0.01f), new Vector3(doorW / 2, doorH, frontZ + 0.01f), new Vector3(doorW / 2, 0, frontZ + 0.01f), new Vector2(0, 0), new Vector2(1, 1));
+            dark.Object("Corredor dos vestiários", Gfx.Emissive(Color.white, night ? new Color(0.75f, 0.7f, 0.6f) : new Color(0.55f, 0.52f, 0.46f), CorridorTex()), v.root, false);
+            var frame = new MeshKit();
+            frame.Box(new Vector3(-doorW / 2 - 0.08f, doorH / 2, frontZ + 0.06f), new Vector3(0.16f, doorH + 0.1f, 0.14f));
+            frame.Box(new Vector3(doorW / 2 + 0.08f, doorH / 2, frontZ + 0.06f), new Vector3(0.16f, doorH + 0.1f, 0.14f));
+            frame.Box(new Vector3(0, doorH + 0.07f, frontZ + 0.06f), new Vector3(doorW + 0.32f, 0.14f, 0.14f));
+            frame.Object("Batente", Gfx.Lit(new Color(0.22f, 0.23f, 0.26f), null, 0.5f, 0.6f), v.root, false);
+            float leafW = doorW / 2f;
+            foreach (float sx in new[] { -1f, 1f })
+            {
+                // folha girada ~75° para fora, presa no lado do batente
+                var hinge = new Vector3(sx * doorW / 2, 0, frontZ + 0.05f);
+                var q = Quaternion.Euler(0, sx * -75f, 0);
+                var c = hinge + q * new Vector3(-sx * leafW / 2, doorH / 2, 0.03f);
+                var leaf = new MeshKit();
+                leaf.Box(Vector3.zero, new Vector3(leafW - 0.04f, doorH - 0.04f, 0.06f));
+                leaf.Box(new Vector3(-sx * (leafW / 2 - 0.18f), 0.05f, 0.05f), new Vector3(0.04f, 0.3f, 0.05f));   // puxador
+                var lg = leaf.Object("Porta do vestiário", Gfx.Lit(Color.Lerp(accent, new Color(0.2f, 0.22f, 0.26f), 0.4f), null, 0.4f, 0.2f), v.root, false);
+                lg.transform.localPosition = c;
+                lg.transform.localRotation = q;
+                // janelinha de vidro na folha
+                var win = new MeshKit();
+                win.Quad(new Vector3(-0.22f, 0.35f, 0.035f), new Vector3(-0.22f, 0.85f, 0.035f), new Vector3(0.22f, 0.85f, 0.035f), new Vector3(0.22f, 0.35f, 0.035f));
+                win.Object("Vidro da porta", Gfx.Emissive(new Color(0.2f, 0.28f, 0.35f), new Color(0.15f, 0.18f, 0.2f)), lg.transform, false);
+            }
             if (stadium)
             {
                 var glass = new MeshKit();
@@ -842,6 +867,35 @@ namespace Craquez
                 }
             tun.Object("Túnel inflável", Gfx.Lit(Color.Lerp(accent, Color.white, 0.08f), null, 0.35f), v.root, false);
             ribs.Object("Arcos do túnel", Gfx.Lit(Color.Lerp(accent, Color.black, 0.35f), null, 0.4f), v.root, false);
+        }
+
+        static Texture2D _corridor;
+
+        /// <summary>Corredor visto pela porta: paredes que fogem para o fundo iluminado e o piso claro.</summary>
+        static Texture2D CorridorTex()
+        {
+            if (_corridor != null) return _corridor;
+            const int W = 64, H = 128;
+            var t = new Texture2D(W, H, TextureFormat.RGBA32, false) { wrapMode = TextureWrapMode.Clamp };
+            var px = new Color[W * H];
+            for (int y = 0; y < H; y++)
+                for (int x = 0; x < W; x++)
+                {
+                    float u = (x + 0.5f) / W - 0.5f, v = (y + 0.5f) / H;
+                    // ponto de fuga no centro, a 40% da altura: quanto mais perto dele, mais longe e mais claro
+                    float dx = Mathf.Abs(u) / 0.5f, dy = Mathf.Abs(v - 0.4f) / 0.6f;
+                    float depth = 1f - Mathf.Max(dx, dy);
+                    Color wall = new Color(0.55f, 0.55f, 0.58f), floor = new Color(0.62f, 0.6f, 0.56f), ceil = new Color(0.4f, 0.4f, 0.44f);
+                    Color c = dx > dy ? wall : v < 0.4f ? floor : ceil;
+                    c *= Mathf.Lerp(0.18f, 1.25f, depth * depth);
+                    if (depth > 0.82f) c = Color.Lerp(c, new Color(1f, 0.95f, 0.85f), (depth - 0.82f) / 0.18f);   // luz no fim do corredor
+                    if (v > 0.9f && Mathf.Abs(u) < 0.15f) c = new Color(1f, 0.98f, 0.9f);                     // luminária
+                    c.a = 1f;
+                    px[y * W + x] = c;
+                }
+            t.SetPixels(px);
+            t.Apply();
+            return _corridor = t;
         }
 
         static void CornerFlags(Venue v, float hl, float hw, Color c)

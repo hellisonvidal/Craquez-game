@@ -33,7 +33,7 @@ namespace Craquez.Tests
             Assert.GreaterOrEqual(Teams.Leagues.Count, 20);
             Assert.GreaterOrEqual(Teams.Count, 300);
             Assert.GreaterOrEqual(Teams.Get(0).roster.Count, 11);
-            Assert.AreEqual(3, Teams.Get(0).kits.Count);
+            Assert.AreEqual(4, Teams.Get(0).kits.Count);
         }
 
         [TestCase(GameModes.Field, 11)]
@@ -617,6 +617,52 @@ namespace Craquez.Tests
             Assert.AreEqual(0, carried, "o cobrador saiu conduzindo a bola do escanteio");
             Assert.GreaterOrEqual(crosses + shorts, corners - 1);
             Assert.GreaterOrEqual(crosses, shorts);
+        }
+
+        /// <summary>Ninguém fica correndo em círculos: soma do giro da direção de corrida numa janela de 2 s.</summary>
+        [TestCase(GameModes.Field)]
+        [TestCase(GameModes.Futsal)]
+        public void PlayersDontRunInCircles(string mode)
+        {
+            int loops = 0, samples = 0, floops = 0;
+            for (uint seed = 1; seed <= 3; seed++)
+            {
+                var sim = NewMatch(mode, seed);
+                var a = new CpuBrain(0, 0.7f); var b = new CpuBrain(1, 0.7f);
+                int n = sim.players.Count;
+                var prev = new Vector2[n];
+                var prevF = new Vector2[n];
+                var fsum = new float[n];
+                var fh = new System.Collections.Generic.Queue<float>[n];
+                for (int k = 0; k < n; k++) fh[k] = new System.Collections.Generic.Queue<float>();
+                var hist = new System.Collections.Generic.Queue<float>[n];
+                var sum = new float[n];
+                for (int k = 0; k < n; k++) hist[k] = new System.Collections.Generic.Queue<float>();
+                for (int i = 0; i < 60 * 240 && sim.state != MatchState.Fulltime; i++)
+                {
+                    sim.Step(new[] { a.MakeInput(sim), b.MakeInput(sim) });
+                    if (sim.state != MatchState.Playing) continue;
+                    foreach (var p in sim.players)
+                    {
+                        if (p.isKeeper) continue;
+                        float turn = 0f;
+                        if (p.vel.magnitude > 1.2f && prev[p.id].magnitude > 1.2f) turn = Vector2.SignedAngle(prev[p.id], p.vel);
+                        prev[p.id] = p.vel;
+                        float ft = prevF[p.id] != Vector2.zero ? Vector2.SignedAngle(prevF[p.id], p.facing) : 0f;
+                        prevF[p.id] = p.facing;
+                        fh[p.id].Enqueue(ft); fsum[p.id] += ft;
+                        if (fh[p.id].Count > 120) fsum[p.id] -= fh[p.id].Dequeue();
+                        if (Mathf.Abs(fsum[p.id]) > 330f) { floops++; fh[p.id].Clear(); fsum[p.id] = 0f; }
+                        hist[p.id].Enqueue(turn); sum[p.id] += turn;
+                        if (hist[p.id].Count > 120) sum[p.id] -= hist[p.id].Dequeue();
+                        samples++;
+                        if (Mathf.Abs(sum[p.id]) > 330f) { loops++; hist[p.id].Clear(); sum[p.id] = 0f; }
+                    }
+                }
+            }
+            System.Console.WriteLine($"[círculos {mode}] {loops} voltas completas correndo, {floops} giros do corpo, em {samples / 60} s-jogador");
+            // (no futsal, quadra pequena, as voltas para marcar/receber são mais comuns)
+            Assert.Less(loops, samples / 60 / (mode == GameModes.Field ? 200 : 40), "jogadores correndo em círculos");
         }
 
         /// <summary>Saída de bola: a bola fica exatamente na marca do meio-campo até o toque.</summary>

@@ -51,7 +51,14 @@ namespace Craquez
             var m = new Material(Template(cutout ? "ToonOutlineCutout" : "ToonOutline"));
             Set(m, c, tex);
             m.SetFloat("_Smoothness", smooth);
-            if (cutout) m.SetFloat("_Cutoff", 0.01f);
+            if (cutout)
+            {
+                m.SetFloat("_Cutoff", 0.01f);
+                // tecido (uniforme): sempre à frente da pele, mesmo com pouca precisão de profundidade
+                m.SetFloat("_ZOffF", -1f);
+                m.SetFloat("_ZOffU", -8f);
+                m.renderQueue = 2010;
+            }
             return m;
         }
 
@@ -65,7 +72,14 @@ namespace Craquez
             Set(m, c, tex);
             m.SetFloat("_Smoothness", smooth);
             m.SetFloat("_Metallic", Mathf.Clamp01(skin));
-            if (cutout) m.SetFloat("_Cutoff", 0.01f);
+            if (cutout)
+            {
+                m.SetFloat("_Cutoff", 0.01f);
+                // tecido (uniforme): sempre à frente da pele, mesmo com pouca precisão de profundidade
+                m.SetFloat("_ZOffF", -1f);
+                m.SetFloat("_ZOffU", -8f);
+                m.renderQueue = 2010;
+            }
             return m;
         }
 

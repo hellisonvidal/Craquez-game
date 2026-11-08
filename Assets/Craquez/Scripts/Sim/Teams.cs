@@ -71,7 +71,7 @@ namespace Craquez.Sim
     public static class Teams
     {
         public static readonly string[] PatternNames = { "liso", "listras", "aros", "faixa", "metades", "riscas", "faixa_peito", "faixa_vertical", "xadrez" };
-        public static readonly string[] KitNames = { "Principal", "Reserva", "Terceiro" };
+        public static readonly string[] KitNames = { "Principal", "Reserva", "Terceiro", "Alternativo" };
 
         static bool _loaded;
         static readonly List<League> _leagues = new List<League>();
@@ -260,6 +260,29 @@ namespace Craquez.Sim
             };
         }
 
+        /// <summary>
+        /// Quarto uniforme (alternativo) de todos os times, derivado das cores do clube: time de cor clara
+        /// ganha um tom profundo da segunda cor com detalhes na principal; time escuro, gelo com faixa.
+        /// </summary>
+        static Kit AltKit(Color c1, Color c2)
+        {
+            Color.RGBToHSV(c1, out float h1, out float s1, out float v1);
+            Color.RGBToHSV(c2, out float h2, out float s2, out float v2);
+            bool light = c1.grayscale > 0.55f;
+            Color body, detail;
+            if (light)
+            {
+                body = s2 > 0.2f ? Color.HSVToRGB(h2, Mathf.Clamp01(s2 * 1.05f), 0.32f) : Color.HSVToRGB(h1, Mathf.Clamp01(s1 + 0.2f), 0.28f);
+                detail = c1;
+            }
+            else
+            {
+                body = Color.HSVToRGB(h1, 0.08f, 0.93f);
+                detail = s1 > 0.15f ? Color.HSVToRGB(h1, Mathf.Clamp01(s1), Mathf.Max(0.45f, v1)) : c2;
+            }
+            return new Kit { c1 = body, c2 = detail, shorts = body, socks = body, pattern = 6, trim = detail };
+        }
+
         static List<Kit> ParseKits(List<object> list, Color c1, Color c2)
         {
             var kits = new List<Kit>();
@@ -280,6 +303,7 @@ namespace Craquez.Sim
                 }
             if (kits.Count == 0) kits = DefaultKits(c1, c2);
             while (kits.Count < 3) kits.Add(DefaultKits(c1, c2)[kits.Count]);
+            if (kits.Count < 4) kits.Add(AltKit(kits[0].c1, kits[0].c2));
             return kits;
         }
 

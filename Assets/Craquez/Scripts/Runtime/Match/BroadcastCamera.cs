@@ -68,7 +68,7 @@ namespace Craquez
             zoom = Settings.CameraZoom;
             _focus = Vector3.zero;
             // faixa de profundidade justa: menos "briga" de superfícies (pontos piscando) ao longe
-            cam.nearClipPlane = 0.5f;
+            cam.nearClipPlane = 0.8f;   // (mais precisão de profundidade: nada de pele atravessando o uniforme)
             cam.farClipPlane = 650f;
         }
 

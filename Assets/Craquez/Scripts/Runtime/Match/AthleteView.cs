@@ -852,8 +852,10 @@ namespace Craquez
             // movimento, o joelho sempre dobra para trás e os braços balançam com as pernas)
             var mvL = new Vector2(lv.x, lv.z);
             float mvMag = mvL.magnitude;
-            var mvDir = mvMag > 0.15f ? mvL / mvMag : new Vector2(0f, 1f);
-            _gDir = Vector2.Lerp(_gDir == Vector2.zero ? mvDir : _gDir, mvDir, 1f - Mathf.Exp(-dt * 8f)).normalized;
+            if (_gDir == Vector2.zero) _gDir = new Vector2(0f, 1f);
+            // só muda a direção da passada com movimento de verdade e devagar (o tremido da velocidade
+            // em baixa fazia a perna "varrer" em círculo)
+            if (mvMag > 0.9f) _gDir = Vector2.Lerp(_gDir, mvL / mvMag, 1f - Mathf.Exp(-dt * 3f)).normalized;
             float back = Mathf.Clamp01(-_gDir.y), lateral = Mathf.Abs(_gDir.x);
             float act = anim != null ? anim.ActionWeight : 0f;
             float moving = Mathf.Clamp01((spd - 0.35f) / 0.7f);
@@ -905,11 +907,9 @@ namespace Craquez
                 float hip = HipAt(u), knee = KneeAt(u);
                 // + no eixo "right" leva o vetor para trás: flexão (para a frente) é ângulo negativo
                 var lat = right * ps * 0.035f;
-                // eixo da passada: perpendicular à direção do movimento (de costas, o "para a frente" da perna é para trás)
-                var mvW = (right * _gDir.x + fwd * _gDir.y).normalized;
-                var axis = Vector3.Cross(up, mvW).normalized;   // = right quando anda para a frente
-                if (axis.sqrMagnitude < 1e-4f) axis = right;
-                var thighDir = (Quaternion.AngleAxis(-hip, axis) * -up + lat).normalized;
+                // passada: componente para a frente/para trás no plano do corpo e um pouco para o lado
+                // (nada de girar o plano da perna: isso desenhava círculos)
+                var thighDir = (Quaternion.AngleAxis(-hip * _gDir.y, right) * (Quaternion.AngleAxis(hip * _gDir.x * 0.6f, fwd) * -up) + lat).normalized;
                 _pose.Rotate(th, Quaternion.Slerp(Quaternion.identity, Quaternion.FromToRotation(cf.position - th.position, thighDir), W));
                 // o joelho dobra sempre para trás do corpo
                 var calfDir = (Quaternion.AngleAxis(knee, right) * thighDir + lat * 0.5f).normalized;
@@ -1017,6 +1017,13 @@ namespace Craquez
             }
             float sideFix = Mathf.Abs(side) > 4f ? side - Mathf.Sign(side) * 4f : 0f;
             if (Mathf.Abs(sideFix) > 0.1f) _pose.Rotate(rig.spine, Quaternion.AngleAxis(sideFix * 0.8f * w, fwd));
+            // ombros mais baixos (o modelo deixava os ombros "encolhidos", altos demais)
+            foreach (var cn in new[] { "clavicle_l", "clavicle_r" })
+            {
+                if (!rig.bones.TryGetValue(cn, out var clv) || clv.childCount == 0) continue;
+                float cs = Mathf.Sign(Vector3.Dot(clv.GetChild(0).position - rig.spine.position, right));
+                _pose.Rotate(clv, Quaternion.AngleAxis(-cs * 8f, fwd));
+            }
             // peito aberto: o topo da coluna levemente para trás (ombros não caem para a frente)
             _pose.Rotate(rig.spine, Quaternion.AngleAxis(-3f * w * (1f - Mathf.Clamp01(spd / 7f)), right));
         }

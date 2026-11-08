@@ -26,7 +26,7 @@ namespace Craquez
         }
 
         // paleta 8x8: 0-1 mandante, 2-3 visitante, 4-7 pele, 8-10 cabelo, 11-13 calças, 14 branco, 15 preto, 16-23 roupas comuns
-        static Texture2D Palette(Color h1, Color h2, Color a1, Color a2)
+        static Texture2D Palette(Color h1, Color h2, Color a1, Color a2, List<Craquez.Sim.Kit> hk, List<Craquez.Sim.Kit> ak)
         {
             var t = new Texture2D(8, 8, TextureFormat.RGBA32, false) { filterMode = FilterMode.Point, wrapMode = TextureWrapMode.Clamp };
             var c = new Color[64];
@@ -42,6 +42,14 @@ namespace Craquez
             c[14] = Color.white; c[15] = new Color(0.06f, 0.06f, 0.07f);
             for (int i = 0; i < 8; i++) c[16 + i] = casual[i];
             for (int i = 24; i < 64; i++) c[i] = Color.gray;
+            // camisas dos 4 uniformes de cada time: 24-31 mandante (c1,c2 por uniforme), 32-39 visitante
+            for (int k = 0; k < 4; k++)
+            {
+                var kh = hk != null && hk.Count > 0 ? hk[Mathf.Min(k, hk.Count - 1)] : null;
+                var ka = ak != null && ak.Count > 0 ? ak[Mathf.Min(k, ak.Count - 1)] : null;
+                c[24 + k * 2] = kh != null ? kh.c1 : h1; c[25 + k * 2] = kh != null ? kh.c2 : h2;
+                c[32 + k * 2] = ka != null ? ka.c1 : a1; c[33 + k * 2] = ka != null ? ka.c2 : a2;
+            }
             t.SetPixels(c);
             t.Apply(false);
             return t;
@@ -98,9 +106,12 @@ namespace Craquez
             if (s.team == 2 || rr > 0.85) { shirt = 16 + r.Next(8); shirt2 = shirt; }
             else
             {
-                int baseC = s.team == 0 ? 0 : 2;
-                shirt = baseC + (rr < 0.6 ? 0 : 1);
-                shirt2 = baseC + (rr < 0.6 ? 1 : 0);
+                // camisa de um dos 4 uniformes do time, na proporção 60 : 30 : 20 : 10
+                double w = r.NextDouble() * 120.0;
+                int kit = w < 60 ? 0 : w < 90 ? 1 : w < 110 ? 2 : 3;
+                int baseC = (s.team == 0 ? 24 : 32) + kit * 2;
+                shirt = baseC;
+                shirt2 = baseC + 1;
             }
             int skin = 4 + r.Next(4), hair = 8 + r.Next(3), pants = 11 + r.Next(3);
             var p = s.pos;
@@ -134,10 +145,13 @@ namespace Craquez
         /// Cria os blocos de torcedores. <paramref name="groups"/>: uma lista de lugares por bloco (cada bloco
         /// pula no seu tempo). Os blocos ficam no <paramref name="parent"/> com a rotação dada.
         /// </summary>
+        /// <summary>Kits dos dois times (os 4 uniformes) para a roupa dos torcedores; defina antes de Build.</summary>
+        public static List<Craquez.Sim.Kit> HomeKits, AwayKits;
+
         public static void Build(Transform parent, Quaternion rot, List<List<Spot>> groups, Color h1, Color h2, Color a1, Color a2, int seed, bool mixed)
         {
             if (groups == null || groups.Count == 0) return;
-            var mat = Gfx.Lit(Color.white, Palette(h1, h2, a1, a2), 0.05f);
+            var mat = Gfx.Lit(Color.white, Palette(h1, h2, a1, a2, HomeKits, AwayKits), 0.05f);
             int gi = 0;
             foreach (var g in groups)
             {

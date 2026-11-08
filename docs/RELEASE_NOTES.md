@@ -1,13 +1,31 @@
-## Craquez 2.1.0
+## Craquez 2.2.0
 
 Jogo de futebol feito 100% com inteligência artificial, **gratuito**. Android, Windows e Linux.
 
 ### Downloads
-- **Android**: `Craquez-v2.1.0.apk` (instale permitindo "fontes desconhecidas")
-- **Windows**: `Craquez-v2.1.0-Instalador-Windows.exe` (instalador) ou `Craquez-v2.1.0-Windows.zip` (portátil)
-- **Linux**: `Craquez-v2.1.0-Linux.tar.gz` → extraia e rode `./Craquez` (ou `./instalar.sh` para o atalho no menu)
+- **Android**: `Craquez-v2.2.0.apk` (instale permitindo "fontes desconhecidas")
+- **Windows**: `Craquez-v2.2.0-Instalador-Windows.exe` (instalador) ou `Craquez-v2.2.0-Windows.zip` (portátil)
+- **Linux**: `Craquez-v2.2.0-Linux.tar.gz` → extraia e rode `./Craquez` (ou `./instalar.sh` para o atalho no menu)
 
 ### Novidades
+- **Jogadores sem roupa em alguns celulares**: corrigido (em telas com pouca precisão de
+  profundidade a pele "furava" o uniforme; o tecido agora fica sempre por cima).
+- **Proporções do corpo**: ombros mais baixos e mãos menores.
+- **Corrida e caminhada**: sem o movimento em círculo das pernas (a direção da passada só muda com
+  movimento de verdade); passada também de lado e de costas.
+- **Transições nas bolas paradas**: no lateral e nas cobranças rápidas o cobrador vai até a bola de
+  onde estava, em vez de aparecer nela; nas cenas (falta, escanteio, tiro de meta, pênalti) ele
+  espera os companheiros e caminha até a bola.
+- **Portas nos vestiários**: batente, duas folhas abertas e o corredor iluminado lá dentro.
+- **O mais perto vai na bola**: o companheiro mais próximo da bola solta vai buscá-la; a troca
+  automática de jogador acontece mais cedo.
+- **Goleiro não entra mais no gol**: o mergulho nunca o leva para trás da linha (antes ele sumia
+  dentro da rede e a bola entrava junto).
+- **Uniforme alternativo**: todos os times ganharam um 4º uniforme.
+- **Torcedores com as camisas do time**, variando entre os 4 uniformes (60 : 30 : 20 : 10).
+
+## Versão 2.1.0
+
 - **Torcedores em 3D**: gente modelada (pernas, tronco com a camisa do time, braços, cabeça, cabelo
   ou boné) nas fileiras da frente dos estádios, em todas as fileiras dos ginásios, na
   arquibancadinha do society e na rua. Cada bloco se mexe no seu tempo: balança parado, pula e

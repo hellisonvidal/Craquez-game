@@ -95,6 +95,7 @@ namespace Craquez.Sim
         public Vector2 walkUpTo, walkUpFacing;
         /// <summary>Antes de ir para a bola, o cobrador espera parado os companheiros se posicionarem.</summary>
         public float walkUpWait;
+        bool walkUpFast;
         /// <summary>Faltas do time no tempo (futsal: da 6ª em diante, tiro livre sem barreira).</summary>
         public int[] teamFouls = new int[2];
         /// <summary>Quem fez o último passe com o pé (regra do recuo: o goleiro não pega com as mãos).</summary>
@@ -466,6 +467,7 @@ namespace Craquez.Sim
                 }
             }
             var inward = (new Vector2(TeamDir(t) * halfLen * 0.3f, 0) - spot).Norm();
+            var takerBefore = taker.position;
             taker.position = spot - inward * 0.5f;
             taker.vel = Vector2.zero;
             taker.facing = inward;
@@ -549,7 +551,22 @@ namespace Craquez.Sim
                 _marked.Clear();
             }
             walkUpTaker = -1;
-            if (cut && (cornerKick || kind == "goalkick" || ((kind == "freekick" || kind == "offside") && setPiece)))
+            walkUpFast = false;
+            if (!cut && takerBefore.Dist(taker.position) > 0.8f && takerBefore.Dist(taker.position) < 14f && !taker.isKeeper)
+            {
+                // reinício rápido (lateral, falta cobrada logo): o cobrador vai até a bola de onde estava,
+                // em passo rápido, em vez de aparecer nela
+                var to = taker.position;
+                walkUpTaker = taker.id;
+                walkUpTo = to;
+                walkUpFacing = taker.facing == Vector2.zero ? inward : taker.facing;
+                walkUpWait = 0f;
+                walkUpFast = true;
+                taker.position = takerBefore;
+                taker.facing = (to - takerBefore).Norm();
+                ball.owner = -1;
+            }
+            else if (cut && (cornerKick || kind == "goalkick" || ((kind == "freekick" || kind == "offside") && setPiece)))
                 BeginWalkUp(taker, kind);
             protectTeam = t;
             protectT = 2.5f;
@@ -558,7 +575,8 @@ namespace Craquez.Sim
             noOffsideKick = kind == "throwin" || kind == "corner" || kind == "goalkick";
             state = MatchState.Restart;
             stateTimer = cut ? (kind == "freekick" ? 1.6f : 1.1f) : (quickRestarts ? 0.35f : 0.7f);
-            if (walkUpTaker >= 0) stateTimer += WalkUpTime + walkUpWait;
+            if (walkUpTaker >= 0 && walkUpFast) stateTimer += Mathf.Min(2.2f, walkUpTo.Dist(players[walkUpTaker].position) / 4.5f + 0.2f);
+            else if (walkUpTaker >= 0) stateTimer += WalkUpTime + walkUpWait;
             Emit("whistle", t, -1, kind);
         }
 
@@ -603,7 +621,7 @@ namespace Craquez.Sim
             var p = players[walkUpTaker];
             var d = walkUpTo - p.position;
             float dist = d.magnitude;
-            if (walkUpWait > 0f && stateTimer > WalkUpTime * 0.8f)
+            if (walkUpWait > 0f && !walkUpFast && stateTimer > WalkUpTime * 0.8f)
             {
                 // parado, de olho na bola, esperando a área/barreira se arrumar
                 walkUpWait -= DT;
@@ -614,7 +632,7 @@ namespace Craquez.Sim
                 return;
             }
             // termina ao chegar, ou quando o tempo da cena acaba (sem ficar preso)
-            if (dist < 0.3f || stateTimer <= 0.3f)
+            if (dist < 0.3f || stateTimer <= (walkUpFast ? 0.05f : 0.3f))
             {
                 p.position = walkUpTo;
                 p.vel = Vector2.zero;
@@ -627,7 +645,7 @@ namespace Craquez.Sim
                 return;
             }
             // anda (trote no fim): rápido o bastante para não alongar a cena
-            p.intent = d / dist * Mathf.Clamp(dist * 0.35f, 0.3f, 0.55f);
+            p.intent = d / dist * (walkUpFast ? Mathf.Clamp(dist * 0.5f, 0.45f, 0.85f) : Mathf.Clamp(dist * 0.35f, 0.3f, 0.55f));
             p.wantSprint = false;
         }
 
@@ -926,7 +944,7 @@ namespace Craquez.Sim
             c.autoT = AutoSwitchEvery;
             var cur = players[c.player];
             var n = NearestToBall(t);
-            if (n != null && n.id != cur.id && cur.position.Dist(ball.pos) > n.position.Dist(ball.pos) + 7f)
+            if (n != null && n.id != cur.id && cur.position.Dist(ball.pos) > n.position.Dist(ball.pos) + 4.5f)
             {
                 c.player = n.id;
                 Emit("switch", t);
@@ -1783,7 +1801,8 @@ namespace Craquez.Sim
                 else if (ball.owner < 0 && NearestToBall(t) == p && ctrl[t].player != p.id)
                 {
                     var human = players[ctrl[t].player];
-                    if (human.position.Dist(ball.pos) > p.position.Dist(ball.pos) + 3f)
+                    // o mais perto da bola vai nela (antes só ia se o controlado estivesse 3 m mais longe)
+                    if (human.position.Dist(ball.pos) > p.position.Dist(ball.pos) + 0.3f)
                     {
                         target = InterceptPoint(p);
                         urgent = true;
@@ -2566,7 +2585,13 @@ namespace Craquez.Sim
                 // voo quase sem freio; ao tocar o chão, desliza e para aos poucos (antes parava de uma vez)
                 float drag = Mathf.Lerp(0.3f, 6.5f, Mathf.SmoothStep(0f, 1f, Mathf.Clamp01((u - 0.38f) / 0.3f)));
                 p.vel -= p.vel * Mathf.Min(1f, drag * DT);
+                // o mergulho nunca leva o goleiro para dentro do próprio gol (antes ele "entrava" na rede,
+                // sumia atrás dela e a bola ia junto)
+                float gx = -halfLen * TeamDir(p.team);
+                float inward = -Mathf.Sign(gx);   // sentido do campo
+                if ((p.position.x - gx) * inward < 0.35f && p.vel.x * inward < 0f) p.vel.x = 0f;
                 p.position += p.vel * DT;
+                if ((p.position.x - gx) * inward < 0.25f) p.position.x = gx + inward * 0.25f;
                 return;
             }
             if (p.isKeeper && p.dive > 0f) maxS = Mathf.Lerp(3.6f, 4.8f, p.defense);
@@ -2676,6 +2701,12 @@ namespace Craquez.Sim
             float m = mode.runMargin, r = SimPlayer.Radius;
             p.position.x = Mathf.Clamp(p.position.x, -halfLen - m + r, halfLen + m - r);
             p.position.y = Mathf.Clamp(p.position.y, -halfW - m + r, halfW + m - r);
+            // goleiro não entra no próprio gol (fica na linha ou à frente dela, entre as traves)
+            if (p.isKeeper && Mathf.Abs(p.position.y) < goalHalf + 0.6f)
+            {
+                float gx = -halfLen * TeamDir(p.team), inward = -Mathf.Sign(gx);
+                if ((p.position.x - gx) * inward < 0.2f) { p.position.x = gx + inward * 0.2f; if (p.vel.x * inward < 0f) p.vel.x = 0f; }
+            }
         }
 
         void ResolveCollisions()
