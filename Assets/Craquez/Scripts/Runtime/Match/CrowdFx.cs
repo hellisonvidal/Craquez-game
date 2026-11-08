@@ -63,7 +63,7 @@ namespace Craquez
             _nextWave = 50f + Random.value * 40f;
             // bandeiras dos torcedores: agitadas de um lado para o outro (cada uma no seu ritmo, mais
             // forte quando a torcida se empolga), espalhadas pela arquibancada oposta e atrás dos gols
-            int flags = field ? 38 : venue.flagRowsEnd == 0 ? 8 : 16;
+            int flags = field ? 26 : venue.flagRowsEnd == 0 ? 6 : 11;
             int rowsL = Mathf.Max(1, venue.flagRowsLong), rowsE = venue.flagRowsEnd;
             float spanL = venue.flagSpanLong > 0f ? venue.flagSpanLong : dx;
             // frente de cada arquibancada (onde fica a primeira fileira) e altura do primeiro degrau

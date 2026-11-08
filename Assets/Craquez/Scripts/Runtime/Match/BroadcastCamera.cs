@@ -101,10 +101,12 @@ namespace Craquez
         /// Estruturas grandes do estádio/ginásio (paredes, arquibancadas, cobertura) que podem
         /// ficar entre a câmera e o jogo: somem enquanto taparem a visão (a sombra continua).
         /// </summary>
-        public void SetOccluders(Transform venueRoot)
+        public void SetOccluders(params Transform[] roots)
         {
             _occ.Clear(); _occMode.Clear(); _occHidden.Clear();
-            if (venueRoot == null) return;
+            if (roots == null) return;
+            foreach (var venueRoot in roots)
+            if (venueRoot != null)
             foreach (var r in venueRoot.GetComponentsInChildren<Renderer>(true))
             {
                 if (r is ParticleSystemRenderer) continue;

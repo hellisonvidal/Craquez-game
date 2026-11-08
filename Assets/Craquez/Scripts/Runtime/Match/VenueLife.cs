@@ -75,10 +75,7 @@ namespace Craquez
                         if (Mathf.Abs(z) < sim.goalHalf + 0.6f && R() < 0.6f) continue;   // atrás do gol, mais vazio no meio
                         AddFan(new Vector3(sx * (hl + 1.1f + R() * 1.6f), 0, z), R, rng);
                     }
-                // frente (lado da câmera): só nos cantos, baixos, para não tapar o jogo
-                foreach (float sx in new[] { -1f, 1f })
-                    for (int i = 0; i < 2 + dense; i++)
-                        AddFan(new Vector3(sx * (hl - 1.5f - i * 1.2f - R()), 0, -hw - 1.3f - R() * 0.8f), R, rng);
+                // (lado da câmera: ninguém — a galera ali tapava o jogo)
                 if (!v.noDog) BuildDog(new Vector3(0, 0, hw + 0.6f));
                 BuildBirds(v, rng, 7 + dense * 3, hl, hw, wh, sitWall);
             }

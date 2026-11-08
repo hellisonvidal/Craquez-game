@@ -75,7 +75,8 @@ namespace Craquez
             parent.SetParent(transform, false);
             if (s.mode.id != GameModes.Street) _crowd = CrowdFx.Create(transform, s, venue, kits[0], kits[1], _night, q, c.teamA, c.teamB);
             life = VenueLife.Create(transform, s, venue, kits[0], kits[1], home, away, _night, q, cam, c.venue);
-            VenueExtras.Create(transform, s, venue, kits[0], kits[1], _night, q, c.venue);
+            var extras = VenueExtras.Create(transform, s, venue, kits[0], kits[1], _night, q, c.venue);
+            _occRoots = new[] { _crowd != null ? _crowd.transform : null, life != null ? life.transform : null, extras != null ? extras.transform : null };
             AthleteFactory.IndoorShoes = c.mode == GameModes.Futsal;
             // capitão: o primeiro "Líder" de cada time (ou o camisa de número mais baixo entre os de linha)
             var captains = new int[] { -1, -1 };
@@ -97,7 +98,10 @@ namespace Craquez
             bcam = cam.gameObject.GetComponent<BroadcastCamera>();
             if (bcam == null) bcam = cam.gameObject.AddComponent<BroadcastCamera>();
             bcam.Setup(cam, s, Settings.Camera);
-            bcam.SetOccluders(venue.root);
+            // tudo o que é cenário (estrutura, torcida, bandeiras, gente da rua, extras) some quando tapa o jogo
+            var roots = new System.Collections.Generic.List<Transform> { venue.root };
+            if (_occRoots != null) roots.AddRange(_occRoots);
+            bcam.SetOccluders(roots.ToArray());
             bcam.SnapToBall();
             weather = gameObject.AddComponent<WeatherFx>();
             string wk = c.weather == "aleatorio" ? WeatherFx.Kinds[(int)(c.seed % 5)] : c.weather;
@@ -106,7 +110,7 @@ namespace Craquez
             weather.pitch2 = venue.pitchMat2;
             UrpSetup.Camera(cam, q);
             Sfx.Crowd(s.mode.id == GameModes.Field ? 0.55f : 0.3f, s.mode.id == GameModes.Field ? 0.25f : 0f);
-            FanCrowd.Hype = 0f; FanCrowd.GoalT = 0f; FanCrowd.GoalTeam = -1; FanCrowd.OlaStart = -100f;
+            FanCrowd.Hype = 0f; FanCrowd.GoalT = 0f; FanCrowd.GoalTeam = -1; FanCrowd.OlaStart = -100f; FanCrowd.ShotT = 0f; FanCrowd.FoulT = 0f;
         }
 
         static Kit KeeperKit(Kit own, Kit other, int t)
@@ -369,6 +373,7 @@ namespace Craquez
             switch (e.type)
             {
                 case "kick":
+                    if (e.kind == "shot" || e.kind == "chip") FanCrowd.ShotT = 1.8f;
                     Sfx.Kick(e.power);
                     if (e.kind == "shot") { _crowdHype = Mathf.Max(_crowdHype, 0.5f); bcam.Shake(0.15f); _crowd?.React("shot"); }
                     break;
@@ -434,6 +439,7 @@ namespace Craquez
                     ShowCard(e.kind == "yellow" ? new Color(1f, 0.85f, 0.1f) : new Color(0.85f, 0.08f, 0.1f));
                     break;
                 case "foul":
+                    FanCrowd.FoulT = 2.2f; FanCrowd.FoulOn = 1 - e.team;
                     Sfx.Whistle();
                     if (e.team == 1) Sfx.Boo();   // torcida da casa vaia falta do visitante
                     else Sfx.Ooh();
@@ -598,6 +604,10 @@ namespace Craquez
             // torcedores 3D: empolgação com o perigo e com a pressão do time da casa
             FanCrowd.Hype = Mathf.Clamp01(_crowdHype + danger * 0.6f) * quiet;
             if (FanCrowd.GoalT > 0f) FanCrowd.GoalT -= Time.deltaTime;
+            if (FanCrowd.ShotT > 0f) FanCrowd.ShotT -= Time.deltaTime;
+            if (FanCrowd.FoulT > 0f) FanCrowd.FoulT -= Time.deltaTime;
+            FanCrowd.Ball = new Vector3(sim.ball.pos.x, 0f, sim.ball.pos.y);
+            FanCrowd.HomeAttack = sim.TeamInPossession(0);
             // ola em momentos aleatórios (bola no meio-campo, jogo rolando)
             if (_nextOla <= 0f) _nextOla = Time.time + Random.Range(45f, 100f);
             if (Time.time > _nextOla && sim.state == MatchState.Playing && Mathf.Abs(sim.ball.pos.x) < sim.halfLen * 0.4f && FanCrowd.GoalT <= 0f)
@@ -617,6 +627,7 @@ namespace Craquez
         }
 
         float _nextOla;
+        Transform[] _occRoots;
 
         public Side[] sides = { Side.Player1, Side.Cpu };
 

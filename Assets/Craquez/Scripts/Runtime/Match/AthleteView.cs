@@ -1040,7 +1040,7 @@ namespace Craquez
             {
                 if (!rig.bones.TryGetValue(cn, out var clv) || clv.childCount == 0) continue;
                 float cs = Mathf.Sign(Vector3.Dot(clv.GetChild(0).position - rig.spine.position, right));
-                _pose.Rotate(clv, Quaternion.AngleAxis(-cs * 8f, fwd));
+                _pose.Rotate(clv, Quaternion.AngleAxis(-cs * 17f, fwd));   // linha dos ombros bem abaixo da cabeça
             }
             // peito aberto: o topo da coluna levemente para trás (ombros não caem para a frente)
             _pose.Rotate(rig.spine, Quaternion.AngleAxis(-3f * w * (1f - Mathf.Clamp01(spd / 7f)), right));

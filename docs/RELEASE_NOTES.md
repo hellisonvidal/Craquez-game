@@ -8,6 +8,13 @@ Jogo de futebol feito 100% com inteligência artificial, **gratuito**. Android, 
 - **Linux**: `Craquez-v2.3.1-Linux.tar.gz` → extraia e rode `./Craquez` (ou `./instalar.sh` para o atalho no menu)
 
 ### Novidades
+- **Corpo**: mãos ~32% menores que o modelo original e linha dos ombros bem mais baixa.
+- **Visão livre**: bandeiras, torcedores da rua e do society, e os elementos extras do cenário também
+  somem quando tapam o jogo; ninguém mais fica do lado da câmera na rua.
+- **Torcida 3D interativa**: palmas no ritmo quando o time ataca, mãos na cabeça no chute que passa
+  perto (e alívio do outro lado), protesto na falta, os blocos perto do lance se agitam mais, braços
+  para cima e pulos no gol e na ola.
+- **Menos bandeiras** (26 no estádio, 11 nos ginásios, 6 no society).
 - **Jogadores sem rodar**: quem chega rápido no lugar freia antes de virar (antes ficava orbitando
   o ponto); devagar e sem a bola, o atleta fica de frente para o jogo e dá passos de lado em vez de
   girar a cada empurrão; a IA e a condução da CPU não giram mais em espiral; o corpo vira com

@@ -130,9 +130,9 @@ namespace Craquez
             rig.Init(inst.transform);
             rig.Physique(look.build, look.frame);
             inst.transform.localScale = Vector3.one * look.scale;
-            // mãos do modelo eram grandes demais para o corpo: ~25% menores
+            // mãos do modelo eram grandes demais para o corpo: ~32% menores
             foreach (var hn in new[] { "hand_l", "hand_r" })
-                if (rig.bones.TryGetValue(hn, out var hb)) hb.localScale = hb.localScale * 0.75f;
+                if (rig.bones.TryGetValue(hn, out var hb)) hb.localScale = hb.localScale * 0.68f;
             Dress(rig, look, p.isKeeper ? keeperKit : kit, p.number, quality);
             Accessories(rig, look, p.isKeeper ? keeperKit : kit, p.isKeeper, captain, quality);
             return rig;
