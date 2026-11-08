@@ -8,6 +8,29 @@ Jogo de futebol feito 100% com inteligência artificial, **gratuito**. Android, 
 - **Linux**: `Craquez-v2.1.0-Linux.tar.gz` → extraia e rode `./Craquez` (ou `./instalar.sh` para o atalho no menu)
 
 ### Novidades
+- **Escanteios de verdade**: bola parada no canto; cobrança com cruzamento na área (força escolhe
+  primeiro ou segundo pau) ou toque curto para o companheiro que vem buscar. A área já aparece
+  ocupada (atacantes nos seus lugares, marcadores colados).
+- **Cena da cobrança**: no escanteio, na falta e no tiro de meta o cobrador vai andando até a bola
+  parada antes de cobrar (no escanteio, com câmera de fora do campo, atrás da bandeirinha).
+- **Saída de bola na marca central**: a bola fica exatamente no centro até o toque.
+- **Defesas do goleiro**: a ponta dos dedos desvia a bola na direção do contato (para fora, rente
+  à trave ou por cima do travessão); a espalmada usa a posição real das mãos; agarrando no
+  mergulho, a bola fica nas mãos esticadas durante o voo e a queda.
+- **Braços que acompanham o corpo**: o balanço segue a perna oposta em qualquer ritmo (andando,
+  trotando, correndo), o cotovelo dobra mais com o braço à frente, os braços abrem nas curvas e
+  andando de lado/de costas; cada atleta com o seu jeito (abertura, cotovelo, assimetria).
+- **Estádios completos**: arquibancadas nos quatro lados (a do lado da câmera some sozinha quando
+  tapa a visão), cantos fechados, tribuna central com vestiários, camarotes e imprensa; ginásios
+  com arquibancada dos dois lados e vão da porta do vestiário; society com cobertura na
+  arquibancadinha e bancos de reservas.
+- **Bandeiras da torcida agitadas** de um lado para o outro (cada uma no seu ritmo, mais forte nos
+  lances de perigo e no gol), também atrás dos gols; bandeirões dos estádios ondulando no vento.
+- **Option file**: times em ordem alfabética dentro de cada liga e escudos embutidos no próprio
+  arquivo (aparecem na escolha dos times quando existem).
+- **Menus reorganizados**: Configurações em submenus (Som, Câmera, Partida, Vídeo); Option file
+  com tela própria no menu principal; Mural de troféus dentro de Competições; pausa com submenus.
+- **Câmeras**: retiradas Drone, Atrás do Gol e Ombro.
 - **Jogo destravado (CPU x CPU e contra você)**: a bola viajando num passe deixava os dois times
   "defendendo" e todos recuavam para trás dela — agora o time mantém a fase de ataque até o
   adversário dominar, os atacantes atacam a profundidade (até a linha da zaga) e o time se espalha

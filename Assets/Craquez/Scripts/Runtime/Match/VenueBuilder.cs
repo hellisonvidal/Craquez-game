@@ -914,6 +914,32 @@ namespace Craquez
             var cm = Gfx.Cutout(Color.white, crowd, 0.5f, 0.05f);
             v.crowdMats.Add(cm);
             ppl.Object("Galera", cm, v.root, false);
+            // cobertura da arquibancadinha (telhas translúcidas sobre pilares) e guarda-corpo
+            var cover = new MeshKit();
+            var cpost = new MeshKit();
+            float cz0 = fz + 1.0f, cz1 = fz + 1.2f + 4 * 0.8f + 0.4f, cy = 4.6f;
+            for (float x = -hl * 0.6f; x <= hl * 0.6f + 0.1f; x += hl * 0.3f)
+            {
+                cpost.Cylinder(new Vector3(x, 0, cz1), new Vector3(x, cy + 0.6f, cz1), 0.09f, 6);
+                cpost.Cylinder(new Vector3(x, cy + 0.6f, cz1), new Vector3(x, cy, cz0), 0.06f, 5);
+            }
+            cpost.Cylinder(new Vector3(-hl * 0.6f, 1.1f, cz0 + 0.05f), new Vector3(hl * 0.6f, 1.1f, cz0 + 0.05f), 0.035f, 5);
+            cover.Quad(new Vector3(-hl * 0.62f, cy, cz0), new Vector3(-hl * 0.62f, cy + 0.6f, cz1 + 0.3f), new Vector3(hl * 0.62f, cy + 0.6f, cz1 + 0.3f), new Vector3(hl * 0.62f, cy, cz0), new Vector2(0, 0), new Vector2(hl / 2f, 2f));
+            cover.Quad(new Vector3(hl * 0.62f, cy, cz0), new Vector3(hl * 0.62f, cy + 0.6f, cz1 + 0.3f), new Vector3(-hl * 0.62f, cy + 0.6f, cz1 + 0.3f), new Vector3(-hl * 0.62f, cy, cz0), new Vector2(0, 0), new Vector2(hl / 2f, 2f));
+            cpost.Object("Estrutura da cobertura", Gfx.Lit(new Color(0.4f, 0.42f, 0.46f), null, 0.4f, 0.6f), v.root, true);
+            cover.Object("Cobertura da arquibancada", Gfx.Transparent(new Color(0.85f, 0.9f, 0.95f, 0.55f), Gfx.Net(128, 3f, 6f)), v.root, false);
+            // bancos de reservas cobertos dos dois lados da porta do vestiário (atrás do alambrado baixo)
+            var bench = new MeshKit();
+            foreach (float bxs in new[] { -1f, 1f })
+            {
+                var c0 = new Vector3(bxs * 7.5f, 0f, -(fz + 1.4f));
+                bench.Box(c0 + new Vector3(0, 0.45f, 0), new Vector3(4.4f, 0.12f, 0.6f));
+                bench.Box(c0 + new Vector3(0, 1.15f, -0.45f), new Vector3(4.6f, 2.3f, 0.08f));
+                bench.Box(c0 + new Vector3(0, 2.3f, 0f), new Vector3(4.6f, 0.08f, 1.1f));
+                bench.Box(c0 + new Vector3(-2.3f, 1.15f, 0f), new Vector3(0.08f, 2.3f, 1.0f));
+                bench.Box(c0 + new Vector3(2.3f, 1.15f, 0f), new Vector3(0.08f, 2.3f, 1.0f));
+            }
+            bench.Object("Bancos de reservas", Gfx.Lit(Color.Lerp(homeKit.c1, new Color(0.2f, 0.22f, 0.26f), 0.55f), null, 0.4f), v.root, false);
             // bar do clube / vestiário atrás de um dos gols
             var club = new MeshKit();
             club.Box(new Vector3(fx + 8f, 1.6f, 0), new Vector3(6f, 3.2f, 12f), 2f);
