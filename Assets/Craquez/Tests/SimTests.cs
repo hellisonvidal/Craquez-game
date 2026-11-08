@@ -627,7 +627,7 @@ namespace Craquez.Tests
         public void KeeperDistributionReachesTeammate(string mode)
         {
             int ok = 0, total = 0;
-            for (uint seed = 1; seed <= 12; seed++)
+            for (uint seed = 1; seed <= (mode == "futsal" ? 30u : 12u); seed++)
             {
                 var sim = NewMatch(mode, seed);
                 var a = new CpuBrain(0, 0.7f); var b = new CpuBrain(1, 0.7f);
@@ -651,7 +651,7 @@ namespace Craquez.Tests
                 }
             }
             System.Console.WriteLine($"[reposição {mode}] {ok}/{total} para o companheiro");
-            Assert.Greater(total, 2);
+            Assert.Greater(total, 3);
             Assert.GreaterOrEqual(ok / (float)total, 0.75f, "o goleiro entrega a bola ao adversário");
         }
 

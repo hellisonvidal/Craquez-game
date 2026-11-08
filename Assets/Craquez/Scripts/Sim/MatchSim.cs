@@ -2179,7 +2179,7 @@ namespace Craquez.Sim
                 if (fs > farS) { farS = fs; far = m; }
             }
             if (best == null && !force) return false;   // espera alguém se desmarcar
-            bool punt = canPunt && (best == null || rng.Chance(field ? 0.2f : 0.12f));
+            bool punt = canPunt && (best == null || rng.Chance(field ? 0.08f : 0.05f));   // com alguém livre, quase sempre sai jogando
             if (punt && far != null) { Punt(p, far); return true; }
             if (best == null) best = safest ?? far;
             if (best != null) KeeperThrow(p, best);
