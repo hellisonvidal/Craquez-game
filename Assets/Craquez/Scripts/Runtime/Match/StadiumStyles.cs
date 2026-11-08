@@ -185,16 +185,17 @@ namespace Craquez
             {
                 case 1:   // Metropolitana: anel de LED branco na beirada e mastros com bandeiras do clube
                 case 5:   // Caldeirão: bandeirões no alto da arquibancada
+                {
+                    // bandeirões no vento (o pano ondula; os mastros ficam firmes)
+                    var flagMat = Gfx.Lit(homeKit.c1, null, 0.1f);
+                    var flagMat2 = Gfx.Lit(homeKit.c2, null, 0.1f);
                     for (int i = -3; i <= 3; i++)
                     {
                         var b = new Vector3(i * hl * 0.28f, topY + (model == 1 ? 6.6f : 0.2f), farZ + 0.5f);
-                        k.Cylinder(b, b + Vector3.up * 7f, 0.08f, 5);
-                        var f0 = b + Vector3.up * 7f;
-                        accent.Quad(f0, f0 + new Vector3(3.2f, -0.2f, 0), f0 + new Vector3(3.2f, -2.2f, 0), f0 + new Vector3(0, -2f, 0));
-                        accent.Quad(f0 + new Vector3(0, -2f, 0), f0 + new Vector3(3.2f, -2.2f, 0), f0 + new Vector3(3.2f, -0.2f, 0), f0);
+                        FlagWave.Create(v.root, b, Quaternion.identity, 3.6f, 2.2f, 7f, (i & 1) == 0 ? flagMat : flagMat2, false, model * 17 + i);
                     }
-                    accentMat = Gfx.Lit(homeKit.c1, null, 0.1f);
                     break;
+                }
                 case 2:   // Estadual: marquise de concreto com nervuras (estilo anos 50)
                     for (float x = -hl - 6f; x <= hl + 6f; x += 6f)
                         k.Box(new Vector3(x, ry + 1.2f, farZ - st.rows * 0.8f * 0.45f), new Vector3(0.5f, 1.6f, st.rows * 0.8f * 1.1f));

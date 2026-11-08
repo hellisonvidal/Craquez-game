@@ -308,10 +308,10 @@ namespace Craquez.UI
                 _setPiece.rectTransform.Place(0, 0, 1, 0, 40, 150, 40, -200);
                 UiKit.Shadow(_setPiece, 3, 0.9f);
             }
-            int want = _sim.setPiece && _sim.setPieceTeam >= 0 && human[_sim.setPieceTeam] && _sim.ball.owner == _sim.setPieceTaker ? (_sim.setPieceShot ? 1 : 0) : -1;
+            int want = _sim.setPiece && _sim.setPieceTeam >= 0 && human[_sim.setPieceTeam] && _sim.ball.owner == _sim.setPieceTaker ? (_sim.setPieceShot ? 1 : _sim.cornerKick ? 2 : _sim.kickIn ? 3 : 0) : -1;
             if (want == _setPieceShown) return;
             _setPieceShown = want;
-            _setPiece.text = want < 0 ? "" : InputRouter.SetPieceHelp(devices[_sim.setPieceTeam], want == 1);
+            _setPiece.text = want < 0 ? "" : InputRouter.SetPieceHelp(devices[_sim.setPieceTeam], want == 1, want == 2 ? "ESCANTEIO" : want == 3 ? "LATERAL" : "FALTA");
         }
     }
 }

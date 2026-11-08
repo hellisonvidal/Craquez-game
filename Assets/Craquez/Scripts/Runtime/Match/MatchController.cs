@@ -389,7 +389,7 @@ namespace Craquez
             }
             else if (page == 1)
             {
-                first = UiKit.Cycler(list, "Câmera", BroadcastCamera.Modes, view.bcam.mode, i => { view.bcam.mode = i; Settings.Camera = i; });
+                first = UiKit.Cycler(list, "Câmera", BroadcastCamera.OfferedNames, BroadcastCamera.ToOffered(view.bcam.mode), i => { view.bcam.mode = BroadcastCamera.FromOffered(i); Settings.Camera = view.bcam.mode; });
                 UiKit.Size(first, 72, 72);
                 UiKit.Size(UiKit.Cycler(list, "Zoom", BroadcastCamera.Zooms, view.bcam.zoom + 2, i => { view.bcam.zoom = i - 2; Settings.CameraZoom = i - 2; }), 72, 72);
                 UiKit.Size(UiKit.Cycler(list, "Gráficos", Settings.QualityNames, Settings.Quality, i => { Settings.Quality = i; UrpSetup.Quality(i); UrpSetup.Camera(_cam, i); }), 72, 72);

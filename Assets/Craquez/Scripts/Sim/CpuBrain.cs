@@ -95,6 +95,29 @@ namespace Craquez.Sim
                     Press(ref f, InputFrame.Pass, 8);
                     return f;
                 }
+                if (sim.cornerKick)
+                {
+                    // escanteio: cruzamento na área (força varia: primeiro ou segundo pau) ou toque curto
+                    // para o companheiro que veio buscar, se ele estiver livre
+                    if (Noise(sim, 47) > 0.02f) return f;
+                    var shortSpot = sim.CornerShortSpot();
+                    SimPlayer near = null;
+                    foreach (var m in sim.players)
+                        if (m.team == p.team && m != p && !m.isKeeper && !m.sentOff && m.position.Dist(shortSpot) < (sim.mode.id == GameModes.Field ? 5f : 3f)) near = m;
+                    float freeN = 99f;
+                    if (near != null) foreach (var o in sim.players) if (o.team != p.team && !o.sentOff) freeN = Mathf.Min(freeN, o.position.Dist(near.position));
+                    if (near != null && freeN > 2.5f && Noise(sim, 977) < 0.28f)
+                    {
+                        f.move = (near.position - p.position).Norm();
+                        Press(ref f, InputFrame.Pass, 6);
+                    }
+                    else
+                    {
+                        f.move = (g - p.position).Norm();
+                        Press(ref f, InputFrame.Lob, 10 + (int)(Noise(sim, 49) * 20f));
+                    }
+                    return f;
+                }
                 if (Noise(sim, 40) > 0.012f) return f;
                 float r = Noise(sim, 41);
                 if (sim.setPieceShot && dg < 28f && r < 0.45f + p.shot * 0.3f)

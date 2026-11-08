@@ -153,7 +153,7 @@ namespace Craquez
                 // câmeras próximas do jogador (só nas duas primeiras partidas, para não alongar o roteiro)
                 if (mc != null && mc.view != null && (tag == "campo_noite" || tag == "futsal"))
                 {
-                    foreach (var k in new[] { BroadcastCamera.Kind.PlayerSide, BroadcastCamera.Kind.Shoulder, BroadcastCamera.Kind.Behind })
+                    foreach (var k in new[] { BroadcastCamera.Kind.PlayerSide, BroadcastCamera.Kind.WideClose, BroadcastCamera.Kind.Behind })
                     {
                         mc.view.bcam.mode = (int)k;
                         yield return Shot(tag + "_cam_" + k, 2.5f);

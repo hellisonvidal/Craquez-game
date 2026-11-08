@@ -410,6 +410,16 @@ namespace Craquez
                             var back = (b - new Vector3(g.x, 0f, g.z)).normalized;
                             bcam.Scene(b + back * 7.5f + Vector3.up * 2.6f, Vector3.Lerp(b, g, 0.55f), sim.stateTimer * 0.9f);
                         }
+                        else if (e.kind == "corner" && !bcam.cinematic)
+                        {
+                            // cena do escanteio: de fora do campo, atrás da bandeirinha; o cobrador chega
+                            // andando e ajeita a bola, com a área ao fundo
+                            var b = new Vector3(sim.ball.pos.x, 0f, sim.ball.pos.y);
+                            var box = new Vector3(Mathf.Sign(b.x) * (sim.halfLen - sim.mode.penaltyDist), 1f, 0f);
+                            var outward = (b - box); outward.y = 0f; outward.Normalize();
+                            bool field = sim.mode.id == GameModes.Field;
+                            bcam.Scene(b + outward * (field ? 6.5f : 4f) + Vector3.up * (field ? 2.4f : 1.9f), Vector3.Lerp(b, box, 0.45f), sim.stateTimer * 0.92f, field ? 44f : 50f);
+                        }
                     }
                     break;
                 case "card":

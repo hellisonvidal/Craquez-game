@@ -12,8 +12,7 @@ namespace Craquez
     {
         MatchSim _sim;
         ParticleSystem _flashes, _wave;
-        Mesh[] _flagMesh;
-        Vector3[][] _flagBase, _flagCur;
+        FlagWave[] _flags;
         float _t, _nextWave, _waveT = -1f, _hype;
         Vector3[] _ring;     // contorno da arquibancada (frente das fileiras)
         float _ringLen;
@@ -62,45 +61,41 @@ namespace Craquez
             var we = _wave.emission;
             we.rateOverTime = 0f;
             _nextWave = 50f + Random.value * 40f;
-            // bandeiras
-            int flags = field ? 12 : 6;
-            _flagMesh = new Mesh[flags];
-            _flagBase = new Vector3[flags][];
-            _flagCur = new Vector3[flags][];
+            // bandeiras dos torcedores: agitadas de um lado para o outro (cada uma no seu ritmo, mais
+            // forte quando a torcida se empolga), espalhadas pela arquibancada oposta e atrás dos gols
+            int flags = field ? 20 : 9;
+            _flags = new FlagWave[flags];
+            var rng = new System.Random(_homeTeam * 31 + _awayTeam * 7 + 5);
             for (int i = 0; i < flags; i++)
             {
                 float u = (i + 0.5f) / flags;
-                var pos = RingAt(0.5f + u * (2f * dx / (_ringLen)));   // só na arquibancada oposta à câmera (não tapam o jogo)
+                // 70% na arquibancada oposta à câmera; o resto atrás dos gols (não tapam o jogo)
+                Vector3 pos;
+                Quaternion face;
+                int far = Mathf.RoundToInt(flags * 0.7f);
+                if (i < far)
+                {
+                    pos = RingAt(0.5f + ((i + 0.5f) / far) * (2f * dx / _ringLen));
+                    face = Quaternion.LookRotation(Vector3.forward, Vector3.up);
+                }
+                else
+                {
+                    int k2 = i - far, nEnd = flags - far;
+                    float sx = k2 % 2 == 0 ? 1f : -1f;
+                    float zz = Mathf.Lerp(-dz * 0.7f, dz * 0.7f, (k2 / 2 + 0.5f) / Mathf.Max(1, (nEnd + 1) / 2));
+                    pos = new Vector3(sx * dx, y, zz);
+                    face = Quaternion.LookRotation(new Vector3(sx, 0, 0), Vector3.up);
+                }
                 bool isAway = i % 3 == 2;
                 var k = isAway ? away : home;
-                // bandeiras do clube (escudo nas cores do time) intercaladas com as de faixas
                 int team = isAway ? _awayTeam : _homeTeam;
                 Texture2D tex = null;
                 if (team >= 0 && (i % 2 == 0 || isAway)) tex = Craquez.UI.Crest.ClubFlag(team, 128, 80);
                 if (tex == null) tex = FlagTex(k, i);
-                var go = new GameObject("Bandeira");
-                go.transform.SetParent(transform, false);
-                go.transform.position = pos + Vector3.up * (field ? 3.5f : 2f);
-                go.transform.rotation = Quaternion.LookRotation(Vector3.forward, Vector3.up);   // de frente para o campo
-                var mk = new MeshKit();
-                float w = field ? 3.2f : 2f, h = field ? 2f : 1.3f;
-                const int nx = 8, ny = 4;
-                for (int a = 0; a < nx; a++)
-                    for (int b = 0; b < ny; b++)
-                        mk.Quad(new Vector3(w * a / nx, h * b / ny, 0), new Vector3(w * a / nx, h * (b + 1) / ny, 0), new Vector3(w * (a + 1) / nx, h * (b + 1) / ny, 0), new Vector3(w * (a + 1) / nx, h * b / ny, 0),
-                            new Vector2(a / (float)nx, b / (float)ny), new Vector2((a + 1) / (float)nx, (b + 1) / (float)ny));
-                _flagMesh[i] = mk.Build("bandeira");
-                _flagMesh[i].MarkDynamic();
-                _flagBase[i] = _flagMesh[i].vertices;
-                go.AddComponent<MeshFilter>().sharedMesh = _flagMesh[i];
-                var mr = go.AddComponent<MeshRenderer>();
-                mr.sharedMaterial = Gfx.Cutout(Color.white, tex, 0.1f, 0.1f);
-                mr.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
-                // mastro
-                var pole = new MeshKit();
-                pole.Cylinder(Vector3.zero, new Vector3(0, h + 0.4f, 0), 0.03f, 6);
-                var pg = pole.Object("Mastro", Gfx.Lit(new Color(0.8f, 0.8f, 0.82f), null, 0.5f), go.transform, false);
-                pg.transform.localPosition = new Vector3(0, -0.4f, 0);
+                float w = field ? 2.6f + (float)rng.NextDouble() * 1.2f : 1.7f + (float)rng.NextDouble() * 0.6f;
+                float h = w * 0.62f;
+                _flags[i] = FlagWave.Create(transform, pos + Vector3.up * (field ? 1.2f : 0.6f) + face * Vector3.back * 0.6f, face, w, h, h + (field ? 1.6f : 1.0f),
+                    Gfx.Cutout(Color.white, tex, 0.1f, 0.1f), true, rng.Next());
             }
         }
 
@@ -198,19 +193,100 @@ namespace Craquez
                 _wave.transform.rotation = Quaternion.LookRotation((p2 - p).sqrMagnitude > 1e-6f ? (p2 - p).normalized : Vector3.forward);
                 if (u >= 1.2f) _waveT = -1f;
             }
-            // bandeiras tremulando (mais forte com a torcida empolgada)
-            float amp = 0.12f + _hype * 0.15f;
-            for (int i = 0; i < _flagMesh.Length; i++)
-            {
-                var b = _flagBase[i];
-                var v = _flagCur[i] ??= new Vector3[b.Length];
-                for (int k = 0; k < b.Length; k++)
+            // bandeiras: a empolgação da torcida chega nelas
+            if (_flags != null) foreach (var f in _flags) if (f != null) f.hype = _hype;
+        }
+    }
+
+    /// <summary>
+    /// Bandeira com mastro. Agitada: o mastro varre de um lado para o outro (como um torcedor
+    /// balançando a bandeira) e o pano arrasta atrás do movimento, com ondulação; parada: só o vento.
+    /// Cada bandeira tem ritmo, amplitude e pausas próprios.
+    /// </summary>
+    public class FlagWave : MonoBehaviour
+    {
+        Mesh _mesh;
+        Vector3[] _rest, _cur;
+        float _w, _h, _top, _t, _phase, _sweepAmp, _sweepFreq, _restCycle, _prevAng, _angVel;
+        bool _waved;
+        Quaternion _base;
+        public float hype;
+
+        public static FlagWave Create(Transform parent, Vector3 basePos, Quaternion facing, float w, float h, float poleH, Material cloth, bool waved, int seed)
+        {
+            var go = new GameObject("Bandeira");
+            go.transform.SetParent(parent, false);
+            go.transform.position = basePos;
+            go.transform.rotation = facing;
+            var f = go.AddComponent<FlagWave>();
+            var r = new System.Random(seed);
+            f._w = w; f._h = h; f._top = poleH;
+            f._waved = waved;
+            f._base = facing;
+            f._phase = (float)r.NextDouble() * 10f;
+            f._sweepAmp = 28f + (float)r.NextDouble() * 22f;
+            f._sweepFreq = 0.55f + (float)r.NextDouble() * 0.5f;
+            f._restCycle = 9f + (float)r.NextDouble() * 9f;
+            var mk = new MeshKit();
+            const int nx = 10, ny = 4;
+            for (int a = 0; a < nx; a++)
+                for (int b = 0; b < ny; b++)
                 {
-                    float x = b[k].x;
-                    v[k] = b[k] + new Vector3(0, -x * 0.06f, Mathf.Sin(_t * 5f + x * 2.2f + i) * amp * x);
+                    float x0 = w * a / nx, x1 = w * (a + 1) / nx, y0 = poleH - h + h * b / ny, y1 = poleH - h + h * (b + 1) / ny;
+                    var uv0 = new Vector2(a / (float)nx, b / (float)ny); var uv1 = new Vector2((a + 1) / (float)nx, (b + 1) / (float)ny);
+                    mk.Quad(new Vector3(x0, y0, 0), new Vector3(x0, y1, 0), new Vector3(x1, y1, 0), new Vector3(x1, y0, 0), uv0, uv1);
+                    mk.Quad(new Vector3(x1, y0, 0), new Vector3(x1, y1, 0), new Vector3(x0, y1, 0), new Vector3(x0, y0, 0), new Vector2(uv1.x, uv0.y), new Vector2(uv0.x, uv1.y));
                 }
-                _flagMesh[i].vertices = v;
+            f._mesh = mk.Build("bandeira");
+            f._mesh.MarkDynamic();
+            f._rest = f._mesh.vertices;
+            f._cur = (Vector3[])f._rest.Clone();
+            go.AddComponent<MeshFilter>().sharedMesh = f._mesh;
+            var mr = go.AddComponent<MeshRenderer>();
+            mr.sharedMaterial = cloth;
+            mr.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
+            var pole = new MeshKit();
+            pole.Cylinder(Vector3.zero, new Vector3(0, poleH + 0.15f, 0), 0.03f, 6);
+            pole.Object("Mastro", Gfx.Lit(new Color(0.78f, 0.78f, 0.8f), null, 0.5f), go.transform, false);
+            return f;
+        }
+
+        void Update()
+        {
+            float dt = Mathf.Max(1e-4f, Time.deltaTime);
+            _t += dt;
+            float ang = 0f;
+            if (_waved)
+            {
+                // agita em ciclos (pausa um pouco e volta); no gol/lance de perigo, agita sem parar e mais forte
+                float cyc = Mathf.Repeat(_t + _phase * 3f, _restCycle) / _restCycle;
+                float active = Mathf.Max(Mathf.SmoothStep(0f, 1f, Mathf.Clamp01(Mathf.Sin(cyc * Mathf.PI) * 2.2f - 0.4f)), Mathf.Clamp01(hype));
+                float amp = _sweepAmp * (0.7f + 0.5f * Mathf.Clamp01(hype)) * active;
+                float fr = _sweepFreq * (1f + 0.5f * Mathf.Clamp01(hype));
+                // varredura em "8": vai e volta com um pouco de inclinação para a frente
+                ang = Mathf.Sin(_t * fr * Mathf.PI * 2f + _phase) * amp;
+                float lean = Mathf.Sin(_t * fr * Mathf.PI * 4f + _phase) * amp * 0.12f;
+                transform.rotation = _base * Quaternion.AngleAxis(ang, Vector3.forward) * Quaternion.AngleAxis(lean, Vector3.right);
             }
+            _angVel = Mathf.Lerp(_angVel, (ang - _prevAng) / dt, 1f - Mathf.Exp(-dt * 10f));
+            _prevAng = ang;
+            // pano: arrasta atrás do movimento (curva no plano), ondula (fora do plano) e cai um pouco
+            float drag = Mathf.Clamp(_angVel * 0.0045f, -0.9f, 0.9f);
+            float speed = Mathf.Clamp01(Mathf.Abs(_angVel) / 80f);
+            float flutter = 0.1f + 0.18f * speed + 0.08f * Mathf.Clamp01(hype);
+            for (int k = 0; k < _rest.Length; k++)
+            {
+                var b = _rest[k];
+                float x = b.x / _w;           // 0 no mastro, 1 na ponta
+                float yb = (_top - b.y) / _h; // 0 em cima, 1 embaixo
+                float z = Mathf.Sin(_t * (6f + 4f * speed) - x * 5.5f + _phase) * flutter * x * _w * 0.35f
+                        + Mathf.Sin(_t * 9.3f - x * 9f + yb * 2f) * 0.03f * x * _w;
+                float dy = -drag * x * x * _w * 0.55f - x * _w * 0.1f * (1f - speed) * yb;
+                float dx = -Mathf.Abs(drag) * x * x * _w * 0.12f;
+                _cur[k] = new Vector3(b.x + dx, b.y + dy, z);
+            }
+            _mesh.vertices = _cur;
+            _mesh.RecalculateBounds();
         }
     }
 }

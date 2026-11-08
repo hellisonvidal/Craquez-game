@@ -20,6 +20,30 @@ namespace Craquez
         };
         /// <summary>Índices antigos (versão 2.0) -> novos, para manter a escolha salva.</summary>
         public static int FromOld(int old) => old switch { 0 => 0, 1 => 1, 2 => 3, 3 => 5, 4 => 8, 5 => 7, 6 => 9, 7 => 10, 9 => 2, _ => 0 };
+        /// <summary>Câmeras oferecidas nos menus (drone, atrás do gol e ombro foram retiradas).</summary>
+        public static readonly Kind[] Offered =
+        {
+            Kind.Tv, Kind.TvClose, Kind.WideClose, Kind.Wide, Kind.Tactical,
+            Kind.PlayerSide, Kind.Behind, Kind.Pitchside, Kind.Dynamic,
+        };
+        public static string[] OfferedNames
+        {
+            get
+            {
+                var n = new string[Offered.Length];
+                for (int i = 0; i < n.Length; i++) n[i] = Modes[(int)Offered[i]];
+                return n;
+            }
+        }
+        /// <summary>Modo salvo -> posição na lista dos menus (modo retirado vira TV).</summary>
+        public static int ToOffered(int mode)
+        {
+            for (int i = 0; i < Offered.Length; i++) if ((int)Offered[i] == mode) return i;
+            return 0;
+        }
+        public static int FromOffered(int i) => (int)Offered[Mathf.Clamp(i, 0, Offered.Length - 1)];
+        /// <summary>Modo válido (um modo retirado, salvo em versão antiga, vira TV).</summary>
+        public static int Sanitize(int mode) => FromOffered(ToOffered(mode));
         public static readonly string[] Zooms = { "Bem aberto", "Aberto", "Normal", "Perto", "Bem perto" };
         /// <summary>Zoom: -2 (aberto) .. +2 (perto).</summary>
         public int zoom;
@@ -40,7 +64,7 @@ namespace Craquez
         {
             cam = c;
             sim = s;
-            mode = Mathf.Clamp(m, 0, Modes.Length - 1);
+            mode = Sanitize(m);
             zoom = Settings.CameraZoom;
             _focus = Vector3.zero;
             // faixa de profundidade justa: menos "briga" de superfícies (pontos piscando) ao longe

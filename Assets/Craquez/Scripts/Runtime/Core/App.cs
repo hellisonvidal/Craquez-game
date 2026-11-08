@@ -762,7 +762,7 @@ namespace Craquez
                     _cfg.tacticsA = new Tactics();
                     _cfg.tacticsB = new Tactics();
                 }), 50, 50);
-            UiKit.Size(UiKit.Cycler(list, "Câmera", BroadcastCamera.Modes, Settings.Camera, i => Settings.Camera = i), 50, 50);
+            UiKit.Size(UiKit.Cycler(list, "Câmera", BroadcastCamera.OfferedNames, BroadcastCamera.ToOffered(Settings.Camera), i => Settings.Camera = BroadcastCamera.FromOffered(i)), 50, 50);
             UiKit.Size(UiKit.Cycler(list, "Faltas", new[] { "Cena antes da cobrança", "Cobrança rápida" }, _cfg.quickRestarts ? 1 : 0, i => { _cfg.quickRestarts = i == 1; Settings.QuickRestarts = i == 1; }), 50, 50);
             UiKit.Size(UiKit.Cycler(list, "Cerimônia de abertura", new[] { "Mostrar", "Pular" }, _cfg.ceremony ? 0 : 1, i => _cfg.ceremony = i == 0), 50, 50);
             // local da partida (desenho 2D, com o seletor nas laterais da imagem) e bola
@@ -1347,7 +1347,7 @@ namespace Craquez
             string[] mus = { "Desligada", "20%", "40%", "60%", "80%", "100%" };
             int mi = Settings.Music ? Mathf.Clamp(Mathf.RoundToInt(Settings.MusicVolume * 5f), 1, 5) : 0;
             UiKit.Size(UiKit.Cycler(list, "Música dos menus", mus, mi, i => { Settings.Music = i > 0; if (i > 0) Settings.MusicVolume = i / 5f; Sfx.MenuMusic(true); }), 50, 50);
-            UiKit.Size(UiKit.Cycler(list, "Câmera", BroadcastCamera.Modes, Settings.Camera, i => Settings.Camera = i), 50, 50);
+            UiKit.Size(UiKit.Cycler(list, "Câmera", BroadcastCamera.OfferedNames, BroadcastCamera.ToOffered(Settings.Camera), i => Settings.Camera = BroadcastCamera.FromOffered(i)), 50, 50);
             UiKit.Size(UiKit.Cycler(list, "Zoom da câmera", BroadcastCamera.Zooms, Settings.CameraZoom + 2, i => Settings.CameraZoom = i - 2), 50, 50);
             UiKit.Size(UiKit.Cycler(list, "Faltas", new[] { "Cena antes da cobrança", "Cobrança rápida" }, Settings.QuickRestarts ? 1 : 0, i => { Settings.QuickRestarts = i == 1; _cfg.quickRestarts = i == 1; }), 50, 50);
             var status = UiKit.Label(list, "", 20, Theme.Body, Theme.TextDim);

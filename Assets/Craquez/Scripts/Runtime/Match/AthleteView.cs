@@ -633,6 +633,10 @@ namespace Craquez
         Vector2 acc2D;
         bool _styleInit;
         float _cadence = 1f, _armAmp = 1f, _twist = 1f, _knee = 1f, _idleT, _restPose;
+        // jeito de carregar os braços: abertos/colados ao corpo, cotovelo mais ou menos dobrado,
+        // braços mais à frente, assimetria (um braço balança mais que o outro)
+        float _armCarry, _elbowStyle, _armFwd, _armAsym;
+        float _swingL, _swingR, _armSideLag;
         int _restKind;
 
         void InitStyle()
@@ -646,6 +650,12 @@ namespace Craquez
             _twist = 0.8f + R(2) * 0.6f;          // ombros girando mais ou menos
             _knee = 0.9f + R(3) * 0.35f;          // quem levanta mais o joelho
             _restKind = (int)(R(4) * 3f);         // 0 mãos na cintura, 1 braços soltos, 2 mãos nos joelhos (cansado)
+            _armCarry = 3f + R(5) * 11f;          // graus de abertura dos braços
+            uint h2 = h * 2654435761u;
+            float R2(int k) => ((h2 >> (k * 5)) & 31) / 31f;
+            _elbowStyle = -10f + R2(0) * 26f;
+            _armFwd = -4f + R2(1) * 10f;
+            _armAsym = 0.85f + R2(2) * 0.3f;
             if (p.isKeeper) _armAmp *= 0.85f;
         }
 
@@ -665,6 +675,9 @@ namespace Craquez
             bool hasBall = view.sim.ball.owner == p.id;
             var right = transform.right; var up = transform.up; var fwd = transform.forward;
             float amp = _armAmp * (1f + 0.4f * sprint) * (hasBall ? 0.85f : 1f) - 1f;
+            _thighL = ThighAngle("_l", up, right);
+            _thighR = ThighAngle("_r", up, right);
+            _localVel = transform.InverseTransformDirection(new Vector3(p.vel.x, 0f, p.vel.y));
             for (int side = -1; side <= 1; side += 2)
             {
                 string sfx = side < 0 ? "_l" : "_r";
@@ -673,14 +686,31 @@ namespace Craquez
                 rig.bones.TryGetValue("hand" + sfx, out var hd);
                 if (ua == null || la == null || hd == null) continue;
                 float s = Mathf.Sign(Vector3.Dot(ua.position - rig.spine.position, right));
-                // balanço: amplia (ou contém) o ângulo que a captura já tem, no plano da corrida
+                // balanço acoplado às pernas: o braço acompanha a coxa do lado oposto (como no corpo
+                // humano), em qualquer ritmo — andando, trotando, correndo. A amplitude e o jeito de
+                // carregar os braços mudam de atleta para atleta.
                 var armDir = la.position - ua.position;
                 float swing = Vector3.SignedAngle(-up, Vector3.ProjectOnPlane(armDir, right), right);
-                float extra = Mathf.Clamp(swing * amp * run, -25f, 25f);
-                _pose.Rotate(ua, Quaternion.AngleAxis(extra * w, right));
-                // cotovelo: dobra mais correndo (~90° no pique), quase solto andando
+                float legA = side < 0 ? _thighR : _thighL;
+                float gain = Mathf.Lerp(0.75f, 1.45f, Mathf.Max(run, sprint)) * _armAmp * (side < 0 ? 1f : _armAsym) * (hasBall ? 0.8f : 1f);
+                float moving = Mathf.Clamp01((spd - 0.3f) / 1.2f);
+                float want = legA * gain - (_armFwd + 8f * run + 6f * sprint);
+                ref float sw = ref (side < 0 ? ref _swingL : ref _swingR);
+                sw = Mathf.Lerp(sw, want, 1f - Mathf.Exp(-Time.deltaTime * 18f));
+                float corr = Mathf.Clamp(sw - swing, -40f, 40f) * 0.8f * moving;
+                // amplia o que a captura já tem no pique (braço bombeando)
+                corr += Mathf.Clamp(swing * amp * run, -12f, 12f) * (1f - moving * 0.5f);
+                _pose.Rotate(ua, Quaternion.AngleAxis(corr * w, right));
+                // abertura: estilo + equilíbrio (curva: o braço de fora abre; de lado/de costas: os dois abrem)
+                float turnOpen = Mathf.Clamp(-_yawRate * s * 0.04f, 0f, 14f) * Mathf.Clamp01(spd / 4f);
+                float lateral = Mathf.Clamp01(Mathf.Abs(_localVel.x) / 2.5f) + Mathf.Clamp01(-_localVel.z / 2f);
+                float open = (_armCarry * (0.6f + 0.4f * run) + turnOpen + lateral * 10f) * moving;
+                _pose.Rotate(ua, Quaternion.AngleAxis(s * open * w, fwd));
+                // cotovelo: dobra mais correndo (~90° no pique), quase solto andando; dobra mais
+                // quando o braço vai à frente e abre quando vai para trás (como no movimento real)
                 float bend = Vector3.Angle(la.position - ua.position, hd.position - la.position);
-                float wantBend = Mathf.Lerp(15f, 88f, Mathf.Max(run * 0.7f, sprint));
+                float phaseBend = Mathf.Clamp(-sw * 0.35f, -12f, 22f) * moving;
+                float wantBend = Mathf.Clamp(Mathf.Lerp(15f, 88f, Mathf.Max(run * 0.7f, sprint)) + _elbowStyle * moving + phaseBend, 8f, 110f);
                 if (bend < wantBend) _pose.Rotate(la, Quaternion.AngleAxis(-(wantBend - bend) * 0.8f * w, right));
                 // com a bola: braços um pouco abertos (equilíbrio)
                 if (hasBall) _pose.Rotate(ua, Quaternion.AngleAxis(s * 12f * w * Mathf.Max(0.4f, run), fwd));
@@ -719,6 +749,17 @@ namespace Craquez
         }
 
         float _phaseOff => p != null ? p.id * 1.618f : 0f;
+        float _thighL, _thighR;
+        Vector3 _localVel;
+
+        /// <summary>Ângulo da coxa no plano da corrida (negativo = perna à frente).</summary>
+        float ThighAngle(string sfx, Vector3 up, Vector3 right)
+        {
+            rig.bones.TryGetValue("thigh" + sfx, out var th);
+            rig.bones.TryGetValue("calf" + sfx, out var cf);
+            if (th == null || cf == null) return 0f;
+            return Vector3.SignedAngle(-up, Vector3.ProjectOnPlane(cf.position - th.position, right), right);
+        }
 
         /// <summary>Parado há um tempo: mãos na cintura (ou nos joelhos, cansado), como no jogo de verdade.</summary>
         void RestPose()

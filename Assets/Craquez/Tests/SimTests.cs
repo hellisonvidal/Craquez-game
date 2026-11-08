@@ -576,6 +576,63 @@ namespace Craquez.Tests
             Assert.LessOrEqual(timeouts, kickins / 5, "CPU estoura os 4 segundos do lateral");
         }
 
+        /// <summary>Escanteio: o cobrador vai andando até a bola e cobra cruzando na área ou com toque curto (nunca conduz).</summary>
+        [TestCase(GameModes.Field)]
+        [TestCase(GameModes.Futsal)]
+        public void CornerIsCrossOrShortPass(string mode)
+        {
+            int corners = 0, walkUps = 0, crosses = 0, shorts = 0, other = 0, carried = 0;
+            for (uint seed = 1; seed <= 12; seed++)
+            {
+                var sim = NewMatch(mode, seed);
+                var a = new CpuBrain(0, 0.7f); var b = new CpuBrain(1, 0.7f);
+                for (int i = 0; i < 90 + seed * 13; i++) sim.Step(new[] { a.MakeInput(sim), b.MakeInput(sim) });
+                int t = (int)(seed % 2);
+                float sx = (sim.halfLen - 0.3f) * sim.TeamDir(t), sy = (seed % 4 < 2 ? 1f : -1f) * (sim.halfW - 0.3f);
+                sim.ForceRestart(t, new Vector2(sx, sy), "corner");
+                corners++;
+                if (sim.walkUpTaker >= 0) walkUps++;
+                var held = sim.ball.pos;
+                int taker = -1;
+                for (int i = 0; i < 60 * 20; i++)
+                {
+                    if (sim.walkUpTaker >= 0) Assert.Less(sim.ball.pos.Dist(held), 0.01f, $"a bola saiu do lugar durante a caminhada: {held} -> {sim.ball.pos} owner {sim.ball.owner} st {sim.state} i {i} seed {seed} wu {sim.walkUpTaker} ko {sim.kickoffPass}");
+                    bool was = sim.cornerKick && sim.setPiece && sim.state == MatchState.Playing;
+                    if (was) taker = sim.setPieceTaker;
+                    sim.Step(new[] { a.MakeInput(sim), b.MakeInput(sim) });
+                    bool done = false;
+                    foreach (var e in sim.events)
+                    {
+                        if (!was) continue;
+                        if (e.type == "cross") { crosses++; done = true; }
+                        else if (e.type == "kick" && e.id == taker) { if (e.kind == "pass") shorts++; else if (e.kind != "lob") other++; done = true; }
+                    }
+                    if (was && !sim.setPiece && !done && sim.ball.owner == taker) { carried++; done = true; }
+                    if (done) break;
+                }
+            }
+            System.Console.WriteLine($"[escanteio {mode}] {corners} escanteios: {crosses} cruzamentos, {shorts} curtos, {other} outros, {carried} conduzidos");
+            Assert.AreEqual(corners, walkUps, "sem a cena do cobrador indo até a bola");
+            Assert.AreEqual(0, other, "escanteio virou chute");
+            Assert.AreEqual(0, carried, "o cobrador saiu conduzindo a bola do escanteio");
+            Assert.GreaterOrEqual(crosses + shorts, corners - 1);
+            Assert.GreaterOrEqual(crosses, shorts);
+        }
+
+        /// <summary>Saída de bola: a bola fica exatamente na marca do meio-campo até o toque.</summary>
+        [Test] public void KickoffBallOnCenterMark()
+        {
+            foreach (var mode in new[] { GameModes.Field, GameModes.Futsal, GameModes.Society })
+            {
+                var sim = NewMatch(mode, 3);
+                for (int i = 0; i < 200 && sim.kickoffPass; i++)
+                {
+                    if (sim.ball.owner == sim.kickoffKicker) Assert.Less(sim.ball.pos.magnitude, 0.01f, mode + ": bola fora da marca central");
+                    sim.Step(new InputFrame[2]);
+                }
+            }
+        }
+
         /// <summary>Recuo: passe com o pé do companheiro para o goleiro não pode ser agarrado.</summary>
         [Test] public void BackPassIsNotCaught()
         {
