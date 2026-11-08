@@ -321,7 +321,7 @@ namespace Craquez
         void ShowTrophyWall()
         {
             var root = Page("MURAL DE TROFÉUS");
-            _back = ShowCompetitions;
+            _back = ShowModes;
             var won = Trophies();
             Title(root, "MURAL DE TROFÉUS", won.Count == 0 ? "Vença uma competição para pôr o primeiro troféu na estante" : won.Count + (won.Count == 1 ? " troféu conquistado" : " troféus conquistados"));
             var area = UiKit.Rect(root, "estante").Place(0, 0, 1, 1, 90, 120, 90, 250);

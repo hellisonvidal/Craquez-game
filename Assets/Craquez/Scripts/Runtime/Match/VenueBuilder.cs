@@ -472,16 +472,23 @@ namespace Craquez
             var tex = Gfx.Led(txt, cols, 2048, 64);
             var mat = Gfx.Emissive(Color.white, new Color(0.9f, 0.9f, 0.9f), tex);
             v.ledMats.Add(mat);
-            var k = new MeshKit();
             float h = 0.95f, d = 5.2f, dz = 4.2f;
             float x0 = -(hl + d), x1 = hl + d, z0 = -(hw + dz), z1 = hw + dz;
             float L = (x1 - x0) / 12f;
-            k.Quad(new Vector3(x0, 0, z1), new Vector3(x0, h, z1), new Vector3(x1, h, z1), new Vector3(x1, 0, z1), new Vector2(0, 0), new Vector2(L, 1));
-            k.Quad(new Vector3(x1, 0, z0), new Vector3(x1, h, z0), new Vector3(x0, h, z0), new Vector3(x0, 0, z0), new Vector2(0, 0), new Vector2(L, 1));
             float Lz = (z1 - z0) / 12f;
+            // um objeto por lado: a placa do lado da câmera some sozinha quando tapa a visão
+            var k = new MeshKit();
+            k.Quad(new Vector3(x0, 0, z1), new Vector3(x0, h, z1), new Vector3(x1, h, z1), new Vector3(x1, 0, z1), new Vector2(0, 0), new Vector2(L, 1));
+            k.Object("Placas LED (fundo)", mat, v.root, false);
+            k = new MeshKit();
+            k.Quad(new Vector3(x1, 0, z0), new Vector3(x1, h, z0), new Vector3(x0, h, z0), new Vector3(x0, 0, z0), new Vector2(0, 0), new Vector2(L, 1));
+            k.Object("Placas LED (câmera)", mat, v.root, false);
+            k = new MeshKit();
             k.Quad(new Vector3(x1, 0, z1), new Vector3(x1, h, z1), new Vector3(x1, h, z0), new Vector3(x1, 0, z0), new Vector2(0, 0), new Vector2(Lz, 1));
+            k.Object("Placas LED (direita)", mat, v.root, false);
+            k = new MeshKit();
             k.Quad(new Vector3(x0, 0, z0), new Vector3(x0, h, z0), new Vector3(x0, h, z1), new Vector3(x0, 0, z1), new Vector2(0, 0), new Vector2(Lz, 1));
-            k.Object("Placas LED", mat, v.root, false);
+            k.Object("Placas LED (esquerda)", mat, v.root, false);
         }
 
         /// <summary>Arquibancadas em degraus com torcida, cobertura nos estádios maiores.</summary>
@@ -858,22 +865,27 @@ namespace Craquez
             Lines(v, sim, hl, hw);
             Goals(v, sim, hl, true);
             // alambrado: postes + tela (baixo do lado da câmera para não tapar o jogo)
-            var posts = new MeshKit();
-            var fence = new MeshKit();
             float fx = hl + 3f, fz = hw + 3f;
+            var postMat = Gfx.Lit(variant == 7 ? new Color(0.5f, 0.35f, 0.2f) : variant == 6 ? new Color(0.15f, 0.15f, 0.18f) : new Color(0.55f, 0.58f, 0.6f), null, 0.5f, variant == 7 ? 0f : 0.6f);
+            var fenceMat = Gfx.Transparent(variant == 6 ? new Color(0.3f, 0.3f, 0.36f, 0.85f) : new Color(0.75f, 0.78f, 0.8f, 0.85f), Gfx.Net(128, 18f, 1.6f));
+            int fenceN = 0;
             void FenceSide(Vector3 p0, Vector3 p1, float h)
             {
+                // cada lado é um objeto próprio (o do lado da câmera some quando tapa a visão)
+                var posts = new MeshKit();
+                var fence = new MeshKit();
                 float len = (p1 - p0).magnitude;
                 int n = Mathf.Max(1, Mathf.RoundToInt(len / 3f));
                 for (int i = 0; i <= n; i++) posts.Cylinder(Vector3.Lerp(p0, p1, i / (float)n), Vector3.Lerp(p0, p1, i / (float)n) + Vector3.up * h, 0.05f, 6);
                 fence.Quad(p0, p0 + Vector3.up * h, p1 + Vector3.up * h, p1, new Vector2(0, 0), new Vector2(len / 0.6f, h / 0.6f));
+                posts.Object("Postes do alambrado " + fenceN, postMat, v.root, false);
+                fence.Object("Alambrado " + fenceN, fenceMat, v.root, false);
+                fenceN++;
             }
             FenceSide(new Vector3(-fx, 0, fz), new Vector3(fx, 0, fz), 5f);
             FenceSide(new Vector3(fx, 0, fz), new Vector3(fx, 0, -fz), 6f);
             FenceSide(new Vector3(-fx, 0, -fz), new Vector3(-fx, 0, fz), 6f);
             FenceSide(new Vector3(fx, 0, -fz), new Vector3(-fx, 0, -fz), 1.2f);
-            posts.Object("Postes do alambrado", Gfx.Lit(variant == 7 ? new Color(0.5f, 0.35f, 0.2f) : variant == 6 ? new Color(0.15f, 0.15f, 0.18f) : new Color(0.55f, 0.58f, 0.6f), null, 0.5f, variant == 7 ? 0f : 0.6f), v.root, false);
-            fence.Object("Alambrado", Gfx.Transparent(variant == 6 ? new Color(0.3f, 0.3f, 0.36f, 0.85f) : new Color(0.75f, 0.78f, 0.8f, 0.85f), Gfx.Net(128, 18f, 1.6f)), v.root, false);
             // refletores nas quinas
             var poles = new MeshKit();
             var lampMk = new MeshKit();
@@ -1057,12 +1069,16 @@ namespace Craquez
             Color[] cols = { new Color(0.0f, 0.75f, 0.5f), home.c1, new Color(0.1f, 0.2f, 0.6f), new Color(0.9f, 0.6f, 0.1f), away.c1, new Color(0.75f, 0.1f, 0.2f) };
             var led = Gfx.Emissive(Color.white, new Color(0.8f, 0.8f, 0.8f), Gfx.Led(txt, cols, 2048, 64));
             v.ledMats.Add(led);
-            var bd = new MeshKit();
             float bx = hl + 2.2f, bz = hw + 2.2f, bh = 0.8f;
+            var bd = new MeshKit();
             bd.Quad(new Vector3(-bx, 0, bz), new Vector3(-bx, bh, bz), new Vector3(bx, bh, bz), new Vector3(bx, 0, bz), new Vector2(0, 0), new Vector2(bx / 6f, 1));
+            bd.Object("Placas (fundo)", led, v.root, false);
+            bd = new MeshKit();
             bd.Quad(new Vector3(bx, 0, bz), new Vector3(bx, bh, bz), new Vector3(bx, bh, -bz), new Vector3(bx, 0, -bz), new Vector2(0, 0), new Vector2(bz / 6f, 1));
+            bd.Object("Placas (direita)", led, v.root, false);
+            bd = new MeshKit();
             bd.Quad(new Vector3(-bx, 0, -bz), new Vector3(-bx, bh, -bz), new Vector3(-bx, bh, bz), new Vector3(-bx, 0, bz), new Vector2(0, 0), new Vector2(bz / 6f, 1));
-            bd.Object("Placas", led, v.root, false);
+            bd.Object("Placas (esquerda)", led, v.root, false);
             // ginásio
             float W = hl + 18f, D = hw + 17f, H = 17f;
             var wallLow = Gfx.Lit(Color.Lerp(pp.surround, Color.white, 0.25f), Gfx.Asphalt(256, Color.white, variant + 20, 0f), 0.25f);
@@ -1112,9 +1128,22 @@ namespace Craquez
             var cm = Gfx.Lit(Color.white, crowd, 0.05f);
             v.crowdMats.Add(cm);
             var concrete = Gfx.Lit(new Color(0.6f, 0.61f, 0.64f), Gfx.Asphalt(256, Color.white, 13, 0.05f), 0.15f);
-            var rail = new MeshKit();
+            // torcedores de verdade (silhuetas recortadas em pé, pulando nos lances) sobre os degraus
+            bool stripedH = homeKit.pattern == 1 || homeKit.pattern == 5 || homeKit.pattern == 2;
+            int hseed = variant * 37 + 3;
+            var hPeople = Gfx.CrowdPeople(1024, quality >= 1 ? 96 : 64, homeKit.c1, homeKit.c2, awayKit.c1, hseed, 0f, stripedH);
+            var hCheer = Gfx.CrowdPeople(1024, quality >= 1 ? 96 : 64, homeKit.c1, homeKit.c2, awayKit.c1, hseed, 1f, stripedH);
+            var hMats = new Material[2];
+            for (int g = 0; g < 2; g++)
+            {
+                hMats[g] = Gfx.Cutout(Color.white, hPeople, 0.5f, 0.05f);
+                v.crowdMats.Add(hMats[g]);
+                v.crowdPhase[hMats[g]] = g * 2.4f;
+                v.crowdCheer.Add((hMats[g], hPeople, hCheer));
+            }
             foreach (float sz in new[] { 1f, -1f })
             {
+                var rail = new MeshKit();
                 var st = new MeshKit();
                 var stc = new MeshKit();
                 // lado da câmera também com arquibancada (some quando tapa a visão), com o vão da
@@ -1144,14 +1173,26 @@ namespace Craquez
                 }
                 st.Object("Torcida", cm, v.root, false);
                 stc.Object("Degraus", concrete, v.root, false);
+                var pg = new[] { new MeshKit(), new MeshKit() };
+                foreach (var (xa, xb) in segs)
+                    for (int r = 0; r < rows; r++)
+                    {
+                        float y1 = 1.0f + (r + 1) * 0.45f, d = (start + r * 0.85f + 0.5f) * sz;
+                        float ua = (r * 0.37f) % 1f, ub = ua + (xb - xa) / 9f;
+                        const float hh = 0.8f;
+                        var A = new Vector3(xa, y1, d); var B = new Vector3(xb, y1, d);
+                        if (sz > 0) pg[r % 2].Quad(B, A, A + Vector3.up * hh, B + Vector3.up * hh, new Vector2(ua, 0f), new Vector2(ub, 1f));
+                        else pg[r % 2].Quad(A, B, B + Vector3.up * hh, A + Vector3.up * hh, new Vector2(ua, 0f), new Vector2(ub, 1f));
+                    }
+                for (int g = 0; g < 2; g++) pg[g].Object("Torcedores " + (sz > 0 ? "fundo" : "câmera") + " " + g, hMats[g], v.root, false);
                 // base e guarda-corpo
                 var front = new MeshKit();
                 front.Box(new Vector3(0, 0.5f, (start - 0.1f) * sz), new Vector3(sx * 2f, 1f, 0.2f), 2f);
                 front.Object("Mureta", wallLow, v.root, false);
                 rail.Cylinder(new Vector3(-sx, 2.0f, (start - 0.1f) * sz), new Vector3(sx, 2.0f, (start - 0.1f) * sz), 0.03f, 6);
                 for (float x = -sx; x <= sx; x += 2.5f) rail.Cylinder(new Vector3(x, 1f, (start - 0.1f) * sz), new Vector3(x, 2.0f, (start - 0.1f) * sz), 0.025f, 5);
+                rail.Object("Guarda-corpo " + (sz > 0 ? "(fundo)" : "(câmera)"), Gfx.Lit(new Color(0.75f, 0.77f, 0.8f), null, 0.6f, 0.8f), v.root, false);
             }
-            rail.Object("Guarda-corpo", Gfx.Lit(new Color(0.75f, 0.77f, 0.8f), null, 0.6f, 0.8f), v.root, false);
             // placar suspenso no centro
             var sb = new MeshKit();
             sb.Box(new Vector3(0, H - 4.5f, 0), new Vector3(4.2f, 2.2f, 4.2f), 1f);
@@ -1708,11 +1749,13 @@ namespace Craquez
             for (int i = 0; i < _rest.Length; i++)
             {
                 if (_pinned[i]) continue;
+                // bolsão: forte no ponto do impacto, espalhando pela malha (o pano estufa e depois cai)
                 float d2 = (_rest[i] - hit).sqrMagnitude;
-                float w = Mathf.Exp(-d2 * 1.6f);
-                _vel[i] += new Vector3(_side * 4.2f, -0.6f, (_rest[i].z - hit.z) * 0.8f) * (w * k);
+                float w = Mathf.Exp(-d2 * 2.2f) + 0.25f * Mathf.Exp(-d2 * 0.35f);
+                var radial = _rest[i] - hit; radial.x = 0f;
+                _vel[i] += (new Vector3(_side * 3.4f, -0.4f, 0f) + radial * 0.5f) * (w * k);
             }
-            _awake = 4f;
+            _awake = 5f;
         }
 
         /// <summary>Bola encostando na rede (rolando ou parada dentro do gol): afunda o tecido em volta.</summary>
@@ -1743,8 +1786,10 @@ namespace Craquez
             float breeze = Mathf.Sin(Time.time * 1.3f + transform.position.x) * 0.004f;
             _awake = Mathf.Max(0f, _awake - dt);
             int N = _rest.Length;
-            const float kRest = 38f, kNbr = 240f, damp = 5.5f;
-            int sub = 2;
+            // tecido de náilon: volta devagar ao lugar (mola fraca), a onda corre pela malha e o
+            // amortecimento tira o "tremido" (antes era duro e vibrava como borracha)
+            const float kRest = 14f, kNbr = 160f, damp = 3.2f;
+            int sub = 4;
             float h = dt / sub;
             for (int s = 0; s < sub; s++)
                 for (int i = 0; i < N; i++)
@@ -1756,9 +1801,11 @@ namespace Craquez
                     if (nb.Length > 0) avg /= nb.Length;
                     var acc = -_disp[i] * kRest + (avg - _disp[i]) * kNbr - _vel[i] * damp;
                     acc.x += _side * breeze * 40f * Mathf.Clamp01(_rest[i].y);   // o vento empurra o fundo
-                    acc.y -= 0.6f;                                                // caimento do tecido
+                    acc.y -= 0.6f + 2.5f * Mathf.Clamp01(Mathf.Abs(_disp[i].x) * 2f);   // caimento: estufado, o pano pesa
                     _vel[i] += acc * h;
+                    _vel[i] *= 1f / (1f + 0.6f * h * _vel[i].magnitude);          // arrasto do ar no tecido
                     _disp[i] += _vel[i] * h;
+                    if (_disp[i].sqrMagnitude > 0.49f) { _disp[i] = _disp[i].normalized * 0.7f; _vel[i] *= 0.5f; }   // o fio não estica sem limite
                     // a rede não atravessa para dentro do gol além do pano original
                     if (_disp[i].x * _side < -0.25f) { _disp[i].x = -0.25f * _side; _vel[i].x = 0f; }
                 }

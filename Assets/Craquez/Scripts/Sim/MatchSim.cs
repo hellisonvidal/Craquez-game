@@ -93,6 +93,8 @@ namespace Craquez.Sim
         /// </summary>
         public int walkUpTaker = -1;
         public Vector2 walkUpTo, walkUpFacing;
+        /// <summary>Antes de ir para a bola, o cobrador espera parado os companheiros se posicionarem.</summary>
+        public float walkUpWait;
         /// <summary>Faltas do time no tempo (futsal: da 6ª em diante, tiro livre sem barreira).</summary>
         public int[] teamFouls = new int[2];
         /// <summary>Quem fez o último passe com o pé (regra do recuo: o goleiro não pega com as mãos).</summary>
@@ -549,7 +551,7 @@ namespace Craquez.Sim
             noOffsideKick = kind == "throwin" || kind == "corner" || kind == "goalkick";
             state = MatchState.Restart;
             stateTimer = cut ? (kind == "freekick" ? 1.6f : 1.1f) : (quickRestarts ? 0.35f : 0.7f);
-            if (walkUpTaker >= 0) stateTimer += WalkUpTime;
+            if (walkUpTaker >= 0) stateTimer += WalkUpTime + walkUpWait;
             Emit("whistle", t, -1, kind);
         }
 
@@ -578,6 +580,7 @@ namespace Craquez.Sim
             from.y = Mathf.Clamp(from.y, -halfW + 0.4f, halfW - 0.4f);
             if (from.Dist(to) < 1.5f) return;
             walkUpTaker = taker.id;
+            walkUpWait = kind == "goalkick" ? 0.5f : 1.3f;
             walkUpTo = to;
             walkUpFacing = f;
             taker.position = from;
@@ -593,6 +596,16 @@ namespace Craquez.Sim
             var p = players[walkUpTaker];
             var d = walkUpTo - p.position;
             float dist = d.magnitude;
+            if (walkUpWait > 0f && stateTimer > WalkUpTime * 0.8f)
+            {
+                // parado, de olho na bola, esperando a área/barreira se arrumar
+                walkUpWait -= DT;
+                p.intent = Vector2.zero;
+                p.wantSprint = false;
+                p.vel = Vector2.zero;
+                p.facing = V2.RotateToward(p.facing, (ball.pos - p.position).Norm(), 6f * DT).Norm();
+                return;
+            }
             // termina ao chegar, ou quando o tempo da cena acaba (sem ficar preso)
             if (dist < 0.3f || stateTimer <= 0.3f)
             {
@@ -1627,7 +1640,7 @@ namespace Craquez.Sim
             // o batedor vem da entrada da área até a bola
             walkUpTaker = -1;
             BeginWalkUp(taker, "penalty");
-            if (walkUpTaker >= 0) stateTimer += WalkUpTime;
+            if (walkUpTaker >= 0) stateTimer += WalkUpTime + walkUpWait;
             Emit("whistle", t, -1, "penalty");
         }
 

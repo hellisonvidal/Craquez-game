@@ -60,6 +60,57 @@ namespace Craquez
                 if (axis.sqrMagnitude < 1e-6f) continue;
                 pose.Rotate(foot, Quaternion.AngleAxis(delta, axis.normalized));   // + levanta a ponta
             }
+            FeetStraight(rig, root, pose, act);
+        }
+
+        static readonly Dictionary<AthleteRig, int> _footSideAxis = new Dictionary<AthleteRig, int>();
+
+        static Vector3 Axis(Transform t, int i) => i == 0 ? t.right : i == 1 ? t.up : t.forward;
+
+        /// <summary>
+        /// Pés retos: a ponta do pé aponta para a frente do corpo (com a abertura natural de ~8°) e a
+        /// sola fica plana no chão (sem o pé "torto", virado para dentro/fora ou deitado de lado).
+        /// No ar e nas ações (chute, drible) a correção é menor.
+        /// </summary>
+        public static void FeetStraight(AthleteRig rig, Transform root, PoseEdits pose, float act)
+        {
+            float ground = root.position.y;
+            var up = Vector3.up;
+            var bodyFwd = Vector3.ProjectOnPlane(root.forward, up).normalized;
+            if (bodyFwd.sqrMagnitude < 1e-4f) return;
+            for (int side = 0; side < 2; side++)
+            {
+                var foot = side == 0 ? rig.footL : rig.footR;
+                rig.bones.TryGetValue(side == 0 ? "ball_l" : "ball_r", out var toe);
+                if (foot == null || toe == null) continue;
+                float h = Mathf.Min(foot.position.y, toe.position.y + 0.05f) - ground;
+                float stance = 1f - Mathf.Clamp01((h - 0.08f) / 0.15f);
+                float w = Mathf.Lerp(0.35f, 1f, stance) * (1f - act * 0.75f);
+                if (w <= 0.01f) continue;
+                // 1) direção (giro em torno do eixo vertical)
+                var fwd = Vector3.ProjectOnPlane(toe.position - foot.position, up);
+                if (fwd.sqrMagnitude < 1e-5f) continue;
+                float sgn = side == 0 ? -1f : 1f;   // esquerdo abre para a esquerda
+                var want = Quaternion.AngleAxis(sgn * 8f, up) * bodyFwd;
+                float yaw = Vector3.SignedAngle(fwd, want, up);
+                float excess = Mathf.Abs(yaw) > 6f ? yaw - Mathf.Sign(yaw) * 6f : 0f;
+                if (Mathf.Abs(excess) > 0.3f) pose.Rotate(foot, Quaternion.AngleAxis(Mathf.Clamp(excess, -60f, 60f) * w, up));
+                // 2) sola plana (giro em torno do comprimento do pé), só apoiado
+                if (stance < 0.2f) continue;
+                if (!_footSideAxis.TryGetValue(rig, out int ax))
+                {
+                    // o eixo do osso mais perpendicular ao comprimento do pé = eixo lateral da sola
+                    var f0 = (toe.position - foot.position).normalized;
+                    ax = 0; float best = 9f;
+                    for (int i = 0; i < 3; i++) { float d = Mathf.Abs(Vector3.Dot(Axis(foot, i), f0)) + Mathf.Abs(Vector3.Dot(Axis(foot, i), up)); if (d < best) { best = d; ax = i; } }
+                    _footSideAxis[rig] = ax;
+                }
+                var lat = Axis(foot, ax);
+                var flat = Vector3.ProjectOnPlane(lat, up);
+                if (flat.sqrMagnitude < 1e-4f) continue;
+                float tilt = Vector3.Angle(lat, flat);
+                if (tilt > 2f) pose.Rotate(foot, Quaternion.Slerp(Quaternion.identity, Quaternion.FromToRotation(lat, flat.normalized), Mathf.Clamp01(stance * w * 0.9f) * Mathf.Min(1f, 40f / tilt)));
+            }
         }
 
         /// <summary>Abertura lateral do braço (graus) no referencial do atleta.</summary>

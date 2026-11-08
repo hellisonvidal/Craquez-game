@@ -111,8 +111,10 @@ namespace Craquez
                 var b = r.bounds;
                 bool floor = b.size.y < 0.6f && b.max.y < 0.8f;
                 if (floor || Mathf.Max(b.size.x, b.size.y, b.size.z) < 1.2f) continue;
-                // gols, redes e o que fica dentro do campo nunca somem
-                if (sim != null && Mathf.Abs(b.center.x) < sim.halfLen + 3.5f && Mathf.Abs(b.center.z) < sim.halfW + 1.5f && b.max.y < 6f) continue;
+                // gols, redes e o que fica inteiramente dentro do campo nunca somem (antes bastava o
+                // centro estar dentro: guarda-corpos e placas que dão a volta no campo nunca sumiam)
+                if (sim != null && Mathf.Abs(b.min.x) < sim.halfLen + 3.5f && Mathf.Abs(b.max.x) < sim.halfLen + 3.5f
+                    && Mathf.Abs(b.min.z) < sim.halfW + 1.2f && Mathf.Abs(b.max.z) < sim.halfW + 1.2f && b.max.y < 6f) continue;
                 _occ.Add(r);
                 _occMode.Add(r.shadowCastingMode);
                 _occHidden.Add(false);
@@ -120,6 +122,7 @@ namespace Craquez
         }
 
         readonly Vector3[] _targets = new Vector3[7];
+        readonly System.Collections.Generic.List<Vector3> _tList = new System.Collections.Generic.List<Vector3>();
 
         void UpdateOccluders(Vector3 focus)
         {
@@ -135,13 +138,23 @@ namespace Craquez
             targets[4] = new Vector3(Mathf.Clamp(focus.x - 15f, -hl, hl), 0.5f, Mathf.Sign(c.z) * hw);
             targets[5] = new Vector3(Mathf.Clamp(focus.x + 15f, -hl, hl), 0.5f, Mathf.Sign(c.z) * hw);
             targets[6] = new Vector3(focus.x, 1.5f, 0f);
+            // e uma grade sobre todo o campo visível: nada pode tapar nenhum pedaço da área de jogo
+            _tList.Clear();
+            _tList.AddRange(targets);
+            for (int gx = 0; gx <= 6; gx++)
+                for (int gz = 0; gz <= 3; gz++)
+                {
+                    var g = new Vector3(Mathf.Lerp(-hl, hl, gx / 6f), 0.6f, Mathf.Lerp(-hw, hw, gz / 3f));
+                    var vp = cam.WorldToViewportPoint(g);
+                    if (vp.z > 0f && vp.x > -0.05f && vp.x < 1.05f && vp.y > -0.05f && vp.y < 1.05f) _tList.Add(g);
+                }
             for (int i = 0; i < _occ.Count; i++)
             {
                 var r = _occ[i];
                 if (r == null) continue;
                 var b = r.bounds;
                 bool block = false;
-                foreach (var t in targets)
+                foreach (var t in _tList)
                 {
                     var d = t - c;
                     float len = d.magnitude;

@@ -21,7 +21,7 @@ namespace Craquez
         float _drumTarget;
         AudioClip _flutter, _bark;
         AudioClip _ui, _move, _kick, _kickHard, _whistle, _whistleLong, _whistleEnd, _net, _post, _crowdLoop, _cheer, _ooh, _chantLoop, _thud;
-        float _crowdTarget = 0.35f, _chantTarget;
+        float _crowdTarget = 0f, _chantTarget;   // nos menus, silêncio (o ruído da torcida soava como chiado)
 
         public static void Init()
         {
@@ -50,7 +50,7 @@ namespace Craquez
             _whistle = Whistle(0.35f, rng);
             _whistleLong = Whistle(0.9f, rng);
             _whistleEnd = Whistle3(rng);
-            _net = Noise(0.5f, 0.35f, 900f, rng, decay: 6f);
+            _net = NetSwish(rng);
             _post = Metal(rng);
             _flutter = Flutter(rng);
             _bark = Bark(rng);
@@ -125,6 +125,8 @@ namespace Craquez
         {
             if (_i == null || _i._music == null) return;
             _i._musicTarget = on && Settings.Music ? Mathf.Clamp01(Settings.MusicVolume) : 0f;
+            _inMenus = on;
+            if (on) { _i._crowdTarget = _i._chantTarget = _i._drumTarget = 0f; }   // menus: sem ambiente de torcida
             if (_i._musicTarget > 0f && !_i._music.isPlaying)
             {
                 if (_i._musicHeld) _i._music.UnPause(); else _i._music.Play();
@@ -191,7 +193,7 @@ namespace Craquez
         public static void Cheer() { if (!_noCrowd) Play(_i?._cheer, 1f); }
         public static void Boo() { if (!_noCrowd) Play(_i?._boo, 0.7f, 0.95f + Random.value * 0.1f); }
         /// <summary>Batucada da torcida (0..1).</summary>
-        public static void Drums(float v) { if (_i != null) _i._drumTarget = _noCrowd ? 0f : v; }
+        public static void Drums(float v) { if (_i != null) _i._drumTarget = _noCrowd || _inMenus ? 0f : v; }
         public static void Ooh() { if (!_noCrowd) Play(_i?._ooh, 0.7f, 0.9f + Random.value * 0.2f); }
         /// <summary>Aplauso/vibração curta da torcida (desarme, drible, boa defesa).</summary>
         public static void Applause(float v = 0.4f) { if (!_noCrowd) Play(_i?._applause, Mathf.Clamp01(v * 1.3f), 0.97f + Random.value * 0.08f); }
@@ -199,8 +201,12 @@ namespace Craquez
         public static void Hurray(float v = 0.4f) { if (_noCrowd) return; if (_i?._hurray != null) Play(_i._hurray, v, 0.95f + Random.value * 0.1f); else Applause(v); }
 
         /// <summary>Volume da torcida (0 = silêncio, menu) e canto organizado.</summary>
+        static bool _inMenus = true;
+
         public static void Crowd(float level, float chant)
         {
+            // nos menus (inclusive com a partida de fundo rodando) a torcida fica muda: só a trilha
+            if (_inMenus) { level = 0f; chant = 0f; }
             if (_i == null) return;
             _i._crowdTarget = _noCrowd ? 0f : level;
             _i._chantTarget = _noCrowd ? 0f : chant;
@@ -328,6 +334,35 @@ namespace Craquez
                 d[i] = lp * vol * Mathf.Exp(-t * decay) * Mathf.Min(1f, t * 200f) * 3f;
             }
             return Make("noise", d);
+        }
+
+        /// <summary>
+        /// Bola na rede: baque abafado do couro no náilon + o "chuá" do tecido (ruído em banda média
+        /// com o tremor das cordas), cauda curta das cordas assentando.
+        /// </summary>
+        static AudioClip NetSwish(System.Random r)
+        {
+            int n = (int)(0.75f * Rate);
+            var d = new float[n];
+            float lp1 = 0, lp2 = 0, hp = 0, prev = 0;
+            float k1 = 1f - Mathf.Exp(-2 * Mathf.PI * 3800f / Rate), k2 = 1f - Mathf.Exp(-2 * Mathf.PI * 700f / Rate);
+            for (int i = 0; i < n; i++)
+            {
+                float t = i / (float)Rate;
+                float w = (float)(r.NextDouble() * 2 - 1);
+                lp1 += (w - lp1) * k1;            // passa-baixa ~3,8 kHz
+                lp2 += (lp1 - lp2) * k2;          // tira os graves: banda ~0,7-3,8 kHz
+                float band = lp1 - lp2;
+                hp = band;
+                float swishEnv = Mathf.Min(1f, t * 60f) * Mathf.Exp(-t * 5.5f);
+                float flutter = 0.65f + 0.35f * Mathf.Sin(2 * Mathf.PI * (21f - t * 10f) * t);   // cordas vibrando
+                float thump = Mathf.Sin(2 * Mathf.PI * (95f - 30f * t) * t) * Mathf.Exp(-t * 22f) * 0.55f;
+                float rustle = (t > 0.18f ? band * Mathf.Exp(-(t - 0.18f) * 9f) * 0.25f * (0.5f + 0.5f * Mathf.Sin(t * 90f)) : 0f);
+                float s = hp * swishEnv * flutter * 1.6f + thump + rustle;
+                d[i] = Mathf.Lerp(prev, s, 0.85f);
+                prev = d[i];
+            }
+            return Make("rede", d);
         }
 
         static AudioClip Metal(System.Random r)

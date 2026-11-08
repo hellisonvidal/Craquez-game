@@ -8,6 +8,17 @@ Jogo de futebol feito 100% com inteligência artificial, **gratuito**. Android, 
 - **Linux**: `Craquez-v2.1.0-Linux.tar.gz` → extraia e rode `./Craquez` (ou `./instalar.sh` para o atalho no menu)
 
 ### Novidades
+- **Visão livre**: placas, alambrados, guarda-corpos e arquibancadas do lado da câmera agora somem
+  sempre que tapam qualquer pedaço do campo visível (antes só o ponto da bola era testado, e o que
+  dava a volta no campo nunca sumia).
+- **Pés retos**: a ponta do pé aponta para a frente do corpo e a sola fica plana no chão.
+- **Fim da comemoração**: ninguém fica com os braços erguidos depois do gol.
+- **Goleiro**: o lado do mergulho fica fixo durante a defesa e o movimento é contínuo (sem "quadros").
+- **Redes** de náilon mais soltas (estufam, pesam e voltam devagar) e novo som da bola na rede.
+- **Menus sem chiado**: o ambiente da torcida não toca mais nos menus.
+- **Option file** de volta dentro de Configurações (aba própria); Mural de troféus de novo no menu.
+- **Cobrança**: o cobrador espera parado os companheiros se posicionarem antes de ir para a bola.
+- **Ginásios**: torcedores em pé (pulando nos lances) nas arquibancadas laterais.
 - **Escanteios de verdade**: bola parada no canto; cobrança com cruzamento na área (força escolhe
   primeiro ou segundo pau) ou toque curto para o companheiro que vem buscar. A área já aparece
   ocupada (atacantes nos seus lugares, marcadores colados).

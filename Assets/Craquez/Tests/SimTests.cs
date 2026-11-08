@@ -289,7 +289,7 @@ namespace Craquez.Tests
             offender.vel = new Vector2(dir * 6f, 0);
             sim.ball.owner = victim.id;
             sim.Foul(offender, victim);
-            for (int i = 0; i < 60 * 5 && sim.state != MatchState.Playing; i++) sim.Step(new InputFrame[2]);
+            for (int i = 0; i < 60 * 9 && sim.state != MatchState.Playing; i++) sim.Step(new InputFrame[2]);
             Assert.IsTrue(sim.setPiece, "sem bola parada");
             Assert.AreEqual(shotAllowed, sim.setPieceShot);
             var spot = sim.setPieceSpot;

@@ -194,7 +194,7 @@ namespace Craquez
 
         // --------------------------------------------------------------- texturas
         public static Texture2D Tex(int w, int h, bool mips = true, TextureWrapMode wrap = TextureWrapMode.Repeat)
-            => new Texture2D(w, h, TextureFormat.RGBA32, mips) { wrapMode = wrap, filterMode = FilterMode.Trilinear, anisoLevel = 4 };
+            => new Texture2D(w, h, TextureFormat.RGBA32, mips) { wrapMode = wrap, filterMode = FilterMode.Trilinear, anisoLevel = 8 };
 
         static float Hash(int x, int y, int s)
         {

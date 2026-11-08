@@ -678,6 +678,7 @@ namespace Craquez
 
         void OnDestroy()
         {
+            Sfx.Crowd(0f, 0f);   // saiu da partida: nada de ruído de torcida nos menus
             Time.timeScale = 1f;   // menus em tempo real
         }
     }

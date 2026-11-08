@@ -444,6 +444,13 @@ namespace Craquez
                 Debug.Log($"[diag] atleta {p.name}: cabeça a {rig.head.position.y - transform.position.y:F2} m do chão (raiz), pés {rig.footL?.position.y - transform.position.y:F2} m; rotação do modelo {rig.model.localEulerAngles}");
             }
             if (_celebrate > 0f) _celebrate -= dt;
+            // a comemoração acaba quando o jogo volta (saída de bola/jogo rolando): ninguém fica de braços erguidos
+            var stt = view.sim.state;
+            if (stt == Craquez.Sim.MatchState.Kickoff || stt == Craquez.Sim.MatchState.Playing || stt == Craquez.Sim.MatchState.Restart || stt == Craquez.Sim.MatchState.Foul)
+            {
+                _celebrate = 0f;
+                _armsUp = Mathf.MoveTowards(_armsUp, 0f, dt * 4f);
+            }
         }
 
         // ------------------------------------------------------------ defesas do goleiro
@@ -459,11 +466,19 @@ namespace Craquez
         {
             if (p.saveKind > 0)
             {
+                float simU = 1f - p.saveT / Mathf.Max(0.01f, p.saveTotal);
+                bool fresh = _saveRec <= 0f || p.saveKind != _saveKindV || simU + 0.05f < _saveU;
                 _saveKindV = p.saveKind;
-                // lado do mergulho no corpo: + = para a direita do goleiro
-                var sideW = new Vector3(0, 0, p.saveSide);
-                _saveSideV = Vector3.Dot(sideW, transform.right) >= 0f ? 1f : -1f;
-                _saveU = 1f - p.saveT / Mathf.Max(0.01f, p.saveTotal);
+                if (fresh)
+                {
+                    // lado do mergulho no corpo (+ = direita do goleiro): decidido no começo da defesa e
+                    // mantido até o fim (antes era recalculado a cada quadro e o corpo "trocava" de lado)
+                    var sideW = new Vector3(0, 0, p.saveSide);
+                    _saveSideV = Vector3.Dot(sideW, transform.right) >= 0f ? 1f : -1f;
+                    _saveU = simU;
+                }
+                // progresso contínuo entre os passos da simulação (sem "quadros")
+                else _saveU = Mathf.Clamp(Mathf.Max(_saveU + dt / Mathf.Max(0.05f, p.saveTotal), simU - 0.02f), 0f, Mathf.Min(1f, simU + 0.04f));
                 _saveRec = 0.45f;
             }
             else

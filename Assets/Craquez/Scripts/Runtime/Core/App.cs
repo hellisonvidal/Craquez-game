@@ -555,7 +555,7 @@ namespace Craquez
         }
 
         /// <summary>Menu principal: Jogar, Competições (com o mural de troféus), Option file e Configurações.</summary>
-        static Texture2D _settingsArt, _optionArt;
+        static Texture2D _settingsArt;
 
         void ShowModes()
         {
@@ -568,9 +568,10 @@ namespace Craquez
             var wc = Competitions.All[0];
             int titles = Trophies().Count;
             var play = BigCard(grid, "JOGAR", "AMISTOSO", "Campo, futsal, society e rua", ModeArt(MenuArt.Kind.Field), 512f / 560f, new Color(0.13f, 0.77f, 0.37f), ShowPlay);
-            BigCard(grid, "COMPETIÇÕES", titles > 0 ? titles + (titles == 1 ? " TÍTULO" : " TÍTULOS") : Competitions.All.Length + " COMPETIÇÕES", "Ligas, copas, seleções e mural de troféus", TrophyArt.Texture(wc.trophy, wc.c1, wc.c2, 512), 1f, new Color(0.98f, 0.7f, 0.15f), ShowCompetitions);
-            BigCard(grid, "OPTION FILE", Teams.OverrideCount > 0 ? Teams.OverrideCount + " TIMES EDITADOS" : "ORIGINAL", "Times, elencos, uniformes e escudos", _optionArt ??= MenuArt.Venue(GameModes.Field, 2, new Color(0.55f, 0.35f, 0.95f), 640, 560), 640f / 560f, new Color(0.62f, 0.4f, 0.98f), ShowOptionFile);
-            BigCard(grid, "CONFIGURAÇÕES", "OPÇÕES", "Som, câmera, partida e vídeo", _settingsArt ??= MenuArt.SettingsArt(), 512f / 560f, new Color(0.35f, 0.5f, 0.9f), ShowOptions);
+            BigCard(grid, "COMPETIÇÕES", titles > 0 ? titles + (titles == 1 ? " TÍTULO" : " TÍTULOS") : Competitions.All.Length + " COMPETIÇÕES", "Ligas, copas e torneios de seleções", TrophyArt.Texture(wc.trophy, wc.c1, wc.c2, 512), 1f, new Color(0.98f, 0.7f, 0.15f), ShowCompetitions);
+            var lc = Competitions.All[4];
+            BigCard(grid, "MURAL DE TROFÉUS", titles + (titles == 1 ? " TÍTULO" : " TÍTULOS"), "As suas conquistas", TrophyArt.Texture(lc.trophy, lc.c1, lc.c2, 512, titles == 0), 1f, new Color(0.85f, 0.55f, 0.2f), ShowTrophyWall);
+            BigCard(grid, "CONFIGURAÇÕES", "OPÇÕES", "Som, câmera, partida, vídeo e option file", _settingsArt ??= MenuArt.SettingsArt(), 512f / 560f, new Color(0.35f, 0.5f, 0.9f), ShowOptions);
             // sair do jogo sem precisar fechar o app à força (também pelo voltar do menu principal)
             var quit = UiKit.Button(root, "SAIR DO JOGO", ConfirmQuit, 28, new Color(0.55f, 0.1f, 0.14f));
             quit.GetComponent<RectTransform>().At(1, 0, 300, 62, -90, 112);
@@ -1312,13 +1313,14 @@ namespace Craquez
         System.Collections.Generic.Dictionary<string, object> _optSnap;
 
         /// <summary>Abas das configurações (submenus): som, câmera, partida e vídeo.</summary>
-        static readonly string[] OptionTabs = { "SOM", "CÂMERA", "PARTIDA", "VÍDEO" };
+        static readonly string[] OptionTabs = { "SOM", "CÂMERA", "PARTIDA", "VÍDEO", "OPTION FILE" };
         static readonly string[] OptionTabInfo =
         {
             "Volume, música dos menus e vibração",
             "Câmera da partida e zoom",
             "Nomes dos atletas e cobranças de falta",
             "Qualidade, tela, resolução e efeitos",
+            "Times, elencos, uniformes e escudos",
         };
         int _optTab;
 
@@ -1399,6 +1401,27 @@ namespace Craquez
                     Add(UiKit.Cycler(list, "Nomes dos atletas", Settings.PlayerTagNames, Settings.PlayerTags, i => Settings.PlayerTags = i));
                     Add(UiKit.Cycler(list, "Faltas", new[] { "Cena antes da cobrança", "Cobrança rápida" }, Settings.QuickRestarts ? 1 : 0, i => { Settings.QuickRestarts = i == 1; _cfg.quickRestarts = i == 1; }));
                     break;
+                case 4:
+                {
+                    int crests = 0;
+                    for (int i = 0; i < Teams.Count; i++) if (Teams.Crest(i) != null) crests++;
+                    var status = UiKit.Label(list, "", 24, Theme.Body, Theme.Text);
+                    status.supportRichText = true;
+                    status.gameObject.AddComponent<LayoutElement>().minHeight = 130;
+                    status.text = (Teams.OptionFilePath != "" ? "<b>Carregado:</b>  " + Teams.OptionFilePath : "<b>Nenhum option file carregado</b> (dados originais do jogo)") +
+                                  "\nTimes alterados: " + Teams.OverrideCount + "   •   Escudos: " + crests +
+                                  "\n<color=#8fa3bf>Os times aparecem em ordem alfabética dentro de cada liga.</color>";
+                    Add(UiKit.Button(list, "Carregar option file…", () => ShowBrowse(null), 28));
+                    Add(UiKit.Button(list, "Remover option file (voltar ao original)", () =>
+                    {
+                        PlayerPrefs.DeleteKey(OptionKey);
+                        PlayerPrefs.SetInt(OptionOffKey, 1);
+                        PlayerPrefs.Save();
+                        ReloadOptionFile();
+                        ShowOptions(4, false);
+                    }, 28, new Color(0.4f, 0.12f, 0.15f)));
+                    break;
+                }
                 default:
                     // no PC, tudo ajustável; no celular, o essencial
                     Add(UiKit.Cycler(list, "Predefinição", Settings.QualityNames, Mathf.Min(Settings.Quality, Settings.QualityNames.Length - 1), i => { Settings.Quality = i; Apply(); }));
@@ -1419,36 +1442,8 @@ namespace Craquez
             UiKit.Select(fresh ? first : (tabSel ?? first));
         }
 
-        /// <summary>Option file (banco de dados): o que está carregado, carregar outro ou voltar ao original.</summary>
-        void ShowOptionFile()
-        {
-            var root = Page("OPTION FILE");
-            _back = ShowModes;
-            Title(root, "OPTION FILE", "Nomes, uniformes, elencos, estádios e escudos dos times");
-            UiKit.Panel(root).rectTransform.Place(0, 0, 1, 1, 90, 200, 90, 250);
-            var list = UiKit.Rect(root, "opções").Place(0, 0, 1, 1, 120, 230, 120, 280);
-            UiKit.VList(list, 14, 0, false);
-            int crests = 0;
-            for (int i = 0; i < Teams.Count; i++) if (Teams.Crest(i) != null) crests++;
-            var status = UiKit.Label(list, "", 28, Theme.Body, Theme.Text);
-            status.gameObject.AddComponent<LayoutElement>().minHeight = 150;
-            status.text = (Teams.OptionFilePath != "" ? "<b>Carregado:</b>  " + Teams.OptionFilePath : "<b>Nenhum option file carregado</b> (dados originais do jogo)") +
-                          "\nTimes alterados: " + Teams.OverrideCount + "   •   Escudos: " + crests +
-                          "\n<color=#8fa3bf>Os times aparecem em ordem alfabética dentro de cada liga.</color>";
-            status.supportRichText = true;
-            var load = UiKit.Button(list, "Carregar option file…", () => ShowBrowse(null), 30);
-            UiKit.Size(load, 80, 80);
-            UiKit.Size(UiKit.Button(list, "Remover option file (voltar ao original)", () =>
-            {
-                PlayerPrefs.DeleteKey(OptionKey);
-                PlayerPrefs.SetInt(OptionOffKey, 1);
-                PlayerPrefs.Save();
-                ReloadOptionFile();
-                ShowOptionFile();
-            }, 30, new Color(0.4f, 0.12f, 0.15f)), 80, 80);
-            UiKit.Size(UiKit.Button(list, "‹  Voltar", ShowModes, 30), 80, 80);
-            UiKit.Select(load);
-        }
+        /// <summary>Option file: aba dentro de Configurações.</summary>
+        void ShowOptionFile() => ShowOptions(4, false);
 
         // ------------------------------------------------------------ partida
         void StartMatch()
