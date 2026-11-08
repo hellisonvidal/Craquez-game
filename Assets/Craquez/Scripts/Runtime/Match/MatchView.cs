@@ -76,9 +76,15 @@ namespace Craquez
             life = VenueLife.Create(transform, s, venue, kits[0], kits[1], home, away, _night, q, cam, c.venue);
             VenueExtras.Create(transform, s, venue, kits[0], kits[1], _night, q, c.venue);
             AthleteFactory.IndoorShoes = c.mode == GameModes.Futsal;
+            // capitão: o primeiro "Líder" de cada time (ou o camisa de número mais baixo entre os de linha)
+            var captains = new int[] { -1, -1 };
+            foreach (var p in s.players) if (!p.isKeeper && p.Has(Trait.Lider) && captains[p.team] < 0) captains[p.team] = p.id;
+            for (int t = 0; t < 2; t++)
+                if (captains[t] < 0)
+                    foreach (var p in s.players) if (p.team == t && !p.isKeeper && (captains[t] < 0 || p.number < s.players[captains[t]].number)) captains[t] = p.id;
             foreach (var p in s.players)
             {
-                var rig = AthleteFactory.Create(p, kits[p.team], gk[p.team], parent, q, (p.team == 0 ? c.tacticsA : c.tacticsB).boots);
+                var rig = AthleteFactory.Create(p, kits[p.team], gk[p.team], parent, q, (p.team == 0 ? c.tacticsA : c.tacticsB).boots, captains[p.team] == p.id);
                 var av = rig.gameObject.AddComponent<AthleteView>();
                 av.Setup(p, rig, this);
                 athletes.Add(av);

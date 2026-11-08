@@ -655,6 +655,34 @@ namespace Craquez.Tests
             Assert.GreaterOrEqual(ok / (float)total, 0.75f, "o goleiro entrega a bola ao adversário");
         }
 
+        /// <summary>CPU x CPU: o jogo acontece (chutes e posse no campo de ataque, não só troca de passes no meio).</summary>
+        [TestCase("field", 8)]
+        [TestCase("society", 8)]
+        [TestCase("futsal", 10)]
+        public void CpuMatchHasAction(string mode, int minShots)
+        {
+            int shots = 0, owned = 0, attackThird = 0;
+            for (uint seed = 1; seed <= 3; seed++)
+            {
+                var sim = NewMatch(mode, seed);
+                var a = new CpuBrain(0, 0.7f); var b = new CpuBrain(1, 0.7f);
+                for (int i = 0; i < 60 * 300 && sim.state != MatchState.Fulltime; i++)
+                {
+                    sim.Step(new[] { a.MakeInput(sim), b.MakeInput(sim) });
+                    foreach (var e in sim.events) if (e.type == "kick" && e.kind == "shot") shots++;
+                    if (sim.ball.owner >= 0 && sim.state == MatchState.Playing)
+                    {
+                        var o = sim.players[sim.ball.owner];
+                        owned++;
+                        if (o.position.x * sim.TeamDir(o.team) > sim.halfLen / 3f) attackThird++;
+                    }
+                }
+            }
+            System.Console.WriteLine($"[ação {mode}] chutes {shots}, posse no terço de ataque {attackThird * 100 / Mathf.Max(1, owned)}%");
+            Assert.GreaterOrEqual(shots, minShots, "CPU x CPU quase não chuta");
+            Assert.Greater(attackThird / (float)Mathf.Max(1, owned), 0.07f, "a bola não chega ao ataque");
+        }
+
         [Test] public void JsonRoundTrip()
         {
             var o = MiniJson.Parse("{\"a\": [1, 2.5, \"x\\n\"], \"b\": {\"c\": true, \"d\": null}}");

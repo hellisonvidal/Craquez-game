@@ -701,8 +701,24 @@ namespace Craquez
                 float tw = Vector3.SignedAngle(Vector3.ProjectOnPlane(tr.position - tl.position, up), Vector3.ProjectOnPlane(cr.position - cl.position, up), up);
                 _pose.Rotate(rig.spine, Quaternion.AngleAxis(Mathf.Clamp(tw * (_twist - 1f), -8f, 8f) * run * w, up));
             }
+            // tronco antecipa a curva (o olhar e os ombros entram antes do quadril)
+            float into = Mathf.Clamp(_yawRate * 0.035f, -12f, 12f) * Mathf.Clamp01(spd / 3f);
+            _pose.Rotate(rig.spine, Quaternion.AngleAxis(into * w, up));
+            // parado: respira e troca o peso de uma perna para a outra (ninguém fica estátua)
+            float still = 1f - Mathf.Clamp01(spd / 0.8f);
+            if (still > 0.01f)
+            {
+                float t = Time.time + _phaseOff;
+                float breathe = Mathf.Sin(t * (p.stamina < 0.5f ? 2.6f : 1.5f)) * (p.stamina < 0.5f ? 2.2f : 1.1f);
+                _pose.Rotate(rig.spine, Quaternion.AngleAxis(-breathe * still * w, right));
+                rig.bones.TryGetValue("spine_01", out var sp1);
+                _pose.Rotate(sp1, Quaternion.AngleAxis(Mathf.Sin(t * 0.45f) * 2.2f * still * w, fwd));
+                if (rig.pelvis != null) _pose.Rotate(rig.pelvis, Quaternion.AngleAxis(Mathf.Sin(t * 0.45f + 0.6f) * 1.6f * still * w, fwd));
+            }
             RestPose();
         }
+
+        float _phaseOff => p != null ? p.id * 1.618f : 0f;
 
         /// <summary>Parado há um tempo: mãos na cintura (ou nos joelhos, cansado), como no jogo de verdade.</summary>
         void RestPose()

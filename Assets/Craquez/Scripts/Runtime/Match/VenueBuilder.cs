@@ -92,6 +92,7 @@ namespace Craquez
             if (st.scene == 0) { if (quality >= 1) City(v, hl, hw, tier, night, seed); }
             else Scenery(v, hl, hw, st, night, seed, quality);
             v.tunnel = new Vector3(0, 0, -(hw + 6f));
+            Entrance(v, v.tunnel.z - 3.5f, homeKit.c1, true, night);
             return v;
         }
 
@@ -427,7 +428,8 @@ namespace Craquez
             // rua: trave de cano pintado de amarelo (gol de racha), sem a armação de ferro do estádio
             var postMat = Gfx.Character(street ? new Color(0.98f, 0.78f, 0.12f) : Color.white, null, street ? 0.35f : 0.55f);
             var stripeMat = Gfx.Character(new Color(0.85f, 0.1f, 0.12f), null, 0.5f);
-            var netTex = Gfx.Net(256, 32f, 3.2f);
+            // rua e quadras pequenas: fio mais grosso (o gol é pequeno e o fio fino some sobre o chão claro)
+            var netTex = street ? Gfx.Net(256, 26f, 5f) : futsal ? Gfx.Net(256, 28f, 4f) : Gfx.Net(256, 32f, 3.2f);
             foreach (float s in new[] { -1f, 1f })
             {
                 var k = new MeshKit();
@@ -456,7 +458,7 @@ namespace Craquez
                 if (futsal) ks.Object("Trave (faixas)", stripeMat, v.root);
                 if (withNets)
                 {
-                    var net = GoalNet.Create(v.root, gx, s, gw, gh, gd, netTex);
+                    var net = GoalNet.Create(v.root, gx, s, gw, gh, gd, netTex, street ? new Color(0.95f, 0.55f, 0.15f, 1f) : Color.white);
                     v.nets.Add(net);
                 }
             }
@@ -694,6 +696,64 @@ namespace Craquez
             k.Object("Bancos", Gfx.Lit(new Color(0.14f, 0.18f, 0.28f), null, 0.4f), v.root, false);
         }
 
+        /// <summary>
+        /// Entrada dos jogadores: bloco dos vestiários (fachada, janelas, letreiro "VESTIÁRIOS", boca do
+        /// túnel escura) e, no estádio, o túnel inflável na cor do time avançando para o gramado.
+        /// frontZ = onde fica a fachada (os atletas saem dela em direção ao campo, +z).
+        /// </summary>
+        static void Entrance(Venue v, float frontZ, Color accent, bool stadium, bool night)
+        {
+            float W = stadium ? 22f : 7f, H = stadium ? 6.5f : 3.4f, D = stadium ? 10f : 3f;
+            float doorW = stadium ? 4.6f : 1.8f, doorH = stadium ? 3.1f : 2.3f;
+            var wall = new MeshKit();
+            // corpo do prédio e marquise sobre a porta
+            wall.Box(new Vector3(0, H / 2, frontZ - D / 2 - 0.02f), new Vector3(W, H, D), 3f);
+            wall.Box(new Vector3(0, doorH + 0.25f, frontZ + 0.7f), new Vector3(doorW + 1.6f, 0.22f, 1.6f));
+            wall.Object("Vestiários", Gfx.Lit(new Color(0.62f, 0.63f, 0.66f), Gfx.Asphalt(256, Color.white, 23, 0.04f), 0.2f), v.root, true);
+            // boca do túnel (escura) e faixa de vidro das janelas
+            var dark = new MeshKit();
+            dark.Quad(new Vector3(-doorW / 2, 0, frontZ + 0.01f), new Vector3(-doorW / 2, doorH, frontZ + 0.01f), new Vector3(doorW / 2, doorH, frontZ + 0.01f), new Vector3(doorW / 2, 0, frontZ + 0.01f));
+            dark.Object("Boca do túnel", Gfx.Lit(new Color(0.03f, 0.03f, 0.035f), null, 0.05f), v.root, false);
+            if (stadium)
+            {
+                var glass = new MeshKit();
+                foreach (float sx in new[] { -1f, 1f })
+                    glass.Quad(new Vector3(sx > 0 ? doorW / 2 + 1.2f : -W / 2 + 0.8f, H - 2.3f, frontZ + 0.012f), new Vector3(sx > 0 ? doorW / 2 + 1.2f : -W / 2 + 0.8f, H - 0.8f, frontZ + 0.012f),
+                        new Vector3(sx > 0 ? W / 2 - 0.8f : -doorW / 2 - 1.2f, H - 0.8f, frontZ + 0.012f), new Vector3(sx > 0 ? W / 2 - 0.8f : -doorW / 2 - 1.2f, H - 2.3f, frontZ + 0.012f));
+                var glow = night ? new Color(0.9f, 0.85f, 0.65f) * 0.6f : new Color(0.08f, 0.12f, 0.18f);
+                glass.Object("Janelas", Gfx.Emissive(new Color(0.15f, 0.22f, 0.3f), glow), v.root, false);
+            }
+            // letreiro
+            var sign = new MeshKit();
+            float sw = stadium ? 7f : 2.6f, sh = stadium ? 0.9f : 0.45f, sy = doorH + (stadium ? 0.9f : 0.55f);
+            sign.Quad(new Vector3(-sw / 2, sy, frontZ + 0.02f), new Vector3(-sw / 2, sy + sh, frontZ + 0.02f), new Vector3(sw / 2, sy + sh, frontZ + 0.02f), new Vector3(sw / 2, sy, frontZ + 0.02f), new Vector2(0, 0), new Vector2(1, 1));
+            var tex = Gfx.Led(new[] { "VESTIARIOS" }, new[] { Color.Lerp(accent, Color.black, 0.55f) }, 512, 64);
+            var sm = Gfx.Emissive(Color.white, new Color(0.8f, 0.8f, 0.8f), tex);
+            sign.Object("Letreiro dos vestiários", sm, v.root, false);
+            if (!stadium) return;
+            // túnel inflável/sanfonado: arcos na cor do time, aberto do lado do campo
+            var tun = new MeshKit();
+            var ribs = new MeshKit();
+            float tl = 4.8f, r = doorW / 2 + 0.2f;   // (termina antes das placas)
+            int seg = 10;
+            for (int i = 0; i < seg; i++)
+            {
+                float a0 = Mathf.PI * i / seg, a1 = Mathf.PI * (i + 1) / seg;
+                Vector3 P(float a, float z) => new Vector3(Mathf.Cos(a) * r, Mathf.Sin(a) * (doorH + 0.15f), z);
+                float z0 = frontZ + 0.05f, z1 = frontZ + tl;
+                tun.Quad(P(a0, z0), P(a1, z0), P(a1, z1), P(a0, z1));
+                tun.Quad(P(a0, z1), P(a1, z1), P(a1, z0), P(a0, z0));
+            }
+            for (float z = frontZ + 0.5f; z < frontZ + tl; z += 1.2f)
+                for (int i = 0; i < seg; i++)
+                {
+                    float a0 = Mathf.PI * i / seg, a1 = Mathf.PI * (i + 1) / seg;
+                    ribs.Cylinder(new Vector3(Mathf.Cos(a0) * (r + 0.04f), Mathf.Sin(a0) * (doorH + 0.19f), z), new Vector3(Mathf.Cos(a1) * (r + 0.04f), Mathf.Sin(a1) * (doorH + 0.19f), z), 0.06f, 6);
+                }
+            tun.Object("Túnel inflável", Gfx.Lit(Color.Lerp(accent, Color.white, 0.08f), null, 0.35f), v.root, false);
+            ribs.Object("Arcos do túnel", Gfx.Lit(Color.Lerp(accent, Color.black, 0.35f), null, 0.4f), v.root, false);
+        }
+
         static void CornerFlags(Venue v, float hl, float hw, Color c)
         {
             var k = new MeshKit();
@@ -831,6 +891,7 @@ namespace Craquez
             v.boardPost = true;
             v.tunnel = new Vector3(0, 0, -(hw + 2f));
             v.standDist = 3f;
+            Entrance(v, -(hw + 5.2f), homeKit.c1, false, night);
             return v;
         }
 
@@ -1043,6 +1104,7 @@ namespace Craquez
                 }
             v.tunnel = new Vector3(0, 0, -(hw + 2.5f));
             v.standDist = 3f;
+            Entrance(v, -(hw + 4.6f), homeKit.c1, false, night);
         }
 
         /// <summary>Ginásio completo: faixas no teto, arquibancadas atrás dos gols, bancos, tabelas de basquete e portões.</summary>
@@ -1467,7 +1529,7 @@ namespace Craquez
         float _side;
         float _hitT = 1f;   // (> 0: simula a rede desde o começo)
 
-        public static GoalNet Create(Transform parent, float gx, float side, float gw, float gh, float gd, Texture2D netTex)
+        public static GoalNet Create(Transform parent, float gx, float side, float gw, float gh, float gd, Texture2D netTex, Color? tint = null)
         {
             var go = new GameObject("Rede");
             go.transform.SetParent(parent, false);
@@ -1510,7 +1572,8 @@ namespace Craquez
             go.AddComponent<MeshFilter>().sharedMesh = n._mesh;
             var mr = go.AddComponent<MeshRenderer>();
             // translúcida (não recortada): de longe vira um véu branco, como rede de verdade, sem sumir nem serrilhar
-            var nm = Gfx.Transparent(new Color(1f, 1f, 1f, 0.95f), netTex);
+            var nc = tint ?? Color.white;
+            var nm = Gfx.Transparent(new Color(nc.r, nc.g, nc.b, 0.98f), netTex);
             // dos dois lados e desenhada depois dos outros transparentes (alambrado, vidros): a
             // rede não some atrás da tela do society nem quando vista por dentro do gol
             nm.SetFloat("_Cull", 0f);

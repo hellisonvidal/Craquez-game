@@ -155,7 +155,8 @@ namespace Craquez.Sim
                 }
                 if (_holdBtn == 0 && _cooldown == 0)
                 {
-                    float shootRange = sim.halfLen * Mathf.Lerp(0.32f, 0.45f, skill) * (0.8f + 0.35f * p.shot) * (p.Has(Trait.LongaDistancia) ? 1.2f : 1f);
+                    float shootRange = sim.halfLen * Mathf.Lerp(0.4f, 0.55f, skill) * (0.8f + 0.35f * p.shot) * (p.Has(Trait.LongaDistancia) ? 1.2f : 1f);
+                    var option = BestOption(sim, p, out float optScore);
                     if (toGoal.magnitude < shootRange && Mathf.Abs(p.position.y) < sim.halfW * 0.7f)
                     {
                         // mira o canto longe do goleiro
@@ -167,16 +168,19 @@ namespace Craquez.Sim
                         _finesse = Noise(sim, 13) < 0.25f + skill * 0.2f;
                         if (_finesse) f.buttons |= InputFrame.Finesse;
                     }
-                    else if (oppD > 2.2f && Noise(sim, 14) < (0.012f + skill * 0.012f) * (0.6f + p.passing * 0.8f) && sim.HasForwardOption(p))
+                    else if (option != null && optScore > 2.2f && oppD > 2.2f && Noise(sim, 14) < (0.03f + skill * 0.03f) * (0.6f + p.passing * 0.8f))
                     {
-                        // jogada para frente: passe ou enfiada para quem está livre mais adiante
-                        f.move = new Vector2(dir, (Noise(sim, 15) - 0.5f) * 0.8f).Norm();
-                        Press(ref f, Noise(sim, 16) > 0.45f ? InputFrame.Pass : InputFrame.Through, 10 + (int)(Noise(sim, 17) * 12f));
+                        // jogada para frente: passe (ou enfiada, se ele está correndo para o espaço) para quem está livre adiante
+                        f.move = (option.position - p.position).Norm();
+                        bool run = Vector2.Dot(option.vel, new Vector2(dir, 0f)) > 3f;
+                        Press(ref f, run && Noise(sim, 16) > 0.4f ? InputFrame.Through : InputFrame.Pass, 8 + (int)(Noise(sim, 17) * 8f));
                     }
-                    else if (oppD < 2.2f && Noise(sim, 2) < (0.06f + skill * 0.08f) * (1.4f - p.flair * 0.7f))
+                    else if (oppD < 2.2f && option != null && Noise(sim, 2) < (0.05f + skill * 0.06f) * (1.4f - p.flair * 0.7f))
                     {
-                        f.move = new Vector2(dir, (Noise(sim, 3) - 0.5f) * 1.6f).Norm();
-                        Press(ref f, Noise(sim, 4) > 0.25f ? InputFrame.Pass : InputFrame.Lob, 8 + (int)(Noise(sim, 5) * 14f));
+                        // pressionado: toca para o companheiro mais livre (não para uma direção qualquer)
+                        f.move = (option.position - p.position).Norm();
+                        float dd = option.position.Dist(p.position);
+                        Press(ref f, dd > sim.halfLen * 0.6f ? InputFrame.Lob : InputFrame.Pass, 6 + (int)(Mathf.Clamp01(dd / sim.halfLen) * 10f));
                     }
                 }
             }
@@ -203,7 +207,7 @@ namespace Craquez.Sim
                     float bd = p.position.Dist(sim.ball.pos);
                     // bote: escolhe o momento (de frente para o portador); por trás quase não arrisca
                     bool behind = Vector2.Dot(owner.facing, (p.position - owner.position).Norm()) < -0.45f;
-                    float tackleRate = (0.05f + skill * 0.06f) * (behind ? 0.2f : 1f) * (0.6f + p.discipline * 0.6f);
+                    float tackleRate = (0.022f + skill * 0.03f) * (behind ? 0.2f : 1f) * (0.6f + p.discipline * 0.6f);
                     if (bd < 1.3f && Noise(sim, 6) < tackleRate) Press(ref f, InputFrame.Pass, 1);
                     else if (bd < 2.6f && bd > 1.4f && !behind && Noise(sim, 7) < (0.002f + skill * 0.004f) * (0.5f + p.discipline)) Press(ref f, InputFrame.Shoot, 1);
                 }
@@ -219,6 +223,32 @@ namespace Craquez.Sim
                 }
             }
             return f;
+        }
+
+        /// <summary>
+        /// Melhor companheiro para o passe: livre (marcador longe), linha do passe aberta e quanto
+        /// faz o time avançar; atrás só se estiver bem livre. Retorna a nota (maior = melhor).
+        /// </summary>
+        SimPlayer BestOption(MatchSim sim, SimPlayer p, out float bestS)
+        {
+            float dir = sim.TeamDir(p.team);
+            SimPlayer best = null;
+            bestS = float.MinValue;
+            bool field = sim.mode.id == GameModes.Field;
+            foreach (var m in sim.players)
+            {
+                if (m.team != p.team || m == p || m.isKeeper || m.sentOff) continue;
+                float d = m.position.Dist(p.position);
+                if (d < (field ? 5f : 2.5f) || d > sim.halfLen * 1.2f) continue;
+                float free = 99f;
+                foreach (var o in sim.players) if (o.team != p.team && !o.sentOff) free = Mathf.Min(free, o.position.Dist(m.position));
+                float lane = sim.LaneFree(p.team, p.position, m.position);
+                float gain = (m.position.x - p.position.x) * dir;
+                float sc = Mathf.Min(free, field ? 8f : 5f) * 0.45f + Mathf.Min(lane, 4f) * 0.6f + gain * (field ? 0.09f : 0.16f) - d * 0.02f;
+                if (lane < (field ? 1.2f : 0.8f)) sc -= 3f;
+                if (sc > bestS) { bestS = sc; best = m; }
+            }
+            return best;
         }
 
         /// <summary>Direção de condução com menos adversários à frente (cone de ~6 m).</summary>

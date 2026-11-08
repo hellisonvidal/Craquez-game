@@ -8,6 +8,22 @@ Jogo de futebol feito 100% com inteligência artificial, **gratuito**. Android, 
 - **Linux**: `Craquez-v2.1.0-Linux.tar.gz` → extraia e rode `./Craquez` (ou `./instalar.sh` para o atalho no menu)
 
 ### Novidades
+- **Jogo destravado (CPU x CPU e contra você)**: a bola viajando num passe deixava os dois times
+  "defendendo" e todos recuavam para trás dela — agora o time mantém a fase de ataque até o
+  adversário dominar, os atacantes atacam a profundidade (até a linha da zaga) e o time se espalha
+  atacando e fecha defendendo. A CPU procura o passe para frente para quem está livre e com a linha
+  aberta (e, pressionada, toca para o mais livre, não para qualquer lado), chuta de um pouco mais
+  longe e dá menos botes certeiros. Em teste: no campo, de 2 para ~20 chutes em 3 partidas.
+- **Força dos passes**: a velocidade de saída agora considera o atrito e o arrasto da bola, e a
+  força cresce com a distância (curto chega macio, longo chega firme) — o passe não morre no meio
+  do caminho; a antecipação do companheiro usa o tempo de voo real.
+- **Atletas mais diferentes**: luvas nos goleiros, braçadeira do capitão, fita nos punhos de alguns,
+  cabeças raspadas e cabelos descoloridos, mais variação de altura e de tom de pele.
+- **Entrada dos jogadores**: prédio dos vestiários com fachada, janelas, letreiro e boca do túnel,
+  com túnel inflável na cor do time nos estádios; porta do vestiário nos ginásios e no society.
+- **Redes da rua** com fio mais grosso e cor de nylon, visíveis sobre o chão claro.
+- **Corpo menos robótico**: o tronco antecipa as curvas; parado, o atleta respira (mais ofegante
+  cansado) e troca o peso de uma perna para a outra; cada um no seu ritmo.
 - **Movimentação refeita**: cada atleta tem o seu jeito de correr (ritmo da passada, braços mais
   soltos ou contidos, giro dos ombros, joelho alto); no pique o braço bombeia com o cotovelo a ~90°
   e o joelho sobe; conduzindo a bola, passadas mais curtas e rápidas com os braços abertos; na
