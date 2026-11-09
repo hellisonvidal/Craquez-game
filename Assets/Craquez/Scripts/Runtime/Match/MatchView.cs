@@ -468,16 +468,14 @@ namespace Craquez
             }
         }
 
-        /// <summary>Festa do gol: papel picado nas cores do time e sinalizadores com fumaça atrás do gol.</summary>
+        /// <summary>Festa do gol: sinalizadores com fumaça na arquibancada atrás do gol (estádio).</summary>
         void GoalParty(int team)
         {
             if (venue == null) return;
-            var k = kits[Mathf.Clamp(team, 0, 1)];
             float gx = sim.halfLen * Mathf.Sign(sim.ball.pos.x == 0 ? 1 : sim.ball.pos.x);
             bool field = sim.mode.id == GameModes.Field;
             var center = new Vector3(gx + Mathf.Sign(gx) * (field ? 18f : 5f), field ? 14f : 8f, 0f);
-            Burst(center, new Vector3(field ? 10f : 4f, 2f, field ? 50f : 18f), new[] { k.c1, k.c2, Color.white }, 700, false);
-            Burst(new Vector3(0, field ? 16f : 8f, sim.halfW + (field ? 20f : 8f)), new Vector3(field ? 80f : 30f, 2f, 8f), new[] { k.c1, k.c2 }, 500, false);
+            // (sem papel picado: caía sobre os jogadores na comemoração)
             if (field)
                 for (int i = 0; i < 6; i++)
                     Burst(center + new Vector3(0, -6f, (i - 2.5f) * 8f), new Vector3(0.5f, 0.2f, 0.5f), new[] { new Color(1f, 0.45f, 0.1f), new Color(1f, 0.25f, 0.05f) }, 120, true);

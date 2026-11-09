@@ -186,7 +186,10 @@ namespace Craquez
                 if (!block && !showAll && b.SqrDistance(c) < 25f) block = true;
                 if (block == _occHidden[i]) continue;
                 _occHidden[i] = block;
-                r.shadowCastingMode = block ? UnityEngine.Rendering.ShadowCastingMode.ShadowsOnly : _occMode[i];
+                // escondido: quem já fazia sombra continua fazendo (só a sombra); quem não fazia some de vez
+                // (antes passava a projetar sombra: treliças e vigas do lado da câmera riscavam a quadra)
+                if (_occMode[i] == UnityEngine.Rendering.ShadowCastingMode.Off) r.forceRenderingOff = block;
+                else r.shadowCastingMode = block ? UnityEngine.Rendering.ShadowCastingMode.ShadowsOnly : _occMode[i];
             }
         }
 
