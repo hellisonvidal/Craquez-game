@@ -2494,6 +2494,7 @@ namespace Craquez.Sim
             // com jogadores na frente, a bola aparece tarde)
             int react = Mathf.RoundToInt(Mathf.Lerp(21f, 13f, p.defense)) - (p.Has(Trait.Reflexo) ? 2 : 0) + (Screened(p) ? 4 : 0);
             if (p.oneOnOne) react = Mathf.Max(8, react - 3);   // cara a cara: já está armado esperando o chute
+            else react += 2;   // chute de média distância: o goleiro precisa ver a bola sair (~0,25-0,4 s)
             bool reacting = tick - lastShotTick < react;
             if (ball.owner < 0 && ball.vel.x * dir < -5f && !reacting)
             {
