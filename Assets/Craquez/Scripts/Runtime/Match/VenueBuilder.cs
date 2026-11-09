@@ -899,7 +899,7 @@ namespace Craquez
                 var c = new Vector3(s * 9f, 0f, hw + 3.2f);
                 for (int i = 0; i < 6; i++)
                     Figure(bodyK, skinK, c + new Vector3(-2.6f + i * 1.05f, 0f, 1.05f), 180f, true);
-                Figure(bodyK, skinK, c + new Vector3(-s * 1.2f, 0f, -2.1f), 180f + s * 25f, false);   // técnico
+                // (o técnico e os reservas aquecendo são atletas animados: MatchView.BuildBench)
                 bodyK.Object("Reservas " + (s < 0 ? "casa" : "visitante"), Gfx.Lit(Color.Lerp(kit.c1, Color.black, 0.25f), null, 0.3f), v.root, false);
                 skinK.Object("Reservas (pele)", Gfx.Lit(new Color(0.78f, 0.6f, 0.47f), null, 0.2f), v.root, false);
                 // área técnica: linha tracejada 1 m para os lados do banco e até 1 m da lateral

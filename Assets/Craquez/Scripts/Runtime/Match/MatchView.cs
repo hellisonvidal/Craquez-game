@@ -95,6 +95,7 @@ namespace Craquez
                 athletes.Add(av);
             }
             if (s.mode.id == GameModes.Field) BuildReferee(parent, q);
+            if (s.mode.id == GameModes.Field) BuildBench(parent, q);
             BuildBall(q);
             BuildStations();
             _marker0 = Marker(new Color(0.1f, 0.85f, 1f));
@@ -309,6 +310,109 @@ namespace Craquez
         Vector2 _refTarget;
         int _refThink;
 
+        // ------------------------------------------------------------ banco: técnicos e aquecimento
+        readonly List<AthleteView> _coaches = new List<AthleteView>();
+        readonly List<(AthleteView av, int team, float phase)> _warm = new List<(AthleteView, int, float)>();
+        float _coachTalk0, _coachTalk1;
+
+        /// <summary>
+        /// Técnicos de pé na área técnica (terno escuro) e reservas de colete aquecendo atrás dos gols
+        /// (atletas animados, só visuais — não entram na simulação).
+        /// </summary>
+        void BuildBench(Transform parent, int q)
+        {
+            for (int t = 0; t < 2; t++)
+            {
+                var cp = new SimPlayer { id = -1, name = "Técnico", number = 0, face = new float[] { 1 + t, 1, 2, 1, 0, 1 } };
+                var suit = new Kit { c1 = new Color(0.1f, 0.11f, 0.14f), c2 = Color.Lerp(kits[t].c1, Color.black, 0.3f), shorts = new Color(0.08f, 0.08f, 0.1f), socks = new Color(0.05f, 0.05f, 0.06f) };
+                var rig = AthleteFactory.Create(cp, suit, suit, parent, q);
+                var av = rig.gameObject.AddComponent<AthleteView>();
+                cp.position = new Vector2((t == 0 ? -1f : 1f) * 9f, sim.halfW + 1.6f);
+                cp.facing = new Vector2(0f, -1f);
+                av.Setup(cp, rig, this);
+                _coaches.Add(av);
+            }
+            if (q < 1) return;
+            // coletes: laranja para o mandante, verde-limão para o visitante
+            var bibs = new[] { new Color(1f, 0.45f, 0.05f), new Color(0.65f, 0.95f, 0.1f) };
+            for (int t = 0; t < 2; t++)
+                for (int i = 0; i < 3; i++)
+                {
+                    var wp = new SimPlayer { id = -1, name = "Reserva", number = 12 + i, face = new float[] { (i + t) % 4, i % 3, (t * 2 + i) % 4, 1, i % 2, 2 } };
+                    var bib = new Kit { c1 = bibs[t], c2 = bibs[t], shorts = Color.Lerp(kits[t].shorts, Color.black, 0.2f), socks = kits[t].socks };
+                    var rig = AthleteFactory.Create(wp, bib, bib, parent, q);
+                    var av = rig.gameObject.AddComponent<AthleteView>();
+                    float gx = (t == 0 ? -1f : 1f) * (sim.halfLen + 4f);
+                    wp.position = new Vector2(gx, sim.halfW * (0.35f + i * 0.17f));
+                    wp.facing = new Vector2(0f, 1f);
+                    av.Setup(wp, rig, this);
+                    _warm.Add((av, t, i * 1.7f + t * 0.9f));
+                }
+        }
+
+        void BenchStep()
+        {
+            if (_coaches.Count == 0) return;
+            float dt = MatchSim.DT, hw = sim.halfW, hl = sim.halfLen;
+            bool live = sim.state == MatchState.Playing;
+            for (int t = 0; t < _coaches.Count; t++)
+            {
+                var av = _coaches[t];
+                var p = av.p;
+                float cx = (t == 0 ? -1f : 1f) * 9f;
+                // acompanha o lance de lado dentro da área técnica (até a beira), de frente para o jogo
+                float bx = Mathf.Clamp(sim.ball.pos.x * 0.12f + cx, cx - 4f, cx + 4f);
+                bool near = Mathf.Abs(sim.ball.pos.x - cx) < 25f && sim.ball.pos.y > 0f;
+                var target = new Vector2(bx, hw + (near ? 1.2f : 1.9f));
+                var to = target - p.position;
+                float d = to.magnitude;
+                var want = d > 0.4f ? to / d * Mathf.Min(1.3f, d) : Vector2.zero;
+                p.vel = Vector2.MoveTowards(p.vel, want, 3f * dt);
+                p.position += p.vel * dt;
+                var look = (sim.ball.pos - p.position).Norm();
+                p.facing = V2.RotateToward(p.facing, look, 2.5f * dt).Norm();
+                // orienta: aponta para o campo de vez em quando (mais com o lance perto, nas faltas e no gol)
+                ref float talk = ref (t == 0 ? ref _coachTalk0 : ref _coachTalk1);
+                talk -= dt;
+                if (talk <= 0f)
+                {
+                    float r = Mathf.Abs(Mathf.Sin(sim.tick * 0.013f + t * 2.1f));
+                    talk = live ? (near ? 2.5f : 5f) + r * 4f : 3f;
+                    if (r > 0.45f || sim.state == MatchState.Foul)
+                    {
+                        // mostra para onde o time deve ir: para o ataque ou para a bola
+                        var dirAtk = new Vector2(sim.TeamDir(t), 0f);
+                        var aimV = Vector2.Lerp(dirAtk, (sim.ball.pos - p.position).Norm(), 0.5f).Norm();
+                        av.point = AthleteView.W(aimV) + Vector3.up * 0.25f;
+                        _coachPointT[t] = 1.4f;
+                    }
+                }
+                if (_coachPointT[t] > 0f) { _coachPointT[t] -= dt; if (_coachPointT[t] <= 0f) av.point = Vector3.zero; }
+                av.OnTick();
+            }
+            // aquecimento atrás dos gols: trote de ida e volta e paradas para alongar
+            foreach (var w in _warm)
+            {
+                var p = w.av.p;
+                float gx = (w.team == 0 ? -1f : 1f) * (hl + 4f);
+                float cyc = (float)(sim.tick * dt * 0.09f + w.phase);
+                float u = Mathf.Repeat(cyc, 1f);
+                // 0..0,4 vai, 0,4..0,5 parado, 0,5..0,9 volta, 0,9..1 parado
+                float z0 = hw * 0.3f, z1 = hw * 0.9f;
+                float s = u < 0.4f ? u / 0.4f : u < 0.5f ? 1f : u < 0.9f ? 1f - (u - 0.5f) / 0.4f : 0f;
+                var target = new Vector2(gx + Mathf.Sin(w.phase * 3f) * 0.8f, Mathf.Lerp(z0, z1, Mathf.SmoothStep(0f, 1f, s)));
+                var to = target - p.position;
+                p.vel = Vector2.MoveTowards(p.vel, to / dt * 0.15f, 6f * dt);
+                if (p.vel.magnitude > 3.2f) p.vel = p.vel.normalized * 3.2f;
+                p.position += p.vel * dt;
+                if (p.vel.magnitude > 0.3f) p.facing = V2.RotateToward(p.facing, p.vel.normalized, 5f * dt).Norm();
+                else p.facing = V2.RotateToward(p.facing, (sim.ball.pos - p.position).Norm(), 2f * dt).Norm();
+                w.av.OnTick();
+            }
+        }
+
+        readonly float[] _coachPointT = new float[2];
+
         /// <summary>
         /// Árbitro (só visual, não interfere na simulação): sistema diagonal — fica na diagonal
         /// do campo, a 12-18 m do lance, com o jogo entre ele e o assistente; sai das linhas de
@@ -406,6 +510,7 @@ namespace Craquez
                 if (show) a.OnTick();
             }
             RefereeStep();
+            BenchStep();
             _ballPrev = _ballCur;
             _ballCur = new Vector3(sim.ball.pos.x, sim.ball.z + sim.ball.radius, sim.ball.pos.y);
             foreach (var e in sim.events) OnEvent(e);
