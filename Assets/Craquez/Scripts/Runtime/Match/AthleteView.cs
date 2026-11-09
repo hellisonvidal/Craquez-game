@@ -301,7 +301,29 @@ namespace Craquez
             _pose.Rotate(lo, Quaternion.Slerp(Quaternion.identity, Quaternion.FromToRotation(hd.position - lo.position, dir), _pointW));
         }
 
-        float _protest;
+        float _protest, _help;
+
+        /// <summary>Dando a mão para quem caiu: inclina o tronco e estende o braço até a mão dele.</summary>
+        void HelpUp()
+        {
+            var sim = view.sim;
+            SimPlayer v = p.helping >= 0 && p.helping < sim.players.Count ? sim.players[p.helping] : null;
+            bool want = v != null && v.down > 0f && p.position.Dist(v.position) < 1.3f;
+            _help = Mathf.MoveTowards(_help, want ? 1f : 0f, Time.deltaTime * 2.5f);
+            if (_help <= 0.001f || v == null) return;
+            rig.bones.TryGetValue("upperarm_r", out var up);
+            rig.bones.TryGetValue("lowerarm_r", out var lo);
+            rig.bones.TryGetValue("hand_r", out var hd);
+            rig.bones.TryGetValue("spine_01", out var sp1);
+            if (up == null || lo == null || hd == null) return;
+            // a mão vai até a altura da mão de quem está no chão e sobe junto quando ele levanta
+            float rise = v.downTotal > 0f ? Mathf.Clamp01(1f - v.down / Mathf.Min(0.9f, v.downTotal * 0.35f)) : 0f;
+            var target = W(v.position) + Vector3.up * Mathf.Lerp(0.45f, 1.0f, rise);
+            if (sp1 != null) _pose.Rotate(sp1, Quaternion.AngleAxis(Mathf.Lerp(28f, 8f, rise) * _help, transform.right));
+            var dir = (target - up.position).normalized;
+            _pose.Rotate(up, Quaternion.Slerp(Quaternion.identity, Quaternion.FromToRotation(lo.position - up.position, dir), _help));
+            _pose.Rotate(lo, Quaternion.Slerp(Quaternion.identity, Quaternion.FromToRotation(hd.position - lo.position, dir), _help));
+        }
 
         /// <summary>Quem fez a falta reclama: braços abertos, palmas para cima.</summary>
         void Protest()
@@ -1265,6 +1287,7 @@ namespace Craquez
                 FallLimbs();
                 Protest();
                 PointArm();
+                HelpUp();
             }
             GroundFeet();
             Cloth();

@@ -66,6 +66,8 @@ namespace Craquez.Sim
         public float saveContact = 0.4f;
         /// <summary>Goleiro cobrando tiro de meta: a bola fica no chão (hold é só o tempo de espera, não está nas mãos).</summary>
         public bool goalKick;
+        /// <summary>Indo ajudar a levantar quem sofreu a falta (id da vítima; -1 = não).</summary>
+        public int helping = -1;
         /// <summary>Goleiro com a bola nas mãos (não vale para o tiro de meta, com a bola no chão).</summary>
         public bool InHands => hold > 0f && !goalKick;
         /// <summary>Cartões: amarelos recebidos e expulsão (fica fora de campo; no futsal volta outro em 2 min).</summary>

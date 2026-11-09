@@ -460,6 +460,7 @@ namespace Craquez.Sim
                 p.facing = new Vector2(TeamDir(p.team), 0);
                 p.stun = p.slide = p.hold = p.dive = p.kickCd = 0f;
                 p.goalKick = false;
+                p.helping = -1;
                 p.windup = 0f;
                 p.skill = Skill.None;
             }
@@ -1589,6 +1590,35 @@ namespace Craquez.Sim
                 if (offender.yellows >= 2) SendOff(offender, "second");
                 else Emit("card", offender.team, offender.id, "yellow");
             }
+            // às vezes alguém vem dar a mão para levantar: um companheiro perto ou, em fair play, quem
+            // fez a falta. A vítima fica um pouco mais no chão (sente a pancada) até ele chegar.
+            foreach (var q in players) q.helping = -1;
+            if (!quickRestarts && mode.id != GameModes.Street && rng.Chance(0.45f))
+            {
+                bool rival = rng.Chance(0.3f) && !offender.sentOff;
+                SimPlayer h = null; float hd = 12f;
+                foreach (var q in players)
+                {
+                    if (q == victim || q.isKeeper || q.sentOff || q.down > 0f) continue;
+                    if (rival ? q != offender : q.team != victim.team) continue;
+                    float d = q.position.Dist(victim.position);
+                    if (d < hd) { hd = d; h = q; }
+                }
+                if (h != null)
+                {
+                    h.helping = victim.id;
+                    victim.down = Mathf.Max(victim.down, 1.6f + hd / 2.2f + 1.0f) + rng.Range(0f, 0.6f);
+                    victim.downTotal = victim.down;
+                    victim.stun = victim.down + 0.15f;
+                }
+            }
+            else if (!quickRestarts && rng.Chance(0.35f))
+            {
+                // sente a pancada um pouco mais (sem ninguém por perto para ajudar)
+                victim.down += rng.Range(0.6f, 1.6f);
+                victim.downTotal = victim.down;
+                victim.stun = victim.down + 0.15f;
+            }
             var spot = victim.position;
             spot.x = Mathf.Clamp(spot.x, -halfLen + 1f, halfLen - 1f);
             spot.y = Mathf.Clamp(spot.y, -halfW + 1f, halfW - 1f);
@@ -1612,6 +1642,21 @@ namespace Craquez.Sim
             stateTimer -= DT;
             foreach (var p in players)
             {
+                if (p.helping >= 0 && p.down <= 0f && !p.sentOff)
+                {
+                    // vai até a vítima e para do lado dela, de frente, para dar a mão
+                    var v = players[p.helping];
+                    var off = p.position - v.position;
+                    var spotH = v.position + (off.sqrMagnitude > 0.01f ? off.normalized : new Vector2(1f, 0f)) * 0.75f;
+                    var toH = spotH - p.position;
+                    float dh = toH.magnitude;
+                    p.intent = dh > 0.15f ? toH / dh * Mathf.Clamp(dh * 0.6f, 0.15f, 0.55f) : Vector2.zero;
+                    p.wantSprint = false;
+                    p.facing = V2.RotateToward(p.facing, (v.position - p.position).Norm(), 0.15f);
+                    p.stun = 0f;
+                    MovePlayer(p);
+                    continue;
+                }
                 if (p.down <= 0f && p.stun <= 0f && !p.isKeeper)
                 {
                     // companheiros mais perto vão ver a vítima; o resto desacelera
@@ -1639,6 +1684,7 @@ namespace Craquez.Sim
             int t = foulTeam;
             var victim = foulVictim >= 0 ? players[foulVictim] : null;
             foulTeam = foulVictim = foulOffender = -1;
+            foreach (var q in players) q.helping = -1;
             state = MatchState.Playing;
             if (_foulPenalty)
             {
