@@ -1037,9 +1037,11 @@ namespace Craquez.Sim
             {
                 if ((pressed & b) != 0)
                 {
-                    if (keeperHold && (b == InputFrame.Pass || b == InputFrame.Lob))
+                    if (keeperHold && !players[ball.owner].goalKick)
+                        KeeperHandRelease(players[ball.owner], b, c.aim, f.buttons);   // reposição com as mãos (combinações)
+                    else if (keeperHold && (b == InputFrame.Pass || b == InputFrame.Lob))
                     {
-                        Pass(players[ball.owner], c.aim, 0.6f, false, b == InputFrame.Lob);   // Pass zera o "segurando" e protege a reposição
+                        Pass(players[ball.owner], c.aim, 0.6f, false, b == InputFrame.Lob);   // tiro de meta: passe pelo chão ou alto
                     }
                     else OnPress(t, p, b);
                 }
@@ -2740,6 +2742,8 @@ namespace Craquez.Sim
             bool punt = canPunt && (best == null || rng.Chance(field ? 0.08f : 0.05f));   // com alguém livre, quase sempre sai jogando
             if (punt && far != null) { Punt(p, far); return true; }
             if (best == null) best = safest ?? far;
+            // companheiro livre lá na frente (contra-ataque): arremesso rápido e reto
+            if (best != null && best.position.Dist(p.position) > 20f && (best.position.x - p.position.x) * dir > 15f && rng.Chance(0.6f)) { KeeperThrow(p, best, 2); return true; }
             if (best != null) KeeperThrow(p, best);
             else Pass(p, new Vector2(dir, rng.Range(-0.3f, 0.3f)), 0.75f, false, true);
             return true;
@@ -2870,13 +2874,104 @@ namespace Craquez.Sim
             return (lo + hi) * 0.5f;
         }
 
+        /// <summary>
+        /// Reposição com as mãos escolhida pelo jogador: Passe = rolada; Passe + Colocado = por cima do
+        /// ombro, curto; Alto = arremesso longo em arco; Enfiada = arremesso rápido e reto (contra-ataque);
+        /// Chute = chutão de bate-pronto; Chute + Colocado = bate-pronto baixo; Proteger + Passe = solta a
+        /// bola no pé e sai jogando. No futsal não há chute com as mãos: o chute vira arremesso rápido.
+        /// </summary>
+        void KeeperHandRelease(SimPlayer k, int b, Vector2 aim, int held)
+        {
+            bool fin = (held & InputFrame.Finesse) != 0, shield = (held & InputFrame.Shield) != 0;
+            bool futsal = mode.id == GameModes.Futsal;
+            float dir = TeamDir(k.team);
+            if (aim.sqrMagnitude < 0.04f) aim = new Vector2(dir, 0f);
+            aim = aim.Norm();
+            if (shield && b == InputFrame.Pass)
+            {
+                // solta a bola no chão, à frente, e segue com ela nos pés
+                k.hold = 0f;
+                k.heldT = 0f;
+                ball.pos = k.position + aim * 0.5f;
+                ball.z = 0.4f; ball.vz = -1f; ball.vel = aim * 1.2f;
+                k.facing = aim;
+                protectTeam = k.team; protectT = 0.6f;
+                Emit("kick", k.team, k.id, "drop", power: 0.1f);
+                return;
+            }
+            bool kick = b == InputFrame.Shoot && !futsal;
+            float minD = kick ? 20f : 4f, maxD = b == InputFrame.Pass && !fin ? 26f : 70f;
+            var m = TargetInCone(k, aim, minD, maxD);
+            if (kick)
+            {
+                if (fin) DropKick(k, m, aim);
+                else Punt(k, m);
+                return;
+            }
+            int style = b == InputFrame.Pass ? (fin ? 1 : 0) : b == InputFrame.Lob ? 1 : 2;
+            if (m == null)
+            {
+                // ninguém naquela direção: arremessa para o espaço na direção pedida
+                var ghost = new SimPlayer { id = -1, position = k.position + aim * (style == 0 ? 12f : style == 1 ? 22f : 28f) };
+                KeeperThrow(k, ghost, style);
+                return;
+            }
+            KeeperThrow(k, m, style);
+        }
+
+        /// <summary>Companheiro mais bem colocado na direção pedida (cone de ~40°), entre minD e maxD.</summary>
+        SimPlayer TargetInCone(SimPlayer k, Vector2 aim, float minD, float maxD)
+        {
+            SimPlayer best = null; float bestS = float.MinValue;
+            foreach (var m in players)
+            {
+                if (m.team != k.team || m == k || m.sentOff) continue;
+                var to = m.position - k.position;
+                float d = to.magnitude;
+                if (d < minD || d > maxD) continue;
+                float cos = Vector2.Dot(to / d, aim);
+                if (cos < 0.75f) continue;
+                float free = float.MaxValue;
+                foreach (var o in players) if (o.team != k.team && !o.sentOff) free = Mathf.Min(free, o.position.Dist(m.position));
+                float sc = cos * 4f + Mathf.Min(free, 8f) * 0.4f - d * 0.02f;
+                if (sc > bestS) { bestS = sc; best = m; }
+            }
+            return best;
+        }
+
+        /// <summary>Bate-pronto baixo: a bola quica e sai rasante, num arco de ~18° (mais rápido e preciso que o chutão).</summary>
+        void DropKick(SimPlayer p, SimPlayer m, Vector2 aim)
+        {
+            bool field = mode.id == GameModes.Field;
+            var target = m != null ? m.position + m.vel * 1.2f : p.position + aim * (field ? 40f : halfLen * 0.9f);
+            target.x = Mathf.Clamp(target.x, -halfLen + 6f, halfLen - 6f);
+            target.y = Mathf.Clamp(target.y, -halfW + 3f, halfW - 3f);
+            var to = target - p.position;
+            float d = Mathf.Clamp(to.magnitude, 12f, field ? 55f : halfLen * 1.2f);
+            var dirv = to.normalized.Rotated(rng.Gauss() * 0.03f * (1.3f - p.passing));
+            const float ang = 18f, h0 = 0.25f;
+            float v0 = SolveLoft(d * rng.Range(0.96f, 1.02f), ang, h0, out _);
+            ball.pos = p.position + dirv * 0.5f;
+            ball.z = h0;
+            ball.vel = dirv * (v0 * Mathf.Cos(ang * Mathf.Deg2Rad));
+            ball.vz = v0 * Mathf.Sin(ang * Mathf.Deg2Rad);
+            ball.spin = 0f;
+            if (m != null) { passReceiver = m.id; passReceiverT = 3f; passTick = tick; lastPasser = p.id; passFrom = ball.pos; }
+            ReleaseBall(p);
+            protectTeam = p.team;
+            protectT = 0.5f;
+            p.kickKind = InputFrame.Lob;
+            Emit("kick", p.team, p.id, "punt", power: 0.8f);
+        }
+
         /// <summary>Arremesso do goleiro com as mãos (rasteiro e firme no curto, por cima no médio).</summary>
-        void KeeperThrow(SimPlayer p, SimPlayer m)
+        void KeeperThrow(SimPlayer p, SimPlayer m, int style = -1)
         {
             float d0 = m.position.Dist(p.position);
-            bool roll = d0 < (mode.id == GameModes.Field ? 18f : 12f);
+            bool roll = style >= 0 ? style == 0 : d0 < (mode.id == GameModes.Field ? 18f : 12f);
+            bool fast = style == 2;
             // onde o companheiro vai estar quando a bola chegar (rasteira firme ~11-14 m/s; por cima ~1 s)
-            float tArr = roll ? d0 / (mode.id == GameModes.Field ? 12f : 10f) : 0.6f + d0 / 30f;
+            float tArr = roll ? d0 / (mode.id == GameModes.Field ? 12f : 10f) : fast ? d0 / 19f : 0.6f + d0 / 30f;
             var target = m.position + m.vel * Mathf.Min(tArr, 1.2f);
             var to = target - p.position;
             float d = Mathf.Max(to.magnitude, 1f);
@@ -2893,6 +2988,17 @@ namespace Craquez.Sim
                 ball.z = 0.02f;
                 ball.vz = 0f;
             }
+            else if (fast)
+            {
+                // arremesso rápido (de beisebol): sai reto e forte, na altura do peito, e chega rápido para
+                // puxar o contra-ataque
+                float h0 = 1.9f;
+                float v0 = SolveLoft(d * 0.98f, 6f, h0, out _);
+                v0 = Mathf.Max(v0, 15f);
+                ball.z = h0;
+                ball.vel = dirv * (v0 * Mathf.Cos(6f * Mathf.Deg2Rad));
+                ball.vz = v0 * Mathf.Sin(6f * Mathf.Deg2Rad);
+            }
             else
             {
                 // por cima do ombro: sai da mão alta, em arco baixo, e cai no pé do companheiro
@@ -2903,15 +3009,18 @@ namespace Craquez.Sim
                 ball.vz = v0 * Mathf.Sin(22f * Mathf.Deg2Rad);
             }
             ball.spin = 0f;
-            passReceiver = m.id;
-            passReceiverT = 3f;
-            passTick = tick; lastPasser = p.id;
-            passFrom = ball.pos;
+            if (m.id >= 0)
+            {
+                passReceiver = m.id;
+                passReceiverT = 3f;
+                passTick = tick; lastPasser = p.id;
+                passFrom = ball.pos;
+            }
             ReleaseBall(p);
             protectTeam = p.team;
             protectT = 0.8f;
             p.kickKind = InputFrame.Pass;
-            Emit("kick", p.team, p.id, "gkthrow", power: 0.4f);
+            Emit("kick", p.team, p.id, "gkthrow", power: fast ? 0.9f : 0.4f);
         }
 
         /// <summary>

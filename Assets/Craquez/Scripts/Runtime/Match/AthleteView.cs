@@ -77,6 +77,7 @@ namespace Craquez
                 }
                 case "kick":
                     if (e.kind == "throw") { _throwT = 0.32f; _oneArm = false; _throwLow = false; break; }   // lateral com as mãos
+                    if (e.kind == "drop") break;   // goleiro soltou a bola no pé: sem gesto de chute
                     if (e.kind == "gkthrow")
                     {
                         // goleiro: um braço só — por cima do ombro, ou rolando rente ao chão

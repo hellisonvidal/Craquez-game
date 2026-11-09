@@ -319,8 +319,18 @@ namespace Craquez.UI
                 UiKit.Shadow(_setPiece, 3, 0.9f);
             }
             int want = _sim.setPiece && _sim.setPieceTeam >= 0 && human[_sim.setPieceTeam] && _sim.ball.owner == _sim.setPieceTaker ? (_sim.setPieceShot ? 1 : _sim.cornerKick ? 2 : _sim.kickIn ? 3 : 0) : -1;
+            // goleiro do time humano com a bola nas mãos: as reposições possíveis
+            var own = _sim.Owner;
+            if (want < 0 && own != null && own.isKeeper && own.InHands && human[own.team] && _sim.state == MatchState.Playing) want = 9;
             if (want == _setPieceShown) return;
             _setPieceShown = want;
+            if (want == 9)
+            {
+                bool futsal = _sim.mode.id == GameModes.Futsal;
+                _setPiece.text = "PASSE rolar  •  PASSE+COLOCADO por cima  •  ALTO longo  •  ENFIADA rápido  •  " +
+                    (futsal ? "CHUTE rápido" : "CHUTE chutão  •  CHUTE+COLOCADO bate-pronto baixo") + "  •  PROTEGER+PASSE soltar no pé";
+                return;
+            }
             _setPiece.text = want < 0 ? "" : InputRouter.SetPieceHelp(devices[_sim.setPieceTeam], want == 1, want == 2 ? "ESCANTEIO" : want == 3 ? "LATERAL" : "FALTA");
         }
 
