@@ -398,7 +398,7 @@ namespace Craquez.UI
         {
             if (_lineup == null) return;
             bool cine = view != null && view.bcam != null && view.bcam.cinematic;
-            bool on = Settings.LineupBar && !cine;
+            bool on = Settings.LineupBar && !cine && !_sim.training;
             _lineupCg.alpha = Mathf.MoveTowards(_lineupCg.alpha, on ? 1f : 0f, Time.unscaledDeltaTime * 4f);
             if (_lineupCg.alpha <= 0f) return;
             // entre os quadros dos jogadores controlados (que só aparecem para quem é humano)

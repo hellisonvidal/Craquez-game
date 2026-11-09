@@ -629,6 +629,7 @@ namespace Craquez
             _modeButtons[GameModes.Futsal] = BigCard(grid, "FUTSAL", "5 x 5", "Quadra  •  " + VenueBuilder.FutsalNames.Length + " ginásios", ModeArt(MenuArt.Kind.Futsal), 512f / 560f, new Color(0.96f, 0.62f, 0.04f), () => ShowKind(GameModes.Futsal));
             _modeButtons[GameModes.Society] = BigCard(grid, "SOCIETY", "7 x 7", "Grama sintética  •  " + VenueBuilder.SocietyNames.Length + " campos", ModeArt(MenuArt.Kind.Society), 512f / 560f, new Color(0.02f, 0.71f, 0.83f), () => ShowKind(GameModes.Society));
             _modeButtons[GameModes.Street] = BigCard(grid, "RUA", "3 A 5 POR LADO", "Times de rua  •  " + VenueBuilder.StreetNames.Length + " ruas", ModeArt(MenuArt.Kind.Street), 512f / 560f, new Color(0.93f, 0.28f, 0.6f), () => { _lastMode = GameModes.Street; Choose(GameModes.Street, false); });
+            _modeButtons["treino"] = BigCard(grid, "TREINO", "ARENA", "Você contra o goleiro  •  chute à vontade", ModeArt(MenuArt.Kind.Field), 512f / 560f, new Color(0.55f, 0.42f, 0.95f), () => { _lastMode = "treino"; StartTraining(); });
             UiKit.Select(_lastMode != null && _modeButtons.TryGetValue(_lastMode, out var lb) && lb != null ? lb : first);
         }
 
@@ -1480,6 +1481,35 @@ namespace Craquez
         void ShowOptionFile() => ShowOptions(4, false);
 
         // ------------------------------------------------------------ partida
+        /// <summary>
+        /// Arena de treino: você conduz um atacante contra o goleiro, no campo do seu time; a cada chute
+        /// (gol, defesa ou bola fora) uma bola nova aparece no seu pé em outro ponto. Sem relógio.
+        /// </summary>
+        void StartTraining()
+        {
+            var c = _cfg;
+            _trainBak = (c.mode, c.national, c.teamB, c.tacticsA, c.tacticsB, c.timeOfDay, c.weather, c.ceremony, c.minutes, c.sideA, c.sideB, c.stadium, c.toss);
+            if (Teams.Get(c.teamA) == null || Teams.Get(c.teamA).IsNational) c.teamA = 0;
+            c.mode = GameModes.Field; c.national = false;
+            if (c.teamB == c.teamA) c.teamB = c.teamA + 1;
+            c.tacticsA = new Tactics(); c.tacticsB = new Tactics();
+            c.timeOfDay = "dia"; c.weather = "sol"; c.ceremony = false; c.minutes = 45;
+            c.sideA = Side.Player1; c.sideB = Side.Cpu; c.stadium = 0; c.toss = false;
+            c.training = true;
+            StartMatch();
+        }
+
+        (string mode, bool national, int teamB, Tactics ta, Tactics tb, string tod, string weather, bool ceremony, int minutes, Side sa, Side sb, int stadium, bool toss) _trainBak;
+
+        void EndTraining()
+        {
+            var c = _cfg;
+            if (!c.training) return;
+            c.training = false;
+            (c.mode, c.national, c.teamB, c.tacticsA, c.tacticsB, c.timeOfDay, c.weather, c.ceremony, c.minutes, c.sideA, c.sideB, c.stadium, c.toss) = _trainBak;
+        }
+
+
         void StartMatch()
         {
             Sfx.MenuMusic(false);
@@ -1496,7 +1526,7 @@ namespace Craquez
             var go = new GameObject("Partida");
             go.transform.SetParent(transform, false);
             _match = go.AddComponent<MatchController>();
-            _match.onExit = () => { EndMatch(); ShowPlay(); };
+            _match.onExit = () => { EndMatch(); EndTraining(); ShowPlay(); };
             _match.onRestart = c => { EndMatch(); StartMatch(); };
             _match.Begin(_cfg, cam);
         }

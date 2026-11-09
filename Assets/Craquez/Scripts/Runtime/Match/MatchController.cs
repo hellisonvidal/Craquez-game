@@ -54,7 +54,8 @@ namespace Craquez
             string w = c.weather == "aleatorio" ? WeatherFx.Kinds[(int)(c.seed % (uint)WeatherFx.Kinds.Length)] : c.weather;
             sim.rollScale = RollFor(c.mode, w);
             sim.startSwapped = c.swapSides;
-            if (c.toss)
+            sim.training = c.training;
+            if (c.toss && !c.training)
             {
                 // sorteio: quem ganha escolhe o lado; quem perde dá a saída
                 uint h = c.seed * 2654435761u + 977u;
@@ -106,6 +107,7 @@ namespace Craquez
             else
             {
                 _phase = Phase.Playing; Sfx.Whistle();
+                if (c.training) hud.Toast("TREINO  •  chute ao gol: a cada lance a bola volta ao seu pé", 4f);
                 if (tossWinner >= 0)
                 {
                     var tw = Teams.Get(tossWinner == 0 ? c.teamA : c.teamB);
@@ -426,7 +428,7 @@ namespace Craquez
                         string scorer = e.id >= 0 ? sim.players[e.id].name : "";
                         if (e.kind == "own") scorer += " (contra)";
                         hud.Goal(td.name, scorer, view.kits[e.team].c1);
-                        if (!attract) { _showTeam = e.team; _showScorer = e.id; }
+                        if (!attract && !cfg.training) { _showTeam = e.team; _showScorer = e.id; }
                         for (int t = 0; t < 2; t++) if (_cpu[t] == null) InputRouter.Rumble(_dev[t], 0.8f, 0.9f, 0.6f, this);
                         break;
                     }
