@@ -24,8 +24,27 @@ namespace Craquez
         Vector3 _ballPrev, _ballCur;
         Quaternion _ballRot = Quaternion.identity;
         float _crowdT, _crowdHype, _silence;
+        bool _cheering;
         CrowdFx _crowd;
         AthleteView _referee;
+        float _cardT;
+        GameObject _card;
+
+        /// <summary>O juiz ergue o cartão (amarelo ou vermelho) na mão direita por ~2,5 s.</summary>
+        void ShowCard(Color c)
+        {
+            if (_referee == null || _referee.rig == null) return;
+            if (_card != null) Destroy(_card);
+            _referee.rig.bones.TryGetValue("hand_r", out var hand);
+            if (hand == null) return;
+            var mk = new MeshKit();
+            mk.Box(Vector3.zero, new Vector3(0.075f, 0.105f, 0.008f));
+            _card = mk.Object("Cartão", Gfx.Lit(c, null, 0.4f), hand, false);
+            _card.transform.localPosition = new Vector3(0f, 0.09f, 0f);
+            _card.transform.localRotation = Quaternion.identity;
+            _cardT = 2.6f;
+        }
+        public VenueLife life;
         bool _night;
 
         public void Build(MatchSim s, MatchConfig c, Camera camera)
@@ -37,21 +56,37 @@ namespace Craquez
             var home = Teams.Get(c.teamA);
             var away = Teams.Get(c.teamB);
             kits = Teams.PickKits(home, away, c.kitA, c.kitB);
+            // society e rua: sem som de torcida (campo pequeno, sem arquibancada cheia)
+            Sfx.NoCrowd = s.mode.id == GameModes.Society || s.mode.id == GameModes.Street;
+            _quietOwner = this;
             _night = c.timeOfDay == "noite";
             Lighting(c.timeOfDay, s.mode.id, q);
+            FanCrowd.HomeKits = home.kits; FanCrowd.AwayKits = away.kits;   // torcedores com os uniformes dos times
             if (s.mode.id == GameModes.Futsal) venue = VenueBuilder.Futsal(s, home, away, kits[0], kits[1], c.venue, _night, q, transform);
             else if (s.mode.id == GameModes.Street) venue = VenueBuilder.Street(s, home, away, kits[0], kits[1], c.venue, _night, q, transform);
             else if (s.mode.id == GameModes.Society) venue = VenueBuilder.Society(s, home, away, kits[0], kits[1], c.venue, _night, q, transform);
             else venue = VenueBuilder.Stadium(s, home, away, kits[0], kits[1], _night, q, transform, c.stadium);
             // goleiros: uniforme de cor neutra que não confunde com nenhum dos dois
             var gk = new[] { KeeperKit(kits[0], kits[1], 0), KeeperKit(kits[1], kits[0], 1) };
+            _gk = gk;
+            _q = q;
             var parent = new GameObject("Atletas").transform;
+            _athParent = parent;
             parent.SetParent(transform, false);
             if (s.mode.id != GameModes.Street) _crowd = CrowdFx.Create(transform, s, venue, kits[0], kits[1], _night, q, c.teamA, c.teamB);
+            life = VenueLife.Create(transform, s, venue, kits[0], kits[1], home, away, _night, q, cam, c.venue);
+            var extras = VenueExtras.Create(transform, s, venue, kits[0], kits[1], _night, q, c.venue);
+            _occRoots = new[] { _crowd != null ? _crowd.transform : null, life != null ? life.transform : null, extras != null ? extras.transform : null };
             AthleteFactory.IndoorShoes = c.mode == GameModes.Futsal;
+            // capitão: o primeiro "Líder" de cada time (ou o camisa de número mais baixo entre os de linha)
+            var captains = new int[] { -1, -1 };
+            foreach (var p in s.players) if (!p.isKeeper && p.Has(Trait.Lider) && captains[p.team] < 0) captains[p.team] = p.id;
+            for (int t = 0; t < 2; t++)
+                if (captains[t] < 0)
+                    foreach (var p in s.players) if (p.team == t && !p.isKeeper && (captains[t] < 0 || p.number < s.players[captains[t]].number)) captains[t] = p.id;
             foreach (var p in s.players)
             {
-                var rig = AthleteFactory.Create(p, kits[p.team], gk[p.team], parent, q, (p.team == 0 ? c.tacticsA : c.tacticsB).boots);
+                var rig = AthleteFactory.Create(p, kits[p.team], gk[p.team], parent, q, (p.team == 0 ? c.tacticsA : c.tacticsB).boots, captains[p.team] == p.id);
                 var av = rig.gameObject.AddComponent<AthleteView>();
                 av.Setup(p, rig, this);
                 athletes.Add(av);
@@ -63,7 +98,11 @@ namespace Craquez
             bcam = cam.gameObject.GetComponent<BroadcastCamera>();
             if (bcam == null) bcam = cam.gameObject.AddComponent<BroadcastCamera>();
             bcam.Setup(cam, s, Settings.Camera);
-            bcam.SetOccluders(venue.root);
+            // tudo o que é cenário (estrutura, torcida, bandeiras, gente da rua, extras) some quando tapa o jogo
+            var roots = new System.Collections.Generic.List<Transform> { venue.root };
+            if (_occRoots != null) roots.AddRange(_occRoots);
+            bcam.SetOccluders(roots.ToArray());
+            bcam.entrance = venue.entrance;
             bcam.SnapToBall();
             weather = gameObject.AddComponent<WeatherFx>();
             string wk = c.weather == "aleatorio" ? WeatherFx.Kinds[(int)(c.seed % 5)] : c.weather;
@@ -72,6 +111,7 @@ namespace Craquez
             weather.pitch2 = venue.pitchMat2;
             UrpSetup.Camera(cam, q);
             Sfx.Crowd(s.mode.id == GameModes.Field ? 0.55f : 0.3f, s.mode.id == GameModes.Field ? 0.25f : 0f);
+            FanCrowd.Hype = 0f; FanCrowd.GoalT = 0f; FanCrowd.GoalTeam = -1; FanCrowd.OlaStart = -100f; FanCrowd.ShotT = 0f; FanCrowd.FoulT = 0f;
         }
 
         static Kit KeeperKit(Kit own, Kit other, int t)
@@ -235,6 +275,7 @@ namespace Craquez
                 target = v + new Vector2(0f, v.y > 0 ? -4f : 4f);
                 urgency = 1f;
                 if (p.position.Dist(v) < 9f) _referee.point = AthleteView.W(new Vector2(sim.TeamDir(sim.foulTeam), 0f));
+                if (_cardT > 0f) _referee.point = Vector3.up * 3f + AthleteView.W(new Vector2(sim.TeamDir(sim.foulTeam), 0f)) * 0.3f;   // cartão erguido
             }
             else if (sim.setPiece)
             {
@@ -300,7 +341,13 @@ namespace Craquez
         /// <summary>Após cada passo da simulação.</summary>
         public void OnTick()
         {
-            foreach (var a in athletes) a.OnTick();
+            foreach (var a in athletes)
+            {
+                // expulso vai para o vestiário: some do campo (antes ficava parado/caído do lado de fora)
+                bool show = !a.p.sentOff;
+                if (a.gameObject.activeSelf != show) { a.gameObject.SetActive(show); if (show) a.Snap(); }
+                if (show) a.OnTick();
+            }
             RefereeStep();
             _ballPrev = _ballCur;
             _ballCur = new Vector3(sim.ball.pos.x, sim.ball.z + sim.ball.radius, sim.ball.pos.y);
@@ -323,9 +370,11 @@ namespace Craquez
         void OnEvent(SimEvent e)
         {
             if (e.id >= 0 && e.id < athletes.Count) athletes[e.id].OnEvent(e);
+            life?.OnEvent(e);
             switch (e.type)
             {
                 case "kick":
+                    if (e.kind == "shot" || e.kind == "chip") FanCrowd.ShotT = 1.8f;
                     Sfx.Kick(e.power);
                     if (e.kind == "shot") { _crowdHype = Mathf.Max(_crowdHype, 0.5f); bcam.Shake(0.15f); _crowd?.React("shot"); }
                     break;
@@ -375,9 +424,23 @@ namespace Craquez
                             var back = (b - new Vector3(g.x, 0f, g.z)).normalized;
                             bcam.Scene(b + back * 7.5f + Vector3.up * 2.6f, Vector3.Lerp(b, g, 0.55f), sim.stateTimer * 0.9f);
                         }
+                        else if (e.kind == "corner" && !bcam.cinematic)
+                        {
+                            // cena do escanteio: de fora do campo, atrás da bandeirinha; o cobrador chega
+                            // andando e ajeita a bola, com a área ao fundo
+                            var b = new Vector3(sim.ball.pos.x, 0f, sim.ball.pos.y);
+                            var box = new Vector3(Mathf.Sign(b.x) * (sim.halfLen - sim.mode.penaltyDist), 1f, 0f);
+                            var outward = (b - box); outward.y = 0f; outward.Normalize();
+                            bool field = sim.mode.id == GameModes.Field;
+                            bcam.Scene(b + outward * (field ? 6.5f : 4f) + Vector3.up * (field ? 2.4f : 1.9f), Vector3.Lerp(b, box, 0.45f), sim.stateTimer * 0.92f, field ? 44f : 50f);
+                        }
                     }
                     break;
+                case "card":
+                    ShowCard(e.kind == "yellow" ? new Color(1f, 0.85f, 0.1f) : new Color(0.85f, 0.08f, 0.1f));
+                    break;
                 case "foul":
+                    FanCrowd.FoulT = 2.2f; FanCrowd.FoulOn = 1 - e.team;
                     Sfx.Whistle();
                     if (e.team == 1) Sfx.Boo();   // torcida da casa vaia falta do visitante
                     else Sfx.Ooh();
@@ -385,6 +448,8 @@ namespace Craquez
                     bcam.Shake(0.12f);
                     break;
                 case "goal":
+                    FanCrowd.GoalTeam = e.team;
+                    FanCrowd.GoalT = 8f;
                     Sfx.Net();
                     // gol do mandante: o estádio explode; do visitante: só o setor visitante comemora
                     bool homeGoal = e.team == 0;
@@ -395,7 +460,7 @@ namespace Craquez
                     _silence = homeGoal ? 0f : 6f;
                     bcam.Shake(0.6f);
                     foreach (var n in venue.nets)
-                        n.Hit(new Vector3(sim.ball.pos.x, sim.ball.z + 0.3f, sim.ball.pos.y), sim.ball.Speed + 10f);
+                        n.Hit(new Vector3(sim.ball.pos.x, sim.ball.z + 0.3f, sim.ball.pos.y), sim.ball.Speed * 0.15f);   // (o bolsão vem da própria bola: Press)
                     break;
             }
         }
@@ -467,8 +532,24 @@ namespace Craquez
             Destroy(go, 12f);
         }
 
+        void LateCard()
+        {
+            if (_cardT <= 0f) return;
+            _cardT -= Time.deltaTime;
+            if (_cardT <= 0f && _card != null) { Destroy(_card); _card = null; }
+        }
+
         void Update()
         {
+            LateCard();
+            // bola dentro do gol encostando na rede
+            if (sim != null && venue != null && Mathf.Abs(sim.ball.pos.x) > sim.halfLen - 0.05f)
+            {
+                var bw = new Vector3(sim.ball.pos.x, sim.ball.z + BallCatalog.Radius(sim.mode.id), sim.ball.pos.y);
+                var bv = new Vector3(sim.ball.vel.x, sim.ball.vz, sim.ball.vel.y);
+                // a rede envolve a bola (raio real da bola)
+                foreach (var n in venue.nets) n.Press(bw, bv, BallCatalog.Radius(sim.mode.id));
+            }
             if (sim == null) return;
             // bola interpolada + rotação pelo rolamento
             var bp = Vector3.Lerp(_ballPrev, _ballCur, Alpha);
@@ -500,14 +581,42 @@ namespace Craquez
             float want = homeAttack ? danger * 0.7f : danger * 0.15f;
             if (_silence > 0f) { _silence -= Time.deltaTime; want = 0f; }
             _crowdHype = Mathf.MoveTowards(_crowdHype, want, Time.deltaTime * 0.3f);
-            float bounce = Mathf.Abs(Mathf.Sin(_crowdT * (6f + _crowdHype * 6f))) * (0.002f + _crowdHype * 0.006f);
             foreach (var m in venue.crowdMats)
             {
+                // cada grupo de fileiras pula no seu tempo
+                float ph = venue.crowdPhase.TryGetValue(m, out var f) ? f : 0f;
+                float bounce = Mathf.Abs(Mathf.Sin(_crowdT * (6f + _crowdHype * 6f) + ph)) * (0.002f + _crowdHype * 0.006f) * (ph > 0f ? 1.6f : 1f);
                 m.mainTextureOffset = new Vector2(0, bounce);
                 if (m.HasProperty("_BaseMap")) m.SetTextureOffset("_BaseMap", new Vector2(0, bounce));
             }
+            // gol do mandante / lance de perigo: a arquibancada levanta os braços
+            bool cheering = _crowdHype > 0.95f && _silence <= 0f;
+            if (cheering != _cheering)
+            {
+                _cheering = cheering;
+                foreach (var cc in venue.crowdCheer)
+                {
+                    var tex = cheering ? cc.cheer : cc.normal;
+                    cc.mat.mainTexture = tex;
+                    if (cc.mat.HasProperty("_BaseMap")) cc.mat.SetTexture("_BaseMap", tex);
+                }
+            }
             float quiet = _silence > 0f ? 0.55f : 1f;
             float tense = !homeAttack ? danger * 0.12f : 0f;   // murmúrio quando o visitante ameaça
+            // torcedores 3D: empolgação com o perigo e com a pressão do time da casa
+            FanCrowd.Hype = Mathf.Clamp01(_crowdHype + danger * 0.6f) * quiet;
+            if (FanCrowd.GoalT > 0f) FanCrowd.GoalT -= Time.deltaTime;
+            if (FanCrowd.ShotT > 0f) FanCrowd.ShotT -= Time.deltaTime;
+            if (FanCrowd.FoulT > 0f) FanCrowd.FoulT -= Time.deltaTime;
+            FanCrowd.Ball = new Vector3(sim.ball.pos.x, 0f, sim.ball.pos.y);
+            FanCrowd.HomeAttack = sim.TeamInPossession(0);
+            // ola em momentos aleatórios (bola no meio-campo, jogo rolando)
+            if (_nextOla <= 0f) _nextOla = Time.time + Random.Range(45f, 100f);
+            if (Time.time > _nextOla && sim.state == MatchState.Playing && Mathf.Abs(sim.ball.pos.x) < sim.halfLen * 0.4f && FanCrowd.GoalT <= 0f)
+            {
+                FanCrowd.OlaStart = Time.time;
+                _nextOla = Time.time + Random.Range(70f, 150f);
+            }
             Sfx.Crowd(((sim.mode.id == GameModes.Field ? 0.5f : 0.28f) + _crowdHype * 0.3f + tense) * quiet,
                 sim.mode.id == GameModes.Field ? (0.22f + (homeAttack ? danger * 0.18f : -danger * 0.1f)) * quiet : 0f);
             Sfx.Drums(sim.mode.id == GameModes.Street ? 0f : (0.12f + _crowdHype * 0.3f) * quiet);
@@ -518,6 +627,9 @@ namespace Craquez
                 if (m.HasProperty("_BaseMap")) m.SetTextureOffset("_BaseMap", o);
             }
         }
+
+        float _nextOla;
+        Transform[] _occRoots;
 
         public Side[] sides = { Side.Player1, Side.Cpu };
 
@@ -533,7 +645,57 @@ namespace Craquez
             m.rotation = Quaternion.Euler(0, Mathf.Atan2(p.facing.x, p.facing.y) * Mathf.Rad2Deg, 0);
         }
 
-        void OnDestroy() => Sfx.Drums(0f);
+        static MatchView _quietOwner;
+
+        void OnDestroy()
+        {
+            Sfx.Drums(0f);
+            // (ao "jogar de novo" a partida nova já foi montada antes desta ser destruída)
+            if (_quietOwner == this) { Sfx.NoCrowd = false; _quietOwner = null; }
+        }
+
+        /// <summary>
+        /// Pausa: congela cada atleta (e o juiz) exatamente na pose e no lugar em que estava —
+        /// nada de animação, física de roupa ou correção de pose rodando com o jogo parado.
+        /// </summary>
+        Kit[] _gk;
+        int _q;
+        Transform _athParent;
+        bool _frozen;
+
+        /// <summary>Substituição: refaz o atleta <paramref name="id"/> com a cara, o nome e o número de quem entrou.</summary>
+        public void Replace(int id)
+        {
+            if (id < 0 || id >= athletes.Count) return;
+            var p = sim.players[id];
+            var old = athletes[id];
+            var rig = AthleteFactory.Create(p, kits[p.team], _gk[p.team], _athParent, _q, (p.team == 0 ? cfg.tacticsA : cfg.tacticsB).boots);
+            var av = rig.gameObject.AddComponent<AthleteView>();
+            av.Setup(p, rig, this);
+            athletes[id] = av;
+            if (old != null) Destroy(old.gameObject);
+            av.Snap();
+            if (_frozen) StartCoroutine(FreezeAfterPose(av));
+        }
+
+        System.Collections.IEnumerator FreezeAfterPose(AthleteView a)
+        {
+            yield return new WaitForEndOfFrame();   // um quadro animado para assumir a pose parada
+            if (_frozen && a != null) { if (a.rig != null && a.rig.animator != null) a.rig.animator.Update(0.2f); a.enabled = false; if (a.rig != null && a.rig.animator != null) a.rig.animator.enabled = false; }
+        }
+
+        public void Freeze(bool on)
+        {
+            _frozen = on;
+            void F(AthleteView a)
+            {
+                if (a == null) return;
+                a.enabled = !on;
+                if (a.rig != null && a.rig.animator != null) a.rig.animator.enabled = !on;
+            }
+            foreach (var a in athletes) F(a);
+            F(_referee);
+        }
 
         public AthleteView ViewOf(int id) => id >= 0 && id < athletes.Count ? athletes[id] : null;
     }

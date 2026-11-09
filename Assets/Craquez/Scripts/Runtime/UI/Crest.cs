@@ -139,6 +139,22 @@ namespace Craquez.UI
             return s;
         }
 
+        /// <summary>
+        /// Escudo do time sem bandeiras (menus de seleção): o escudo do usuário (option file)
+        /// ou o brasão desenhado com as cores e a sigla do time — também para seleções.
+        /// </summary>
+        public static Sprite Badge(int index)
+        {
+            var user = Teams.Crest(index);
+            var t = Teams.Get(index);
+            string key = "b:" + index + ":" + t.name + (user != null ? ":u" : "");
+            if (_cache.TryGetValue(key, out var s) && s != null) return s;
+            var tex = user != null ? user : Draw(t);
+            s = Sprite.Create(tex, new Rect(0, 0, tex.width, tex.height), new Vector2(0.5f, 0.5f));
+            _cache[key] = s;
+            return s;
+        }
+
         /// <summary>Ícone da liga: a bandeira do país (ligas nacionais) ou o troféu desenhado.</summary>
         public static Sprite League(League lg)
         {

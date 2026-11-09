@@ -49,16 +49,30 @@ namespace Craquez
             set { PlayerPrefs.SetFloat("volume", value); PlayerPrefs.Save(); AudioListener.volume = value; }
         }
 
+        /// <summary>Nomes e números sobre os atletas: 0 controlados e quem tem a bola, 1 todos, 2 desligado.</summary>
+        public static int PlayerTags
+        {
+            get => PlayerPrefs.GetInt("player_tags", 0);
+            set { PlayerPrefs.SetInt("player_tags", value); PlayerPrefs.Save(); }
+        }
+        public static readonly string[] PlayerTagNames = { "Controlados e bola", "Todos", "Desligado" };
+
         public static bool Vibration
         {
             get => PlayerPrefs.GetInt("vibration", 1) == 1;
             set { PlayerPrefs.SetInt("vibration", value ? 1 : 0); PlayerPrefs.Save(); }
         }
 
+        /// <summary>Câmera da partida (lista da 2.1; a escolha da 2.0 é convertida na primeira leitura).</summary>
         public static int Camera
         {
-            get => PlayerPrefs.GetInt("camera", 0);
-            set { PlayerPrefs.SetInt("camera", value); PlayerPrefs.Save(); }
+            get
+            {
+                if (!PlayerPrefs.HasKey("camera_v2") && PlayerPrefs.HasKey("camera"))
+                    PlayerPrefs.SetInt("camera_v2", BroadcastCamera.FromOld(PlayerPrefs.GetInt("camera", 0)));
+                return PlayerPrefs.GetInt("camera_v2", 0);
+            }
+            set { PlayerPrefs.SetInt("camera_v2", value); PlayerPrefs.Save(); }
         }
 
         /// <summary>-2 (aberto) .. +2 (perto).</summary>
@@ -108,8 +122,9 @@ namespace Craquez
         public static string[] QualityNames => Application.isMobilePlatform ? _qualityMobile : _qualityPc;
 
         // ---- salvar / cancelar (tela de opções) ----
-        static readonly string[] IntKeys = { "quality", "vibration", "camera", "camera_zoom", "quick_restarts", "gfx_scale", "gfx_fps", "gfx_vsync", "gfx_aa", "gfx_shadows", "gfx_tex", "gfx_display", "gfx_res", "music" };
+        static readonly string[] IntKeys = { "quality", "vibration", "camera_v2", "camera_zoom", "quick_restarts", "gfx_scale", "gfx_fps", "gfx_vsync", "gfx_aa", "gfx_shadows", "gfx_tex", "gfx_display", "gfx_res", "music" };
         static readonly string[] FloatKeys = { "volume", "music_volume" };
+        static readonly string[] StringKeys = { "gfx_res_wh" };
 
         /// <summary>Foto das preferências ao abrir as opções (para o "Cancelar").</summary>
         public static Dictionary<string, object> Snapshot()
@@ -117,6 +132,7 @@ namespace Craquez
             var d = new Dictionary<string, object>();
             foreach (var k in IntKeys) if (PlayerPrefs.HasKey(k)) d[k] = PlayerPrefs.GetInt(k);
             foreach (var k in FloatKeys) if (PlayerPrefs.HasKey(k)) d[k] = PlayerPrefs.GetFloat(k);
+            foreach (var k in StringKeys) if (PlayerPrefs.HasKey(k)) d[k] = PlayerPrefs.GetString(k);
             return d;
         }
 
@@ -125,6 +141,7 @@ namespace Craquez
         {
             foreach (var k in IntKeys) { if (d.TryGetValue(k, out var v)) PlayerPrefs.SetInt(k, (int)v); else PlayerPrefs.DeleteKey(k); }
             foreach (var k in FloatKeys) { if (d.TryGetValue(k, out var v)) PlayerPrefs.SetFloat(k, (float)v); else PlayerPrefs.DeleteKey(k); }
+            foreach (var k in StringKeys) { if (d.TryGetValue(k, out var v)) PlayerPrefs.SetString(k, (string)v); else PlayerPrefs.DeleteKey(k); }
             PlayerPrefs.Save();
             AudioListener.volume = Volume;
         }
@@ -166,6 +183,8 @@ namespace Craquez
 
         /// <summary>Índice em Screen.resolutions (-1 = nativa do monitor).</summary>
         public static int Resolution { get => I("gfx_res", -1); set => I("gfx_res", value, true); }
+        /// <summary>Resolução escolhida como "LxA" (vazio = nativa).</summary>
+        public static string ResolutionWH { get => PlayerPrefs.GetString("gfx_res_wh", ""); set { PlayerPrefs.SetString("gfx_res_wh", value); } }
 
         /// <summary>Qualidade usada para os detalhes do cenário (texturas): a predefinição ou o ajuste avançado.</summary>
         public static int DetailLevel => Textures > 0 ? Textures - 1 + (Textures == 3 && !Application.isMobilePlatform ? 1 : 0) : Quality;

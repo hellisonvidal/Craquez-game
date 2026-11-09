@@ -4,13 +4,46 @@ using UnityEngine;
 namespace Craquez
 {
     /// <summary>
-    /// Câmera de transmissão (estilo TV): fica na lateral, acompanha a bola com
-    /// antecipação e suavização, aproxima em lances perto da área. Modos: TV,
-    /// TV próxima, alta (tática) e cinema (cerimônia / replays).
+    /// Câmera da partida. Três famílias:
+    /// transmissão (TV, TV próxima, aberta, tática) na lateral, acompanhando a bola com antecipação;
+    /// próximas ao jogador (perto do jogador, atrás do jogador, ombro, rente ao gramado), que
+    /// seguem o atleta controlado; e especiais (dinâmica, atrás do gol, drone).
     /// </summary>
     public class BroadcastCamera : MonoBehaviour
     {
-        public static readonly string[] Modes = { "TV", "TV Próxima", "Alta (tática)", "Atrás do Jogador", "Dinâmica", "Beira do Campo", "Atrás do Gol", "Drone", "Isométrica", "Transmissão Aberta" };
+        public enum Kind { Tv, TvClose, Wide, Tactical, PlayerSide, Behind, Shoulder, Pitchside, Dynamic, BehindGoal, Drone, WideClose }
+        public static readonly string[] Modes =
+        {
+            "TV", "TV Próxima", "Transmissão Aberta", "Alta (tática)",
+            "Perto do Jogador", "Atrás do Jogador", "Ombro (bem perto)", "Rente ao Gramado",
+            "Dinâmica", "Atrás do Gol", "Drone", "Aberta Aproximada",
+        };
+        /// <summary>Índices antigos (versão 2.0) -> novos, para manter a escolha salva.</summary>
+        public static int FromOld(int old) => old switch { 0 => 0, 1 => 1, 2 => 3, 3 => 5, 4 => 8, 5 => 7, 6 => 9, 7 => 10, 9 => 2, _ => 0 };
+        /// <summary>Câmeras oferecidas nos menus (drone, atrás do gol e ombro foram retiradas).</summary>
+        public static readonly Kind[] Offered =
+        {
+            Kind.Tv, Kind.TvClose, Kind.WideClose, Kind.Wide, Kind.Tactical,
+            Kind.PlayerSide, Kind.Behind, Kind.Pitchside, Kind.Dynamic,
+        };
+        public static string[] OfferedNames
+        {
+            get
+            {
+                var n = new string[Offered.Length];
+                for (int i = 0; i < n.Length; i++) n[i] = Modes[(int)Offered[i]];
+                return n;
+            }
+        }
+        /// <summary>Modo salvo -> posição na lista dos menus (modo retirado vira TV).</summary>
+        public static int ToOffered(int mode)
+        {
+            for (int i = 0; i < Offered.Length; i++) if ((int)Offered[i] == mode) return i;
+            return 0;
+        }
+        public static int FromOffered(int i) => (int)Offered[Mathf.Clamp(i, 0, Offered.Length - 1)];
+        /// <summary>Modo válido (um modo retirado, salvo em versão antiga, vira TV).</summary>
+        public static int Sanitize(int mode) => FromOffered(ToOffered(mode));
         public static readonly string[] Zooms = { "Bem aberto", "Aberto", "Normal", "Perto", "Bem perto" };
         /// <summary>Zoom: -2 (aberto) .. +2 (perto).</summary>
         public int zoom;
@@ -26,16 +59,18 @@ namespace Craquez
         public bool cinematic;
         public Vector3 cinePos, cineLook;
         public float cineFov = 40f;
+        /// <summary>Entrada dos vestiários (do lado da câmera): só aparece nas cenas (cerimônia, replays).</summary>
+        public Transform entrance;
 
         public void Setup(Camera c, MatchSim s, int m)
         {
             cam = c;
             sim = s;
-            mode = Mathf.Clamp(m, 0, Modes.Length - 1);
+            mode = Sanitize(m);
             zoom = Settings.CameraZoom;
             _focus = Vector3.zero;
             // faixa de profundidade justa: menos "briga" de superfícies (pontos piscando) ao longe
-            cam.nearClipPlane = 0.5f;
+            cam.nearClipPlane = 0.8f;   // (mais precisão de profundidade: nada de pele atravessando o uniforme)
             cam.farClipPlane = 650f;
         }
 
@@ -56,6 +91,7 @@ namespace Craquez
             cam.transform.position = pos;
             cam.transform.rotation = Quaternion.LookRotation(look - pos);
             cam.fieldOfView = fov;
+            _baseFov = fov;
         }
 
         // ---------------------------------------------------------------- paredes na frente
@@ -67,18 +103,22 @@ namespace Craquez
         /// Estruturas grandes do estádio/ginásio (paredes, arquibancadas, cobertura) que podem
         /// ficar entre a câmera e o jogo: somem enquanto taparem a visão (a sombra continua).
         /// </summary>
-        public void SetOccluders(Transform venueRoot)
+        public void SetOccluders(params Transform[] roots)
         {
             _occ.Clear(); _occMode.Clear(); _occHidden.Clear();
-            if (venueRoot == null) return;
+            if (roots == null) return;
+            foreach (var venueRoot in roots)
+            if (venueRoot != null)
             foreach (var r in venueRoot.GetComponentsInChildren<Renderer>(true))
             {
                 if (r is ParticleSystemRenderer) continue;
                 var b = r.bounds;
                 bool floor = b.size.y < 0.6f && b.max.y < 0.8f;
                 if (floor || Mathf.Max(b.size.x, b.size.y, b.size.z) < 1.2f) continue;
-                // gols, redes e o que fica dentro do campo nunca somem
-                if (sim != null && Mathf.Abs(b.center.x) < sim.halfLen + 3.5f && Mathf.Abs(b.center.z) < sim.halfW + 1.5f && b.max.y < 6f) continue;
+                // gols, redes e o que fica inteiramente dentro do campo nunca somem (antes bastava o
+                // centro estar dentro: guarda-corpos e placas que dão a volta no campo nunca sumiam)
+                if (sim != null && Mathf.Abs(b.min.x) < sim.halfLen + 3.5f && Mathf.Abs(b.max.x) < sim.halfLen + 3.5f
+                    && Mathf.Abs(b.min.z) < sim.halfW + 1.2f && Mathf.Abs(b.max.z) < sim.halfW + 1.2f && b.max.y < 6f) continue;
                 _occ.Add(r);
                 _occMode.Add(r.shadowCastingMode);
                 _occHidden.Add(false);
@@ -86,6 +126,7 @@ namespace Craquez
         }
 
         readonly Vector3[] _targets = new Vector3[7];
+        readonly System.Collections.Generic.List<Vector3> _tList = new System.Collections.Generic.List<Vector3>();
 
         void UpdateOccluders(Vector3 focus)
         {
@@ -101,13 +142,37 @@ namespace Craquez
             targets[4] = new Vector3(Mathf.Clamp(focus.x - 15f, -hl, hl), 0.5f, Mathf.Sign(c.z) * hw);
             targets[5] = new Vector3(Mathf.Clamp(focus.x + 15f, -hl, hl), 0.5f, Mathf.Sign(c.z) * hw);
             targets[6] = new Vector3(focus.x, 1.5f, 0f);
+            // e uma grade sobre todo o campo visível: nada pode tapar nenhum pedaço da área de jogo
+            _tList.Clear();
+            _tList.AddRange(targets);
+            for (int gx = 0; gx <= 6; gx++)
+                for (int gz = 0; gz <= 3; gz++)
+                {
+                    var g = new Vector3(Mathf.Lerp(-hl, hl, gx / 6f), 0.6f, Mathf.Lerp(-hw, hw, gz / 3f));
+                    var vp = cam.WorldToViewportPoint(g);
+                    if (vp.z > 0f && vp.x > -0.05f && vp.x < 1.05f && vp.y > -0.05f && vp.y < 1.05f) _tList.Add(g);
+                }
+            // retângulo do campo na tela e a profundidade do ponto do campo mais perto da câmera:
+            // qualquer coisa inteira antes do campo que caia sobre ele na tela está na frente
+            var fwd = cam.transform.forward;
+            float dmin = float.MaxValue;
+            float sx0 = 1f, sy0 = 1f, sx1 = 0f, sy1 = 0f;
+            for (int k = 0; k < 4; k++)
+            {
+                var fc = new Vector3((k & 1) == 0 ? -hl : hl, 0f, (k & 2) == 0 ? -hw : hw);
+                dmin = Mathf.Min(dmin, Vector3.Dot(fc - c, fwd));
+                var vp = cam.WorldToViewportPoint(fc);
+                if (vp.z <= 0f) { sx0 = 0f; sy0 = 0f; sx1 = 1f; sy1 = 1f; continue; }
+                sx0 = Mathf.Min(sx0, vp.x); sy0 = Mathf.Min(sy0, vp.y); sx1 = Mathf.Max(sx1, vp.x); sy1 = Mathf.Max(sy1, vp.y);
+            }
+            sx0 = Mathf.Max(sx0, 0f); sy0 = Mathf.Max(sy0, 0f); sx1 = Mathf.Min(sx1, 1f); sy1 = Mathf.Min(sy1, 1f);
             for (int i = 0; i < _occ.Count; i++)
             {
                 var r = _occ[i];
                 if (r == null) continue;
                 var b = r.bounds;
-                bool block = false;
-                foreach (var t in targets)
+                bool block = InFrontOfField(b, c, fwd, dmin, sx0, sy0, sx1, sy1);
+                if (!block) foreach (var t in _tList)
                 {
                     var d = t - c;
                     float len = d.magnitude;
@@ -115,11 +180,37 @@ namespace Craquez
                     if (b.Contains(c) || (b.IntersectRay(new Ray(c, d / len), out float hit) && hit < len - 0.5f)) { block = true; break; }
                 }
                 // colado na câmera (poste, mureta, alambrado) também some
-                if (!block && b.SqrDistance(c) < 16f) block = true;
+                if (!block && b.SqrDistance(c) < 25f) block = true;
                 if (block == _occHidden[i]) continue;
                 _occHidden[i] = block;
                 r.shadowCastingMode = block ? UnityEngine.Rendering.ShadowCastingMode.ShadowsOnly : _occMode[i];
             }
+        }
+
+        readonly Vector3[] _corners = new Vector3[8];
+
+        /// <summary>
+        /// O objeto está inteiro entre a câmera e o campo (mais perto que o ponto do campo mais próximo)
+        /// e, na tela, cai sobre o campo? Então tapa o jogo (placa, letreiro, porta, arquibancada da frente).
+        /// </summary>
+        bool InFrontOfField(Bounds b, Vector3 c, Vector3 fwd, float dmin, float sx0, float sy0, float sx1, float sy1)
+        {
+            var mn = b.min; var mx = b.max;
+            float dmax = float.MinValue, x0 = 2f, y0 = 2f, x1 = -1f, y1 = -1f;
+            bool any = false;
+            for (int k = 0; k < 8; k++)
+            {
+                var p = new Vector3((k & 1) == 0 ? mn.x : mx.x, (k & 2) == 0 ? mn.y : mx.y, (k & 4) == 0 ? mn.z : mx.z);
+                dmax = Mathf.Max(dmax, Vector3.Dot(p - c, fwd));
+                var vp = cam.WorldToViewportPoint(p);
+                if (vp.z <= 0.05f) continue;
+                any = true;
+                x0 = Mathf.Min(x0, vp.x); y0 = Mathf.Min(y0, vp.y); x1 = Mathf.Max(x1, vp.x); y1 = Mathf.Max(y1, vp.y);
+            }
+            if (!any || dmax > dmin + 0.3f) return false;
+            // sobreposição real com o campo na tela (não só encostando na borda)
+            float ox = Mathf.Min(x1, sx1) - Mathf.Max(x0, sx0), oy = Mathf.Min(y1, sy1) - Mathf.Max(y0, sy0);
+            return ox > 0.005f && oy > 0.005f;
         }
 
         void LateUpdate()
@@ -130,8 +221,26 @@ namespace Craquez
                 _sceneT -= Time.deltaTime;
                 if (_sceneT <= 0f) { cinematic = _sceneWasCine; SnapToBall(); }
             }
+            // o enquadramento é pensado em 16:9; em telas mais estreitas (4:3, 16:10, retrato)
+            // abre o campo de visão vertical para mostrar a mesma largura de campo
+            if (_baseFov <= 0f) _baseFov = cam.fieldOfView;
+            cam.fieldOfView = _baseFov;
             Move();
+            _baseFov = cam.fieldOfView;
+            cam.fieldOfView = FitAspect(_baseFov, cam.aspect);
             UpdateOccluders(cinematic ? cineLook : _focus);
+            if (entrance != null && entrance.gameObject.activeSelf != cinematic) entrance.gameObject.SetActive(cinematic);
+        }
+
+        float _baseFov;
+
+        /// <summary>FOV vertical que mantém a largura vista em 16:9 (telas mais largas ficam como estão).</summary>
+        public static float FitAspect(float fov16x9, float aspect)
+        {
+            const float A = 16f / 9f;
+            if (aspect <= 0.01f || aspect >= A) return fov16x9;
+            float t = Mathf.Tan(fov16x9 * 0.5f * Mathf.Deg2Rad) * A / aspect;
+            return Mathf.Min(80f, 2f * Mathf.Atan(t) * Mathf.Rad2Deg);
         }
 
         void Move()
@@ -154,96 +263,139 @@ namespace Craquez
             var target = ball + _lead;
             target.x = Mathf.Clamp(target.x, -hl * 0.88f, hl * 0.88f);
             target.z = Mathf.Clamp(target.z * 0.55f, -hw * 0.5f, hw * 0.5f);
-            _focus = Vector3.SmoothDamp(_focus, target, ref _vel, 0.35f, 60f, dt);
+            var kind = (Kind)Mathf.Clamp(mode, 0, Modes.Length - 1);
+            bool onPlayer = kind == Kind.PlayerSide || kind == Kind.Behind || kind == Kind.Shoulder || kind == Kind.Dynamic;
+            if (!onPlayer) _focus = Vector3.SmoothDamp(_focus, target, ref _vel, 0.35f, 60f, dt);
             // perto do gol: aproxima um pouco
             float nearGoal = Mathf.Clamp01((Mathf.Abs(_focus.x) - hl * 0.55f) / (hl * 0.35f));
             float zk = 1f - zoom * 0.14f;   // zoom afasta/aproxima mantendo o ângulo
-            if (mode == 3 || mode == 4)
+            switch (kind)
             {
-                // câmeras "por trás": seguem a direção do ataque (jogador controlado ou time com a bola)
-                Vector3 anchor;
-                float dir;
-                if (mode == 3)
-                {
-                    var pl = sim.Controlled(followTeam);
-                    anchor = new Vector3(pl.position.x, 0, pl.position.y);
-                    dir = sim.TeamDir(followTeam);
-                }
-                else
-                {
-                    int t = sim.ball.owner >= 0 ? sim.players[sim.ball.owner].team : (sim.ball.lastTouchTeam >= 0 ? sim.ball.lastTouchTeam : 0);
-                    anchor = ball;
-                    dir = sim.TeamDir(t);
-                }
-                _attackDir = Vector3.Slerp(_attackDir, new Vector3(dir, 0, 0), 1f - Mathf.Exp(-dt * 1.2f));
-                float bk = (field ? (mode == 3 ? 10f : 20f) : (mode == 3 ? 7f : 11f)) * zk;
-                float up = (field ? (mode == 3 ? 4.2f : 9f) : (mode == 3 ? 3.2f : 6f)) * zk;
-                var focus = Vector3.Lerp(anchor, ball, mode == 3 ? 0.35f : 1f);
-                _focus = Vector3.SmoothDamp(_focus, focus, ref _vel, 0.25f, 80f, dt);
-                var p3 = _focus - _attackDir * bk + Vector3.up * up;
-                if (_shake > 0f) { _shake = Mathf.MoveTowards(_shake, 0f, dt * 2.5f); p3 += Random.insideUnitSphere * _shake * 0.2f; }
-                cam.transform.position = Vector3.Lerp(cam.transform.position, p3, 1f - Mathf.Exp(-dt * 6f));
-                cam.transform.rotation = Quaternion.Slerp(cam.transform.rotation, Quaternion.LookRotation(_focus + _attackDir * (field ? 8f : 4f) + Vector3.up * 0.5f - cam.transform.position), 1f - Mathf.Exp(-dt * 6f));
-                cam.fieldOfView = Mathf.Lerp(cam.fieldOfView, 52f, 1f - Mathf.Exp(-dt * 2f));
-                return;
-            }
-            if (mode >= 6 && mode <= 8)
-            {
-                Vector3 p6, look6;
-                float fov6;
-                if (mode == 6)
-                {
-                    // atrás do gol que o time seguido defende, olhando o campo no sentido do ataque
-                    float dir = sim.TeamDir(followTeam);
-                    float behind = (field ? 16f : 8f) * zk;
-                    p6 = new Vector3(-dir * (hl + behind) + _focus.x * 0.35f, (field ? 11f : 6.5f) * zk, _focus.z * 0.6f);
-                    look6 = new Vector3(_focus.x, 0.5f, _focus.z);
-                    fov6 = field ? 46f : 50f;
-                }
-                else if (mode == 7)
-                {
-                    // drone: quase de cima, um pouco atrás, acompanha a bola de perto
-                    p6 = _focus + new Vector3(0f, (field ? 30f : 15f) * zk, -(field ? 9f : 5f) * zk);
-                    look6 = _focus;
-                    fov6 = 42f;
-                }
-                else
-                {
-                    // isométrica: diagonal de um canto, estilo jogo de estratégia
-                    float dd = (field ? 34f : 17f) * zk;
-                    p6 = _focus + new Vector3(-dd * 0.7f, dd * 0.8f, -dd * 0.7f);
-                    look6 = _focus;
-                    fov6 = 30f;
-                }
-                if (_shake > 0f) { _shake = Mathf.MoveTowards(_shake, 0f, dt * 2.5f); p6 += Random.insideUnitSphere * _shake * 0.25f; }
-                cam.transform.position = Vector3.Lerp(cam.transform.position, p6, 1f - Mathf.Exp(-dt * 5f));
-                cam.transform.rotation = Quaternion.Slerp(cam.transform.rotation, Quaternion.LookRotation(look6 - cam.transform.position), 1f - Mathf.Exp(-dt * 6f));
-                cam.fieldOfView = Mathf.Lerp(cam.fieldOfView, fov6, 1f - Mathf.Exp(-dt * 2f));
-                return;
+                case Kind.PlayerSide: PlayerSide(ball, field, zk, dt); return;
+                case Kind.Behind:
+                case Kind.Shoulder:
+                case Kind.Dynamic: BehindCam(kind, ball, field, zk, dt); return;
+                case Kind.BehindGoal:
+                case Kind.Drone: Special(kind, field, hl, zk, dt); return;
             }
             float height, back, fov;
-            switch (mode)
+            switch (kind)
             {
-                case 1: height = field ? 11f : 7f; back = field ? 28f : 15f; fov = 34f; break;
-                case 2: height = field ? 42f : 20f; back = field ? 36f : 18f; fov = 38f; break;
-                case 5: height = field ? 3.2f : 2.4f; back = field ? 14f : 6f; fov = 44f; break;
-                case 9: height = field ? 30f : 14f; back = field ? 58f : 24f; fov = 34f; break;   // transmissão aberta: o campo todo
-                default: height = field ? 18f : 10f; back = field ? 38f : 16f; fov = field ? 31f : 38f; break;
+                case Kind.TvClose: height = field ? 9f : 7f; back = field ? 19f : 15f; fov = field ? 32f : 34f; break;
+                case Kind.Tactical: height = field ? 42f : 20f; back = field ? 36f : 18f; fov = 38f; break;
+                case Kind.Pitchside: height = field ? 2.6f : 2.1f; back = field ? 10f : 5f; fov = 46f; break;
+                case Kind.Wide: height = field ? 30f : 14f; back = field ? 58f : 24f; fov = 34f; break;   // o campo todo
+                // aberta aproximada: alta como a aberta (vê a jogada e o posicionamento), mas fechada
+                // na bola — atletas grandes o bastante para ver os detalhes
+                case Kind.WideClose: height = field ? 21f : 11f; back = field ? 40f : 18f; fov = field ? 24f : 30f; break;
+                // TV (padrão): no campo, mais perto do jogo e de frente (antes 18 m de altura a 38 m da
+                // lateral: os atletas ficavam pequenos)
+                default: height = field ? 13f : 10f; back = field ? 26f : 16f; fov = field ? 30f : 38f; break;
             }
             height *= zk;
             back *= zk;
             fov -= nearGoal * 4f;
             _dist = Mathf.Lerp(_dist <= 0 ? back : _dist, back * (1f - nearGoal * 0.1f), 1f - Mathf.Exp(-dt * 1.5f));
-            var pos = new Vector3(_focus.x * 0.82f, height, -(hw + _dist) + _focus.z * 0.25f);
-            if (_shake > 0f)
-            {
-                _shake = Mathf.MoveTowards(_shake, 0f, dt * 2.5f);
-                pos += Random.insideUnitSphere * _shake * 0.25f;
-            }
+            var pos = new Vector3(_focus.x * (kind == Kind.Pitchside ? 0.95f : field && (kind == Kind.Tv || kind == Kind.TvClose) ? 0.9f : 0.82f), height, -(hw + _dist) + _focus.z * 0.25f);
+            pos += ShakeOffset(dt, 0.25f);
             cam.transform.position = pos;
-            var look = _focus + Vector3.up * 0.6f;
+            var look = _focus + Vector3.up * (kind == Kind.Pitchside ? 1.1f : 0.6f);
             cam.transform.rotation = Quaternion.LookRotation(look - pos);
             cam.fieldOfView = Mathf.Lerp(cam.fieldOfView, fov, 1f - Mathf.Exp(-dt * 2f));
+        }
+
+        Vector3 ShakeOffset(float dt, float k)
+        {
+            if (_shake <= 0f) return Vector3.zero;
+            _shake = Mathf.MoveTowards(_shake, 0f, dt * 2.5f);
+            return Random.insideUnitSphere * _shake * k;
+        }
+
+        Vector3 _player;
+
+        /// <summary>Posição do atleta controlado (suavizada), puxada um pouco para a bola.</summary>
+        Vector3 PlayerAnchor(Vector3 ball, float toBall, float dt)
+        {
+            var pl = sim.Controlled(Mathf.Clamp(followTeam, 0, 1));
+            var p = new Vector3(pl.position.x, 0, pl.position.y);
+            var want = Vector3.Lerp(p, ball, toBall);
+            _player = _player == Vector3.zero ? want : Vector3.Lerp(_player, want, 1f - Mathf.Exp(-dt * 5f));
+            return _player;
+        }
+
+        /// <summary>"Perto do jogador": lateral, baixa e fechada no atleta controlado (estilo câmera pro).</summary>
+        void PlayerSide(Vector3 ball, bool field, float zk, float dt)
+        {
+            var a = PlayerAnchor(ball, 0.3f, dt);
+            _focus = Vector3.SmoothDamp(_focus, a, ref _vel, 0.22f, 80f, dt);
+            float dist = (field ? 15f : 8.5f) * zk, h = (field ? 6.2f : 4.2f) * zk;
+            var p = new Vector3(_focus.x, h, _focus.z - dist) + ShakeOffset(dt, 0.2f);
+            cam.transform.position = Vector3.Lerp(cam.transform.position, p, 1f - Mathf.Exp(-dt * 6f));
+            var q = Quaternion.LookRotation(_focus + Vector3.up * 1.0f - cam.transform.position);
+            cam.transform.rotation = Quaternion.Slerp(cam.transform.rotation, q, 1f - Mathf.Exp(-dt * 7f));
+            cam.fieldOfView = Mathf.Lerp(cam.fieldOfView, field ? 36f : 42f, 1f - Mathf.Exp(-dt * 2f));
+        }
+
+        /// <summary>Câmeras "por trás", no sentido do ataque: atrás do jogador, ombro (bem perto) e dinâmica (segue a bola).</summary>
+        void BehindCam(Kind kind, Vector3 ball, bool field, float zk, float dt)
+        {
+            Vector3 anchor;
+            float dir;
+            if (kind == Kind.Dynamic)
+            {
+                int t = sim.ball.owner >= 0 ? sim.players[sim.ball.owner].team : (sim.ball.lastTouchTeam >= 0 ? sim.ball.lastTouchTeam : 0);
+                anchor = ball;
+                dir = sim.TeamDir(t);
+            }
+            else
+            {
+                anchor = PlayerAnchor(ball, kind == Kind.Shoulder ? 0.12f : 0.35f, dt);
+                dir = sim.TeamDir(Mathf.Clamp(followTeam, 0, 1));
+            }
+            _attackDir = Vector3.Slerp(_attackDir, new Vector3(dir, 0, 0), 1f - Mathf.Exp(-dt * 1.2f));
+            float bk, up, fov, ahead;
+            switch (kind)
+            {
+                case Kind.Shoulder: bk = field ? 4.6f : 3.6f; up = field ? 2.3f : 2.0f; fov = 60f; ahead = field ? 12f : 7f; break;
+                case Kind.Dynamic: bk = field ? 20f : 11f; up = field ? 9f : 6f; fov = 52f; ahead = field ? 8f : 4f; break;
+                default: bk = field ? 10f : 7f; up = field ? 4.2f : 3.2f; fov = 52f; ahead = field ? 8f : 4f; break;
+            }
+            bk *= zk; up *= zk;
+            _focus = Vector3.SmoothDamp(_focus, anchor, ref _vel, kind == Kind.Shoulder ? 0.15f : 0.25f, 80f, dt);
+            // ombro: um pouco para o lado, para o atleta não tapar a jogada
+            var side = Vector3.Cross(Vector3.up, _attackDir).normalized * (kind == Kind.Shoulder ? -1.1f : 0f);
+            var p3 = _focus - _attackDir * bk + Vector3.up * up + side + ShakeOffset(dt, 0.2f);
+            float follow = kind == Kind.Shoulder ? 9f : 6f;
+            cam.transform.position = Vector3.Lerp(cam.transform.position, p3, 1f - Mathf.Exp(-dt * follow));
+            var look = _focus + _attackDir * ahead + Vector3.up * (kind == Kind.Shoulder ? 1.0f : 0.5f);
+            cam.transform.rotation = Quaternion.Slerp(cam.transform.rotation, Quaternion.LookRotation(look - cam.transform.position), 1f - Mathf.Exp(-dt * follow));
+            cam.fieldOfView = Mathf.Lerp(cam.fieldOfView, fov, 1f - Mathf.Exp(-dt * 2f));
+        }
+
+        void Special(Kind kind, bool field, float hl, float zk, float dt)
+        {
+            Vector3 p6, look6;
+            float fov6;
+            if (kind == Kind.BehindGoal)
+            {
+                // atrás do gol que o time seguido defende, olhando o campo no sentido do ataque
+                float dir = sim.TeamDir(followTeam);
+                float behind = (field ? 16f : 8f) * zk;
+                p6 = new Vector3(-dir * (hl + behind) + _focus.x * 0.35f, (field ? 11f : 6.5f) * zk, _focus.z * 0.6f);
+                look6 = new Vector3(_focus.x, 0.5f, _focus.z);
+                fov6 = field ? 46f : 50f;
+            }
+            else
+            {
+                // drone: quase de cima, um pouco atrás, acompanha a bola de perto
+                p6 = _focus + new Vector3(0f, (field ? 30f : 15f) * zk, -(field ? 9f : 5f) * zk);
+                look6 = _focus;
+                fov6 = 42f;
+            }
+            p6 += ShakeOffset(dt, 0.25f);
+            cam.transform.position = Vector3.Lerp(cam.transform.position, p6, 1f - Mathf.Exp(-dt * 5f));
+            cam.transform.rotation = Quaternion.Slerp(cam.transform.rotation, Quaternion.LookRotation(look6 - cam.transform.position), 1f - Mathf.Exp(-dt * 6f));
+            cam.fieldOfView = Mathf.Lerp(cam.fieldOfView, fov6, 1f - Mathf.Exp(-dt * 2f));
         }
 
         public void SnapToBall()

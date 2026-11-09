@@ -21,6 +21,7 @@ namespace Craquez
                 string shader = name.StartsWith("Unlit") ? "Universal Render Pipeline/Unlit" :
                     name == "Particles" ? "Universal Render Pipeline/Particles/Unlit" :
                     name.StartsWith("ToonOutline") ? "Craquez/ToonOutline" :
+                    name.StartsWith("Athlete") ? "Craquez/Athlete" :
                     name == "LitTransparent" ? "Universal Render Pipeline/Lit" : "Craquez/Toon";
                 if (Shader.Find(shader) == null) shader = "Universal Render Pipeline/Lit";
                 var sh = Shader.Find(shader) ?? Shader.Find("Standard");
@@ -50,7 +51,35 @@ namespace Craquez
             var m = new Material(Template(cutout ? "ToonOutlineCutout" : "ToonOutline"));
             Set(m, c, tex);
             m.SetFloat("_Smoothness", smooth);
-            if (cutout) m.SetFloat("_Cutoff", 0.01f);
+            if (cutout)
+            {
+                m.SetFloat("_Cutoff", 0.01f);
+                // tecido (uniforme): sempre à frente da pele, mesmo com pouca precisão de profundidade
+                m.SetFloat("_ZOffF", -1f);
+                m.SetFloat("_ZOffU", -8f);
+                m.renderQueue = 2010;
+            }
+            return m;
+        }
+
+        /// <summary>
+        /// Material dos atletas (luz suave e volume): skin = 1 na pele (espalhamento quente no
+        /// limite luz/sombra), 0 no tecido e nas chuteiras.
+        /// </summary>
+        public static Material Athlete(Color c, Texture tex, float smooth, float skin, bool cutout = false)
+        {
+            var m = new Material(Template(cutout ? "AthleteCutout" : "Athlete"));
+            Set(m, c, tex);
+            m.SetFloat("_Smoothness", smooth);
+            m.SetFloat("_Metallic", Mathf.Clamp01(skin));
+            if (cutout)
+            {
+                m.SetFloat("_Cutoff", 0.01f);
+                // tecido (uniforme): sempre à frente da pele, mesmo com pouca precisão de profundidade
+                m.SetFloat("_ZOffF", -1f);
+                m.SetFloat("_ZOffU", -8f);
+                m.renderQueue = 2010;
+            }
             return m;
         }
 
@@ -179,7 +208,7 @@ namespace Craquez
 
         // --------------------------------------------------------------- texturas
         public static Texture2D Tex(int w, int h, bool mips = true, TextureWrapMode wrap = TextureWrapMode.Repeat)
-            => new Texture2D(w, h, TextureFormat.RGBA32, mips) { wrapMode = wrap, filterMode = FilterMode.Trilinear, anisoLevel = 4 };
+            => new Texture2D(w, h, TextureFormat.RGBA32, mips) { wrapMode = wrap, filterMode = FilterMode.Trilinear, anisoLevel = 8 };
 
         static float Hash(int x, int y, int s)
         {
@@ -247,6 +276,38 @@ namespace Craquez
                     float gap = Hash(x, y, seed + 29);
                     if (gap > 0.965f && blade < 0.4f) k *= 0.62f;
                     var c = new Color(baseC.r * tint.r * k, baseC.g * tint.g * k, baseC.b * tint.b * k, 1f);
+                    px[y * size + x] = c;
+                }
+            t.SetPixels32(px);
+            t.Apply(true);
+            return t;
+        }
+
+        /// <summary>
+        /// Grama sintética (society): fios finos no sentido do rolo, grânulos de borracha preta
+        /// aparecendo entre os fios e a emenda entre dois rolos (textura de ~2 m, emenda no meio).
+        /// </summary>
+        public static Texture2D Turf(int size, int seed)
+        {
+            var t = Tex(size, size);
+            t.anisoLevel = 8;
+            var px = new Color32[size * size];
+            for (int y = 0; y < size; y++)
+                for (int x = 0; x < size; x++)
+                {
+                    float u = x / (float)size, v = y / (float)size;
+                    float fib = VNoise(u * 260f, v * 18f, 260, seed + 3);            // fios
+                    float fib2 = VNoise(u * 420f + v * 6f, v * 30f, 420, seed + 5);
+                    float low = Fbm(u * 4, v * 4, 4, seed, 3) - 0.5f;
+                    float k = 0.88f + (fib - 0.5f) * 0.3f + (fib2 - 0.5f) * 0.14f + low * 0.08f;
+                    var c = new Color(k * 0.98f, k, k * 0.9f, 1f);
+                    // borracha entre os fios (pontinhos escuros) e um pouco de areia clara
+                    float g = Hash(x, y, seed + 11);
+                    if (g > 0.93f && fib < 0.5f) c = new Color(0.16f, 0.16f, 0.15f, 1f);
+                    else if (g < 0.015f) c *= 1.18f;
+                    // emenda entre rolos (4 cm, um pouco mais escura) na metade da textura
+                    if (Mathf.Abs(u - 0.5f) < 0.01f) c *= 0.72f;
+                    c.a = 1f;
                     px[y * size + x] = c;
                 }
             t.SetPixels32(px);
@@ -375,7 +436,7 @@ namespace Craquez
         }
 
         /// <summary>Arquibancada lotada: "pixels" de gente com camisas nas cores do time e da torcida rival.</summary>
-        public static Texture2D CrowdTex(int w, int h, Color home, Color home2, Color away, int seed, float occupancy = 0.92f)
+        public static Texture2D CrowdTex(int w, int h, Color home, Color home2, Color away, int seed, float occupancy = 0.92f, Color? seatColor = null, float awayShare = 0.18f)
         {
             var t = Tex(w, h, true);
             var px = new Color32[w * h];
@@ -385,11 +446,11 @@ namespace Craquez
                 {
                     float r = Hash(cx, cy, seed);
                     bool empty = Hash(cx, cy, seed + 1) > occupancy;
-                    bool awaySide = cx > (w / cell) * 0.82f;
+                    bool awaySide = cx >= (w / cell) * (1f - awayShare);   // setor do visitante (0 = só mandante, 1 = só visitante)
                     Color shirt = awaySide ? away : (r < 0.55f ? home : r < 0.8f ? home2 : Color.HSVToRGB(Hash(cx, cy, seed + 5), 0.3f, 0.8f));
                     Color skin = Color.Lerp(new Color(0.36f, 0.22f, 0.15f), new Color(0.95f, 0.78f, 0.65f), Hash(cx, cy, seed + 2));
                     Color hair = Color.Lerp(new Color(0.05f, 0.04f, 0.03f), new Color(0.5f, 0.35f, 0.2f), Hash(cx, cy, seed + 3) * 0.6f);
-                    Color seat = new Color(0.18f, 0.2f, 0.25f);
+                    Color seat = seatColor ?? new Color(0.18f, 0.2f, 0.25f);
                     for (int y = 0; y < cell; y++)
                         for (int x = 0; x < cell; x++)
                         {
@@ -409,44 +470,98 @@ namespace Craquez
             return t;
         }
 
-        /// <summary>Silhuetas de torcedores (cabeça, ombros, braços, cachecóis e bandeiras) com alfa, repetível.</summary>
-        public static Texture2D CrowdPeople(int w, int h, Color home, Color home2, Color away, int seed)
+        /// <summary>
+        /// Silhuetas de torcedores com alfa, repetível: corpos de larguras e alturas diferentes
+        /// (crianças inclusive), camisa do time (listrada quando o uniforme é listrado), boné,
+        /// cachecol no pescoço ou esticado acima da cabeça, braços para cima e bandeiras.
+        /// <paramref name="cheer"/> 0-1 = quantos estão de braços erguidos (1 = comemoração de gol).
+        /// </summary>
+        public static Texture2D CrowdPeople(int w, int h, Color home, Color home2, Color away, int seed, float cheer = 0f, bool stripes = false, float awayShare = 0.18f)
         {
             var t = Tex(w, h, true);
             var px = new Color32[w * h];
-            int pw = 14;
+            int pw = Mathf.Max(10, h * 14 / 64);
             int n = w / pw;
             for (int i = 0; i < n; i++)
             {
                 float r = Hash(i, 1, seed);
-                if (r > 0.94f) continue;   // lugar vazio
-                bool awaySide = i > n * 0.82f;
+                if (r > 0.95f) continue;   // lugar vazio
+                bool awaySide = i >= n * (1f - awayShare);
+                bool fanShirt = r < 0.8f;
                 Color shirt = awaySide ? away : (r < 0.55f ? home : r < 0.8f ? home2 : Color.HSVToRGB(Hash(i, 5, seed), 0.35f, 0.75f));
-                Color skin = Color.Lerp(new Color(0.36f, 0.22f, 0.15f), new Color(0.95f, 0.78f, 0.65f), Hash(i, 2, seed));
-                Color hair = Color.Lerp(new Color(0.05f, 0.04f, 0.03f), new Color(0.45f, 0.32f, 0.2f), Hash(i, 3, seed) * 0.7f);
-                int cx = i * pw + pw / 2 + (int)((Hash(i, 4, seed) - 0.5f) * 4);
-                float hgt = 0.82f + Hash(i, 6, seed) * 0.18f;
-                bool armsUp = Hash(i, 7, seed) > 0.72f;
+                Color shirt2 = awaySide ? Color.Lerp(away, Color.white, 0.6f) : (shirt == home ? home2 : home);
+                bool striped = stripes && fanShirt && !awaySide && Hash(i, 10, seed) > 0.35f;
+                Color skin = Color.Lerp(new Color(0.3f, 0.19f, 0.12f), new Color(0.96f, 0.8f, 0.68f), Hash(i, 2, seed));
+                Color hair = Color.Lerp(new Color(0.04f, 0.03f, 0.02f), new Color(0.5f, 0.36f, 0.22f), Hash(i, 3, seed) * 0.7f);
+                int cx = i * pw + pw / 2 + (int)((Hash(i, 4, seed) - 0.5f) * pw * 0.3f);
+                bool kid = Hash(i, 11, seed) > 0.9f;
+                float hgt = kid ? 0.66f : 0.82f + Hash(i, 6, seed) * 0.18f;
+                float wide = (kid ? 0.8f : 0.9f + Hash(i, 12, seed) * 0.25f);
+                bool armsUp = Hash(i, 7, seed) > 0.72f - cheer * 0.68f;
+                bool scarfUp = !armsUp && Hash(i, 13, seed) > 0.9f - cheer * 0.2f;   // cachecol esticado acima da cabeça
+                bool cap = Hash(i, 14, seed) > 0.82f;
                 bool flag = Hash(i, 8, seed) > 0.95f;
+                float lean = (Hash(i, 15, seed) - 0.5f) * 0.12f;
                 for (int y = 0; y < h; y++)
-                    for (int x = Mathf.Max(0, cx - pw); x < Mathf.Min(w, cx + pw); x++)
+                    for (int x = Mathf.Max(0, cx - pw * 2); x < Mathf.Min(w, cx + pw * 2); x++)
                     {
-                        float u = (x - cx) / (float)pw, v = y / (float)h / hgt;   // v: 0 base .. 1 topo da cabeça
+                        float v = y / (float)h / hgt;                       // 0 base .. 1 topo da cabeça
+                        float u = ((x - cx) / (float)pw - lean * v) / wide;
                         Color c = new Color(0, 0, 0, 0);
-                        if (v < 0.62f && Mathf.Abs(u) < 0.42f - (v > 0.5f ? (v - 0.5f) * 1.5f : 0f)) c = shirt * (0.8f + v * 0.3f);
-                        if (v > 0.6f && v < 0.7f && Mathf.Abs(u) < 0.12f) c = skin * 0.9f;                                     // pescoço
-                        if (new Vector2(u * 1.3f, (v - 0.8f) * 1.0f).magnitude < 0.2f) c = v > 0.86f ? hair : skin;          // cabeça
-                        if (armsUp && v > 0.45f && v < 1.05f && Mathf.Abs(Mathf.Abs(u) - 0.42f + (v - 0.45f) * 0.25f) < 0.08f) c = v > 0.95f ? skin : shirt * 0.9f;
-                        if (v > 0.52f && v < 0.58f && Mathf.Abs(u) < 0.4f && Hash(i, 9, seed) > 0.6f) c = home2;           // cachecol
+                        // tronco (ombros arredondados)
+                        if (v < 0.62f && Mathf.Abs(u) < 0.42f - (v > 0.5f ? (v - 0.5f) * 1.5f : 0f))
+                        {
+                            c = striped && Mathf.Repeat(u * 5f + 0.25f, 1f) < 0.5f ? shirt2 : shirt;
+                            c *= 0.78f + v * 0.3f + (u < 0f ? 0.06f : -0.04f);   // luz de um lado, sombra do outro
+                        }
+                        if (v > 0.6f && v < 0.7f && Mathf.Abs(u) < 0.12f) c = skin * 0.85f;                                    // pescoço
+                        if (new Vector2(u * 1.3f, (v - 0.8f) * 1.0f).magnitude < 0.2f) c = (v > 0.86f ? hair : skin) * (u < 0f ? 1f : 0.9f);   // cabeça
+                        if (cap && v > 0.88f && v < 0.99f && Mathf.Abs(u) < 0.17f + (v < 0.9f && u > 0f ? 0.1f : 0f)) c = shirt2 * 0.9f;   // boné
+                        if (armsUp && v > 0.45f && v < 1.08f && Mathf.Abs(Mathf.Abs(u) - 0.42f + (v - 0.45f) * 0.25f) < 0.08f) c = v > 0.98f ? skin : shirt * 0.88f;
+                        if (scarfUp)
+                        {
+                            if (v > 0.5f && v < 1.12f && Mathf.Abs(Mathf.Abs(u) - 0.5f) < 0.07f) c = v > 1.02f ? skin : shirt * 0.85f;   // braços
+                            if (v > 1.04f && v < 1.14f && Mathf.Abs(u) < 0.62f) c = Mathf.Repeat(u * 4f, 1f) < 0.5f ? home : home2;  // cachecol
+                        }
+                        else if (v > 0.52f && v < 0.58f && Mathf.Abs(u) < 0.4f && Hash(i, 9, seed) > 0.6f) c = home2;             // cachecol no pescoço
                         if (flag && u > 0.2f && v > 0.7f && v < 1.15f && u < 1.4f) c = Mathf.Repeat(v * 6f, 1f) < 0.5f ? home : home2;
                         c.a = c.a > 0f ? 1f : 0f;
-                        if (c.a > 0f) px[Mathf.Min(h - 1, y) * w + x] = c;
+                        int yy = Mathf.Min(h - 1, y);
+                        if (c.a > 0f) px[yy * w + x] = c;
                     }
             }
             t.SetPixels32(px);
             t.filterMode = FilterMode.Trilinear;
             t.Apply(true);
             KeepCoverage(t);
+            return t;
+        }
+
+        /// <summary>Faixa de torcida (pano pendurado) nas cores do time, com uma palavra de apoio.</summary>
+        public static Texture2D Banner(Color c1, Color c2, string text, int seed)
+        {
+            int W = 512, H = 96;
+            var t = Tex(W, H, true);
+            var px = new Color32[W * H];
+            int style = seed % 3;
+            var g = Craquez.Glyphs.Render(text, 46);
+            int gw = g.GetLength(0), gh = g.GetLength(1);
+            int gx0 = (W - gw) / 2, gy0 = (H - gh) / 2;
+            Color fg = c2.grayscale > 0.5f == c1.grayscale > 0.5f ? (c1.grayscale > 0.5f ? new Color(0.08f, 0.08f, 0.1f) : Color.white) : c2;
+            for (int y = 0; y < H; y++)
+                for (int x = 0; x < W; x++)
+                {
+                    Color c = style == 0 ? c1 : style == 1 ? (y < H / 3 || y >= 2 * H / 3 ? c2 : c1) : ((x / 64) % 2 == 0 ? c1 : Color.Lerp(c1, c2, 0.35f));
+                    int lx = x - gx0, ly = y - gy0;
+                    if (lx >= 0 && ly >= 0 && lx < gw && ly < gh && g[lx, ly]) c = fg;
+                    if (y < 4 || y > H - 5) c = c2 * 0.8f;   // bainha
+                    float n = VNoise(x / 11f, y / 11f, W / 11, seed + 3);
+                    c *= 0.86f + n * 0.18f;                 // dobras do pano
+                    c.a = 1f;
+                    px[y * W + x] = c;
+                }
+            t.SetPixels32(px);
+            t.Apply(true);
             return t;
         }
 
@@ -651,6 +766,37 @@ namespace Craquez
             t.SetPixels32(px);
             t.Apply(true);
             return t;
+        }
+
+        /// <summary>
+        /// Cobertura (0..1) do número no ponto (u, v) do quadrado unitário (v para cima), sem
+        /// textura: o mesmo traçado de Number, para pintar direto na camisa. aa = largura do
+        /// pixel em unidades do quadrado; grow = engrossa o traço (contorno).
+        /// </summary>
+        public static float NumberAlpha(int n, float u, float v, float aa, float grow = 0f)
+        {
+            string s = Mathf.Clamp(n, 0, 99).ToString();
+            float digitW = 2f, gap = 1.1f, thick = 0.62f;
+            float totalW = s.Length * digitW + (s.Length - 1) * gap;
+            float scale = 0.78f / Mathf.Max(4f + thick, totalW + thick);
+            float ox = (1f - totalW * scale) * 0.5f, oy = (1f - 4f * scale) * 0.5f;
+            var p = new Vector2(u, v);
+            float best = 99f;
+            for (int i = 0; i < s.Length; i++)
+            {
+                var st = Strokes[s[i]];
+                float dx0 = ox + i * (digitW + gap) * scale;
+                for (int k = 0; k + 3 < st.Length; k += 4)
+                {
+                    var a = new Vector2(dx0 + st[k] * scale, oy + st[k + 1] * scale);
+                    var b = new Vector2(dx0 + st[k + 2] * scale, oy + st[k + 3] * scale);
+                    var ab = b - a;
+                    float tt = Mathf.Clamp01(Vector2.Dot(p - a, ab) / Mathf.Max(1e-7f, ab.sqrMagnitude));
+                    best = Mathf.Min(best, Vector2.Distance(p, a + ab * tt));
+                }
+            }
+            float r = thick * scale * 0.5f + grow;
+            return Mathf.Clamp01((r - best) / Mathf.Max(1e-5f, aa) + 0.5f);
         }
 
         /// <summary>Matriz [x, y] (y para cima) do texto em altura h pixels.</summary>

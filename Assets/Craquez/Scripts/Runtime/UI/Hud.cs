@@ -19,13 +19,23 @@ namespace Craquez.UI
         readonly RectTransform[] _pbox = new RectTransform[2];
         public Canvas canvas;
         RectTransform _overlay;
+        /// <summary>Vista da partida (posição dos atletas para os nomes sobre a cabeça).</summary>
+        public MatchView view;
+        RectTransform _tagRoot;
+        readonly List<(RectTransform rt, Text num, Image chip, Text name, CanvasGroup cg)> _tags = new List<(RectTransform, Text, Image, Text, CanvasGroup)>();
+        readonly int[] _tagFor = new int[40];
+        Kit[] _kits;
 
         public void Build(MatchSim sim, MatchConfig cfg, Kit[] kits)
         {
             _sim = sim;
             _cfg = cfg;
+            _kits = kits;
             canvas = UiKit.Canvas("HUD", 10, transform);
             var root = UiKit.SafeRoot(canvas);
+            // nomes sobre os atletas (atrás de todo o resto do HUD)
+            _tagRoot = UiKit.Rect(canvas.transform, "nomes dos atletas").Place(0, 0, 1, 1);
+            _tagRoot.SetAsFirstSibling();
             var ta = Teams.Get(cfg.teamA);
             var tb = Teams.Get(cfg.teamB);
             // placar
@@ -167,6 +177,81 @@ namespace Craquez.UI
             return mm.ToString("00") + ":" + ss.ToString("00");
         }
 
+        /// <summary>Etiqueta: número num círculo na cor do time + sobrenome, numa pílula escura.</summary>
+        (RectTransform rt, Text num, Image chip, Text name, CanvasGroup cg) NewTag()
+        {
+            var bg = UiKit.Image(_tagRoot, new Color(0.02f, 0.03f, 0.07f, 0.72f), Theme.RoundSmall, "etiqueta");
+            bg.raycastTarget = false;
+            var rt = bg.rectTransform;
+            rt.anchorMin = rt.anchorMax = Vector2.zero;
+            rt.pivot = new Vector2(0.5f, 0f);
+            rt.sizeDelta = new Vector2(190, 34);
+            var chip = UiKit.Image(rt, Color.white, Theme.RoundSmall, "número");
+            chip.raycastTarget = false;
+            chip.rectTransform.Place(0, 0, 0, 1, 3, 3, 0, 3).sizeDelta = new Vector2(40, -6);
+            chip.rectTransform.anchoredPosition = new Vector2(23, 0);
+            var num = UiKit.Label(chip.rectTransform, "10", 22, Theme.HeadItalic, Color.black, TextAnchor.MiddleCenter);
+            num.rectTransform.Place(0, 0, 1, 1);
+            num.raycastTarget = false;
+            var name = UiKit.Label(rt, "", 20, Theme.BodyBold, Color.white, TextAnchor.MiddleLeft);
+            name.rectTransform.Place(0, 0, 1, 1, 50, 0, 8, 0);
+            name.raycastTarget = false;
+            var cg = bg.gameObject.AddComponent<CanvasGroup>();
+            cg.blocksRaycasts = false;
+            var tag = (rt, num, chip, name, cg);
+            _tags.Add(tag);
+            return tag;
+        }
+
+        static string Surname(string n)
+        {
+            n = n.Trim();
+            int i = n.LastIndexOf(' ');
+            // "J. Bellingham" -> BELLINGHAM; "Vini Jr." -> VINI JR.
+            if (i > 0 && n.EndsWith(".") && n.Length - i <= 4) return n.ToUpperInvariant();
+            return (i > 0 ? n.Substring(i + 1) : n).ToUpperInvariant();
+        }
+
+        void PlayerTags()
+        {
+            int mode = Settings.PlayerTags;
+            var cam = view != null && view.bcam != null ? view.bcam.cam : null;
+            int used = 0;
+            if (mode != 2 && cam != null && view.athletes.Count > 0 && !view.bcam.cinematic && _sim.state != MatchState.Halftime)
+            {
+                var canvasRt = (RectTransform)canvas.transform;
+                for (int i = 0; i < _sim.players.Count; i++)
+                {
+                    var p = _sim.players[i];
+                    bool show = mode == 1 || p.id == _sim.ball.owner || (_pbox[0].gameObject.activeSelf && _sim.Controlled(0).id == p.id) || (_pbox[1].gameObject.activeSelf && _sim.Controlled(1).id == p.id);
+                    if (!show || i >= view.athletes.Count || view.athletes[i] == null) continue;
+                    var head = view.athletes[i].transform.position + Vector3.up * 2.15f;
+                    var sp = cam.WorldToScreenPoint(head);
+                    if (sp.z <= 0.5f) continue;
+                    if (used >= _tags.Count) NewTag();
+                    var tag = _tags[used++];
+                    if (!tag.rt.gameObject.activeSelf) tag.rt.gameObject.SetActive(true);
+                    RectTransformUtility.ScreenPointToLocalPointInRectangle(canvasRt, sp, canvas.renderMode == RenderMode.ScreenSpaceOverlay ? null : canvas.worldCamera, out var lp);
+                    tag.rt.anchoredPosition = lp + canvasRt.rect.size * 0.5f;
+                    // mais perto da câmera = um pouco maior (sem exagero)
+                    float sc = Mathf.Clamp(14f / sp.z, 0.55f, 1.05f);
+                    tag.rt.localScale = Vector3.one * sc;
+                    if (_tagFor[used - 1] != p.id + 1)
+                    {
+                        _tagFor[used - 1] = p.id + 1;
+                        tag.num.text = p.number.ToString();
+                        tag.name.text = Surname(p.name);
+                        var kc = _kits != null ? _kits[p.team].c1 : Color.white;
+                        tag.chip.color = kc;
+                        tag.num.color = kc.grayscale > 0.55f ? new Color(0.05f, 0.06f, 0.1f) : Color.white;
+                    }
+                    tag.cg.alpha = p.id == _sim.ball.owner ? 1f : 0.85f;
+                }
+            }
+            for (int k = used; k < _tags.Count; k++)
+                if (_tags[k].rt.gameObject.activeSelf) { _tags[k].rt.gameObject.SetActive(false); _tagFor[k] = 0; }
+        }
+
         void Update()
         {
             if (_sim == null) return;
@@ -194,6 +279,7 @@ namespace Craquez.UI
                 _power[t].color = Color.Lerp(Theme.Accent2, Theme.Hot, Mathf.Clamp01((ch - 0.7f) / 0.3f));
             }
             SetPieceHint();
+            PlayerTags();
             _toastT -= Time.unscaledDeltaTime;
             _toastCg.alpha = Mathf.Clamp01(_toastT * 3f);
             _goalT -= Time.unscaledDeltaTime;
@@ -222,10 +308,10 @@ namespace Craquez.UI
                 _setPiece.rectTransform.Place(0, 0, 1, 0, 40, 150, 40, -200);
                 UiKit.Shadow(_setPiece, 3, 0.9f);
             }
-            int want = _sim.setPiece && _sim.setPieceTeam >= 0 && human[_sim.setPieceTeam] && _sim.ball.owner == _sim.setPieceTaker ? (_sim.setPieceShot ? 1 : 0) : -1;
+            int want = _sim.setPiece && _sim.setPieceTeam >= 0 && human[_sim.setPieceTeam] && _sim.ball.owner == _sim.setPieceTaker ? (_sim.setPieceShot ? 1 : _sim.cornerKick ? 2 : _sim.kickIn ? 3 : 0) : -1;
             if (want == _setPieceShown) return;
             _setPieceShown = want;
-            _setPiece.text = want < 0 ? "" : InputRouter.SetPieceHelp(devices[_sim.setPieceTeam], want == 1);
+            _setPiece.text = want < 0 ? "" : InputRouter.SetPieceHelp(devices[_sim.setPieceTeam], want == 1, want == 2 ? "ESCANTEIO" : want == 3 ? "LATERAL" : "FALTA");
         }
     }
 }

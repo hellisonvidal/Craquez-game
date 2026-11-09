@@ -51,8 +51,15 @@ namespace Craquez.Sim
                     {
                         // restituição cai um pouco em impactos fortes (deformação da bola)
                         float e = m.bounce * Mathf.Lerp(1f, 0.85f, Mathf.Clamp01((-vz - 4f) / 10f));
+                        // atrito no impacto: proporcional à força normal (queda forte freia mais que um
+                        // quique rasante), no máximo até a bola passar a rolar (2/7 da velocidade, esfera oca)
+                        float hs = vel.magnitude;
+                        if (hs > 0.01f)
+                        {
+                            float dvT = Mathf.Min(0.42f * (1f + e) * -vz, hs * 2f / 7f);
+                            vel *= (hs - dvT) / hs;
+                        }
                         vz = -vz * e;
-                        vel *= 0.86f;
                         spin *= 0.5f;
                         slideT = 0.18f;
                         bounced = true;

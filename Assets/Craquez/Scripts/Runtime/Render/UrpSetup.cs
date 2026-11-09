@@ -17,6 +17,7 @@ namespace Craquez
             if (cam == null) return;
             var data = cam.GetUniversalAdditionalCameraData();
             data.renderPostProcessing = true;
+            data.stopNaN = true;   // pixel inválido (NaN/infinito) vira preto em vez de explodir no bloom
             int aa = Settings.Antialias;
             if (aa == 0) aa = quality >= 2 ? 4 : quality == 1 ? 3 : 2;   // automático: SMAA alto / SMAA / FXAA
             data.antialiasing = aa == 2 ? AntialiasingMode.FastApproximateAntialiasing
@@ -82,8 +83,10 @@ namespace Craquez
             if (prof.TryGet<Bloom>(out var b))
             {
                 b.intensity.Override(bloom);
-                b.threshold.Override(night ? 0.95f : 1.1f);
+                b.threshold.Override(night ? 1.15f : 1.35f);   // só o que é luz de verdade (refletores, LED) brilha
                 b.scatter.Override(0.65f);
+                b.clamp.Override(4f);   // limita o brilho de um pixel só (sem "pontos de luz" estourados)
+                b.highQualityFiltering.Override(!Application.isMobilePlatform);
             }
             // cel shading: tonemapping neutro (o ACES lava as cores chapadas) e cor mais viva
             if (prof.TryGet<Tonemapping>(out var t)) t.mode.Override(TonemappingMode.Neutral);

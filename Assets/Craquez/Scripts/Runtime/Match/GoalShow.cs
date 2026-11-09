@@ -86,7 +86,14 @@ namespace Craquez
             // comemoração na bandeirinha do lado atacado, do lado da câmera
             float dir = Mathf.Sign(sim.ball.pos.x == 0 ? 1f : sim.ball.pos.x);
             _spot = new Vector2(dir * (sim.halfLen - 3f), -(sim.halfW - 2.5f));
-            view.bcam.cinematic = true;
+            // sem corte: a câmera sai de onde estava, acompanha a bola morrendo na rede e só então
+            // desliza até o autor do gol (a câmera cinematográfica interpola posição e mira)
+            var bc = view.bcam;
+            bc.cinematic = true;
+            bc.cinePos = bc.cam.transform.position;
+            bc.cineLook = new Vector3(sim.ball.pos.x, sim.ball.z, sim.ball.pos.y);
+            bc.cineFov = bc.cam.fieldOfView;
+            _wipeAt = -1f;
             if (_scorer >= 0) view.athletes[_scorer].Celebrate(LiveEnd);
         }
 
@@ -95,12 +102,27 @@ namespace Craquez
         {
             if (_done) return false;
             _t += dt / Mathf.Max(0.01f, Time.timeScale);   // tempo real (o replay usa câmera lenta)
-            if (skip && _t > 1.2f) { Finish(); return false; }
+            if (skip && _t > 1.2f && _wipeAt < 0f) { _skipping = true; Wipe.Play(_hud.Overlay, 4200f); _wipeAt = _t; }
+            // as trocas de plano acontecem por trás da varredura de transmissão (nunca um corte seco)
+            if (_skipping) { if (_t - _wipeAt > 0.25f) { Finish(); return false; } KeepCurrent(dt); return true; }
+            float[] marks = { LiveEnd, ReplayEnd, Length };
+            foreach (float m in marks)
+                if (_t > m - 0.25f && _t < m && _wipeMark != m) { _wipeMark = m; Wipe.Play(_hud.Overlay, 4200f); }
             if (_t < LiveEnd) Live(dt);
             else if (_t < ReplayEnd) Replay(dt);
             else if (_t < Length) Wide();
             else { Finish(); return false; }
             return true;
+        }
+
+        float _wipeAt = -1f, _wipeMark = -1f;
+        bool _skipping;
+
+        /// <summary>Durante a varredura do "pular": mantém o plano atual vivo.</summary>
+        void KeepCurrent(float dt)
+        {
+            if (_t < LiveEnd && !_replaying) Live(dt);
+            else _view.OnTick();
         }
 
         // ------------------------------------------------------------ ao vivo
@@ -121,13 +143,26 @@ namespace Craquez
             var bc = _view.bcam;
             float k = Mathf.Clamp01(_t / LiveEnd);
             var side = new Vector3(-Mathf.Sign(_spot.x) * 2.5f, 0, 0);
-            bc.cinePos = c + new Vector3(0, Mathf.Lerp(2.6f, 2f, k), -Mathf.Lerp(8.5f, 5.5f, k)) + side;
-            bc.cineLook = c + Vector3.up * 1.15f;
-            bc.cineFov = Mathf.Lerp(38f, 32f, k);
+            var ballW = new Vector3(_sim.ball.pos.x, _sim.ball.z + 0.2f, _sim.ball.pos.y);
+            var follow = c + new Vector3(0, Mathf.Lerp(2.6f, 2f, k), -Mathf.Lerp(8.5f, 5.5f, k)) + side;
+            // 0-1,3 s: olhos na bola balançando a rede; depois a mira passa suave para o autor
+            float toScorer = Mathf.SmoothStep(0f, 1f, (_t - 1.1f) / 1.4f);
+            var netView = ballW + new Vector3(-Mathf.Sign(_spot.x) * 9f, 3.2f, -7f);
+            bc.cinePos = Vector3.Lerp(Vector3.Lerp(bc.cam.transform.position, netView, 0.6f), follow, toScorer);
+            bc.cineLook = Vector3.Lerp(ballW, c + Vector3.up * 1.15f, toScorer);
+            bc.cineFov = Mathf.Lerp(Mathf.Lerp(bc.cam.fieldOfView, 30f, 0.3f), Mathf.Lerp(38f, 32f, k), toScorer);
         }
 
         void LiveStep(float dt)
         {
+            // a bola continua: entra, estufa a rede e cai lá dentro
+            float imp = _sim.StepBallInNet();
+            if (imp > 1.5f && _view.venue != null)
+            {
+                var bw = new Vector3(_sim.ball.pos.x, _sim.ball.z + _sim.ball.radius, _sim.ball.pos.y);
+                foreach (var n in _view.venue.nets) n.Hit(bw, imp * 0.45f);   // (o bolsão vem da bola: MatchView chama Press)
+                if (imp > 6f) Sfx.Net();
+            }
             Vector2 sPos = _scorer >= 0 ? _sim.players[_scorer].position : _spot;
             foreach (var p in _sim.players)
             {
@@ -191,7 +226,6 @@ namespace Craquez
                 if (_count > 0) Apply(At(_replayStart), false);
                 _view.SnapAll();
                 Time.timeScale = ReplaySpeed;
-                _hud.Toast("REPLAY", ReplayEnd - LiveEnd - 0.5f);
                 _view.bcam.cinematic = false;
                 _view.bcam.SnapToBall();
             }
@@ -231,7 +265,7 @@ namespace Craquez
             if (!_wide)
             {
                 _wide = true;
-                Time.timeScale = 1f;
+                Time.timeScale = MatchController.GameSpeed;
                 RestoreLive();
                 _view.SnapAll();
                 foreach (var a in _view.athletes)
@@ -272,7 +306,7 @@ namespace Craquez
 
         void Finish()
         {
-            Time.timeScale = 1f;
+            Time.timeScale = MatchController.GameSpeed;
             RestoreLive();
             _sim.events.Clear();
             _view.SnapAll();
@@ -281,6 +315,8 @@ namespace Craquez
             _count = 0;
             _wide = false;
             _done = true;
+            _skipping = false;
+            _wipeAt = _wipeMark = -1f;
         }
     }
 }

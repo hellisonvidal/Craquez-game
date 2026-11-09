@@ -203,6 +203,97 @@ T = {
     },
 }
 
+PUR, ORA, NAVY, MAROON = "#5b2a86", "#f36c21", "#0b1d3a", "#7a1f2b"
+# correções e ligas que ainda usavam cores aproximadas (rodada 8)
+FIX = {
+    "bra": {
+        "EST": (K(B, W, B, "#9ca3af", "listras"), K(W, B, W, W)),                                   # Botafogo
+        "GIG": (K(B, W, B, B, "faixa"), K(W, B, W, W, "faixa")),                                    # Vasco
+        "LEA": (K("#ffd200", "#00843d", "#00843d", "#ffd200"), K(W, "#00843d", W, W)),              # Mirassol
+        "PEI": (K(W, B, W, W, trim=B), K(B, W, B, B, "listras")),                                   # Santos
+    },
+    "brb": {
+        "VOZ": (K(B, W, B, B, "listras"), K(W, B, W, W)),                                           # Ceará
+        "PIC": (K("#0b3d91", RED, "#0b3d91", "#0b3d91", "aros", trim=W), K(W, "#0b3d91", W, W)),   # Fortaleza
+        "ILH": (K(RED, B, B, B, "aros"), K(W, RED, W, W)),                                          # Sport
+        "MCC": (K(W, B, B, W, "faixa"), K(B, W, B, B)),                                             # Ponte Preta
+        "TBU": (K(RED, W, W, RED, "listras"), K(W, RED, W, W)),                                     # Náutico
+        "ESM": (K("#006437", W, W, "#006437"), K(W, "#006437", W, W)),                              # Goiás
+        "CRB": (K(RED, W, W, RED, "aros"), K(W, RED, W, W)),
+        "DOU": (K("#f5c400", "#00843d", "#00843d", "#f5c400"), K("#00843d", "#f5c400", "#00843d", "#00843d")),  # Cuiabá
+        "DRA": (K(RED, B, B, RED, "listras"), K(W, RED, W, W)),                                     # Atlético-GO
+        "FAN": (K(B, W, B, B, "listras"), K(W, B, W, W)),                                           # Operário-PR
+    },
+    "mls": {
+        "CIN": (K("#003087", ORA, "#003087", "#003087", trim=ORA), K(W, "#003087", W, W)),
+        "CLB": (K("#fedd00", B, B, "#fedd00"), K(B, "#fedd00", B, B)),
+        "DCU": (K(B, RED, B, B, trim=RED), K(W, B, W, W)),
+        "NSH": (K("#ece83a", "#1f1646", "#1f1646", "#ece83a"), K("#1f1646", "#ece83a", "#1f1646", "#1f1646")),
+        "ORL": (K("#633492", W, "#633492", "#633492"), K(W, "#633492", W, W)),
+        "PHI": (K("#071b2c", "#b19b69", "#071b2c", "#071b2c", trim="#b19b69"), K(W, "#071b2c", W, W)),
+        "AUS": (K("#00b140", B, B, "#00b140"), K(B, "#00b140", B, B)),
+        "DAL": (K(RED, "#1d4ed8", "#1d4ed8", RED, "aros"), K(W, RED, W, W)),
+        "HOU": (K(ORA, B, W, ORA), K(W, ORA, W, W)),
+    },
+    "uru": {
+        "VIO": (K(PUR, W, W, PUR), K(W, PUR, W, W)),                                                # Defensor
+        "DAN": (K(W, B, B, W, "faixa"), K(B, W, B, B, "faixa")),                                    # Danubio
+        "LVP": (K(B, "#1d4ed8", B, B, "listras"), K(W, B, W, W)),                                   # Liverpool
+        "BOH": (K(B, W, B, B, "listras"), K(W, B, W, W)),                                           # Wanderers
+        "DAR": (K("#00843d", RED, W, "#00843d", "listras"), K(W, "#00843d", W, W)),                 # Rampla
+        "CER": (K(SKY, W, W, SKY, "listras"), K(W, SKY, W, W)),                                     # Cerro
+        "GAU": (K("#00843d", W, W, "#00843d", "listras"), K(W, "#00843d", W, W)),                   # Racing
+        "PIO": (K(RED, "#f5c400", W, RED, "listras"), K(W, RED, W, W)),                             # Progreso
+    },
+    "per": {
+        "CRE": (K("#f3e5c0", MAROON, B, "#f3e5c0", trim=MAROON), K(B, "#f3e5c0", B, B)),            # Universitario
+        "INT": (K(NAVY, W, NAVY, NAVY, "listras"), K(W, NAVY, W, W)),                               # Alianza Lima
+        "CEL": (K("#41b6e6", W, W, "#41b6e6"), K(W, "#41b6e6", W, W)),                              # Sporting Cristal
+        "DOM": (K(RED, B, B, RED, "metades"), K(W, RED, W, W)),                                     # Melgar
+    },
+    "chi": {
+        "CRU": (K(W, "#1d4ed8", "#1d4ed8", W, "faixa_peito", trim=RED), K("#1d4ed8", W, "#1d4ed8", "#1d4ed8")),  # U. Católica
+        "OHI": (K(SKY, W, W, SKY), K(W, SKY, W, W)),
+        "ROM": (K("#00843d", W, W, "#00843d"), K(W, "#00843d", W, W)),                              # S. Wanderers
+        "ITA": (K("#00843d", W, W, "#00843d", trim=W), K(W, "#00843d", W, W)),                      # Audax
+        "ACE": (K("#1d4ed8", B, B, "#1d4ed8", "listras"), K(W, "#1d4ed8", W, W)),                   # Huachipato
+        "CAM": (K(SKY, W, SKY, SKY), K(W, SKY, W, W)),                                              # D. Iquique
+        "LIL": (K(PUR, W, W, PUR), K(W, PUR, W, W)),                                                # D. Concepción
+    },
+    "ecu": {
+        "LDU": (K(W, NAVY, W, W, trim=RED), K(NAVY, W, NAVY, NAVY)),
+        "IDV": (K("#1d4ed8", B, B, B, "listras"), K(W, B, W, W)),
+        "IDO": (K("#fcd116", B, B, "#fcd116"), K(B, "#fcd116", B, B)),                              # Barcelona SC
+        "BOM": (K("#1d4ed8", "#9ca3af", W, "#1d4ed8"), K(W, "#1d4ed8", W, W)),                      # Emelec
+        "AUC": (K("#fcd116", RED, RED, "#fcd116"), K(RED, "#fcd116", RED, RED)),                    # Aucas
+        "MOR": (K(RED, W, W, RED), K(W, RED, W, W)),                                                # D. Cuenca
+        "DAQ": (K(RED, W, W, RED), K(W, RED, W, W)),                                                # Técnico U.
+        "TEC": (K("#fcd116", "#1d4ed8", "#1d4ed8", "#fcd116"), K(W, "#1d4ed8", W, W)),              # Delfín
+    },
+    "sau": {
+        "HIL": (K("#0033a0", W, "#0033a0", "#0033a0", trim=W), K(W, "#0033a0", W, W)),
+        "ITT": (K("#fcd116", B, B, B, "listras"), K(W, B, W, W)),
+        "AHL": (K("#00843d", W, W, "#00843d"), K(W, "#00843d", W, W)),
+        "SHB": (K(W, B, B, W), K(B, W, B, B)),
+    },
+    "rus": {
+        "ZEN": (K("#0077c8", W, W, "#0077c8", trim=W), K(W, "#0077c8", W, W)),
+        "SPM": (K(RED, W, W, RED, "faixa_peito"), K(W, RED, W, W)),
+        "CSK": (K(RED, "#1d4ed8", "#1d4ed8", RED, "metades"), K(W, RED, W, W)),
+        "LOK": (K(RED, "#00843d", RED, RED, "faixa_peito"), K(W, "#00843d", W, W)),
+        "DMO": (K("#1d4ed8", W, W, "#1d4ed8"), K(W, "#1d4ed8", W, W)),
+        "KRA": (K(B, "#00843d", B, B, trim="#00843d"), K(W, "#00843d", W, W)),
+    },
+    "ukr": {
+        "SHA": (K(ORA, B, B, ORA, "listras"), K(W, ORA, W, W)),
+        "DKY": (K(W, "#1d4ed8", W, W, trim="#1d4ed8"), K("#1d4ed8", W, "#1d4ed8", "#1d4ed8")),
+        "CHO": (K("#1d4ed8", B, B, B, "listras"), K(W, "#1d4ed8", W, W)),
+        "KAR": (K("#00843d", W, W, "#00843d"), K(W, "#00843d", W, W)),
+    },
+}
+for lg_id, table in FIX.items():
+    T.setdefault(lg_id, {}).update(table)
+
 d = json.load(open(P, encoding="utf-8"))
 n = 0
 for lg in d["leagues"]:

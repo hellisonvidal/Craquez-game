@@ -170,7 +170,7 @@ namespace Craquez
         }
 
         /// <summary>Opções da cobrança de falta (o chute direto só aparece perto do gol).</summary>
-        public static string SetPieceHelp(DeviceKind d, bool shot)
+        public static string SetPieceHelp(DeviceKind d, bool shot, string title = "FALTA")
         {
             string pass, cross, kick, curl;
             if (d == DeviceKind.Touch) { pass = "PASSE"; cross = "ALTO"; kick = "CHUTE"; curl = "COLOCADO"; }
@@ -181,7 +181,7 @@ namespace Craquez
                 bool ps = IsPlayStation(Pad(d == DeviceKind.Gamepad1 ? 0 : 1));
                 pass = ps ? "Cruz" : "A"; cross = ps ? "Quadrado" : "X"; kick = ps ? "Bola" : "B"; curl = ps ? "R1 + Bola" : "RB + B";
             }
-            string s = "FALTA   •   mire com o analógico   •   " + pass + " passe   •   " + cross + " cruzar na área";
+            string s = title + "   •   mire com o analógico   •   " + pass + " passe   •   " + cross + " cruzar na área";
             if (shot) s += "   •   " + kick + " chute direto (segure p/ força)   •   " + curl + " colocado";
             return s;
         }

@@ -1,117 +1,123 @@
-"""Ícone original do Craquez: bola de futebol que também é um globo (meridianos e
-paralelos), com uma órbita dourada — "o futebol no mundo". Gera:
-  Assets/Craquez/Icons/craquez_icon.png        (1024, fundo + bola)
-  Assets/Craquez/Icons/craquez_icon_fg.png     (1024, só a bola, fundo transparente — ícone adaptativo)
+"""Ícone do Craquez: o jogador da capa fazendo uma bicicleta, em silhueta com contorno de luz,
+com a bola e o rastro, sobre o estádio iluminado. A silhueta e a bola vêm da própria arte da
+capa (Assets/Craquez/Resources/UI/capa.jpg). Gera:
+  Assets/Craquez/Icons/craquez_icon.png        (1024, fundo + jogador)
+  Assets/Craquez/Icons/craquez_icon_fg.png     (1024, só o jogador e a bola — ícone adaptativo do Android)
   Assets/Craquez/Icons/craquez_icon_bg.png     (1024, só o fundo)
   tools/installer/craquez.ico                   (instalador do Windows)
+  tools/installer/linux/craquez.png             (atalho do Linux, 256)
 uso: python3 tools/make_icon.py"""
-import math, os
-from PIL import Image, ImageDraw, ImageFilter
+import os
+import numpy as np
+from PIL import Image, ImageFilter, ImageDraw
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 N = 1024
-S = 3  # supersampling
-W = N * S
+cover = Image.open(os.path.join(ROOT, "Assets", "Craquez", "Resources", "UI", "capa.jpg")).convert("RGB")
+A = np.asarray(cover).astype(np.float32)
 
-def lerp(a, b, t): return tuple(int(a[i] + (b[i] - a[i]) * t) for i in range(len(a)))
+
+def silhouette():
+    """Máscara (0..1) do jogador: pixels escuros na região do corpo (o estádio é claro)."""
+    x0, y0, x1, y1 = 230, 480, 1265, 975
+    reg = A[y0:y1, x0:x1]
+    lum = reg.mean(2)
+    m = np.clip((70 - lum) / 35, 0, 1)
+    img = Image.fromarray((m * 255).astype(np.uint8)).filter(ImageFilter.MedianFilter(5))
+    # fica só o maior bloco (tira pontinhos escuros da torcida/grama)
+    a = np.asarray(img) > 128
+    from collections import deque
+    lab = np.zeros(a.shape, np.int32); best, bl, cur = 0, 0, 0
+    H, W = a.shape
+    for sy in range(0, H, 3):
+        for sx in range(0, W, 3):
+            if a[sy, sx] and lab[sy, sx] == 0:
+                cur += 1; q = deque([(sy, sx)]); lab[sy, sx] = cur; n = 0
+                while q:
+                    y, x = q.popleft(); n += 1
+                    for dy, dx in ((1, 0), (-1, 0), (0, 1), (0, -1)):
+                        yy, xx = y + dy, x + dx
+                        if 0 <= yy < H and 0 <= xx < W and a[yy, xx] and lab[yy, xx] == 0:
+                            lab[yy, xx] = cur; q.append((yy, xx))
+                if n > best: best, bl = n, cur
+    keep = (lab == bl)
+    soft = np.asarray(Image.fromarray((keep * 255).astype(np.uint8)).filter(ImageFilter.GaussianBlur(1.2))).astype(np.float32) / 255
+    return Image.fromarray((soft * 255).astype(np.uint8))
+
+
+def ball():
+    cx, cy, r = 1345, 440, 104
+    crop = cover.crop((cx - r, cy - r, cx + r, cy + r)).convert("RGBA")
+    m = Image.new("L", crop.size, 0)
+    ImageDraw.Draw(m).ellipse((2, 2, 2 * r - 2, 2 * r - 2), fill=255)
+    crop.putalpha(m.filter(ImageFilter.GaussianBlur(1)))
+    return crop
+
 
 def background():
-    img = Image.new("RGBA", (W, W))
-    px = img.load()
-    top, bot = (6, 22, 48), (2, 8, 20)
-    for y in range(W):
-        c = lerp(top, bot, y / W)
-        for x in range(W):
-            d = math.hypot(x - W * 0.5, y - W * 0.42) / (W * 0.7)
-            g = max(0.0, 1 - d) ** 2
-            px[x, y] = (min(255, int(c[0] + 0 * g)), min(255, int(c[1] + 150 * g * 0.5)), min(255, int(c[2] + 110 * g * 0.5)), 255)
+    yy, xx = np.mgrid[0:N, 0:N].astype(np.float32) / N
+    top, bot = np.array([10, 40, 120]), np.array([2, 8, 30])
+    c = top[None, None] * (1 - yy[..., None]) + bot[None, None] * yy[..., None]
+    g = np.exp(-(((xx - 0.5) / 0.45) ** 2 + ((yy - 0.48) / 0.4) ** 2))
+    c += g[..., None] * np.array([40, 120, 230])
+    # anel de luzes do estádio
+    for i in range(26):
+        t = i / 25
+        lx = 0.04 + 0.92 * t; ly = 0.8 - 0.07 * np.sin(t * np.pi)
+        d = ((xx - lx) ** 2 + (yy - ly) ** 2) / 0.00018
+        c += np.exp(-d)[..., None] * np.array([255, 245, 220]) * 0.9
+    # gramado embaixo (arco)
+    arc = yy > 0.82 + 0.05 * ((xx - 0.5) * 2) ** 2
+    c[arc] = c[arc] * 0.25 + np.array([30, 150, 50]) * 0.75
+    img = Image.fromarray(np.clip(c, 0, 255).astype(np.uint8)).convert("RGBA")
     return img
 
-def ball(r_frac=0.33):
-    img = Image.new("RGBA", (W, W), (0, 0, 0, 0))
-    cx, cy, R = W * 0.5, W * 0.5, W * r_frac
-    px = img.load()
-    # esfera: verde neon -> azul petróleo, luz do alto à esquerda, faixas chapadas (cel)
-    lx, ly, lz = -0.45, -0.55, 0.7
-    ln = math.sqrt(lx * lx + ly * ly + lz * lz); lx, ly, lz = lx / ln, ly / ln, lz / ln
-    for y in range(int(cy - R) - 2, int(cy + R) + 2):
-        for x in range(int(cx - R) - 2, int(cx + R) + 2):
-            nx, ny = (x - cx) / R, (y - cy) / R
-            rr = nx * nx + ny * ny
-            if rr > 1: continue
-            nz = math.sqrt(1 - rr)
-            dif = max(0.0, nx * lx + ny * ly + nz * lz)
-            band = 1.0 if dif > 0.55 else (0.78 if dif > 0.2 else 0.6)
-            base = lerp((0, 230, 158), (8, 120, 160), min(1, (ny + 1) / 2 * 0.9 + nx * 0.15))
-            c = tuple(int(v * band) for v in base)
-            # meridianos e paralelos (globo) em branco
-            lat = math.asin(-ny)                      # -pi/2..pi/2
-            lon = math.atan2(nx, nz)                  # -pi/2..pi/2 visível
-            on = False
-            for k in range(-2, 3):
-                if abs(lat - k * math.pi / 6) < 0.035 / max(0.3, nz): on = True
-            for k in range(-3, 4):
-                if abs(lon - k * math.pi / 7) < 0.03 / max(0.25, math.cos(lat)) * 0.9 and abs(lat) < 1.35: on = True
-            if on: c = lerp(c, (240, 255, 248), 0.85)
-            px[x, y] = (*c, 255)
-    d = ImageDraw.Draw(img)
-    # pentágono central (bola de futebol) e pentágonos parciais ao redor
-    def pent(px_, py_, rad, rot=-90, fill=(10, 16, 30, 255)):
-        pts = [(px_ + rad * math.cos(math.radians(rot + i * 72)), py_ + rad * math.sin(math.radians(rot + i * 72))) for i in range(5)]
-        d.polygon(pts, fill=fill)
-    pent(cx - R * 0.08, cy - R * 0.06, R * 0.27)
-    for ang in (-90, -18, 54, 126, 198):
-        a = math.radians(ang)
-        ox, oy = cx - R * 0.08 + math.cos(a) * R * 0.72, cy - R * 0.06 + math.sin(a) * R * 0.72
-        if math.hypot(ox - cx, oy - cy) < R * 0.86: pent(ox, oy, R * 0.17, ang + 180)
-    # contorno grosso (estilo do jogo)
-    d.ellipse([cx - R, cy - R, cx + R, cy + R], outline=(6, 10, 22, 255), width=int(W * 0.018))
-    # recorta o que saiu da esfera
-    mask = Image.new("L", (W, W), 0)
-    ImageDraw.Draw(mask).ellipse([cx - R - W * 0.009, cy - R - W * 0.009, cx + R + W * 0.009, cy + R + W * 0.009], fill=255)
-    out = Image.new("RGBA", (W, W), (0, 0, 0, 0))
-    out.paste(img, (0, 0), mask)
-    # órbita dourada (anel inclinado) passando atrás/na frente da bola
-    box = [cx - R * 1.45, cy - R * 0.45, cx + R * 1.45, cy + R * 0.45]
-    def arc(a0, a1):
-        im = Image.new("RGBA", (W, W), (0, 0, 0, 0))
-        rd = ImageDraw.Draw(im)
-        rd.arc(box, a0, a1, fill=(6, 10, 22, 255), width=int(W * 0.05))
-        rd.arc(box, a0 + 1, a1 - 1, fill=(250, 204, 21, 255), width=int(W * 0.026))
-        return im.rotate(22, resample=Image.BICUBIC, center=(cx, cy))
-    back = arc(180, 360)    # metade de cima do anel: passa atrás da bola
-    front = arc(-4, 184)    # metade de baixo: na frente (sobrepõe as emendas)
-    res = Image.new("RGBA", (W, W), (0, 0, 0, 0))
-    res.alpha_composite(back)
-    res.alpha_composite(out)
-    res.alpha_composite(front)
-    # estrela de brilho
-    sd = ImageDraw.Draw(res)
-    sx, sy, sr = cx + R * 1.05, cy - R * 0.95, R * 0.16
-    pts = []
-    for i in range(8):
-        rad = sr if i % 2 == 0 else sr * 0.28
-        a = math.radians(i * 45 - 90)
-        pts.append((sx + rad * math.cos(a), sy + rad * math.sin(a)))
-    sd.polygon(pts, fill=(255, 245, 200, 255))
-    return res
+
+def foreground():
+    fg = Image.new("RGBA", (N, N), (0, 0, 0, 0))
+    sil = silhouette()
+    w = 880; h = int(sil.height * w / sil.width)
+    sil = sil.resize((w, h), Image.LANCZOS).rotate(-6, resample=Image.BICUBIC, expand=True)
+    ox, oy = (N - sil.width) // 2 - 30, int(N * 0.56 - sil.height / 2)
+    # contorno de luz (ciano) + sombra, depois o corpo escuro
+    rim = sil.filter(ImageFilter.MaxFilter(13)).filter(ImageFilter.GaussianBlur(3))
+    glow = sil.filter(ImageFilter.MaxFilter(25)).filter(ImageFilter.GaussianBlur(18))
+    fg.paste((60, 200, 255, 255), (ox, oy), glow.point(lambda v: v * 0.55))
+    fg.paste((150, 235, 255, 255), (ox, oy), rim)
+    fg.paste((6, 10, 26, 255), (ox, oy), sil)
+    # rastro da bola e a bola (canto superior direito, na frente do pé)
+    tr = Image.new("L", (N, N), 0)
+    d = ImageDraw.Draw(tr)
+    bx, by, br = int(N * 0.79), int(N * 0.22), 118
+    for k in range(18):
+        t = k / 17
+        d.ellipse((bx - br * (1 - t) - 300 * t, by - br * (1 - t * 0.6) + 120 * t, bx + br * (1 - t) - 300 * t, by + br * (1 - t * 0.6) + 120 * t), fill=int(150 * (1 - t)))
+    tr = tr.filter(ImageFilter.GaussianBlur(22))
+    fg.alpha_composite(Image.merge("RGBA", (Image.new("L", (N, N), 255), Image.new("L", (N, N), 230), Image.new("L", (N, N), 150), tr)))
+    b = ball().resize((br * 2, br * 2), Image.LANCZOS)
+    halo = Image.new("L", (N, N), 0)
+    ImageDraw.Draw(halo).ellipse((bx - br - 30, by - br - 30, bx + br + 30, by + br + 30), fill=200)
+    fg.alpha_composite(Image.merge("RGBA", (Image.new("L", (N, N), 255), Image.new("L", (N, N), 240), Image.new("L", (N, N), 200), halo.filter(ImageFilter.GaussianBlur(25)))))
+    fg.alpha_composite(b, (bx - br, by - br))
+    return fg
+
 
 def main():
-    out_dir = os.path.join(ROOT, "Assets", "Craquez", "Icons")
-    os.makedirs(out_dir, exist_ok=True)
     bg = background()
-    fg = ball(0.30)   # adaptativo: a bola cabe na zona segura (66%)
-    full_fg = ball(0.33)
-    full = bg.copy(); full.alpha_composite(full_fg)
-    def save(img, name):
-        img.resize((N, N), Image.LANCZOS).save(os.path.join(out_dir, name))
-    save(full, "craquez_icon.png")
-    save(fg, "craquez_icon_fg.png")
-    save(bg, "craquez_icon_bg.png")
-    inst = os.path.join(ROOT, "tools", "installer")
-    os.makedirs(inst, exist_ok=True)
-    full.resize((256, 256), Image.LANCZOS).save(os.path.join(inst, "craquez.ico"), sizes=[(16, 16), (24, 24), (32, 32), (48, 48), (64, 64), (128, 128), (256, 256)])
-    print("ok")
+    fg = foreground()
+    full = bg.copy(); full.alpha_composite(fg)
+    out = os.path.join(ROOT, "Assets", "Craquez", "Icons")
+    full.save(os.path.join(out, "craquez_icon.png"))
+    bg.save(os.path.join(out, "craquez_icon_bg.png"))
+    # adaptativo: o Android corta ~1/3 das bordas — reduz o desenho para a zona segura
+    safe = Image.new("RGBA", (N, N), (0, 0, 0, 0))
+    small = fg.resize((int(N * 0.74), int(N * 0.74)), Image.LANCZOS)
+    safe.alpha_composite(small, ((N - small.width) // 2, (N - small.height) // 2))
+    safe.save(os.path.join(out, "craquez_icon_fg.png"))
+    full.convert("RGB").save(os.path.join(ROOT, "tools", "installer", "craquez.ico"), sizes=[(16, 16), (32, 32), (48, 48), (64, 64), (128, 128), (256, 256)])
+    full.resize((256, 256), Image.LANCZOS).save(os.path.join(ROOT, "tools", "installer", "linux", "craquez.png"))
+    print("ícones gravados")
+
 
 if __name__ == "__main__":
     main()

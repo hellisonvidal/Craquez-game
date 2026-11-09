@@ -28,6 +28,11 @@ namespace Craquez.Sim
         };
 
         public int id, team, index;
+        /// <summary>Anti-giro da IA: última direção pedida, giro acumulado e tempo de "seguir reto".</summary>
+        public Vector2 aiLastIntent;
+        /// <summary>Giro acumulado do corpo (graus, decai em ~1 s): limita voltas seguidas no mesmo sentido.</summary>
+        public float bodyTurnAcc;
+        public float aiTurnAcc, aiStraightT;
         public bool isKeeper;
         public int number = 1;
         public string name = "";
@@ -41,10 +46,29 @@ namespace Craquez.Sim
 
         public Vector2 position, vel, facing = Vector2.right, intent;
         public float stamina = 1f;
+        /// <summary>Índice no elenco do time (-1 = gerado); usado nas substituições.</summary>
+        public int rosterIndex = -1;
         public bool wantSprint, sprinting;
 
         public float kickCd, stun, slide, tackleAnim, kickAnim, hold, dive, runPhase;
         public bool slideHitBall;
+        /// <summary>
+        /// Defesa do goleiro: 0 nenhuma, 1 encaixe de frente, 2 defesa baixa (cai sobre a bola),
+        /// 3 ponte rasteira, 4 ponte à meia-altura, 5 ponte alta (no ângulo), 6 salto para agarrar no alto.
+        /// saveSide = lado do mergulho no eixo y do campo; saveH = altura das mãos no alvo; saveDist = quanto precisa ir de lado.
+        /// </summary>
+        public int saveKind;
+        /// <summary>Ponte (mergulho lateral: rasteira, meia-altura ou no ângulo). O salto no alto (6) é de pé.</summary>
+        public bool Diving => saveKind >= 3 && saveKind <= 5;
+        /// <summary>Cartões: amarelos recebidos e expulsão (fica fora de campo; no futsal volta outro em 2 min).</summary>
+        public int yellows;
+        public bool sentOff;
+        public float sentOffT;
+        /// <summary>Goleiro lendo um chute: desloca em passadas laterais (não corre).</summary>
+        public bool keeperSet;
+        /// <summary>Há quanto tempo o goleiro está com a bola nas mãos (espera alguém se desmarcar).</summary>
+        public float heldT;
+        public float saveT, saveTotal, saveSide, saveH, saveDist;
 
         public float windup, windupTotal, windupPower;
         public int windupKind;

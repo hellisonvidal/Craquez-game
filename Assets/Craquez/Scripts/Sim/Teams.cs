@@ -71,7 +71,7 @@ namespace Craquez.Sim
     public static class Teams
     {
         public static readonly string[] PatternNames = { "liso", "listras", "aros", "faixa", "metades", "riscas", "faixa_peito", "faixa_vertical", "xadrez" };
-        public static readonly string[] KitNames = { "Principal", "Reserva", "Terceiro" };
+        public static readonly string[] KitNames = { "Principal", "Reserva", "Terceiro", "Alternativo" };
 
         static bool _loaded;
         static readonly List<League> _leagues = new List<League>();
@@ -81,6 +81,8 @@ namespace Craquez.Sim
         public static string OptionDir { get; private set; } = "";
         /// <summary>Texto do banco (para testes fora do Unity).</summary>
         public static string SourceOverride;
+        /// <summary>O option_file.json lido (para as seções de bolas, chuteiras e locais, aplicadas pelo jogo).</summary>
+        public static object OptionDoc { get; private set; }
 
         public static IReadOnlyList<League> Leagues { get { Ensure(); return _leagues; } }
         public static int Count { get { Ensure(); return _flat.Count; } }
@@ -99,6 +101,22 @@ namespace Craquez.Sim
                 if (i >= _leagues[li].first && i < _leagues[li].first + _leagues[li].count) return li;
             return 0;
         }
+
+        static readonly Dictionary<string, string> _continent = new Dictionary<string, string>
+        {
+            ["AR"] = "América do Sul", ["BR"] = "América do Sul", ["CL"] = "América do Sul", ["CO"] = "América do Sul", ["EC"] = "América do Sul",
+            ["PE"] = "América do Sul", ["PY"] = "América do Sul", ["UY"] = "América do Sul", ["VE"] = "América do Sul", ["BO"] = "América do Sul",
+            ["US"] = "América do Norte e Central", ["MX"] = "América do Norte e Central", ["CA"] = "América do Norte e Central", ["CR"] = "América do Norte e Central",
+            ["PA"] = "América do Norte e Central", ["JM"] = "América do Norte e Central",
+            ["CI"] = "África", ["CM"] = "África", ["EG"] = "África", ["GH"] = "África", ["MA"] = "África", ["NG"] = "África", ["SN"] = "África", ["TN"] = "África", ["DZ"] = "África",
+            ["AU"] = "Ásia e Oceania", ["IR"] = "Ásia e Oceania", ["JP"] = "Ásia e Oceania", ["KR"] = "Ásia e Oceania", ["SA"] = "Ásia e Oceania", ["KZ"] = "Ásia e Oceania",
+            ["QA"] = "Ásia e Oceania", ["NZ"] = "Ásia e Oceania", ["CN"] = "Ásia e Oceania",
+        };
+
+        /// <summary>Continente (confederação) da seleção pelo código do país; Europa no resto.</summary>
+        public static string Continent(string iso) => !string.IsNullOrEmpty(iso) && _continent.TryGetValue(iso.ToUpperInvariant(), out var c) ? c : "Europa";
+
+        public static readonly string[] Continents = { "América do Sul", "Europa", "África", "América do Norte e Central", "Ásia e Oceania" };
 
         public static Texture2D Crest(int i)
         {
@@ -242,6 +260,29 @@ namespace Craquez.Sim
             };
         }
 
+        /// <summary>
+        /// Quarto uniforme (alternativo) de todos os times, derivado das cores do clube: time de cor clara
+        /// ganha um tom profundo da segunda cor com detalhes na principal; time escuro, gelo com faixa.
+        /// </summary>
+        static Kit AltKit(Color c1, Color c2)
+        {
+            Color.RGBToHSV(c1, out float h1, out float s1, out float v1);
+            Color.RGBToHSV(c2, out float h2, out float s2, out float v2);
+            bool light = c1.grayscale > 0.55f;
+            Color body, detail;
+            if (light)
+            {
+                body = s2 > 0.2f ? Color.HSVToRGB(h2, Mathf.Clamp01(s2 * 1.05f), 0.32f) : Color.HSVToRGB(h1, Mathf.Clamp01(s1 + 0.2f), 0.28f);
+                detail = c1;
+            }
+            else
+            {
+                body = Color.HSVToRGB(h1, 0.08f, 0.93f);
+                detail = s1 > 0.15f ? Color.HSVToRGB(h1, Mathf.Clamp01(s1), Mathf.Max(0.45f, v1)) : c2;
+            }
+            return new Kit { c1 = body, c2 = detail, shorts = body, socks = body, pattern = 6, trim = detail };
+        }
+
         static List<Kit> ParseKits(List<object> list, Color c1, Color c2)
         {
             var kits = new List<Kit>();
@@ -262,6 +303,7 @@ namespace Craquez.Sim
                 }
             if (kits.Count == 0) kits = DefaultKits(c1, c2);
             while (kits.Count < 3) kits.Add(DefaultKits(c1, c2)[kits.Count]);
+            if (kits.Count < 4) kits.Add(AltKit(kits[0].c1, kits[0].c2));
             return kits;
         }
 
@@ -330,19 +372,66 @@ namespace Craquez.Sim
             yield return Path.Combine(Application.persistentDataPath, "option_file");
         }
 
+        /// <summary>Option file escolhido no navegador de pastas (tem prioridade sobre as pastas padrão).</summary>
+        public static string CustomOptionFile;
+
+        /// <summary>O arquivo que foi lido (vazio se nenhum).</summary>
+        public static string OptionFilePath { get; private set; } = "";
+
+        /// <summary>Option file removido pelo usuário: o jogo usa só os dados originais.</summary>
+        public static bool OptionFileDisabled;
+
+        /// <summary>O arquivo parece um option file do Craquez (lê só o começo).</summary>
+        public static bool LooksLikeOptionFile(string path)
+        {
+            try
+            {
+                using (var r = new StreamReader(path))
+                {
+                    var buf = new char[65536];
+                    int n = r.Read(buf, 0, buf.Length);
+                    var head = new string(buf, 0, n);
+                    return head.TrimStart().StartsWith("{") && (head.Contains("craquez-option-file") || head.Contains("\"teams\"") || head.Contains("\"bolas\"") || head.Contains("\"locais\"") || head.Contains("\"ligas\"") || head.Contains("\"chuteiras\"") || head.Contains("\"competicoes\""));
+                }
+            }
+            catch { return false; }
+        }
+
+        static IEnumerable<string> OptionFiles()
+        {
+            if (OptionFileDisabled) yield break;
+            if (!string.IsNullOrEmpty(CustomOptionFile)) yield return CustomOptionFile;
+            foreach (var dir in OptionDirs()) yield return Path.Combine(dir, "option_file.json");
+        }
+
         static void ApplyOptionFile()
         {
             OverrideCount = 0;
+            OptionDoc = null;
+            OptionFilePath = "";
             _crests.Clear();
             if (SourceOverride != null) return;
-            foreach (var dir in OptionDirs())
+            foreach (var path in OptionFiles())
             {
-                string path = Path.Combine(dir, "option_file.json");
-                if (!File.Exists(path)) continue;
+                bool exists;
+                try { exists = File.Exists(path); } catch { exists = false; }
+                if (!exists) continue;
+                string dir = Path.GetDirectoryName(path) ?? ".";
+                OptionFilePath = path;
                 OptionDir = dir;
                 object doc;
                 try { doc = MiniJson.Parse(File.ReadAllText(path)); }
                 catch (System.Exception e) { Debug.LogWarning("option_file.json inválido: " + e.Message); return; }
+                ApplyOptionDocument(doc, dir);
+                return;
+            }
+        }
+
+        /// <summary>Aplica um option file já lido (times, uniformes, estádios, elencos, escudos).</summary>
+        public static void ApplyOptionDocument(object doc, string dir)
+        {
+            {
+                OptionDoc = doc;
                 var teams = MiniJson.D(doc, "teams");
                 if (teams == null) return;
                 for (int i = 0; i < _flat.Count; i++)
@@ -351,6 +440,7 @@ namespace Craquez.Sim
                     if (!teams.TryGetValue(t.Key, out var o)) continue;
                     if (MiniJson.S(o, "name", null) is string nm) t.name = nm;
                     if (MiniJson.S(o, "short", null) is string sh) t.shortName = sh;
+                    if (((Dictionary<string, object>)o).ContainsKey("rating")) t.rating = Mathf.Clamp(MiniJson.F(o, "rating", t.rating), 0.3f, 0.99f);
                     var kl = MiniJson.L(o, "kits");
                     if (kl != null)
                     {
@@ -375,12 +465,38 @@ namespace Craquez.Sim
                         if (pd.ContainsKey("num")) e.num = MiniJson.I(pl, "num");
                         if (pd.ContainsKey("pos")) e.pos = MiniJson.S(pl, "pos");
                         if (pd.ContainsKey("nat")) e.nat = MiniJson.S(pl, "nat");
+                        if (pd.ContainsKey("ovr")) e.ovr = Mathf.Clamp(MiniJson.I(pl, "ovr"), 30, 99);
+                        // atributos [velocidade, aceleração, chute, passe, controle, defesa] em 0-1
+                        var al = MiniJson.L(pl, "a");
+                        if (al != null && al.Count >= 6)
+                        {
+                            var fa = Floats(al);
+                            for (int k = 0; k < fa.Length; k++) fa[k] = Mathf.Clamp(fa[k], 0.2f, 0.99f);
+                            e.a = fa;
+                        }
+                        var tl = MiniJson.L(pl, "traits") ?? MiniJson.L(pl, "t");
+                        if (tl != null)
+                        {
+                            e.t.Clear();
+                            foreach (var x in tl) if (x is string ts) e.t.Add(ts);
+                        }
                     }
                     string crest = MiniJson.S(o, "crest", "");
-                    if (crest != "" && File.Exists(Path.Combine(dir, crest)))
+                    byte[] png = null;
+                    if (crest.StartsWith("data:image"))
                     {
-                        var tex = new Texture2D(2, 2);
-                        if (tex.LoadImage(File.ReadAllBytes(Path.Combine(dir, crest)))) _crests[i] = tex;
+                        // escudo embutido no próprio option file (um arquivo só, sem a pasta crests/)
+                        int comma = crest.IndexOf(',');
+                        try { if (comma > 0) png = System.Convert.FromBase64String(crest.Substring(comma + 1)); } catch { png = null; }
+                    }
+                    else if (crest != "")
+                    {
+                        try { if (File.Exists(Path.Combine(dir, crest))) png = File.ReadAllBytes(Path.Combine(dir, crest)); } catch { png = null; }
+                    }
+                    if (png != null)
+                    {
+                        var tex = new Texture2D(2, 2, TextureFormat.RGBA32, true) { wrapMode = TextureWrapMode.Clamp };
+                        if (tex.LoadImage(png)) _crests[i] = tex;
                     }
                     OverrideCount++;
                 }
@@ -388,14 +504,40 @@ namespace Craquez.Sim
             }
         }
 
-        /// <summary>Grava um modelo com todos os times para o usuário editar. Retorna o caminho.</summary>
-        public static string ExportOptionTemplate()
+        /// <summary>Ordena índices de times pelo nome (ordem alfabética, sem diferenciar acentos/maiúsculas).</summary>
+        public static void SortByName(List<int> ids)
+        {
+            var cmp = System.Globalization.CultureInfo.InvariantCulture.CompareInfo;
+            const System.Globalization.CompareOptions o = System.Globalization.CompareOptions.IgnoreCase | System.Globalization.CompareOptions.IgnoreNonSpace;
+            ids.Sort((a, b) =>
+            {
+                int c = cmp.Compare(Get(a)?.name ?? "", Get(b)?.name ?? "", o);
+                return c != 0 ? c : a.CompareTo(b);
+            });
+        }
+
+        /// <summary>
+        /// Documento completo do option file: todos os times (nome, sigla, uniformes, estádio,
+        /// elenco) + as seções extras do jogo (bolas, chuteiras, locais).
+        /// </summary>
+        public static Dictionary<string, object> OptionDocument(Dictionary<string, object> extras = null)
         {
             Ensure();
-            string dir = Path.Combine(Application.persistentDataPath, "option_file");
-            Directory.CreateDirectory(Path.Combine(dir, "crests"));
+            // times em ordem alfabética dentro de cada liga
+            var leagues = new List<object>();
+            var order = new List<TeamData>();
+            foreach (var lg in _leagues)
+            {
+                var idx = new List<int>();
+                for (int i = 0; i < lg.count; i++) idx.Add(lg.first + i);
+                SortByName(idx);
+                var ids = new List<object>();
+                foreach (int i in idx) { ids.Add(_flat[i].Key); order.Add(_flat[i]); }
+                leagues.Add(new Dictionary<string, object> { ["id"] = lg.id, ["name"] = lg.name, ["teams"] = ids });
+            }
+            foreach (var t in _flat) if (!order.Contains(t)) order.Add(t);
             var teams = new Dictionary<string, object>();
-            foreach (var t in _flat)
+            foreach (var t in order)
             {
                 var kits = new List<object>();
                 foreach (var k in t.kits)
@@ -409,23 +551,35 @@ namespace Craquez.Sim
                     });
                 var players = new List<object>();
                 for (int i = 0; i < t.roster.Count; i++)
-                    players.Add(new Dictionary<string, object> { ["index"] = i, ["n"] = t.roster[i].n, ["num"] = t.roster[i].num, ["pos"] = t.roster[i].pos });
+                {
+                    var r = t.roster[i];
+                    players.Add(new Dictionary<string, object>
+                    {
+                        ["index"] = i, ["n"] = r.n, ["num"] = r.num, ["pos"] = r.pos, ["nat"] = r.nat, ["ovr"] = r.ovr,
+                        ["traits"] = new List<object>(r.t),
+                    });
+                }
                 teams[t.Key] = new Dictionary<string, object>
                 {
                     ["name"] = t.name, ["short"] = t.shortName, ["kits"] = kits,
-                    ["stadium"] = new Dictionary<string, object> { ["name"] = t.stadium.name, ["cap"] = t.stadium.cap },
+                    ["stadium"] = new Dictionary<string, object> { ["name"] = t.stadium.name, ["cap"] = t.stadium.cap, ["tier"] = t.stadium.tier },
                     ["crest"] = "crests/" + t.Key.Replace("/", "_") + ".png", ["players"] = players,
                 };
             }
             var doc = new Dictionary<string, object>
             {
-                ["formato"] = "craquez-option-file-1",
-                ["ajuda"] = "Edite os valores e salve como option_file.json nesta pasta. Escudos: PNG quadrado em crests/. Apague os times que não quiser alterar.",
+                ["formato"] = "craquez-option-file-2",
+                ["ajuda"] = "Option file do Craquez com tudo o que há no jogo. Edite e salve como option_file.json na pasta option_file " +
+                            "(ao lado do executável no PC, ou na pasta de dados do app). Times: nome, sigla, uniformes (cores #RRGGBB e padrão), " +
+                            "estádio e elenco (nome, número, posição, nacionalidade, geral 30-99). Escudos: PNG quadrado em crests/ com o nome indicado. " +
+                            "bolas/chuteiras: nome e cores de cada modelo (o jogo vem com modelos originais; aqui você pode renomear e recolorir). " +
+                            "locais: nomes dos estádios, ginásios, campos de society e ruas. Apague o que não quiser alterar.",
+                ["ligas"] = leagues,
                 ["teams"] = teams,
             };
-            string path = Path.Combine(dir, "option_file_modelo.json");
-            File.WriteAllText(path, MiniJson.Write(doc));
-            return path;
+            if (extras != null) foreach (var kv in extras) doc[kv.Key] = kv.Value;
+            return doc;
         }
+
     }
 }

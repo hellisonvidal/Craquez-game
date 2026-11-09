@@ -105,6 +105,10 @@ jobs:
           buildName: Craquez
           versioning: None
           androidExportType: androidPackage
+      # option file completo (times, elencos, estádios, bolas, chuteiras) ao lado do executável no PC
+      - name: Option file nos pacotes do PC
+        if: matrix.targetPlatform == 'StandaloneWindows64' || matrix.targetPlatform == 'StandaloneLinux64'
+        run: sudo cp -r option_file "build/${{ matrix.targetPlatform }}/option_file"
       - uses: actions/upload-artifact@v4
         if: matrix.targetPlatform != 'StandaloneLinux64'
         with:
@@ -135,7 +139,7 @@ jobs:
           chmod +x "$D/Craquez" || chmod +x "$D/Craquez.x86_64" || true
           cp tools/installer/linux/craquez.desktop tools/installer/linux/instalar.sh "$D/"
           chmod +x "$D/instalar.sh"
-          cp Assets/Craquez/Resources/UI/craquez_logo.png "$D/craquez.png"
+          cp tools/installer/linux/craquez.png "$D/craquez.png"
           tar czf Craquez-Linux.tar.gz -C build --transform 's,^StandaloneLinux64,Craquez,' StandaloneLinux64
           ls -la Craquez-Linux.tar.gz
       - uses: actions/upload-artifact@v4

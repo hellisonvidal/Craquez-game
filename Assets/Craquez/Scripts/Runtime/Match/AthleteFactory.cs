@@ -69,6 +69,7 @@ namespace Craquez
             public float frame;   // 0 ombros estreitos .. 1 largos
             public float[] face;
             public int boots;
+            public int tape;      // fita nos punhos: 0 nenhuma, 1 um, 2 os dois
         }
 
         /// <summary>face = [pele 0-5, cor do cabelo, estilo, barba, olhos, porte] (leagues.json).</summary>
@@ -89,11 +90,18 @@ namespace Craquez
             float tone = Mathf.Clamp(skin, 0, 5);
             var tint = b == "afro" ? Color.Lerp(new Color(1.05f, 1.02f, 1f), new Color(0.82f, 0.78f, 0.76f), (tone - 3f) / 2f)
                 : Color.Lerp(new Color(1.04f, 1.02f, 1f), new Color(0.9f, 0.82f, 0.74f), tone / 3f);
+            // cada pele um pouco diferente (mais quente, mais rosada, mais oliva)
+            float warm = (R(11) - 0.5f) * 0.08f, rosy = (R(12) - 0.5f) * 0.05f;
+            tint = new Color(tint.r * (1f + warm + rosy), tint.g * (1f + warm * 0.3f), tint.b * (1f - warm * 0.6f + rosy * 0.4f));
+            // cabelo: alguns raspados, alguns descoloridos
+            if (R(13) < 0.07f) hc = 4;
+            bool shaved = R(14) < 0.08f;
             return new Look
             {
-                baseName = b, hair = Mathf.Clamp(hair, 0, Hairs.Length - 1), hairColor = HairColors[Mathf.Clamp(hc, 0, HairColors.Length - 1)],
+                baseName = b, hair = shaved ? -1 : Mathf.Clamp(hair, 0, Hairs.Length - 1), hairColor = HairColors[Mathf.Clamp(hc, 0, HairColors.Length - 1)],
+                tape = R(15) < 0.3f ? (R(16) < 0.5f ? 1 : 2) : 0,
                 // altura: do baixinho (1,68 m) ao grandalhão (1,93 m), mais gente perto da média
-                skinTint = tint, scale = Mathf.Lerp(0.93f, 1.07f, Mathf.Clamp01(F(5, R(6) * 4f) / 4f * 0.5f + (R(8) + R(9)) * 0.25f)), face = f,
+                skinTint = tint, scale = Mathf.Lerp(0.91f, 1.09f, Mathf.Clamp01(F(5, R(6) * 4f) / 4f * 0.5f + (R(8) + R(9)) * 0.25f)), face = f,
                 frame = Mathf.Clamp01(R(10) * 0.7f + F(5, 2f) / 4f * 0.3f),
                 // maioria magro/médio; só alguns fortes (porte do banco + sorteio por nome)
                 build = Mathf.Clamp01(Mathf.Pow(Mathf.Clamp01(F(5, R(6) * 4f) / 4f * 0.6f + R(7) * 0.4f), 1.6f)),
@@ -102,7 +110,7 @@ namespace Craquez
         }
 
         /// <summary>Cria o atleta (com uniforme e número). Retorna o objeto raiz.</summary>
-        public static AthleteRig Create(SimPlayer p, Kit kit, Kit keeperKit, Transform parent, int quality, int boots = -1)
+        public static AthleteRig Create(SimPlayer p, Kit kit, Kit keeperKit, Transform parent, int quality, int boots = -1, bool captain = false)
         {
             var look = LookFor(p);
             if (boots >= 0) look.boots = boots;
@@ -121,21 +129,82 @@ namespace Craquez
             var rig = root.AddComponent<AthleteRig>();
             rig.Init(inst.transform);
             rig.Physique(look.build, look.frame);
-            inst.transform.localScale = Vector3.one * look.scale;
+            // altura de verdade: cada modelo tem uma altura própria (cabeça em repouso de 1,60 a 1,74 m,
+            // ou seja, 1,81 a 1,95 m no topo), e a escala sorteada ia de 0,91 a 1,09 — saíam atletas de
+            // até 2,10 m, grandes demais para o campo. Agora a escala leva cada um à altura sorteada,
+            // de 1,68 a 1,93 m (média ~1,80 m).
+            float u = Mathf.InverseLerp(0.91f, 1.09f, look.scale);
+            float tall = Mathf.Lerp(1.68f, 1.93f, u);
+            float modelH = rig.head != null ? rig.head.position.y - root.transform.position.y + 0.21f : 1.85f;
+            inst.transform.localScale = Vector3.one * Mathf.Clamp(tall / Mathf.Max(1.2f, modelH), 0.82f, 1.08f);
+            // mãos do modelo eram grandes demais para o corpo: ~32% menores
+            foreach (var hn in new[] { "hand_l", "hand_r" })
+                if (rig.bones.TryGetValue(hn, out var hb)) hb.localScale = hb.localScale * 0.68f;
             Dress(rig, look, p.isKeeper ? keeperKit : kit, p.number, quality);
+            Accessories(rig, look, p.isKeeper ? keeperKit : kit, p.isKeeper, captain, quality);
             return rig;
+        }
+
+        /// <summary>
+        /// Detalhes que diferenciam os atletas: luvas do goleiro, braçadeira do capitão, fita nos
+        /// punhos. Montados na pose de ligação e presos aos ossos (acompanham a animação).
+        /// </summary>
+        static void Accessories(AthleteRig rig, Look look, Kit kit, bool keeper, bool captain, int quality)
+        {
+            Transform B(string n) => rig.bones.TryGetValue(n, out var t) ? t : null;
+            foreach (var sfx in new[] { "_l", "_r" })
+            {
+                var up = B("upperarm" + sfx); var lo = B("lowerarm" + sfx); var hd = B("hand" + sfx);
+                if (up == null || lo == null || hd == null) continue;
+                var armDir = (hd.position - lo.position).normalized;
+                if (keeper)
+                {
+                    // luva: punho grosso + mão espalmada maior que a mão (cor de destaque, palma clara)
+                    Transform finger = null;
+                    foreach (Transform c in hd) if (c.GetComponent<Renderer>() == null) { finger = c; break; }
+                    var fdir = finger != null ? (finger.position - hd.position).normalized : armDir;
+                    var glove = new MeshKit();
+                    glove.Cylinder(hd.position - armDir * 0.07f, hd.position + armDir * 0.01f, 0.05f, 10);   // punho
+                    var go = glove.Object("Luva (punho)" + sfx, Gfx.Character(Color.Lerp(kit.c2, Color.black, 0.35f), null, 0.3f), null, false);
+                    go.transform.SetParent(hd, true);
+                    var palm = new MeshKit();
+                    palm.Box(Vector3.zero, new Vector3(0.105f, 0.045f, 0.16f));
+                    var pg = palm.Object("Luva" + sfx, Gfx.Character(Color.Lerp(kit.c1, Color.white, 0.55f), null, 0.3f), hd, false);
+                    pg.transform.position = hd.position + fdir * 0.07f;
+                    pg.transform.rotation = Quaternion.LookRotation(fdir, Vector3.Cross(fdir, armDir).sqrMagnitude > 1e-4f ? Vector3.Cross(fdir, rig.transform.forward) : Vector3.up);
+                    pg.transform.SetParent(hd, true);
+                }
+                else if (look.tape > 0 && (look.tape == 2 || sfx == "_r"))
+                {
+                    var tape = new MeshKit();
+                    tape.Cylinder(hd.position - armDir * 0.055f, hd.position - armDir * 0.005f, 0.036f, 10);
+                    var tg = tape.Object("Fita no punho" + sfx, Gfx.Character(look.tape == 1 ? Color.white : Color.Lerp(kit.c1, Color.white, 0.2f), null, 0.2f), null, false);
+                    tg.transform.SetParent(lo, true);
+                }
+                if (captain && sfx == "_l")
+                {
+                    // braçadeira amarela no braço esquerdo
+                    var a = Vector3.Lerp(up.position, lo.position, 0.38f);
+                    var b2 = Vector3.Lerp(up.position, lo.position, 0.52f);
+                    var band = new MeshKit();
+                    band.Cylinder(a, b2, 0.058f, 12);
+                    var bg = band.Object("Braçadeira de capitão", Gfx.Character(new Color(1f, 0.82f, 0.1f), null, 0.3f), null, false);
+                    bg.transform.SetParent(up, true);
+                }
+            }
         }
 
         public static void Dress(AthleteRig rig, Look look, Kit kit, int number, int quality)
         {
             var smrs = rig.GetComponentsInChildren<SkinnedMeshRenderer>(true);
-            Mesh bodyMesh = null, socksMesh = null;
+            Mesh bodyMesh = null, socksMesh = null, bootsMesh = null;
             foreach (var r in smrs)
             {
                 if (r.name == "Body") bodyMesh = r.sharedMesh;
                 if (r.name == "Socks") socksMesh = r.sharedMesh;
+                if (r.name == "Boots") bootsMesh = r.sharedMesh;
             }
-            var axes = bodyMesh != null ? KitPainter.AxesFrom(bodyMesh, socksMesh) : default;
+            var axes = bodyMesh != null ? KitPainter.AxesFrom(bodyMesh, socksMesh, bootsMesh) : default;
             int tex = quality >= 2 ? 1024 : 512;
             foreach (var smr in smrs)
             {
@@ -148,7 +217,7 @@ namespace Craquez
                     case "Body":
                     {
                         var skin = Shared("skin:" + look.baseName + Teams.Hex(look.skinTint), () =>
-                            Gfx.Character(look.skinTint, T(SkinTex[look.baseName]), 0.32f));
+                            Gfx.Athlete(look.skinTint, T(SkinTex[look.baseName]), 0.3f, 1f));
                         var mats = new Material[Mathf.Max(1, smr.sharedMesh.subMeshCount)];
                         for (int i = 0; i < mats.Length; i++) mats[i] = skin;
                         smr.sharedMaterials = mats;
@@ -161,23 +230,27 @@ namespace Craquez
                     case "Socks":
                     {
                         var part = n == "Shirt" ? KitPart.Shirt : n == "Shorts" ? KitPart.Shorts : KitPart.Socks;
-                        var kt = KitPainter.Paint(smr.sharedMesh, part, kit, axes, part == KitPart.Socks ? tex / 2 : tex);
+                        // a camisa leva o número pintado (uma textura por atleta; no Ultra em 1024)
+                        int size = part == KitPart.Socks ? tex / 2 : part == KitPart.Shirt ? (quality >= 3 ? 1024 : 512) : tex;
+                        var kt = KitPainter.Paint(smr.sharedMesh, part, kit, axes, size, part == KitPart.Shirt ? number : -1);
                         // tecido dos dois lados (vê-se o avesso pela gola e pelas mangas)
-                        smr.sharedMaterial = Shared("kit:" + kt.GetInstanceID(), () => Gfx.Character(Color.white, kt, part == KitPart.Shirt ? 0.34f : 0.26f, true));
+                        if (part == KitPart.Shirt) rig.shirt = smr;
+                        else if (part == KitPart.Shorts) rig.shorts = smr;
+                        smr.sharedMaterial = Shared("kit:" + kt.GetInstanceID(), () => Gfx.Athlete(Color.white, kt, part == KitPart.Shirt ? 0.36f : 0.28f, 0f, true));
                         break;
                     }
                     case "Boots":
                     {
                         int d = look.boots;
                         bool indoor = IndoorShoes;
-                        smr.sharedMaterial = Shared("boots:" + d + (indoor ? "f" : ""), () => Gfx.Character(Color.white, BootPainter.Paint(d, indoor), indoor ? 0.35f : 0.62f));
+                        smr.sharedMaterial = Shared("boots:" + d + (indoor ? "f" : ""), () => Gfx.Athlete(Color.white, BootPainter.Paint(d, indoor), indoor ? 0.4f : 0.6f, 0f));
                         break;
                     }
                     default:
                         if (n.StartsWith("Hair_"))
                         {
                             string hn = n.Substring(5);
-                            bool on = hn == Hairs[look.hair];
+                            bool on = look.hair >= 0 && hn == Hairs[look.hair];
                             smr.gameObject.SetActive(on);
                             if (on)
                                 smr.sharedMaterial = Shared("hair:" + hn + Teams.Hex(look.hairColor), () =>
@@ -202,7 +275,7 @@ namespace Craquez
                         break;
                 }
             }
-            rig.SetNumber(number, kit);
+            // (o número agora vem pintado na camisa)
         }
 
         static readonly string[] FaceKeys =

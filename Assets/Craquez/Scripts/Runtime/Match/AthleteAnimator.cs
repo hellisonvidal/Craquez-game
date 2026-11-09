@@ -60,6 +60,57 @@ namespace Craquez
                 if (axis.sqrMagnitude < 1e-6f) continue;
                 pose.Rotate(foot, Quaternion.AngleAxis(delta, axis.normalized));   // + levanta a ponta
             }
+            FeetStraight(rig, root, pose, act);
+        }
+
+        static readonly Dictionary<AthleteRig, int> _footSideAxis = new Dictionary<AthleteRig, int>();
+
+        static Vector3 Axis(Transform t, int i) => i == 0 ? t.right : i == 1 ? t.up : t.forward;
+
+        /// <summary>
+        /// Pés retos: a ponta do pé aponta para a frente do corpo (com a abertura natural de ~8°) e a
+        /// sola fica plana no chão (sem o pé "torto", virado para dentro/fora ou deitado de lado).
+        /// No ar e nas ações (chute, drible) a correção é menor.
+        /// </summary>
+        public static void FeetStraight(AthleteRig rig, Transform root, PoseEdits pose, float act)
+        {
+            float ground = root.position.y;
+            var up = Vector3.up;
+            var bodyFwd = Vector3.ProjectOnPlane(root.forward, up).normalized;
+            if (bodyFwd.sqrMagnitude < 1e-4f) return;
+            for (int side = 0; side < 2; side++)
+            {
+                var foot = side == 0 ? rig.footL : rig.footR;
+                rig.bones.TryGetValue(side == 0 ? "ball_l" : "ball_r", out var toe);
+                if (foot == null || toe == null) continue;
+                float h = Mathf.Min(foot.position.y, toe.position.y + 0.05f) - ground;
+                float stance = 1f - Mathf.Clamp01((h - 0.08f) / 0.15f);
+                float w = Mathf.Lerp(0.35f, 1f, stance) * (1f - act * 0.75f);
+                if (w <= 0.01f) continue;
+                // 1) direção (giro em torno do eixo vertical)
+                var fwd = Vector3.ProjectOnPlane(toe.position - foot.position, up);
+                if (fwd.sqrMagnitude < 1e-5f) continue;
+                float sgn = side == 0 ? -1f : 1f;   // esquerdo abre para a esquerda
+                var want = Quaternion.AngleAxis(sgn * 8f, up) * bodyFwd;
+                float yaw = Vector3.SignedAngle(fwd, want, up);
+                float excess = Mathf.Abs(yaw) > 6f ? yaw - Mathf.Sign(yaw) * 6f : 0f;
+                if (Mathf.Abs(excess) > 0.3f) pose.Rotate(foot, Quaternion.AngleAxis(Mathf.Clamp(excess, -60f, 60f) * w, up));
+                // 2) sola plana (giro em torno do comprimento do pé), só apoiado
+                if (stance < 0.2f) continue;
+                if (!_footSideAxis.TryGetValue(rig, out int ax))
+                {
+                    // o eixo do osso mais perpendicular ao comprimento do pé = eixo lateral da sola
+                    var f0 = (toe.position - foot.position).normalized;
+                    ax = 0; float best = 9f;
+                    for (int i = 0; i < 3; i++) { float d = Mathf.Abs(Vector3.Dot(Axis(foot, i), f0)) + Mathf.Abs(Vector3.Dot(Axis(foot, i), up)); if (d < best) { best = d; ax = i; } }
+                    _footSideAxis[rig] = ax;
+                }
+                var lat = Axis(foot, ax);
+                var flat = Vector3.ProjectOnPlane(lat, up);
+                if (flat.sqrMagnitude < 1e-4f) continue;
+                float tilt = Vector3.Angle(lat, flat);
+                if (tilt > 2f) pose.Rotate(foot, Quaternion.Slerp(Quaternion.identity, Quaternion.FromToRotation(lat, flat.normalized), Mathf.Clamp01(stance * w * 0.9f) * Mathf.Min(1f, 40f / tilt)));
+            }
         }
 
         /// <summary>Abertura lateral do braço (graus) no referencial do atleta.</summary>
@@ -181,6 +232,7 @@ namespace Craquez
                 else if (t.name == "pelvis") pel = t;
             }
             if (fl == null || fr == null) return;
+            FindKickContacts(go, fl, fr, pel);
             for (int i = 0; i < Loco.Length; i++)
             {
                 if (!Clips.TryGetValue(Loco[i], out var ci) || !ci.loop || i == IIdle) continue;
@@ -230,6 +282,47 @@ namespace Craquez
                 Debug.Log($"[anim] {Loco[i]}: apoio do pé esq. em {bt:F2} do ciclo, chão a {gs:F2} m/s (json {ci.speed:F2})");
             }
         }
+        static readonly Dictionary<string, float> _kickContact = new Dictionary<string, float>();
+        static readonly string[] KickClips = { "Pass", "Shot", "KickPower", "Kick", "ShotLeft", "Volley" };
+
+        /// <summary>
+        /// Instante (s) em que o pé de chute encontra a bola em cada clipe de chute/passe:
+        /// o pico de velocidade do pé (em relação ao quadril). A ação é tocada de modo que
+        /// esse instante caia exatamente na saída da bola da simulação.
+        /// </summary>
+        static void FindKickContacts(GameObject go, Transform fl, Transform fr, Transform pel)
+        {
+            foreach (var name in KickClips)
+            {
+                if (!Clips.TryGetValue(name, out var ci)) continue;
+                float len = ci.clip.length;
+                const float step = 1f / 60f;
+                Vector3 pl = Vector3.zero, pr = Vector3.zero;
+                float best = 0f, bt = 1.1f;
+                bool first = true;
+                for (float t = 0f; t <= len; t += step)
+                {
+                    ci.clip.SampleAnimation(go, t);
+                    var o = pel != null ? pel.position : go.transform.position;
+                    var l = fl.position - o;
+                    var r = fr.position - o;
+                    if (!first && t > len * 0.15f && t < len * 0.9f)
+                    {
+                        float v = Mathf.Max((l - pl).magnitude, (r - pr).magnitude) / step;
+                        // o pé de chute perto do chão (altura da bola)
+                        float low = Mathf.Min(fl.position.y, fr.position.y) - go.transform.position.y;
+                        if (low < 0.45f && v > best) { best = v; bt = t; }
+                    }
+                    pl = l; pr = r; first = false;
+                }
+                _kickContact[name] = bt;
+                Debug.Log($"[anim] {name}: contato com a bola em {bt:F2}s (pé a {best:F1} m/s)");
+            }
+        }
+
+        /// <summary>Instante do contato com a bola no clipe (s); 1,1 s se não medido.</summary>
+        public static float KickContact(string clip) => _kickContact.TryGetValue(clip, out var t) ? t : 1.1f;
+
         public string CurrentAction { get; private set; }
         public float ActionWeight => _actionW;
 
@@ -310,6 +403,9 @@ namespace Craquez
         /// Atualiza a locomoção. speed em m/s; fwd/side = velocidade no referencial do corpo (m/s);
         /// guard = postura de marcação (contenção).
         /// </summary>
+        /// <summary>Ritmo das passadas (1 = natural; >1 passadas mais curtas e rápidas, como conduzindo a bola).</summary>
+        public float cadence = 1f;
+
         public void Tick(float dt, float speed, float fwd, float side, bool guard)
         {
             if (!_valid) return;
@@ -362,7 +458,7 @@ namespace Craquez
                 if (!_locoP[i].IsValid() || _locoW[i] <= 0f) continue;
                 float len = (float)_locoP[i].GetAnimationClip().length;
                 // ritmo casado com a velocidade (pés sem patinar), dentro de limites naturais
-                float rate = (i == IIdle || speed < 0.2f) ? _idleRate : Mathf.Clamp(speed / _locoSpeed[i], 0.7f, 1.65f);
+                float rate = (i == IIdle || speed < 0.2f) ? _idleRate : Mathf.Clamp(speed / _locoSpeed[i] * cadence, 0.7f, 1.8f);
                 cyclesPerSec += _locoW[i] * rate / Mathf.Max(0.1f, len);
                 wsum += _locoW[i];
             }
