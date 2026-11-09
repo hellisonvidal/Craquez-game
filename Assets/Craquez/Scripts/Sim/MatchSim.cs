@@ -60,6 +60,8 @@ namespace Craquez.Sim
         public MatchState state = MatchState.Kickoff;
         public float stateTimer;
         public int kickoffTeam;
+        /// <summary>Quem dá a saída no 1º tempo (sorteio); no 2º tempo, o outro time.</summary>
+        public int firstKickoff;
         public int protectTeam = -1;
         public float protectT;
         public int passReceiver = -1;
@@ -207,9 +209,9 @@ namespace Craquez.Sim
                     players.Add(p);
                 }
             }
-            kickoffTeam = 0;
+            kickoffTeam = firstKickoff;
             MakePuddles(seed);
-            ResetForKickoff(0);
+            ResetForKickoff(firstKickoff);
         }
 
         // ------------------------------------------------------------ piso (chuva e neve)
@@ -743,8 +745,8 @@ namespace Craquez.Sim
                         clock = 0f;
                         teamFouls[0] = teamFouls[1] = 0;   // faltas acumuladas zeram no intervalo
                         foreach (var pl in players) pl.stamina = Mathf.Min(1f, pl.stamina + 0.6f);   // descanso no vestiário
-                        kickoffTeam = 1;
-                        ResetForKickoff(1);
+                        kickoffTeam = 1 - firstKickoff;
+                        ResetForKickoff(kickoffTeam);
                     }
                     break;
             }

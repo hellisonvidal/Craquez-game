@@ -759,7 +759,7 @@ namespace Craquez
                 UiKit.Size(UiKit.Cycler(list, "Clima", WeatherOpts, Mathf.Max(0, System.Array.IndexOf(WeatherIds, _cfg.weather)), i => _cfg.weather = WeatherIds[i]), 50, 50);
                 UiKit.Size(UiKit.Cycler(list, "Clima dinâmico", new[] { "Ligado", "Desligado" }, _cfg.dynamicWeather ? 0 : 1, i => _cfg.dynamicWeather = i == 0), 50, 50);
             }
-            UiKit.Size(UiKit.Cycler(list, "Lado do campo", new[] { "Mandante ataca  ›", "‹  Mandante ataca" }, _cfg.swapSides ? 1 : 0, i => _cfg.swapSides = i == 1), 50, 50);
+            UiKit.Size(UiKit.Cycler(list, "Lado do campo", new[] { "Sorteio do juiz", "Mandante ataca  ›", "‹  Mandante ataca" }, _cfg.toss ? 0 : _cfg.swapSides ? 2 : 1, i => { _cfg.toss = i == 0; _cfg.swapSides = i == 2; }), 50, 50);
             UiKit.Size(UiKit.Cycler(list, "Horário", TodOpts, Mathf.Max(0, System.Array.IndexOf(TodIds, _cfg.timeOfDay)), i => { _cfg.timeOfDay = TodIds[i]; _refreshVenue?.Invoke(); }), 50, 50);
             UiKit.Size(UiKit.Cycler(list, "Dificuldade", DiffOpts, Mathf.Max(0, System.Array.IndexOf(DiffVals, _cfg.difficulty)), i => _cfg.difficulty = DiffVals[i]), 50, 50);
             var mins = new List<string>();

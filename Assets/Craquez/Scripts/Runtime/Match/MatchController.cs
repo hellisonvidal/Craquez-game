@@ -29,6 +29,9 @@ namespace Craquez
         float _orbit;
         Phase _phase;
         float _acc, _cereT;
+        /// <summary>Time que ganhou o sorteio (-1 = sem sorteio).</summary>
+        public int tossWinner = -1;
+        Transform _coin;
         int _cereStep = -1;
         readonly CpuBrain[] _cpu = new CpuBrain[2];
         readonly DeviceKind[] _dev = new DeviceKind[2];
@@ -51,6 +54,14 @@ namespace Craquez
             string w = c.weather == "aleatorio" ? WeatherFx.Kinds[(int)(c.seed % (uint)WeatherFx.Kinds.Length)] : c.weather;
             sim.rollScale = RollFor(c.mode, w);
             sim.startSwapped = c.swapSides;
+            if (c.toss)
+            {
+                // sorteio: quem ganha escolhe o lado; quem perde dá a saída
+                uint h = c.seed * 2654435761u + 977u;
+                tossWinner = (int)((h >> 9) & 1u);
+                sim.startSwapped = ((h >> 13) & 1u) == 1u;
+                sim.firstKickoff = 1 - tossWinner;
+            }
             sim.streetPlayers = c.streetPlayers;
             sim.quickRestarts = c.quickRestarts;
             sim.Setup(c.mode, new TeamSetup { data = ta, tactics = c.tacticsA }, new TeamSetup { data = tb, tactics = c.tacticsB }, c.seed, c.SecondsPerHalf);
@@ -92,7 +103,16 @@ namespace Craquez
                 _touch = TouchControls.Create(transform);
             view.SnapAll();
             if (c.ceremony) StartCeremony();
-            else { _phase = Phase.Playing; Sfx.Whistle(); }
+            else
+            {
+                _phase = Phase.Playing; Sfx.Whistle();
+                if (tossWinner >= 0)
+                {
+                    var tw = Teams.Get(tossWinner == 0 ? c.teamA : c.teamB);
+                    var tl = Teams.Get(tossWinner == 0 ? c.teamB : c.teamA);
+                    hud.Toast("Sorteio: " + tw.shortName + " escolhe o campo  •  " + tl.shortName + " dá a saída", 3f);
+                }
+            }
         }
 
         static float RollFor(string mode, string w) =>
@@ -135,7 +155,8 @@ namespace Craquez
             float hl = sim.halfLen, hw = sim.halfW;
             var ta = Teams.Get(cfg.teamA);
             var tb = Teams.Get(cfg.teamB);
-            int step = _cereT < 4f ? 0 : _cereT < 8f ? 1 : _cereT < 11.5f ? 2 : _cereT < 15f ? 3 : 4;
+            bool toss = tossWinner >= 0 && view.Referee != null;   // (juiz só no campo)
+            int step = _cereT < 4f ? 0 : _cereT < 8f ? 1 : _cereT < 11.5f ? 2 : _cereT < 15f ? 3 : toss && _cereT < 20f ? 4 : 5;
             if (step != _cereStep)
             {
                 _cereStep = step;
@@ -148,7 +169,12 @@ namespace Craquez
                     case 1: hud.Toast("Os times entram em campo", 3.6f); break;
                     case 2: ShowLineup(0); break;
                     case 3: ShowLineup(1); break;
-                    case 4: EndCeremony(); return;
+                    case 4:
+                        if (_lineup != null) Destroy(_lineup);
+                        _lineup = null;
+                        hud.Toast("Sorteio no meio-campo", 2.2f);
+                        break;
+                    case 5: EndCeremony(); return;
                 }
             }
             // câmera: sobrevoo do estádio -> túnel -> escalações
@@ -159,6 +185,14 @@ namespace Craquez
                 bc.cinePos = new Vector3(Mathf.Cos(a) * hl * 1.5f, hl * 0.45f, Mathf.Sin(a) * hl * 1.2f);
                 bc.cineLook = Vector3.zero;
                 bc.cineFov = 50f;
+            }
+            else if (step == 4)
+            {
+                // sorteio: juiz e os dois capitães no círculo central, moeda para o alto
+                bc.cinePos = new Vector3(2.6f, 1.9f, -3.4f);
+                bc.cineLook = new Vector3(0f, 1.2f, 0f);
+                bc.cineFov = 42f;
+                Toss(_cereT - 15f);
             }
             else
             {
@@ -172,6 +206,9 @@ namespace Craquez
                 var p = av.p;
                 float side = p.team == 0 ? -1f : 1f;
                 var target = new Vector2(side * (2f + p.index * 1.25f), -hw * 0.12f);
+                // no sorteio os capitães vão ao centro com o juiz
+                if (step == 4 && view.captains != null && (p.id == view.captains[0] || p.id == view.captains[1]))
+                    target = new Vector2(side * 0.75f, 0.35f);
                 var to = target - p.position;
                 if (_cereT > 4f && to.magnitude > 0.3f)
                 {
@@ -181,13 +218,51 @@ namespace Craquez
                 else
                 {
                     p.vel = Vector2.MoveTowards(p.vel, Vector2.zero, 4f * dt);
-                    if (_cereT > 8f) p.facing = Vector2.Lerp(p.facing, new Vector2(0, -1), 0.05f).normalized;
+                    bool capt = step == 4 && view.captains != null && (p.id == view.captains[0] || p.id == view.captains[1]);
+                    if (capt) p.facing = Vector2.Lerp(p.facing, new Vector2(-side, -0.4f).normalized, 0.08f).normalized;
+                    else if (_cereT > 8f) p.facing = Vector2.Lerp(p.facing, new Vector2(0, -1), 0.05f).normalized;
                 }
                 p.position += p.vel * dt;
                 av.OnTick();
             }
             view.Alpha = 1f;
             if (InputRouter.AnyPressedThisFrame() && _cereT > 0.6f) EndCeremony();
+        }
+
+        /// <summary>
+        /// Sorteio: o juiz (no centro, de frente para a câmera) joga a moeda; ela sobe girando, cai na
+        /// mão dele e o resultado aparece (quem ganha escolhe o lado; o outro dá a saída).
+        /// </summary>
+        void Toss(float t)
+        {
+            var refAv = view.Referee;
+            if (refAv != null)
+            {
+                refAv.p.position = new Vector2(0f, 0.9f);
+                refAv.p.vel = Vector2.zero;
+                refAv.p.facing = new Vector2(0f, -1f);
+                refAv.OnTick();
+            }
+            if (_coin == null)
+            {
+                var mk = new MeshKit();
+                mk.Cylinder(new Vector3(0f, -0.0015f, 0f), new Vector3(0f, 0.0015f, 0f), 0.013f, 16);
+                mk.Disc(new Vector3(0f, 0.0016f, 0f), 0.013f, 16, 0.0016f);
+                _coin = mk.Object("Moeda", Gfx.Lit(new Color(0.92f, 0.75f, 0.3f), null, 0.8f, 0.9f), view.transform, false).transform;
+                _coin.localScale = Vector3.one * 2.2f;   // (um pouco maior que a real, para aparecer na TV)
+            }
+            // sobe de 1,3 m até ~3 m e volta à mão em ~1,2 s, girando
+            float u = Mathf.Clamp01((t - 1.2f) / 1.2f);
+            float y = 1.3f + 4f * 1.7f * u * (1f - u);
+            _coin.position = new Vector3(0f, y, 0.55f);
+            _coin.rotation = Quaternion.Euler(u < 1f ? u * 2160f : 0f, 0f, 0f);
+            _coin.gameObject.SetActive(t < 3.4f);
+            if (t >= 2.5f && t - Time.deltaTime < 2.5f)
+            {
+                var w = Teams.Get(tossWinner == 0 ? cfg.teamA : cfg.teamB);
+                var l = Teams.Get(tossWinner == 0 ? cfg.teamB : cfg.teamA);
+                hud.Toast(w.shortName + " ganha o sorteio e escolhe o campo  •  " + l.shortName + " dá a saída", 3f);
+            }
         }
 
         void ShowLineup(int t)
@@ -219,12 +294,21 @@ namespace Craquez
         {
             if (_lineup != null) Destroy(_lineup);
             _lineup = null;
+            if (_coin != null) { Destroy(_coin.gameObject); _coin = null; }
+            if (tossWinner >= 0 && _cereStep < 4)
+            {
+                // pulou a cerimônia: o resultado do sorteio aparece assim mesmo
+                var w = Teams.Get(tossWinner == 0 ? cfg.teamA : cfg.teamB);
+                var l = Teams.Get(tossWinner == 0 ? cfg.teamB : cfg.teamA);
+                hud.Toast("Sorteio: " + w.shortName + " escolhe o campo  •  " + l.shortName + " dá a saída", 3f);
+            }
             // devolve todos às posições do pontapé inicial
             var fresh = new MatchSim();
             var ta = Teams.Get(cfg.teamA);
             var tb = Teams.Get(cfg.teamB);
             fresh.rollScale = sim.rollScale;
             fresh.startSwapped = sim.startSwapped;
+            fresh.firstKickoff = sim.firstKickoff;
             fresh.streetPlayers = sim.streetPlayers;
             fresh.Setup(cfg.mode, new TeamSetup { data = ta, tactics = cfg.tacticsA }, new TeamSetup { data = tb, tactics = cfg.tacticsB }, cfg.seed, cfg.SecondsPerHalf);
             for (int k = 0; k < sim.players.Count; k++)

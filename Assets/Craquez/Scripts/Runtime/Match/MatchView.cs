@@ -27,6 +27,9 @@ namespace Craquez
         bool _cheering;
         CrowdFx _crowd;
         AthleteView _referee;
+        public AthleteView Referee => _referee;
+        /// <summary>Capitães (id na simulação) de cada time.</summary>
+        public int[] captains = { -1, -1 };
         float _cardT;
         GameObject _card;
 
@@ -79,7 +82,7 @@ namespace Craquez
             _occRoots = new[] { _crowd != null ? _crowd.transform : null, life != null ? life.transform : null, extras != null ? extras.transform : null };
             AthleteFactory.IndoorShoes = c.mode == GameModes.Futsal;
             // capitão: o primeiro "Líder" de cada time (ou o camisa de número mais baixo entre os de linha)
-            var captains = new int[] { -1, -1 };
+            captains = new int[] { -1, -1 };
             foreach (var p in s.players) if (!p.isKeeper && p.Has(Trait.Lider) && captains[p.team] < 0) captains[p.team] = p.id;
             for (int t = 0; t < 2; t++)
                 if (captains[t] < 0)
