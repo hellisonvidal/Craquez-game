@@ -33,9 +33,10 @@ namespace Craquez
         void Build()
         {
             var tex = Blob(128);
-            // água: escura, levemente azulada e lisa (reflete o céu/refletores no brilho especular)
-            var mat = Gfx.Transparent(new Color(0.16f, 0.19f, 0.22f, 0.72f), tex);
-            mat.SetFloat("_Smoothness", 0.92f);
+            // água: escura, levemente azulada e lisa (reflete o céu/refletores no brilho especular);
+            // recorte pelo contorno irregular (o material transparente ignorava o alfa da textura e a
+            // poça aparecia como um ladrilho quadrado)
+            var mat = Gfx.Cutout(new Color(0.1f, 0.12f, 0.14f), tex, 0.5f, 0.95f);
             _quads = new Transform[_sim.puddles.Count];
             for (int i = 0; i < _quads.Length; i++)
             {
@@ -74,13 +75,13 @@ namespace Craquez
             }
             // pingos batendo nas poças: anéis que abrem e somem
             float rain = _weather != null ? _weather.Rain : 0f;
-            _ringAcc += dt * rain * 60f;
+            _ringAcc += dt * rain * 260f;
             while (_ringAcc >= 1f && _rings != null)
             {
                 _ringAcc -= 1f;
                 int i = _rng.Next(_quads.Length);
                 float r = _sim.PuddleRadius(i);
-                if (r < 0.3f) continue;
+                if (r < 0.3f || !_quads[i].gameObject.activeSelf) continue;
                 var pd = _sim.puddles[i];
                 float a = (float)_rng.NextDouble() * Mathf.PI * 2f, d = Mathf.Sqrt((float)_rng.NextDouble()) * r * 0.8f;
                 var ep = new ParticleSystem.EmitParams { position = new Vector3(pd.x + Mathf.Cos(a) * d, 0.03f, pd.y + Mathf.Sin(a) * d), applyShapeToPosition = false };
@@ -120,8 +121,8 @@ namespace Craquez
             ps.Stop(true, ParticleSystemStopBehavior.StopEmittingAndClear);
             var m = ps.main;
             m.loop = false; m.playOnAwake = false;
-            m.startLifetime = 0.55f; m.startSpeed = 0f; m.startSize = 0.12f;
-            m.maxParticles = 400;
+            m.startLifetime = 0.6f; m.startSpeed = 0f; m.startSize = 0.16f;
+            m.maxParticles = 900;
             m.simulationSpace = ParticleSystemSimulationSpace.World;
             m.startColor = new Color(0.85f, 0.9f, 1f, 0.55f);
             var em = ps.emission; em.enabled = false;
