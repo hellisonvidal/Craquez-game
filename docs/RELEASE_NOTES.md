@@ -21,6 +21,33 @@ Jogo de futebol feito 100% com inteligência artificial, **gratuito**. Por enqua
 - **Estádios**: reservas sentados nos bancos com o agasalho do time, técnico de pé na área técnica
   (com as linhas tracejadas), mesa do 4º árbitro com a placa de substituição e o gramado gasto na
   pequena área, na marca do pênalti e no círculo central — nada disso tapa o campo.
+- **Uniformes não somem mais**: num quadro mais longo (carregamento, troca de câmera) o tecido da
+  camisa era calculado num passo só, a "mola" explodia e o atleta aparecia sem roupa ou com a camisa
+  esticada; agora o tecido é calculado em passos pequenos e nunca sai do lugar.
+- **Física da bola revisada**: quiques de bola baixa que se perdiam voltaram (no futsal a bola não
+  quicava); o quique segue o piso (bola largada de 2 m sobe ~0,7 m na grama, como na norma da FIFA
+  para gramado natural, menos na quadra e no society e mais no asfalto).
+- **Chuva e neve no gramado**: a água vai se acumulando com a chuva e aparecem poças (já cheias se o
+  jogo começar chovendo), com os pingos abrindo anéis e espirrando água quando a bola ou os atletas
+  passam; na poça a bola freia de repente e quase não quica, e o atleta perde um pouco de velocidade.
+  Com neve acumulada a bola rola menos (um passe que rodaria ~44 m para em ~16 m com neve alta) e
+  quica bem menos.
+- **Goleiro no tempo da bola**: o corpo chega esticado no mergulho e no encaixe exatamente quando a
+  bola chega (antes ele pulava e o pico do salto vinha antes do chute chegar).
+- **Saída de bola do goleiro**: tiro de meta com a bola no chão — passe para quem está livre e com a
+  linha aberta (pelos lados, nunca cruzando na frente do gol) ou lançamento longo para o companheiro
+  mais sozinho lá na frente, com o alcance calculado pela física da bola (antes ele pegava a bola com
+  as mãos no tiro de meta). Com a bola nos pés (recuo), não sai mais driblando nem toca às cegas para
+  a frente. No futsal o tiro de meta continua com as mãos, como na regra.
+- **Lado de fora dos estádios**: fachada com brises, pilares e lajes, faixa na cor do clube (acesa à
+  noite), portões com catracas, rampas em espiral nos cantos dos estádios grandes, esplanada com
+  árvores, postes, bilheterias e torcedores chegando, avenida em volta e estacionamento com carros e
+  ônibus; a cidade e a paisagem começam depois do entorno.
+- **Escalações no rodapé**: faixa no pé da tela com número e nome dos atletas dos dois times, quem
+  está com a bola em destaque e expulsos apagados (liga/desliga em Opções e na pausa).
+- **Dois instaladores Android**: o normal (público, nomes fictícios) e a versão completa para uso
+  pessoal, com clubes, estádios e jogadores reais já instalados (fica num rascunho privado, só para
+  quem administra o repositório).
 - **Só Android por enquanto**: Windows e Linux saem quando a versão for aprovada.
 
 ## Versão 2.4.1

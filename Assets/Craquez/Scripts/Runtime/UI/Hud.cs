@@ -385,6 +385,8 @@ namespace Craquez.UI
             if (_lineupCg.alpha <= 0f) return;
             // entre os quadros dos jogadores controlados (que só aparecem para quem é humano)
             float l = _pbox[0].gameObject.activeSelf ? 440f : 40f, r = _pbox[1].gameObject.activeSelf ? 440f : 40f;
+            // no celular os botões de toque ocupam o canto de baixo à direita (até ~620 da borda)
+            if ((human[0] && devices[0] == DeviceKind.Touch) || (human[1] && devices[1] == DeviceKind.Touch)) r = Mathf.Max(r, 650f);
             if (!Mathf.Approximately(_lineup.offsetMin.x, l) || !Mathf.Approximately(-_lineup.offsetMax.x, r))
             {
                 _lineup.offsetMin = new Vector2(l, _lineup.offsetMin.y);

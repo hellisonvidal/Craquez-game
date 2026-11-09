@@ -227,8 +227,11 @@ namespace Craquez
                 if (_pitchBase[i].a <= 0f) _pitchBase[i] = pm.HasProperty("_BaseColor") ? pm.GetColor("_BaseColor") : Color.white;
                 var bc = _pitchBase[i];
                 var wet = new Color(bc.r * 0.8f, bc.g * 0.86f, bc.b * 0.8f, bc.a);
-                var c = Color.Lerp(bc, wet, _rainK);
-                if (_snowK > 0.01f) c = Color.Lerp(c, new Color(1.6f, 1.6f, 1.7f), _snowK * 0.7f);
+                // gramado molhado acompanha a água acumulada (seca devagar depois da chuva); a neve
+                // branqueia conforme acumula (a mesma que freia a bola na simulação)
+                var c = Color.Lerp(bc, wet, Mathf.Max(_rainK, Mathf.Clamp01(Water * 1.4f)));
+                float snowW = Mathf.Max(_snowK * 0.35f, SnowCover * 0.85f);
+                if (snowW > 0.01f) c = Color.Lerp(c, new Color(1.6f, 1.6f, 1.7f), snowW);
                 pm.SetColor("_BaseColor", c);
                 pm.SetFloat("_Smoothness", 0.15f);
             }
