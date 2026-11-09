@@ -136,8 +136,14 @@ namespace Craquez
                     // sequência da corrida: tempo fixo por quadro (1/30 s) e câmera de lado acompanhando o
                     // atleta mais rápido no momento (dá para montar um GIF e ver a passada)
                     var bc = mc.view.bcam;
+                    // espera alguém em corrida de verdade (rápido e sem marcar ninguém)
                     AthleteView best = null; float bv = 0f;
-                    foreach (var av in mc.view.athletes) if (!av.p.isKeeper && av.p.vel.magnitude > bv) { bv = av.p.vel.magnitude; best = av; }
+                    for (int tries = 0; tries < 90 && bv < 5.5f; tries++)
+                    {
+                        foreach (var av in mc.view.athletes)
+                            if (!av.p.isKeeper && !av.p.shielding && av.p.vel.magnitude > bv) { bv = av.p.vel.magnitude; best = av; }
+                        if (bv < 5.5f) { bv = 0f; yield return null; }
+                    }
                     if (best != null)
                     {
                         Time.captureFramerate = 30;
@@ -147,10 +153,10 @@ namespace Craquez
                             var pp = best.transform.position;
                             var side = Quaternion.Euler(0, 90, 0) * new Vector3(best.p.vel.x, 0f, best.p.vel.y).normalized;
                             if (side.sqrMagnitude < 0.01f) side = Vector3.right;
-                            bc.cam.transform.position = bc.cinePos = pp + side * 4.2f + Vector3.up * 1.2f;
-                            bc.cineLook = pp + Vector3.up * 0.95f;
+                            bc.cam.transform.position = bc.cinePos = pp + side * 7f + Vector3.up * 1.0f;
+                            bc.cineLook = pp + Vector3.up * 0.9f;
                             bc.cam.transform.LookAt(bc.cineLook);
-                            bc.cam.fieldOfView = bc.cineFov = 40f;
+                            bc.cam.fieldOfView = bc.cineFov = 30f;
                             yield return new WaitForEndOfFrame();
                             _n++;
                             var tex = ScreenCapture.CaptureScreenshotAsTexture();
