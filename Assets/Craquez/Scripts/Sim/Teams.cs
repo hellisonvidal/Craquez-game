@@ -411,6 +411,17 @@ namespace Craquez.Sim
             OptionFilePath = "";
             _crests.Clear();
             if (SourceOverride != null) return;
+            // versão "casa" (uso pessoal): option file com nomes reais já embutido no APK; um
+            // option_file.json do usuário, se houver, é aplicado por cima
+            if (!OptionFileDisabled)
+            {
+                var casa = Resources.Load<TextAsset>("Data/option_file_casa");
+                if (casa != null)
+                {
+                    try { ApplyOptionDocument(MiniJson.Parse(casa.text), Application.persistentDataPath); OptionFilePath = "(embutido na versão casa)"; }
+                    catch (System.Exception e) { Debug.LogWarning("option file casa inválido: " + e.Message); }
+                }
+            }
             foreach (var path in OptionFiles())
             {
                 bool exists;

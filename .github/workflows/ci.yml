@@ -78,8 +78,6 @@ jobs:
         include:
           - name: Android
             targetPlatform: Android
-          - name: Windows
-            targetPlatform: StandaloneWindows64
           - name: Linux
             targetPlatform: StandaloneLinux64
     steps:
@@ -142,12 +140,6 @@ jobs:
           cp tools/installer/linux/craquez.png "$D/craquez.png"
           tar czf Craquez-Linux.tar.gz -C build --transform 's,^StandaloneLinux64,Craquez,' StandaloneLinux64
           ls -la Craquez-Linux.tar.gz
-      - uses: actions/upload-artifact@v4
-        if: matrix.targetPlatform == 'StandaloneLinux64'
-        with:
-          name: Craquez-Linux
-          path: Craquez-Linux.tar.gz
-          retention-days: 14
       # roda o jogo (renderização por software) e tira screenshots de todas as telas e modos
       - name: Screenshots
         if: matrix.targetPlatform == 'StandaloneLinux64'
@@ -172,7 +164,7 @@ jobs:
           retention-days: 14
 
   # versão: com "[publicar]" na mensagem do commit (ou uma tag v*), cria a tag v<versão do projeto>
-  # e publica a Release com o APK, o .exe (zip + instalador) e o Linux
+  # e publica a Release só com o APK do Android (Windows/Linux suspensos até a aprovação)
   release:
     name: Publicar versão
     needs: [build]
@@ -204,9 +196,6 @@ jobs:
           ls -R art | head -50
           mkdir -p out
           find art/Craquez-Android -name "*.apk" -exec cp {} out/Craquez-${GITHUB_REF_NAME}.apk \;
-          (cd art/Craquez-Windows && zip -qr "$GITHUB_WORKSPACE/out/Craquez-${GITHUB_REF_NAME}-Windows.zip" .)
-          cp art/Craquez-Windows-Instalador/Craquez-Setup.exe "out/Craquez-${GITHUB_REF_NAME}-Instalador-Windows.exe"
-          cp art/Craquez-Linux/Craquez-Linux.tar.gz "out/Craquez-${GITHUB_REF_NAME}-Linux.tar.gz"
           ls -la out
       - uses: softprops/action-gh-release@v2
         with:
@@ -216,7 +205,54 @@ jobs:
           body_path: ${{ github.workspace }}/out/NOTAS.md
           files: |
             out/*.apk
-            out/*.zip
-            out/*.exe
-            out/*.tar.gz
           fail_on_unmatched_files: false
+
+  # versão "casa" (uso pessoal, sem fins comerciais): o mesmo APK com um option file de nomes reais
+  # (clubes, estádios e elencos) gerado aqui a partir da base pública transfermarkt-datasets. Como o
+  # repositório é público, o arquivo nunca é versionado nem vira artefato: o APK vai direto para um
+  # RASCUNHO de release, que só quem administra o repositório enxerga.
+  build-casa:
+    name: Build Android (casa)
+    needs: [check, license]
+    if: needs.license.outputs.ok == 'true' && (github.event_name == 'workflow_dispatch' || (github.event_name == 'push' && contains(github.event.head_commit.message, '[publicar]')))
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: jlumbroso/free-disk-space@v1.3.1
+        with:
+          android: true
+          large-packages: false
+      - uses: actions/checkout@v4
+        with:
+          lfs: true
+      - name: Option file casa (dados reais)
+        run: |
+          python3 tools/realdata/build_option_file.py Assets/Craquez/Resources/Data/option_file_casa.json .cache/realdata
+          sed -i 's/^  productName: Craquez$/  productName: Craquez Casa/; s/    Android: com.hellisonvidal.craquez$/    Android: com.hellisonvidal.craquez.casa/' ProjectSettings/ProjectSettings.asset
+      - uses: actions/cache@v4
+        with:
+          path: Library
+          key: Library-Android-${{ hashFiles('Packages/manifest.json', 'ProjectSettings/ProjectVersion.txt') }}
+          restore-keys: Library-Android-
+      - uses: game-ci/unity-builder@v4
+        env:
+          UNITY_LICENSE: ${{ secrets.UNITY_LICENSE }}
+          UNITY_EMAIL: ${{ secrets.UNITY_EMAIL }}
+          UNITY_PASSWORD: ${{ secrets.UNITY_PASSWORD }}
+        with:
+          targetPlatform: Android
+          buildName: CraquezCasa
+          versioning: None
+          androidExportType: androidPackage
+          allowDirtyBuild: true
+      - name: Rascunho de release (privado)
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          V=$(grep -m1 "bundleVersion:" ProjectSettings/ProjectSettings.asset | awk '{print $2}')
+          APK=$(find build/Android -name "*.apk" | head -1)
+          cp "$APK" "Craquez-Casa-v$V.apk"
+          gh release delete "casa-v$V" --yes --cleanup-tag 2>/dev/null || true
+          gh release create "casa-v$V" "Craquez-Casa-v$V.apk" --draft --target "$GITHUB_SHA" --title "Craquez Casa v$V (uso pessoal)" \
+            --notes "Versão para uso pessoal, sem fins comerciais: nomes reais de clubes, estádios e jogadores (base pública transfermarkt-datasets, jul/2026). Rascunho: visível só para quem administra o repositório. Não publique."

@@ -9,9 +9,9 @@ namespace Craquez
     /// </summary>
     public class WeatherFx : MonoBehaviour
     {
-        public static readonly string[] Kinds = { "sol", "nublado", "chuva", "tempestade", "neve" };
-        public static readonly string[] Labels = { "Ensolarado", "Nublado", "Chuva", "Tempestade", "Neve" };
-        static readonly string[] Messages = { "O tempo abriu", "O céu fechou", "Começou a chover", "Tempestade no estádio!", "Começou a nevar" };
+        public static readonly string[] Kinds = { "sol", "nublado", "chuva", "tempestade", "neve", "nevasca" };
+        public static readonly string[] Labels = { "Ensolarado", "Nublado", "Chuva", "Tempestade", "Neve", "Nevasca" };
+        static readonly string[] Messages = { "O tempo abriu", "O céu fechou", "Começou a chover", "Tempestade no estádio!", "Começou a nevar", "Nevasca! A neve cobre o campo" };
 
         public string kind = "sol";
         public bool dynamic;
@@ -75,14 +75,14 @@ namespace Craquez
             em.rateOverTime = 0f;
             return ps;
         }
-        float _cloud, _rainK, _snowK, _storm, _next, _flash, _thunder;
+        float _cloud, _rainK, _snowK, _storm, _next, _flash, _thunder, _windSet = -1f;
         System.Random _rng;
         bool _snowMode;
 
         public void Setup(string k, bool dyn, uint seed, Camera cam, Light sunLight, Material pitchMat)
         {
             kind = System.Array.IndexOf(Kinds, k) >= 0 ? k : "sol";
-            _snowMode = kind == "neve";
+            _snowMode = kind == "neve" || kind == "nevasca";
             dynamic = dyn;
             sun = sunLight;
             pitch = pitchMat;
@@ -96,8 +96,15 @@ namespace Craquez
             _cam = cam;
             _splash = Splashes();
             Target(out _cloud, out _rainK, out _snowK, out _storm);
+            // jogo que já começa na chuva/neve: o gramado já tem água/neve acumulada
+            // (chuva comum só molha o gramado: poças só de chuva forte que persiste ou temporal)
+            Water = kind == "tempestade" ? 0.62f : kind == "chuva" ? 0.12f : 0f;
+            SnowCover = kind == "nevasca" ? 0.8f : kind == "neve" ? 0.45f : 0f;
             Apply(0f);
         }
+
+        /// <summary>Água acumulada no gramado (0..1: as poças crescem com ela) e neve acumulada (0..1).</summary>
+        public float Water, SnowCover;
 
         ParticleSystem Particles(Camera cam, bool rain)
         {
@@ -112,7 +119,7 @@ namespace Craquez
             main.startLifetime = rain ? 1.1f : 7f;
             main.startSpeed = rain ? 28f : 1.2f;
             main.startSize = rain ? 0.018f : 0.09f;
-            main.maxParticles = rain ? 2500 : 1800;
+            main.maxParticles = rain ? 2500 : 4500;
             main.simulationSpace = ParticleSystemSimulationSpace.World;
             main.gravityModifier = rain ? 0.6f : 0.04f;
             main.startColor = rain ? new Color(0.82f, 0.87f, 0.95f, 0.6f) : new Color(1f, 1f, 1f, 0.9f);
@@ -150,6 +157,7 @@ namespace Craquez
                 case "chuva": cloud = 0.85f; rain = 0.65f; break;
                 case "tempestade": cloud = 1f; rain = 1f; storm = 1f; break;
                 case "neve": cloud = 0.75f; snow = 0.8f; break;
+                case "nevasca": cloud = 1f; snow = 1f; storm = 0.35f; break;   // vento forte, sem raios
             }
         }
 
@@ -163,7 +171,7 @@ namespace Craquez
                 if (_next <= 0f)
                 {
                     _next = 35f + (float)_rng.NextDouble() * 35f;
-                    string[] opts = _snowMode ? (kind == "neve" ? new[] { "nublado" } : new[] { "neve" })
+                    string[] opts = _snowMode ? (kind == "neve" ? new[] { "nublado", "nevasca" } : kind == "nevasca" ? new[] { "neve" } : new[] { "neve" })
                         : kind == "sol" ? new[] { "nublado" } : kind == "nublado" ? new[] { "sol", "chuva", "chuva" }
                         : kind == "chuva" ? new[] { "nublado", "tempestade", "nublado" } : new[] { "chuva" };
                     var nk = opts[_rng.Next(opts.Length)];
@@ -176,12 +184,36 @@ namespace Craquez
             }
             Target(out var tc, out var tr, out var ts, out var tst);
             float k = dt <= 0f ? 1f : Mathf.Min(1f, dt * 0.35f);   // transição de ~5 s
+            if (dt > 0f)
+            {
+                // a chuva enche o gramado aos poucos (temporal mais rápido) e ele seca devagar; a neve
+                // acumula enquanto neva e derrete devagar
+                // chuva comum (~0,65) enche bem devagar; temporal enche rápido; com sol as poças secam
+                // em ~2 min, nublado mais devagar
+                float gain = Mathf.Max(0f, _rainK - 0.55f) * 0.009f + (_snowK > 0.05f ? 0f : _storm * 0.004f);
+                float dry = (1f - Mathf.Clamp01(_rainK * 2f)) * (_cloud < 0.5f ? 0.006f : 0.0025f);
+                Water = Mathf.Clamp01(Water + dt * (gain - dry));
+                // neve: acumula enquanto neva (nevasca bem mais rápido) e derrete devagar sem neve
+                float sGain = _snowK * (0.0025f + _storm * 0.006f);
+                SnowCover = Mathf.Clamp01(SnowCover + dt * (sGain - 0.0012f * (1f - Mathf.Clamp01(_snowK * 3f))));
+            }
             _cloud = Mathf.Lerp(_cloud, tc, k);
             _rainK = Mathf.Lerp(_rainK, tr, k);
             _snowK = Mathf.Lerp(_snowK, ts, k);
             _storm = Mathf.Lerp(_storm, tst, k);
             SetEmit(_rain, _rainK > 0.08f, 1800 * _rainK);
-            SetEmit(_snow, _snowK > 0.08f, 300 * _snowK);
+            SetEmit(_snow, _snowK > 0.08f, 300 * _snowK * (1f + 3.5f * _storm));   // nevasca: muito mais flocos
+            if (_snow != null && _snowK > 0.05f && Mathf.Abs(_storm - _windSet) > 0.02f)
+            {
+                // nevasca: vento forte de lado (os flocos cruzam a tela)
+                _windSet = _storm;
+                var vol = _snow.velocityOverLifetime;
+                vol.enabled = _storm > 0.05f;
+                vol.space = ParticleSystemSimulationSpace.World;
+                vol.x = new ParticleSystem.MinMaxCurve(_storm * 7f);
+                vol.y = new ParticleSystem.MinMaxCurve(-_storm * 1.5f);
+                vol.z = new ParticleSystem.MinMaxCurve(_storm * 2f);
+            }
             SetEmit(_splash, _rainK > 0.1f, 900 * _rainK);
             if (_cam != null)
             {
@@ -214,8 +246,11 @@ namespace Craquez
                 if (_pitchBase[i].a <= 0f) _pitchBase[i] = pm.HasProperty("_BaseColor") ? pm.GetColor("_BaseColor") : Color.white;
                 var bc = _pitchBase[i];
                 var wet = new Color(bc.r * 0.8f, bc.g * 0.86f, bc.b * 0.8f, bc.a);
-                var c = Color.Lerp(bc, wet, _rainK);
-                if (_snowK > 0.01f) c = Color.Lerp(c, new Color(1.6f, 1.6f, 1.7f), _snowK * 0.7f);
+                // gramado molhado acompanha a água acumulada (seca devagar depois da chuva); a neve
+                // branqueia conforme acumula (a mesma que freia a bola na simulação)
+                var c = Color.Lerp(bc, wet, Mathf.Max(_rainK, Mathf.Clamp01(Water * 1.4f)));
+                float snowW = Mathf.Max(_snowK * 0.35f, SnowCover * 0.85f);
+                if (snowW > 0.01f) c = Color.Lerp(c, new Color(1.6f, 1.6f, 1.7f), snowW);
                 pm.SetColor("_BaseColor", c);
                 pm.SetFloat("_Smoothness", 0.15f);
             }
@@ -242,5 +277,6 @@ namespace Craquez
 
         public string Label => Labels[Mathf.Max(0, System.Array.IndexOf(Kinds, kind))];
         public float Rain => _rainK;
+        public float Storm => _storm;
     }
 }

@@ -344,7 +344,8 @@ namespace Craquez
         {
             if (st.scene == 0) return;
             var k = new PropKit((int)(seed % 9973) + st.scene * 31);
-            float r0 = hl + 7.5f + st.rows * 0.8f + 14f;
+            // (depois da esplanada, da avenida e do estacionamento do entorno)
+            float r0 = Mathf.Max(hl + 7.5f + st.rows * 0.8f + 14f, v.outerR + 8f);
             var ground = new MeshKit();
             Color gc = st.scene == 4 ? new Color(0.86f, 0.74f, 0.52f) : st.scene == 6 ? new Color(0.92f, 0.94f, 0.97f) : new Color(0.3f, 0.45f, 0.24f);
             ground.Quad(new Vector3(-500, -0.05f, -500), new Vector3(-500, -0.05f, 500), new Vector3(500, -0.05f, 500), new Vector3(500, -0.05f, -500), new Vector2(0, 0), new Vector2(60, 60));
@@ -405,7 +406,7 @@ namespace Craquez
                 case 5:
                 {
                     var river = new MeshKit();
-                    float x0 = hl + 7.5f + st.rows * 0.8f + 18f;
+                    float x0 = hl + 9f + st.rows * 0.8f + 2f + 22f + 12f + 6f;   // depois da avenida
                     river.Quad(new Vector3(x0, -0.02f, -400f), new Vector3(x0, -0.02f, 400f), new Vector3(x0 + 60f, -0.02f, 400f), new Vector3(x0 + 60f, -0.02f, -400f));
                     river.Object("Rio", Gfx.Lit(night ? new Color(0.03f, 0.07f, 0.1f) : new Color(0.16f, 0.38f, 0.42f), null, 0.9f), v.root, false);
                     var bridge = new MeshKit();

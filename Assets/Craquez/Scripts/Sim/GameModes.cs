@@ -107,7 +107,7 @@ namespace Craquez.Sim
                     id = Society, length = 50, width = 30, goalWidth = 5, goalHeight = 2.2f, goalDepth = 1.4f,
                     keeper = true, walls = false, wallBounce = 0, boxDepth = 8, boxHalf = 10, penaltyDist = 9,
                     offside = false, centerR = 5, restartDist = 5,
-                    rollDecel = 1.05f, groundDrag = 0.005f, airDrag = 0.014f, bounce = 0.55f,
+                    rollDecel = 1.05f, groundDrag = 0.005f, airDrag = 0.014f, bounce = 0.62f,
                     surface = "synthetic", runMargin = 2, formation = Formations(Society)["3-2-1"],
                 };
             if (id == Futsal)
@@ -116,7 +116,7 @@ namespace Craquez.Sim
                     id = Futsal, length = 40, width = 20, goalWidth = 3, goalHeight = 2, goalDepth = 1,
                     keeper = true, walls = false, wallBounce = 0, boxDepth = 6, boxHalf = 8, penaltyDist = 6,
                     offside = false, centerR = 3, restartDist = 5,
-                    rollDecel = 0.75f, groundDrag = 0.004f, airDrag = 0.016f, bounce = 0.45f,
+                    rollDecel = 0.75f, groundDrag = 0.004f, airDrag = 0.016f, bounce = 0.56f,
                     surface = "wood", runMargin = 1, formation = Formations(Futsal)["2-1-1"],
                 };
             if (id == Street)
@@ -126,7 +126,7 @@ namespace Craquez.Sim
                     goalWidth = players >= 5 ? 3f : 2.6f, goalHeight = players >= 5 ? 1.6f : 1.4f, goalDepth = 0.8f,
                     keeper = false, walls = true, wallBounce = 0.72f, boxDepth = 0, boxHalf = 0, penaltyDist = 0,
                     offside = false, centerR = 2.5f, restartDist = 3,
-                    rollDecel = 0.95f, groundDrag = 0.006f, airDrag = 0.014f, bounce = 0.68f,
+                    rollDecel = 0.95f, groundDrag = 0.006f, airDrag = 0.014f, bounce = 0.78f,
                     surface = "asphalt", runMargin = 0, formation = Formations(Street)[StreetDefault(players)],
                 };
             return new ModeDef
@@ -134,7 +134,7 @@ namespace Craquez.Sim
                 id = Field, length = 105, width = 68, goalWidth = 7.32f, goalHeight = 2.44f, goalDepth = 2,
                 keeper = true, walls = false, wallBounce = 0, boxDepth = 16.5f, boxHalf = 20.15f, penaltyDist = 11,
                 offside = true, centerR = 9.15f, restartDist = 9.15f,
-                rollDecel = 1.25f, groundDrag = 0.006f, airDrag = 0.013f, bounce = 0.58f,
+                rollDecel = 1.25f, groundDrag = 0.006f, airDrag = 0.013f, bounce = 0.63f,
                 surface = "grass", runMargin = 3, formation = Formations(Field)["4-4-2"],
             };
         }

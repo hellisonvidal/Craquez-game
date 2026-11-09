@@ -128,6 +128,9 @@ namespace Craquez
         readonly Vector3[] _targets = new Vector3[7];
         readonly System.Collections.Generic.List<Vector3> _tList = new System.Collections.Generic.List<Vector3>();
 
+        /// <summary>Tomadas de fora do estádio: nada some (a fachada e o entorno são o assunto).</summary>
+        public bool showAll;
+
         void UpdateOccluders(Vector3 focus)
         {
             if (_occ.Count == 0) return;
@@ -171,8 +174,8 @@ namespace Craquez
                 var r = _occ[i];
                 if (r == null) continue;
                 var b = r.bounds;
-                bool block = InFrontOfField(b, c, fwd, dmin, sx0, sy0, sx1, sy1);
-                if (!block) foreach (var t in _tList)
+                bool block = !showAll && InFrontOfField(b, c, fwd, dmin, sx0, sy0, sx1, sy1);
+                if (!block && !showAll) foreach (var t in _tList)
                 {
                     var d = t - c;
                     float len = d.magnitude;
@@ -180,10 +183,13 @@ namespace Craquez
                     if (b.Contains(c) || (b.IntersectRay(new Ray(c, d / len), out float hit) && hit < len - 0.5f)) { block = true; break; }
                 }
                 // colado na câmera (poste, mureta, alambrado) também some
-                if (!block && b.SqrDistance(c) < 25f) block = true;
+                if (!block && !showAll && b.SqrDistance(c) < 25f) block = true;
                 if (block == _occHidden[i]) continue;
                 _occHidden[i] = block;
-                r.shadowCastingMode = block ? UnityEngine.Rendering.ShadowCastingMode.ShadowsOnly : _occMode[i];
+                // escondido: quem já fazia sombra continua fazendo (só a sombra); quem não fazia some de vez
+                // (antes passava a projetar sombra: treliças e vigas do lado da câmera riscavam a quadra)
+                if (_occMode[i] == UnityEngine.Rendering.ShadowCastingMode.Off) r.forceRenderingOff = block;
+                else r.shadowCastingMode = block ? UnityEngine.Rendering.ShadowCastingMode.ShadowsOnly : _occMode[i];
             }
         }
 

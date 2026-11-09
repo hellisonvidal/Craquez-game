@@ -22,6 +22,8 @@ namespace Craquez
         public bool dynamicWeather = true;
         public int streetPlayers = 3;    // rua: 3x3, 4x4 ou 5x5
         public int stadium;              // campo: 0 = estádio do mandante; 1.. = modelos
+        public bool training;            // arena de treino: atacante x goleiro, sem relógio
+        public bool toss = true;         // sorteio do juiz: lados e saída aleatórios
         public bool swapSides;           // trocar os campos: o mandante começa atacando para a esquerda
         public int venue;                // futsal/rua: qual quadra/rua
         public uint seed = 1;
@@ -56,6 +58,13 @@ namespace Craquez
             set { PlayerPrefs.SetInt("player_tags", value); PlayerPrefs.Save(); }
         }
         public static readonly string[] PlayerTagNames = { "Controlados e bola", "Todos", "Desligado" };
+
+        /// <summary>Faixa no rodapé com a escalação dos dois times (número e nome; destaca quem está com a bola).</summary>
+        public static bool LineupBar
+        {
+            get => PlayerPrefs.GetInt("lineup_bar", 1) == 1;
+            set { PlayerPrefs.SetInt("lineup_bar", value ? 1 : 0); PlayerPrefs.Save(); }
+        }
 
         public static bool Vibration
         {

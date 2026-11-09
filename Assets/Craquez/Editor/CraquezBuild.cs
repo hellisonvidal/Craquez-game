@@ -219,10 +219,15 @@ namespace Craquez.EditorTools
             else AssetDatabase.CreateAsset(m, path);
         }
 
+        static bool Casa => File.Exists("Assets/Craquez/Resources/Data/option_file_casa.json");
+
         static void Common()
         {
             PlayerSettings.companyName = "Craquez";
-            PlayerSettings.productName = "Craquez";
+            // versão "casa" (uso pessoal, option file com dados reais gerado no CI): outro nome e outro
+            // identificador, para instalar ao lado da versão normal
+            PlayerSettings.productName = Casa ? "Craquez Casa" : "Craquez";
+            if (Casa) PlayerSettings.SetApplicationIdentifier(NamedBuildTarget.Android, "com.hellisonvidal.craquez.casa");
             PlayerSettings.defaultInterfaceOrientation = UIOrientation.LandscapeLeft;
             PlayerSettings.allowedAutorotateToPortrait = false;
             PlayerSettings.allowedAutorotateToPortraitUpsideDown = false;
@@ -274,7 +279,7 @@ namespace Craquez.EditorTools
             PlayerSettings.SetScriptingBackend(NamedBuildTarget.Android, ScriptingImplementation.IL2CPP);
             PlayerSettings.Android.targetArchitectures = AndroidArchitecture.ARM64;
             PlayerSettings.Android.minSdkVersion = AndroidSdkVersions.AndroidApiLevel26;
-            PlayerSettings.SetApplicationIdentifier(NamedBuildTarget.Android, "com.hellisonvidal.craquez");
+            PlayerSettings.SetApplicationIdentifier(NamedBuildTarget.Android, Casa ? "com.hellisonvidal.craquez.casa" : "com.hellisonvidal.craquez");
             EditorUserBuildSettings.buildAppBundle = false;
             Run(BuildTarget.Android, BuildTargetGroup.Android, Out("Builds/Android/Craquez.apk"));
         }

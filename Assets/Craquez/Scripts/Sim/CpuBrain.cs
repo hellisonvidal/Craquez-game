@@ -10,7 +10,7 @@ namespace Craquez.Sim
     {
         public int team;
         public float skill;
-        int _holdBtn, _holdTicks, _cooldown, _skillCd, _carryT;
+        int _holdBtn, _holdTicks, _cooldown, _skillCd, _carryT, _gkFeetT;
         Vector2 _carry;
         bool _finesse;
 
@@ -174,6 +174,27 @@ namespace Craquez.Sim
                 }
                 return f;
             }
+            if (sim.ball.owner != p.id || !p.isKeeper) _gkFeetT = 0;
+            if (sim.ball.owner == p.id && p.isKeeper && !p.InHands)
+            {
+                // goleiro com a bola nos pés: passe para quem está livre e com a linha aberta, ou
+                // lançamento para o mais sozinho lá na frente — nunca sai driblando nem chuta a esmo
+                if (_holdBtn != 0 || _cooldown > 0) return f;
+                _gkFeetT++;
+                var m = sim.KeeperFootChoice(p, _gkFeetT > (sim.mode.id == GameModes.Futsal ? 8 : 70), Noise(sim, 61), out int how);
+                if (how < 0) return f;   // espera um companheiro se desmarcar (até ~1 s)
+                _gkFeetT = 0;
+                if (how != 0 && sim.mode.id == GameModes.Futsal)
+                {
+                    // quadra: sem ninguém livre de verdade, o melhor passe possível (linha aberta) rente ao chão
+                    var o2 = BestOption(sim, p, out float s2);
+                    if (o2 != null && s2 > 0f) { m = o2; how = 0; }
+                }
+                f.move = m != null ? (m.position - p.position).Norm() : new Vector2(dir, 0f);
+                if (how == 0) Press(ref f, InputFrame.Pass, 8);
+                else Press(ref f, InputFrame.Lob, how == 1 ? 26 : 14);
+                return f;
+            }
             if (sim.ball.owner == p.id)
             {
                 var goal = new Vector2(sim.halfLen * dir, 0f);
@@ -234,15 +255,36 @@ namespace Craquez.Sim
                 {
                     float shootRange = sim.halfLen * Mathf.Lerp(0.4f, 0.55f, skill) * (0.72f + 0.45f * sty.shooter + 0.15f * sty.risk) * (p.Has(Trait.LongaDistancia) ? 1.2f : 1f);
                     var option = BestOption(sim, p, out float optScore);
-                    if (toGoal.magnitude < shootRange && Mathf.Abs(p.position.y) < sim.halfW * 0.7f)
+                    // cara a cara (ninguém de linha entre ele e o gol nem chegando): conduz até perto e só
+                    // então finaliza, ou quando o goleiro sai em cima (antes chutava de ~20 m sozinho)
+                    bool alone = true;
+                    foreach (var o in sim.players)
+                    {
+                        if (o.team == p.team || o.isKeeper || o.sentOff) continue;
+                        var ro = o.position - p.position;
+                        if (ro.magnitude < 4.5f || ((o.position.x - p.position.x) * dir > -1f && ro.magnitude < toGoal.magnitude)) { alone = false; break; }
+                    }
+                    SimPlayer gkO = null;
+                    foreach (var k in sim.players) if (k.isKeeper && k.team != team) gkO = k;
+                    float gkD = gkO != null ? gkO.position.Dist(p.position) : 99f;
+                    bool fieldM = sim.mode.id == GameModes.Field;
+                    float finish = fieldM ? 11.5f : sim.halfLen * 0.38f;
+                    bool holdOn = alone && sim.mode.keeper && toGoal.magnitude > finish && gkD > (fieldM ? 10.5f : sim.mode.id == GameModes.Futsal ? 6.5f : 6.8f);
+                    if (holdOn)
+                    {
+                        f.move = toGoal.Norm();
+                        f.buttons |= InputFrame.Sprint;
+                    }
+                    else if (toGoal.magnitude < shootRange && Mathf.Abs(p.position.y) < sim.halfW * 0.7f)
                     {
                         // mira o canto longe do goleiro
                         float side = Noise(sim, 1) > 0.5f ? 1f : -1f;
                         foreach (var k in sim.players)
                             if (k.isKeeper && k.team != team) side = k.position.y > 0.2f ? -1f : k.position.y < -0.2f ? 1f : side;
                         f.move = new Vector2(dir, side * 0.6f);
-                        Press(ref f, InputFrame.Shoot, (int)Mathf.Lerp(18f, 40f, toGoal.magnitude / shootRange));
-                        _finesse = Noise(sim, 13) < 0.25f + skill * 0.2f;
+                        // cara a cara: finalização rápida e colocada (antes carregava o chute na cara do goleiro)
+                        Press(ref f, InputFrame.Shoot, alone ? (fieldM ? 15 : 10) + (int)(Noise(sim, 12) * (fieldM ? 9f : 6f)) : (int)Mathf.Lerp(18f, 40f, toGoal.magnitude / shootRange));
+                        _finesse = Noise(sim, 13) < (alone ? 0.4f : 0.25f + skill * 0.2f);
                         if (_finesse) f.buttons |= InputFrame.Finesse;
                     }
                     else if (option != null && optScore > 2.2f - sty.passer * 0.6f && oppD > 2.2f && Noise(sim, 14) < (0.03f + skill * 0.03f) * (0.4f + sty.passer * 1.2f) * (1.2f - sty.dribble * 0.5f))

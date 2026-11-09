@@ -110,6 +110,19 @@ namespace Craquez
                 yield return new WaitForSecondsRealtime(1f);
                 yield return Shot(tag + "_inicio", 2.5f);
                 yield return Shot(tag + "_jogo", 6f);
+                if (weather == "chuva" && mc != null && mc.sim.puddles.Count > 0)
+                {
+                    // poça de perto: anéis da chuva e o reflexo
+                    var bc = mc.view.bcam;
+                    var pd = mc.sim.puddles[0];
+                    bc.cinematic = true;
+                    bc.cam.transform.position = bc.cinePos = new Vector3(pd.x + 5f, 2.6f, pd.y - 5f);
+                    bc.cineLook = new Vector3(pd.x, 0f, pd.y);
+                    bc.cam.transform.LookAt(bc.cineLook);
+                    bc.cam.fieldOfView = bc.cineFov = 45f;
+                    yield return Shot(tag + "_poca", 1.2f);
+                    bc.cinematic = false;
+                }
                 // close em um atleta (verifica corpo, uniforme e animação)
                 if (mc != null && mc.view != null && mc.view.athletes.Count > 3)
                 {
@@ -131,6 +144,43 @@ namespace Craquez
                     bc.cinematic = false;
                 }
                 yield return Shot(tag + "_jogo2", 3f);
+                if (mc != null && mc.view != null && (tag == "campo_noite" || tag == "futsal"))
+                {
+                    // sequência da corrida: tempo fixo por quadro (1/30 s) e câmera de lado acompanhando o
+                    // atleta mais rápido no momento (dá para montar um GIF e ver a passada)
+                    var bc = mc.view.bcam;
+                    // espera alguém em corrida de verdade (rápido e sem marcar ninguém)
+                    AthleteView best = null; float bv = 0f;
+                    for (int tries = 0; tries < 90 && bv < 5.5f; tries++)
+                    {
+                        foreach (var av in mc.view.athletes)
+                            if (!av.p.isKeeper && !av.p.shielding && av.p.vel.magnitude > bv) { bv = av.p.vel.magnitude; best = av; }
+                        if (bv < 5.5f) { bv = 0f; yield return null; }
+                    }
+                    if (best != null)
+                    {
+                        Time.captureFramerate = 30;
+                        bc.cinematic = true;
+                        for (int f = 0; f < 36; f++)
+                        {
+                            var pp = best.transform.position;
+                            var side = Quaternion.Euler(0, 90, 0) * new Vector3(best.p.vel.x, 0f, best.p.vel.y).normalized;
+                            if (side.sqrMagnitude < 0.01f) side = Vector3.right;
+                            bc.cam.transform.position = bc.cinePos = pp + side * 7f + Vector3.up * 1.0f;
+                            bc.cineLook = pp + Vector3.up * 0.9f;
+                            bc.cam.transform.LookAt(bc.cineLook);
+                            bc.cam.fieldOfView = bc.cineFov = 30f;
+                            yield return new WaitForEndOfFrame();
+                            _n++;
+                            var tex = ScreenCapture.CaptureScreenshotAsTexture();
+                            File.WriteAllBytes(Path.Combine(Dir, $"{tag}_corrida_{f:00}.png"), tex.EncodeToPNG());
+                            Destroy(tex);
+                            yield return null;
+                        }
+                        Time.captureFramerate = 0;
+                        bc.cinematic = false;
+                    }
+                }
                 if (mc != null && tag == "campo_noite")
                 {
                     // defesas: chute de média distância no canto (mergulho) e outro na altura do peito (encaixe)
@@ -158,6 +208,38 @@ namespace Craquez
                         yield return Shot(nm + "2", 0.35f);
                         bcK.cinematic = false;
                         yield return new WaitForSecondsRealtime(1.5f);
+                    }
+                    // chute de verdade (do pé do atacante) e a reação do goleiro, quadro a quadro (1/30 s)
+                    {
+                        float gxS = sim.halfLen;
+                        SimPlayer gkS = null, att = null;
+                        foreach (var q in sim.players) if (q.isKeeper && Mathf.Sign(-sim.halfLen * sim.TeamDir(q.team)) == 1f) gkS = q;
+                        if (gkS != null) foreach (var q in sim.players) if (q.team != gkS.team && !q.isKeeper) { att = q; break; }
+                        if (gkS != null && att != null)
+                        {
+                            foreach (var q in sim.players) if (q != gkS && q != att) q.position = new Vector2(-sim.halfLen * 0.4f, q.position.y * 0.5f);
+                            gkS.position = new Vector2(gxS - 1.2f, 0f); gkS.vel = Vector2.zero; gkS.saveKind = 0;
+                            att.position = new Vector2(gxS - 17f, -4f); att.vel = new Vector2(3f, 0.5f); att.facing = new Vector2(1f, 0.25f).normalized;
+                            sim.ball.owner = att.id; sim.ball.pos = att.position + att.facing * 0.45f; sim.ball.vel = att.vel; sim.ball.z = 0f;
+                            sim.TourShoot(att, new Vector2(1f, 0.32f).normalized, 0.75f);
+                            Time.captureFramerate = 30;
+                            bcK.cinematic = true;
+                            bcK.cam.transform.position = bcK.cinePos = new Vector3(gxS - 9f, 3.2f, -15f);
+                            bcK.cineLook = new Vector3(gxS - 8f, 0.9f, 0f);
+                            bcK.cam.transform.LookAt(bcK.cineLook);
+                            bcK.cam.fieldOfView = bcK.cineFov = 52f;
+                            for (int f = 0; f < 30; f++)
+                            {
+                                yield return new WaitForEndOfFrame();
+                                var tex = ScreenCapture.CaptureScreenshotAsTexture();
+                                File.WriteAllBytes(Path.Combine(Dir, $"chute_defesa_{f:00}.png"), tex.EncodeToPNG());
+                                Destroy(tex);
+                                yield return null;
+                            }
+                            Time.captureFramerate = 0;
+                            bcK.cinematic = false;
+                            yield return new WaitForSecondsRealtime(1.5f);
+                        }
                     }
                     // gol forçado: bola entrando no canto (rede balançando) e a comemoração sem corte
                     sim.ball.owner = -1;
@@ -203,6 +285,24 @@ namespace Craquez
                     bc.cam.transform.LookAt(bc.cineLook);
                     bc.cam.fieldOfView = bc.cineFov = 62f;
                     yield return Shot("estadio_" + m, 1.2f);
+                    // de fora: vista aérea do entorno e a esplanada na altura de quem chega
+                    if (m == 1 || m == 2 || m == 6 || m == 13)
+                    {
+                        bc.showAll = true;
+                        bc.cam.transform.position = bc.cinePos = new Vector3(-hl * 1.4f, 70f, -hw * 3.6f);
+                        bc.cineLook = new Vector3(0f, 0f, 0f);
+                        bc.cam.transform.LookAt(bc.cineLook);
+                        bc.cam.fieldOfView = bc.cineFov = 55f;
+                        yield return Shot("estadio_" + m + "_aereo", 1.2f);
+                        float pzv = mc.view.venue.plazaZ;
+                        bc.cam.transform.position = bc.cinePos = new Vector3(hl * 0.35f, 1.7f, -(pzv + 9f));
+                        bc.cineLook = new Vector3(0f, 7f, -(pzv - 11f));
+                        bc.cam.transform.LookAt(bc.cineLook);
+                        bc.cam.fieldOfView = bc.cineFov = 60f;
+                        yield return Shot("estadio_" + m + "_esplanada", 1f);
+                        bc.showAll = false;
+                        bc.cam.fieldOfView = bc.cineFov = 62f;
+                    }
                     bc.cam.transform.position = bc.cinePos = new Vector3(0f, 3f, -hw - 2f);
                     bc.cineLook = new Vector3(hl * 0.9f, 7f, 0f);
                     bc.cam.transform.LookAt(bc.cineLook);

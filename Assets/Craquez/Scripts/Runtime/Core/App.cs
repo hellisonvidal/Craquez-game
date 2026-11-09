@@ -629,6 +629,7 @@ namespace Craquez
             _modeButtons[GameModes.Futsal] = BigCard(grid, "FUTSAL", "5 x 5", "Quadra  •  " + VenueBuilder.FutsalNames.Length + " ginásios", ModeArt(MenuArt.Kind.Futsal), 512f / 560f, new Color(0.96f, 0.62f, 0.04f), () => ShowKind(GameModes.Futsal));
             _modeButtons[GameModes.Society] = BigCard(grid, "SOCIETY", "7 x 7", "Grama sintética  •  " + VenueBuilder.SocietyNames.Length + " campos", ModeArt(MenuArt.Kind.Society), 512f / 560f, new Color(0.02f, 0.71f, 0.83f), () => ShowKind(GameModes.Society));
             _modeButtons[GameModes.Street] = BigCard(grid, "RUA", "3 A 5 POR LADO", "Times de rua  •  " + VenueBuilder.StreetNames.Length + " ruas", ModeArt(MenuArt.Kind.Street), 512f / 560f, new Color(0.93f, 0.28f, 0.6f), () => { _lastMode = GameModes.Street; Choose(GameModes.Street, false); });
+            _modeButtons["treino"] = BigCard(grid, "TREINO", "ARENA", "Você contra o goleiro  •  chute à vontade", ModeArt(MenuArt.Kind.Field), 512f / 560f, new Color(0.55f, 0.42f, 0.95f), () => { _lastMode = "treino"; StartTraining(); });
             UiKit.Select(_lastMode != null && _modeButtons.TryGetValue(_lastMode, out var lb) && lb != null ? lb : first);
         }
 
@@ -733,8 +734,8 @@ namespace Craquez
         static readonly string[] SideOpts = { "Você x CPU", "Você x Amigo (local)", "CPU x CPU (assistir)" };
         static readonly string[] DiffOpts = { "Amador", "Profissional", "Craque", "Lenda" };
         static readonly float[] DiffVals = { 0.3f, 0.55f, 0.75f, 0.95f };
-        static readonly string[] WeatherOpts = { "Ensolarado", "Nublado", "Chuva", "Tempestade", "Neve", "Aleatório" };
-        static readonly string[] WeatherIds = { "sol", "nublado", "chuva", "tempestade", "neve", "aleatorio" };
+        static readonly string[] WeatherOpts = { "Ensolarado", "Nublado", "Chuva", "Tempestade", "Neve", "Nevasca", "Aleatório" };
+        static readonly string[] WeatherIds = { "sol", "nublado", "chuva", "tempestade", "neve", "nevasca", "aleatorio" };
         static readonly string[] TodOpts = { "Dia", "Fim de tarde", "Noite" };
         static readonly string[] TodIds = { "dia", "tarde", "noite" };
 
@@ -759,7 +760,7 @@ namespace Craquez
                 UiKit.Size(UiKit.Cycler(list, "Clima", WeatherOpts, Mathf.Max(0, System.Array.IndexOf(WeatherIds, _cfg.weather)), i => _cfg.weather = WeatherIds[i]), 50, 50);
                 UiKit.Size(UiKit.Cycler(list, "Clima dinâmico", new[] { "Ligado", "Desligado" }, _cfg.dynamicWeather ? 0 : 1, i => _cfg.dynamicWeather = i == 0), 50, 50);
             }
-            UiKit.Size(UiKit.Cycler(list, "Lado do campo", new[] { "Mandante ataca  ›", "‹  Mandante ataca" }, _cfg.swapSides ? 1 : 0, i => _cfg.swapSides = i == 1), 50, 50);
+            UiKit.Size(UiKit.Cycler(list, "Lado do campo", new[] { "Sorteio do juiz", "Mandante ataca  ›", "‹  Mandante ataca" }, _cfg.toss ? 0 : _cfg.swapSides ? 2 : 1, i => { _cfg.toss = i == 0; _cfg.swapSides = i == 2; }), 50, 50);
             UiKit.Size(UiKit.Cycler(list, "Horário", TodOpts, Mathf.Max(0, System.Array.IndexOf(TodIds, _cfg.timeOfDay)), i => { _cfg.timeOfDay = TodIds[i]; _refreshVenue?.Invoke(); }), 50, 50);
             UiKit.Size(UiKit.Cycler(list, "Dificuldade", DiffOpts, Mathf.Max(0, System.Array.IndexOf(DiffVals, _cfg.difficulty)), i => _cfg.difficulty = DiffVals[i]), 50, 50);
             var mins = new List<string>();
@@ -823,7 +824,17 @@ namespace Craquez
                 int vi = VenueIdx();
                 venueCount.text = (vi + 1) + " / " + VenueCount();
                 venueTex = MenuArt.Venue(_cfg.mode, vi, home != null ? home.c1 : Theme.Accent);
-                venueImg.texture = venueTex;
+                // foto de verdade do local, de fora (montada fora da vista na primeira vez; até lá, o desenho)
+                var shot = VenueShot.Cached(_cfg.mode, vi, _cfg.teamA);
+                venueImg.texture = shot != null ? shot : venueTex;
+                if (shot == null)
+                {
+                    string modeAt = _cfg.mode;
+                    StartCoroutine(VenueShot.Render(_cfg.mode, vi, _cfg.teamA, _cfg.teamB, _cfg.streetPlayers, tex =>
+                    {
+                        if (venueImg != null && _cfg.mode == modeAt && VenueIdx() == vi) venueImg.texture = tex;
+                    }));
+                }
                 // de noite, o desenho escurece e azula
                 venueImg.color = _cfg.timeOfDay == "noite" ? new Color(0.55f, 0.62f, 0.85f) : _cfg.timeOfDay == "tarde" ? new Color(1f, 0.86f, 0.72f) : Color.white;
                 venueName.text = _cfg.mode != GameModes.Field ? VenueNames(_cfg.mode)[_cfg.venue % VenueNames(_cfg.mode).Length]
@@ -1409,7 +1420,7 @@ namespace Craquez
                     Add(UiKit.Cycler(list, "Zoom da câmera", BroadcastCamera.Zooms, Settings.CameraZoom + 2, i => Settings.CameraZoom = i - 2));
                     break;
                 case 2:
-                    Add(UiKit.Cycler(list, "Nomes dos atletas", Settings.PlayerTagNames, Settings.PlayerTags, i => Settings.PlayerTags = i));
+                    Add(UiKit.Cycler(list, "Escalações no rodapé", new[] { "Ligado", "Desligado" }, Settings.LineupBar ? 0 : 1, i => Settings.LineupBar = i == 0));
                     Add(UiKit.Cycler(list, "Faltas", new[] { "Cena antes da cobrança", "Cobrança rápida" }, Settings.QuickRestarts ? 1 : 0, i => { Settings.QuickRestarts = i == 1; _cfg.quickRestarts = i == 1; }));
                     break;
                 case 4:
@@ -1470,6 +1481,35 @@ namespace Craquez
         void ShowOptionFile() => ShowOptions(4, false);
 
         // ------------------------------------------------------------ partida
+        /// <summary>
+        /// Arena de treino: você conduz um atacante contra o goleiro, no campo do seu time; a cada chute
+        /// (gol, defesa ou bola fora) uma bola nova aparece no seu pé em outro ponto. Sem relógio.
+        /// </summary>
+        void StartTraining()
+        {
+            var c = _cfg;
+            _trainBak = (c.mode, c.national, c.teamB, c.tacticsA, c.tacticsB, c.timeOfDay, c.weather, c.ceremony, c.minutes, c.sideA, c.sideB, c.stadium, c.toss);
+            if (Teams.Get(c.teamA) == null || Teams.Get(c.teamA).IsNational) c.teamA = 0;
+            c.mode = GameModes.Field; c.national = false;
+            if (c.teamB == c.teamA) c.teamB = c.teamA + 1;
+            c.tacticsA = new Tactics(); c.tacticsB = new Tactics();
+            c.timeOfDay = "dia"; c.weather = "sol"; c.ceremony = false; c.minutes = 45;
+            c.sideA = Side.Player1; c.sideB = Side.Cpu; c.stadium = 0; c.toss = false;
+            c.training = true;
+            StartMatch();
+        }
+
+        (string mode, bool national, int teamB, Tactics ta, Tactics tb, string tod, string weather, bool ceremony, int minutes, Side sa, Side sb, int stadium, bool toss) _trainBak;
+
+        void EndTraining()
+        {
+            var c = _cfg;
+            if (!c.training) return;
+            c.training = false;
+            (c.mode, c.national, c.teamB, c.tacticsA, c.tacticsB, c.timeOfDay, c.weather, c.ceremony, c.minutes, c.sideA, c.sideB, c.stadium, c.toss) = _trainBak;
+        }
+
+
         void StartMatch()
         {
             Sfx.MenuMusic(false);
@@ -1486,7 +1526,7 @@ namespace Craquez
             var go = new GameObject("Partida");
             go.transform.SetParent(transform, false);
             _match = go.AddComponent<MatchController>();
-            _match.onExit = () => { EndMatch(); ShowPlay(); };
+            _match.onExit = () => { EndMatch(); EndTraining(); ShowPlay(); };
             _match.onRestart = c => { EndMatch(); StartMatch(); };
             _match.Begin(_cfg, cam);
         }

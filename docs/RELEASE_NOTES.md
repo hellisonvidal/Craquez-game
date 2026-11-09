@@ -1,13 +1,100 @@
-## Craquez 2.4.1
+## Craquez 2.6.0
 
-Jogo de futebol feito 100% com inteligência artificial, **gratuito**. Android, Windows e Linux.
+Jogo de futebol feito 100% com inteligência artificial, **gratuito**. Por enquanto, só Android.
 
-### Downloads
-- **Android**: `Craquez-v2.4.1.apk` (instale permitindo "fontes desconhecidas")
-- **Windows**: `Craquez-v2.4.1-Instalador-Windows.exe` (instalador) ou `Craquez-v2.4.1-Windows.zip` (portátil)
-- **Linux**: `Craquez-v2.4.1-Linux.tar.gz` → extraia e rode `./Craquez` (ou `./instalar.sh` para o atalho no menu)
+### Download
+- **Android**: `Craquez-v2.6.0.apk` (instale permitindo "fontes desconhecidas")
 
 ### Novidades
+- **Arena de treino** (novo cartão TREINO em Jogar): você conduz um atacante contra o goleiro, sem
+  relógio; a cada gol, defesa ou bola fora, uma bola nova aparece no seu pé em outro ponto.
+- **Sorteio do juiz**: lados e saída de bola decididos na moeda, com o juiz e os capitães no círculo
+  central durante a cerimônia (opção "Lado do campo": sorteio ou fixo).
+- **Seletor de locais com foto de verdade**, vista de fora (estádios, ginásios, society e ruas); os
+  ginásios ganharam o lado de fora (paredes com a faixa do clube, janelas altas, telhado em arco,
+  marquise, calçada e estacionamento).
+- **Tiro de meta sem corte**: o goleiro olha a bola sair, vai buscá-la (ou pega outra no cone atrás
+  do gol), traz nas mãos, coloca na marca e cobra. **Cones com bolas de reposição** em volta do campo.
+- **Reposição com as mãos por combinação de botões**: Passe = rolada; Passe + Colocado = por cima,
+  curto; Alto = arremesso longo; Enfiada = arremesso rápido (contra-ataque); Chute = chutão;
+  Chute + Colocado = bate-pronto baixo; Proteger + Passe = solta a bola no pé (dica na tela). A CPU
+  também usa o arremesso rápido no contra-ataque.
+- **Goleiro no tempo certo**: arma a defesa em cima da hora conforme a distância da bola (bola no
+  corpo, sem pular; salto só acima da cabeça) e reage ao chute como gente (cara a cara mantido em ~40%).
+- **Goleiro se ajeitando** com passadas curtas e joelhos dobrados (as pernas não entortam mais).
+- **Faltas mais reais**: a vítima sente a pancada e às vezes um companheiro (ou quem fez a falta) vem
+  dar a mão para levantar.
+- **Contato físico**: na trombada, quem perde o choque é jogado para longe do contato e se recupera;
+  ombro a ombro em velocidade, os dois inclinam um contra o outro.
+- **Jogadores fora da jogada** andam ou trotam até a posição e param sem ficar "acertando" o lugar
+  (antes corriam o tempo todo e trocavam de direção a cada instante).
+- **Banco vivo**: técnicos acompanhando o lance na área técnica e orientando o time; reservas de
+  colete aquecendo atrás dos gols.
+- **Traves refinadas** (tubos elípticos, suportes curvos por fora da rede no campo e no society).
+- **Chuva, poças e nevasca**: poças só com chuva forte que persiste ou temporal (secam com sol;
+  chuva comum só deixa a bola mais rápida), sem os "ladrilhos" sobre elas; a bola para dentro d'água;
+  novo clima **Nevasca** com neve densa, vento e campo coberto.
+- **HUD**: só o quadro de quem está com a bola (mandante à esquerda, visitante à direita), sem nomes
+  sobre a cabeça; escalações no rodapé.
+- **Bola no gramado**: sombra de contato do tamanho da bola (a mancha grande fazia a bola parecer
+  afundada).
+- **Sem riscos escuros na quadra/campo** (sombra de estruturas que somem para não tapar a câmera) e
+  **sem papel picado** na comemoração.
+
+## Versão 2.5.0
+
+Jogo de futebol feito 100% com inteligência artificial, **gratuito**. Por enquanto, só Android.
+
+### Download
+- **Android**: `Craquez-v2.5.0.apk` (instale permitindo "fontes desconhecidas")
+
+### Novidades
+- **Corrida de verdade**: as pernas seguem curvas de quadril e joelho medidas em caminhada, trote e
+  pique (no pique o apoio é curto, o quadril estende no impulso e o joelho recolhe alto); o ritmo das
+  passadas acompanha a velocidade (~1,4 ciclo/s no trote, ~2,1 no pique) e o corpo sobe na fase de voo
+  entre uma passada e outra. Antes as pernas balançavam em senoides, com ar de robô.
+- **Goleiro encaixando nos chutes**: as mãos desenhadas vão exatamente para onde a simulação calcula
+  as mãos dele e, com a bola chegando, para a própria bola.
+- **Cara a cara como no futebol real (~40%)**: o atacante sozinho conduz até perto e finaliza rápido,
+  colocado; o goleiro sai fechando o ângulo e abafa a bola rasteira (por cima dele, passa). Antes o
+  atacante chutava de ~20 m ou o goleiro tomava quase tudo, conforme o caso. Medido em 120 lances por
+  modalidade: campo 44%, society 34%, futsal 27% (gol menor). Referência: ~38% das chances claras
+  viram gol nas grandes ligas.
+- **Mira em gol pequeno**: no futsal o chute colocado não sai mais pela linha de fundo.
+- **Estádios**: reservas sentados nos bancos com o agasalho do time, técnico de pé na área técnica
+  (com as linhas tracejadas), mesa do 4º árbitro com a placa de substituição e o gramado gasto na
+  pequena área, na marca do pênalti e no círculo central — nada disso tapa o campo.
+- **Uniformes não somem mais**: num quadro mais longo (carregamento, troca de câmera) o tecido da
+  camisa era calculado num passo só, a "mola" explodia e o atleta aparecia sem roupa ou com a camisa
+  esticada; agora o tecido é calculado em passos pequenos e nunca sai do lugar.
+- **Física da bola revisada**: quiques de bola baixa que se perdiam voltaram (no futsal a bola não
+  quicava); o quique segue o piso (bola largada de 2 m sobe ~0,7 m na grama, como na norma da FIFA
+  para gramado natural, menos na quadra e no society e mais no asfalto).
+- **Chuva e neve no gramado**: a água vai se acumulando com a chuva e aparecem poças (já cheias se o
+  jogo começar chovendo), com os pingos abrindo anéis e espirrando água quando a bola ou os atletas
+  passam; na poça a bola freia de repente e quase não quica, e o atleta perde um pouco de velocidade.
+  Com neve acumulada a bola rola menos (um passe que rodaria ~44 m para em ~16 m com neve alta) e
+  quica bem menos.
+- **Goleiro no tempo da bola**: o corpo chega esticado no mergulho e no encaixe exatamente quando a
+  bola chega (antes ele pulava e o pico do salto vinha antes do chute chegar).
+- **Saída de bola do goleiro**: tiro de meta com a bola no chão — passe para quem está livre e com a
+  linha aberta (pelos lados, nunca cruzando na frente do gol) ou lançamento longo para o companheiro
+  mais sozinho lá na frente, com o alcance calculado pela física da bola (antes ele pegava a bola com
+  as mãos no tiro de meta). Com a bola nos pés (recuo), não sai mais driblando nem toca às cegas para
+  a frente. No futsal o tiro de meta continua com as mãos, como na regra.
+- **Lado de fora dos estádios**: fachada com brises, pilares e lajes, faixa na cor do clube (acesa à
+  noite), portões com catracas, rampas em espiral nos cantos dos estádios grandes, esplanada com
+  árvores, postes, bilheterias e torcedores chegando, avenida em volta e estacionamento com carros e
+  ônibus; a cidade e a paisagem começam depois do entorno.
+- **Escalações no rodapé**: faixa no pé da tela com número e nome dos atletas dos dois times, quem
+  está com a bola em destaque e expulsos apagados (liga/desliga em Opções e na pausa).
+- **Dois instaladores Android**: o normal (público, nomes fictícios) e a versão completa para uso
+  pessoal, com clubes, estádios e jogadores reais já instalados (fica num rascunho privado, só para
+  quem administra o repositório).
+- **Só Android por enquanto**: Windows e Linux saem quando a versão for aprovada.
+
+## Versão 2.4.1
+
 - **Goleiro sem mergulho à toa**: bola perto do corpo (até ~1,25 braço) é defendida de pé, inclinando;
   o mergulho é decidido na hora, com a leitura já certa (antes às vezes ele mergulhava no ângulo para
   uma bola que vinha quase nele). Chutes de longe bem colocados voltam a entrar de vez em quando

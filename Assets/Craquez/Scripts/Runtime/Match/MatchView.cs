@@ -27,6 +27,9 @@ namespace Craquez
         bool _cheering;
         CrowdFx _crowd;
         AthleteView _referee;
+        public AthleteView Referee => _referee;
+        /// <summary>Capitães (id na simulação) de cada time.</summary>
+        public int[] captains = { -1, -1 };
         float _cardT;
         GameObject _card;
 
@@ -79,7 +82,7 @@ namespace Craquez
             _occRoots = new[] { _crowd != null ? _crowd.transform : null, life != null ? life.transform : null, extras != null ? extras.transform : null };
             AthleteFactory.IndoorShoes = c.mode == GameModes.Futsal;
             // capitão: o primeiro "Líder" de cada time (ou o camisa de número mais baixo entre os de linha)
-            var captains = new int[] { -1, -1 };
+            captains = new int[] { -1, -1 };
             foreach (var p in s.players) if (!p.isKeeper && p.Has(Trait.Lider) && captains[p.team] < 0) captains[p.team] = p.id;
             for (int t = 0; t < 2; t++)
                 if (captains[t] < 0)
@@ -92,7 +95,9 @@ namespace Craquez
                 athletes.Add(av);
             }
             if (s.mode.id == GameModes.Field) BuildReferee(parent, q);
+            if (s.mode.id == GameModes.Field) BuildBench(parent, q);
             BuildBall(q);
+            BuildStations();
             _marker0 = Marker(new Color(0.1f, 0.85f, 1f));
             _marker1 = Marker(new Color(1f, 0.55f, 0.1f));
             bcam = cam.gameObject.GetComponent<BroadcastCamera>();
@@ -105,10 +110,13 @@ namespace Craquez
             bcam.entrance = venue.entrance;
             bcam.SnapToBall();
             weather = gameObject.AddComponent<WeatherFx>();
-            string wk = c.weather == "aleatorio" ? WeatherFx.Kinds[(int)(c.seed % 5)] : c.weather;
+            string wk = c.weather == "aleatorio" ? WeatherFx.Kinds[(int)(c.seed % (uint)WeatherFx.Kinds.Length)] : c.weather;
             if (s.mode.id == GameModes.Futsal) wk = "sol";   // ginásio coberto
             weather.Setup(wk, c.dynamicWeather && s.mode.id != GameModes.Futsal, c.seed, cam, sun, venue.pitchMat);
             weather.pitch2 = venue.pitchMat2;
+            // poças da chuva (as mesmas da simulação); já cheias se a partida começa chovendo
+            s.SetPitch(weather.Water, weather.SnowCover);
+            PuddleFx.Create(venue.root, s, weather, this);
             UrpSetup.Camera(cam, q);
             Sfx.Crowd(s.mode.id == GameModes.Field ? 0.55f : 0.3f, s.mode.id == GameModes.Field ? 0.25f : 0f);
             FanCrowd.Hype = 0f; FanCrowd.GoalT = 0f; FanCrowd.GoalTeam = -1; FanCrowd.OlaStart = -100f; FanCrowd.ShotT = 0f; FanCrowd.FoulT = 0f;
@@ -203,6 +211,55 @@ namespace Craquez
             RenderSettings.ambientLight = sky;
         }
 
+        Material _ballShadowMat;
+        readonly List<Transform> _stationBalls = new List<Transform>();
+        float[] _stationHidden;
+        Transform _decoy;
+
+        /// <summary>Cones com bolas de reposição em volta do campo (as mesmas posições da simulação).</summary>
+        void BuildStations()
+        {
+            var st = sim.BallStations();
+            _stationHidden = new float[st.Count];
+            if (st.Count == 0) return;
+            var cones = new MeshKit();
+            for (int i = 0; i < st.Count; i++)
+            {
+                var c = new Vector3(st[i].x, 0f, st[i].y);
+                // cone de treino baixo com a "boca" em cima onde a bola fica apoiada
+                const int seg = 14;
+                for (int k = 0; k < seg; k++)
+                {
+                    float a0 = k / (float)seg * Mathf.PI * 2f, a1 = (k + 1) / (float)seg * Mathf.PI * 2f;
+                    Vector3 P(float r, float a, float y) => c + new Vector3(Mathf.Cos(a) * r, y, Mathf.Sin(a) * r);
+                    cones.Quad(P(0.17f, a0, 0f), P(0.17f, a1, 0f), P(0.07f, a1, 0.3f), P(0.07f, a0, 0.3f));
+                    cones.Quad(P(0.22f, a1, 0.012f), P(0.22f, a0, 0.012f), c + Vector3.up * 0.012f, c + Vector3.up * 0.012f);
+                }
+                var b = Instantiate(_ball.gameObject, transform).transform;
+                b.name = "Bola do cone";
+                b.position = c + Vector3.up * (0.3f + sim.ball.radius * 0.75f);
+                b.rotation = Quaternion.Euler(i * 37f, i * 71f, 0f);
+                _stationBalls.Add(b);
+            }
+            cones.Object("Cones das bolas", Gfx.Lit(new Color(1f, 0.45f, 0.08f), null, 0.35f), transform, true);
+        }
+
+        void StationsTick()
+        {
+            if (_stationHidden == null) return;
+            for (int i = 0; i < _stationHidden.Length; i++)
+            {
+                if (_stationHidden[i] <= 0f) continue;
+                _stationHidden[i] -= Time.deltaTime;
+                if (_stationHidden[i] <= 0f)
+                {
+                    // o gandula recolheu a bola que saiu e repôs a do cone
+                    _stationBalls[i].gameObject.SetActive(true);
+                    if (_decoy != null) _decoy.gameObject.SetActive(false);
+                }
+            }
+        }
+
         void BuildBall(int q)
         {
             // esfera lisa (64 x 32) com o mesmo mapeamento da textura dos gomos
@@ -218,7 +275,8 @@ namespace Craquez
             Destroy(sh.GetComponent<Collider>());
             sh.transform.SetParent(transform, false);
             sh.transform.rotation = Quaternion.Euler(90, 0, 0);
-            sh.GetComponent<MeshRenderer>().sharedMaterial = Gfx.UnlitTransparent(new Color(0, 0, 0, 0.45f), Gfx.Radial(64, Color.white, new Color(1, 1, 1, 0), 1.5f));
+            _ballShadowMat = Gfx.UnlitTransparent(new Color(0, 0, 0, 0.32f), Gfx.Radial(64, Color.white, new Color(1, 1, 1, 0), 1.5f));
+            sh.GetComponent<MeshRenderer>().sharedMaterial = _ballShadowMat;
             sh.GetComponent<MeshRenderer>().shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
             _ballShadow = sh.transform;
         }
@@ -251,6 +309,109 @@ namespace Craquez
 
         Vector2 _refTarget;
         int _refThink;
+
+        // ------------------------------------------------------------ banco: técnicos e aquecimento
+        readonly List<AthleteView> _coaches = new List<AthleteView>();
+        readonly List<(AthleteView av, int team, float phase)> _warm = new List<(AthleteView, int, float)>();
+        float _coachTalk0, _coachTalk1;
+
+        /// <summary>
+        /// Técnicos de pé na área técnica (terno escuro) e reservas de colete aquecendo atrás dos gols
+        /// (atletas animados, só visuais — não entram na simulação).
+        /// </summary>
+        void BuildBench(Transform parent, int q)
+        {
+            for (int t = 0; t < 2; t++)
+            {
+                var cp = new SimPlayer { id = -1, name = "Técnico", number = 0, face = new float[] { 1 + t, 1, 2, 1, 0, 1 } };
+                var suit = new Kit { c1 = new Color(0.1f, 0.11f, 0.14f), c2 = Color.Lerp(kits[t].c1, Color.black, 0.3f), shorts = new Color(0.08f, 0.08f, 0.1f), socks = new Color(0.05f, 0.05f, 0.06f) };
+                var rig = AthleteFactory.Create(cp, suit, suit, parent, q);
+                var av = rig.gameObject.AddComponent<AthleteView>();
+                cp.position = new Vector2((t == 0 ? -1f : 1f) * 9f, sim.halfW + 1.6f);
+                cp.facing = new Vector2(0f, -1f);
+                av.Setup(cp, rig, this);
+                _coaches.Add(av);
+            }
+            if (q < 1) return;
+            // coletes: laranja para o mandante, verde-limão para o visitante
+            var bibs = new[] { new Color(1f, 0.45f, 0.05f), new Color(0.65f, 0.95f, 0.1f) };
+            for (int t = 0; t < 2; t++)
+                for (int i = 0; i < 3; i++)
+                {
+                    var wp = new SimPlayer { id = -1, name = "Reserva", number = 12 + i, face = new float[] { (i + t) % 4, i % 3, (t * 2 + i) % 4, 1, i % 2, 2 } };
+                    var bib = new Kit { c1 = bibs[t], c2 = bibs[t], shorts = Color.Lerp(kits[t].shorts, Color.black, 0.2f), socks = kits[t].socks };
+                    var rig = AthleteFactory.Create(wp, bib, bib, parent, q);
+                    var av = rig.gameObject.AddComponent<AthleteView>();
+                    float gx = (t == 0 ? -1f : 1f) * (sim.halfLen + 4f);
+                    wp.position = new Vector2(gx, sim.halfW * (0.35f + i * 0.17f));
+                    wp.facing = new Vector2(0f, 1f);
+                    av.Setup(wp, rig, this);
+                    _warm.Add((av, t, i * 1.7f + t * 0.9f));
+                }
+        }
+
+        void BenchStep()
+        {
+            if (_coaches.Count == 0) return;
+            float dt = MatchSim.DT, hw = sim.halfW, hl = sim.halfLen;
+            bool live = sim.state == MatchState.Playing;
+            for (int t = 0; t < _coaches.Count; t++)
+            {
+                var av = _coaches[t];
+                var p = av.p;
+                float cx = (t == 0 ? -1f : 1f) * 9f;
+                // acompanha o lance de lado dentro da área técnica (até a beira), de frente para o jogo
+                float bx = Mathf.Clamp(sim.ball.pos.x * 0.12f + cx, cx - 4f, cx + 4f);
+                bool near = Mathf.Abs(sim.ball.pos.x - cx) < 25f && sim.ball.pos.y > 0f;
+                var target = new Vector2(bx, hw + (near ? 1.2f : 1.9f));
+                var to = target - p.position;
+                float d = to.magnitude;
+                var want = d > 0.4f ? to / d * Mathf.Min(1.3f, d) : Vector2.zero;
+                p.vel = Vector2.MoveTowards(p.vel, want, 3f * dt);
+                p.position += p.vel * dt;
+                var look = (sim.ball.pos - p.position).Norm();
+                p.facing = V2.RotateToward(p.facing, look, 2.5f * dt).Norm();
+                // orienta: aponta para o campo de vez em quando (mais com o lance perto, nas faltas e no gol)
+                ref float talk = ref (t == 0 ? ref _coachTalk0 : ref _coachTalk1);
+                talk -= dt;
+                if (talk <= 0f)
+                {
+                    float r = Mathf.Abs(Mathf.Sin(sim.tick * 0.013f + t * 2.1f));
+                    talk = live ? (near ? 2.5f : 5f) + r * 4f : 3f;
+                    if (r > 0.45f || sim.state == MatchState.Foul)
+                    {
+                        // mostra para onde o time deve ir: para o ataque ou para a bola
+                        var dirAtk = new Vector2(sim.TeamDir(t), 0f);
+                        var aimV = Vector2.Lerp(dirAtk, (sim.ball.pos - p.position).Norm(), 0.5f).Norm();
+                        av.point = AthleteView.W(aimV) + Vector3.up * 0.25f;
+                        _coachPointT[t] = 1.4f;
+                    }
+                }
+                if (_coachPointT[t] > 0f) { _coachPointT[t] -= dt; if (_coachPointT[t] <= 0f) av.point = Vector3.zero; }
+                av.OnTick();
+            }
+            // aquecimento atrás dos gols: trote de ida e volta e paradas para alongar
+            foreach (var w in _warm)
+            {
+                var p = w.av.p;
+                float gx = (w.team == 0 ? -1f : 1f) * (hl + 4f);
+                float cyc = (float)(sim.tick * dt * 0.09f + w.phase);
+                float u = Mathf.Repeat(cyc, 1f);
+                // 0..0,4 vai, 0,4..0,5 parado, 0,5..0,9 volta, 0,9..1 parado
+                float z0 = hw * 0.3f, z1 = hw * 0.9f;
+                float s = u < 0.4f ? u / 0.4f : u < 0.5f ? 1f : u < 0.9f ? 1f - (u - 0.5f) / 0.4f : 0f;
+                var target = new Vector2(gx + Mathf.Sin(w.phase * 3f) * 0.8f, Mathf.Lerp(z0, z1, Mathf.SmoothStep(0f, 1f, s)));
+                var to = target - p.position;
+                p.vel = Vector2.MoveTowards(p.vel, to / dt * 0.15f, 6f * dt);
+                if (p.vel.magnitude > 3.2f) p.vel = p.vel.normalized * 3.2f;
+                p.position += p.vel * dt;
+                if (p.vel.magnitude > 0.3f) p.facing = V2.RotateToward(p.facing, p.vel.normalized, 5f * dt).Norm();
+                else p.facing = V2.RotateToward(p.facing, (sim.ball.pos - p.position).Norm(), 2f * dt).Norm();
+                w.av.OnTick();
+            }
+        }
+
+        readonly float[] _coachPointT = new float[2];
 
         /// <summary>
         /// Árbitro (só visual, não interfere na simulação): sistema diagonal — fica na diagonal
@@ -349,6 +510,7 @@ namespace Craquez
                 if (show) a.OnTick();
             }
             RefereeStep();
+            BenchStep();
             _ballPrev = _ballCur;
             _ballCur = new Vector3(sim.ball.pos.x, sim.ball.z + sim.ball.radius, sim.ball.pos.y);
             foreach (var e in sim.events) OnEvent(e);
@@ -436,6 +598,22 @@ namespace Craquez
                         }
                     }
                     break;
+                case "spareball":
+                    // o goleiro pega a bola do cone; a que saiu fica lá fora até o gandula recolher
+                    if (e.skill >= 0 && e.skill < _stationBalls.Count && _stationBalls[e.skill] != null)
+                    {
+                        _stationBalls[e.skill].gameObject.SetActive(false);
+                        _stationHidden[e.skill] = 25f;
+                        if (_decoy == null)
+                        {
+                            _decoy = Instantiate(_ball.gameObject, transform).transform;
+                            _decoy.name = "Bola fora de jogo";
+                        }
+                        _decoy.gameObject.SetActive(true);
+                        _decoy.position = new Vector3(sim.spareFrom.x, sim.ball.radius, sim.spareFrom.y);
+                        _decoy.rotation = _ball.rotation;
+                    }
+                    break;
                 case "card":
                     ShowCard(e.kind == "yellow" ? new Color(1f, 0.85f, 0.1f) : new Color(0.85f, 0.08f, 0.1f));
                     break;
@@ -465,16 +643,14 @@ namespace Craquez
             }
         }
 
-        /// <summary>Festa do gol: papel picado nas cores do time e sinalizadores com fumaça atrás do gol.</summary>
+        /// <summary>Festa do gol: sinalizadores com fumaça na arquibancada atrás do gol (estádio).</summary>
         void GoalParty(int team)
         {
             if (venue == null) return;
-            var k = kits[Mathf.Clamp(team, 0, 1)];
             float gx = sim.halfLen * Mathf.Sign(sim.ball.pos.x == 0 ? 1 : sim.ball.pos.x);
             bool field = sim.mode.id == GameModes.Field;
             var center = new Vector3(gx + Mathf.Sign(gx) * (field ? 18f : 5f), field ? 14f : 8f, 0f);
-            Burst(center, new Vector3(field ? 10f : 4f, 2f, field ? 50f : 18f), new[] { k.c1, k.c2, Color.white }, 700, false);
-            Burst(new Vector3(0, field ? 16f : 8f, sim.halfW + (field ? 20f : 8f)), new Vector3(field ? 80f : 30f, 2f, 8f), new[] { k.c1, k.c2 }, 500, false);
+            // (sem papel picado: caía sobre os jogadores na comemoração)
             if (field)
                 for (int i = 0; i < 6; i++)
                     Burst(center + new Vector3(0, -6f, (i - 2.5f) * 8f), new Vector3(0.5f, 0.2f, 0.5f), new[] { new Color(1f, 0.45f, 0.1f), new Color(1f, 0.25f, 0.05f) }, 120, true);
@@ -542,6 +718,7 @@ namespace Craquez
         void Update()
         {
             LateCard();
+            StationsTick();
             // bola dentro do gol encostando na rede
             if (sim != null && venue != null && Mathf.Abs(sim.ball.pos.x) > sim.halfLen - 0.05f)
             {
@@ -558,7 +735,7 @@ namespace Craquez
                 var d = bp - _ball.position;
                 d.y = 0;
                 // nas mãos do goleiro a bola não gira (ele a reposiciona em LateUpdate)
-                bool held = sim.ball.owner >= 0 && sim.players[sim.ball.owner].isKeeper && sim.players[sim.ball.owner].hold > 0f;
+                bool held = sim.ball.owner >= 0 && sim.players[sim.ball.owner].isKeeper && sim.players[sim.ball.owner].InHands;
                 if (!held && d.sqrMagnitude > 1e-6f && d.magnitude < 1.5f)
                 {
                     var axis = Vector3.Cross(Vector3.up, d.normalized);
@@ -567,8 +744,11 @@ namespace Craquez
                 _ball.position = bp;
                 _ball.rotation = _ballRot;
                 _ballShadow.position = new Vector3(bp.x, 0.015f, bp.z);
-                float hz = Mathf.Clamp01(1f - sim.ball.z / 6f);
-                _ballShadow.localScale = Vector3.one * Mathf.Lerp(0.6f, 0.3f, hz);
+                // sombra de contato pequena (o tamanho da bola): a mancha grande e escura em volta
+                // fazia a bola parecer afundada no gramado; no alto ela se espalha e some
+                float hz = Mathf.Clamp01(sim.ball.z / 3f);
+                _ballShadow.localScale = Vector3.one * Mathf.Lerp(sim.ball.radius * 2.4f, sim.ball.radius * 5f, hz);
+                if (_ballShadowMat != null) { var sc = new Color(0f, 0f, 0f, 0.32f * (1f - hz)); _ballShadowMat.color = sc; _ballShadowMat.SetColor("_BaseColor", sc); }
             }
             // marcadores dos jogadores controlados
             PlaceMarker(_marker0, 0);

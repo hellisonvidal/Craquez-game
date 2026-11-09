@@ -32,6 +32,8 @@ namespace Craquez.Sim
         public Vector2 aiLastIntent;
         /// <summary>Giro acumulado do corpo (graus, decai em ~1 s): limita voltas seguidas no mesmo sentido.</summary>
         public float bodyTurnAcc;
+        /// <summary>Goleiro saindo no cara a cara (fecha o ângulo, já armado: reage mais rápido).</summary>
+        public bool oneOnOne;
         public float aiTurnAcc, aiStraightT;
         public bool isKeeper;
         public int number = 1;
@@ -60,6 +62,14 @@ namespace Craquez.Sim
         public int saveKind;
         /// <summary>Ponte (mergulho lateral: rasteira, meia-altura ou no ângulo). O salto no alto (6) é de pé.</summary>
         public bool Diving => saveKind >= 3 && saveKind <= 5;
+        /// <summary>Fração da defesa (0..1) em que a bola deve chegar às mãos: o corpo e os braços chegam ao máximo ali.</summary>
+        public float saveContact = 0.4f;
+        /// <summary>Goleiro cobrando tiro de meta: a bola fica no chão (hold é só o tempo de espera, não está nas mãos).</summary>
+        public bool goalKick;
+        /// <summary>Indo ajudar a levantar quem sofreu a falta (id da vítima; -1 = não).</summary>
+        public int helping = -1;
+        /// <summary>Goleiro com a bola nas mãos (não vale para o tiro de meta, com a bola no chão).</summary>
+        public bool InHands => hold > 0f && !goalKick;
         /// <summary>Cartões: amarelos recebidos e expulsão (fica fora de campo; no futsal volta outro em 2 min).</summary>
         public int yellows;
         public bool sentOff;

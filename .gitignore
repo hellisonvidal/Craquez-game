@@ -143,3 +143,7 @@ __pycache__/
 *.aab
 *.keystore
 *.blend1
+
+# versão casa: option file com dados reais gerado no build (nunca versionar: repositório público)
+Assets/Craquez/Resources/Data/option_file_casa.json*
+.cache/
