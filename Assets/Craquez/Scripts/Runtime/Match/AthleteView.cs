@@ -108,6 +108,19 @@ namespace Craquez
                         case Skill.Stepover: anim.Play(p.skillSide > 0 ? "FeintR" : "FeintL", 0.3f, 0.9f, 1.4f); break;
                     }
                     break;
+                case "bump":
+                {
+                    // e.id = quem perdeu o choque (este, se for ele), e.skill = quem ganhou
+                    var sim = view.sim;
+                    var other = e.skill >= 0 && e.skill < sim.players.Count ? sim.players[e.skill] : null;
+                    if (other == null) break;
+                    var away = W(p.position - other.position);
+                    away.y = 0f;
+                    if (away.sqrMagnitude < 1e-4f) break;
+                    float k = Mathf.Clamp01(e.power / 7f);
+                    _bumpVel += away.normalized * (e.id == p.id ? 70f + 90f * k : 25f);
+                    break;
+                }
                 case "fooled":
                     anim.Play("QuickStop", 0.6f, 0.7f, 1.2f);
                     break;
@@ -303,6 +316,27 @@ namespace Craquez
         }
 
         float _protest, _help;
+        Vector3 _bump, _bumpVel;   // inclinação do choque (graus, no plano do chão: x/z do mundo)
+
+        /// <summary>Ombro a ombro: correndo lado a lado com um adversário, inclina contra ele (graus, mundo).</summary>
+        Vector3 ShoulderDuel()
+        {
+            var sim = view.sim;
+            float v = p.vel.magnitude;
+            if (v < 3f || p.down > 0f || p.slide > 0f || p.isKeeper) return Vector3.zero;
+            SimPlayer best = null; float bd = 0.95f;
+            foreach (var o in sim.players)
+            {
+                if (o.team == p.team || o.sentOff || o.isKeeper) continue;
+                float d = o.position.Dist(p.position);
+                if (d >= bd || o.vel.magnitude < 3f || Vector2.Dot(o.vel / o.vel.magnitude, p.vel / v) < 0.7f) continue;
+                bd = d; best = o;
+            }
+            if (best == null) return Vector3.zero;
+            var to = W(best.position - p.position); to.y = 0f;
+            float k = Mathf.Clamp01((0.95f - bd) / 0.35f);
+            return to.normalized * 7f * k;
+        }
 
         /// <summary>Dando a mão para quem caiu: inclina o tronco e estende o braço até a mão dele.</summary>
         void HelpUp()
@@ -413,9 +447,16 @@ namespace Craquez
                 var fb = FallBody(pitch, roll, lift);
                 pitch = fb.x; roll = fb.y; lift = fb.z;
             }
-            else if (p.offBalance > 0f)
+            // trombada: o corpo é jogado para longe do contato e volta (mola amortecida); no ombro a
+            // ombro em velocidade, os dois inclinam um contra o outro
             {
-                roll += Mathf.Sin(Time.time * 12f) * 2.5f;
+                float dtB = Mathf.Min(Time.deltaTime, 0.05f);
+                _bumpVel += (-_bump * 90f - _bumpVel * 12f) * dtB;
+                _bump += _bumpVel * dtB;
+                var shoulder = ShoulderDuel();
+                var lr = Quaternion.Euler(0f, -_yaw, 0f) * (_bump + shoulder);   // para o referencial do corpo
+                roll += -lr.x;
+                pitch += lr.z;
             }
             transform.position = pos + Vector3.up * lift;
             transform.rotation = Quaternion.Euler(pitch, _yaw, roll);

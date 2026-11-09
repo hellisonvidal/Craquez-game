@@ -3434,6 +3434,8 @@ namespace Craquez.Sim
                                 b.vel += nAB * (imp / mb);
                                 a.vel *= 0.92f; b.vel *= 0.92f;
                                 weak.offBalance = Mathf.Max(weak.offBalance, 0.3f);
+                                var strong = weak == a ? b : a;
+                                Emit("bump", weak.team, weak.id, null, false, closing, strong.id);
                                 // quem conduz pode perder a bola no choque
                                 if (ball.owner == weak.id && closing > 4f && rng.Chance(0.45f * (1.2f - weak.control)) && !weak.isKeeper)
                                 {
