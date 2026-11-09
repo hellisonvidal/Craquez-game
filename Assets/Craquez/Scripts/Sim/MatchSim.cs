@@ -2383,7 +2383,7 @@ namespace Craquez.Sim
         /// Onde estão as mãos do goleiro agora (x, y no campo; z altura). Na ponte as mãos saem do
         /// corpo para o lado do mergulho, na altura escolhida; parado, à frente do peito.
         /// </summary>
-        Vector3 KeeperHands(SimPlayer p, out float radius)
+        public Vector3 KeeperHands(SimPlayer p, out float radius)
         {
             float dir = TeamDir(p.team);
             radius = 0.34f;

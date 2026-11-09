@@ -534,16 +534,21 @@ namespace Craquez
             var ballW = W(sim.ball.pos, sim.ball.z + 0.11f);
             Vector3 target;
             var chest = rig.spine.position;
+            // as mãos vão para onde a simulação diz que elas estão (é isso que decide a defesa) e, com a
+            // bola chegando, para a própria bola: o encaixe/espalmada acontece na bola, não ao lado dela
+            var hs = sim.KeeperHands(p, out _);
+            var handsSim = W(new Vector2(hs.x, hs.y), hs.z);
+            float near = Mathf.Clamp01(1f - ((ballW - handsSim).magnitude - 0.4f) / 1.8f);
             if (_saveKindV >= 3 && _saveKindV <= 5)
             {
-                // mergulho: braços esticados "acima da cabeça" no plano do voo, puxando para a bola
-                var along = Quaternion.AngleAxis(-_saveSideV * (_saveKindV == 5 ? 18f : 6f), transform.forward) * (transform.up * 0.2f + transform.right * _saveSideV * 0.0f);
+                // mergulho: braços esticados no plano do voo, na direção das mãos da simulação
                 var reach = (rig.head != null ? rig.head.position - chest : transform.up).normalized;
-                target = chest + reach * 1.0f + transform.forward * 0.15f + along;
-                if ((ballW - chest).magnitude < 2.2f) target = Vector3.Lerp(target, ballW, 0.6f);
+                var flight = chest + reach * 0.95f + transform.forward * 0.15f;
+                target = Vector3.Lerp(flight, handsSim, 0.6f);
             }
-            else if (_saveKindV == 2) target = chest + transform.forward * 0.45f - Vector3.up * 0.75f;
-            else target = (ballW - chest).magnitude < 3f ? ballW : chest + transform.forward * 0.5f + Vector3.up * (_saveKindV == 6 ? 0.8f : 0.1f);
+            else if (_saveKindV == 2) target = Vector3.Lerp(chest + transform.forward * 0.45f - Vector3.up * 0.75f, handsSim, 0.5f);
+            else target = handsSim;
+            target = Vector3.Lerp(target, ballW, near);
             for (int side = -1; side <= 1; side += 2)
             {
                 string sfx = side < 0 ? "_l" : "_r";
@@ -836,6 +841,41 @@ namespace Craquez
         float _gPhase, _procW;
         Vector2 _gDir;
 
+        float _bounce;
+
+        // curvas (fase do ciclo, graus) — quadril: + flexão (coxa à frente); joelho: + dobrado
+        static readonly float[] HipWalk = { 0f, 24f, 0.15f, 15f, 0.5f, -10f, 0.62f, -6f, 0.75f, 18f, 0.88f, 27f, 1f, 24f };
+        static readonly float[] KneeWalk = { 0f, 5f, 0.15f, 17f, 0.4f, 5f, 0.6f, 38f, 0.72f, 60f, 0.88f, 12f, 1f, 5f };
+        static readonly float[] HipJog = { 0f, 28f, 0.18f, 6f, 0.38f, -14f, 0.55f, 6f, 0.75f, 34f, 0.88f, 39f, 1f, 28f };
+        static readonly float[] KneeJog = { 0f, 18f, 0.12f, 38f, 0.38f, 18f, 0.55f, 76f, 0.68f, 96f, 0.85f, 40f, 0.95f, 18f, 1f, 18f };
+        static readonly float[] HipSprint = { 0f, 36f, 0.12f, 10f, 0.25f, -18f, 0.45f, 12f, 0.65f, 60f, 0.78f, 68f, 0.9f, 50f, 1f, 36f };
+        static readonly float[] KneeSprint = { 0f, 24f, 0.08f, 36f, 0.25f, 22f, 0.45f, 112f, 0.56f, 124f, 0.75f, 62f, 0.9f, 26f, 1f, 24f };
+
+        /// <summary>Curva por pontos (fase, valor), interpolação suave (Catmull-Rom), periódica.</summary>
+        static float Curve(float[] k, float u)
+        {
+            int n = k.Length / 2;
+            u = Mathf.Repeat(u, 1f);
+            int i = 0;
+            while (i < n - 2 && u > k[(i + 1) * 2]) i++;
+            float u0 = k[i * 2], u1 = k[(i + 1) * 2];
+            float t = (u - u0) / Mathf.Max(1e-4f, u1 - u0);
+            float p1 = k[i * 2 + 1], p2 = k[(i + 1) * 2 + 1];
+            float p0 = i > 0 ? k[(i - 1) * 2 + 1] : k[(n - 2) * 2 + 1];
+            float p3 = i + 2 < n ? k[(i + 2) * 2 + 1] : k[1 * 2 + 1];
+            float t2 = t * t, t3 = t2 * t;
+            return 0.5f * (2f * p1 + (-p0 + p2) * t + (2f * p0 - 5f * p1 + 4f * p2 - p3) * t2 + (-p0 + 3f * p1 - 3f * p2 + p3) * t3);
+        }
+
+        /// <summary>Ciclos de passada por segundo pela velocidade (m/s).</summary>
+        static float Freq(float v)
+        {
+            if (v < 1.4f) return Mathf.Lerp(0.75f, 0.95f, v / 1.4f);
+            if (v < 3.5f) return Mathf.Lerp(0.95f, 1.4f, (v - 1.4f) / 2.1f);
+            if (v < 6f) return Mathf.Lerp(1.4f, 1.72f, (v - 3.5f) / 2.5f);
+            return Mathf.Lerp(1.72f, 2.15f, Mathf.Clamp01((v - 6f) / 3f));
+        }
+
         static float G(float u, float c, float w)
         {
             float d = Mathf.Repeat(u - c + 0.5f, 1f) - 0.5f;   // distância circular na fase
@@ -875,24 +915,37 @@ namespace Craquez
             // de costas e de lado: passos mais curtos e baixos
             float dirAmp = Mathf.Lerp(1f, 0.55f, Mathf.Max(back, lateral * 0.8f));
             // comprimento do ciclo (duas passadas): curto andando, longo no pique; o estilo muda a passada
-            float L = (Mathf.Lerp(1.5f, 2.7f, run) + 1.5f * sprint) / Mathf.Max(0.8f, _cadence) * transform.localScale.y;
-            _gPhase = Mathf.Repeat(_gPhase + spd / Mathf.Max(0.5f, L) * dt, 1f);
-            if (W <= 0.01f) return;
+            // ritmo: passadas por segundo de verdade (andar ~0,95, trote ~1,4, corrida ~1,75, pique ~2,15
+            // ciclos/s); a passada (comprimento) sai da velocidade. Antes o comprimento era fixo por faixa.
+            float freq = Freq(spd) * Mathf.Clamp(_cadence, 0.85f, 1.2f) / Mathf.Sqrt(Mathf.Max(0.85f, transform.localScale.y));
+            _gPhase = Mathf.Repeat(_gPhase + freq * dt, 1f);
+            if (W <= 0.01f) { _bounce = 0f; return; }
             bool hasBall = view.sim.ball.owner == p.id;
             float legScale = hasBall ? 0.85f : 1f;
             // quadris e joelhos das duas pernas (direita = fase, esquerda = fase + meio ciclo)
+            // ângulos do quadril e do joelho ao longo do ciclo (0 = pé tocando o chão), tirados de
+            // curvas medidas de caminhada, trote e pique (biomecânica da corrida): no pique o apoio é
+            // curto (~25% do ciclo), o quadril estende no impulso e o joelho recolhe alto no balanço
+            float wJ = Mathf.Clamp01((spd - 1.4f) / 2.1f), wS = Mathf.Clamp01((spd - 3.5f) / 4.5f) * (1f - back) * (1f - lateral * 0.7f);
             float HipAt(float u)
             {
-                float walk = 6.5f + 18.5f * Mathf.Cos(2f * Mathf.PI * u);
-                float runA = 14f + (30f + 10f * sprint) * Mathf.Cos(2f * Mathf.PI * (u - 0.85f));
-                return Mathf.Lerp(walk, runA * 0.88f, run) * legScale * dirAmp;
+                float a = Mathf.Lerp(Curve(HipWalk, u), Curve(HipJog, u), wJ);
+                return Mathf.Lerp(a, Curve(HipSprint, u), wS) * legScale * dirAmp;
             }
             float KneeAt(float u)
             {
-                float walk = 4f + 13f * G(u, 0.13f, 0.07f) + 56f * G(u, 0.72f, 0.1f);
-                float runK = 12f + 28f * G(u, 0.15f, 0.08f) + (84f + 26f * sprint) * _knee * G(u, 0.66f, 0.12f);
-                return Mathf.Lerp(walk, runK, run) * Mathf.Lerp(1f, 0.9f, hasBall ? 1f : 0f) * Mathf.Lerp(1f, 0.7f, Mathf.Max(back, lateral));
+                float a = Mathf.Lerp(Curve(KneeWalk, u), Curve(KneeJog, u), wJ);
+                a = Mathf.Lerp(a, Curve(KneeSprint, u), wS);
+                return a * Mathf.Lerp(1f, 0.92f, hasBall ? 1f : 0f) * Mathf.Lerp(1f, 0.7f, Mathf.Max(back, lateral)) * Mathf.Lerp(1f, _knee, wJ);
             }
+            // voo: o corpo sobe entre um apoio e outro (2 voos por ciclo) e afunda no meio do apoio;
+            // andando é o contrário (sobe no meio do apoio, de leve)
+            float stanceEnd = Mathf.Lerp(Mathf.Lerp(0.6f, 0.38f, wJ), 0.25f, wS);
+            float cyc = Mathf.Repeat(_gPhase * 2f, 1f);   // meio ciclo = um passo
+            float flightU = Mathf.Clamp01((cyc - stanceEnd) / Mathf.Max(0.05f, 1f - stanceEnd));
+            float runB = Mathf.Sin(flightU * Mathf.PI) * Mathf.Lerp(0.055f, 0.045f, wS) - (cyc < stanceEnd ? Mathf.Sin(cyc / stanceEnd * Mathf.PI) * 0.02f : 0f);
+            float walkB = Mathf.Sin(Mathf.Clamp01(cyc / 0.6f) * Mathf.PI) * 0.018f;
+            _bounce = Mathf.Lerp(walkB, runB, wJ) * W * (1f - Mathf.Max(back, lateral) * 0.6f) * (hasBall ? 0.7f : 1f);
             float uR = _gPhase, uL = Mathf.Repeat(_gPhase + 0.5f, 1f);
             // pelve: gira para o lado da perna que vai à frente; ombros no sentido contrário
             float pelvisYaw = (HipAt(uR) - HipAt(uL)) * Mathf.Lerp(0.12f, 0.16f, run) * 0.5f;
@@ -1121,6 +1174,8 @@ namespace Craquez
             if (keeperSave) _ground = Mathf.Lerp(_ground, 0f, 1f - Mathf.Exp(-Time.deltaTime * 10f));
             if (p.slide <= 0f && !keeperSave && p.stun < 0.5f && p.down <= 0f)
                 rig.model.position -= Vector3.up * _ground;
+            // depois de firmar os pés: o sobe-e-desce da corrida (voo entre as passadas)
+            if (p.slide <= 0f && !keeperSave && p.down <= 0f) rig.model.position += Vector3.up * _bounce;
             // sombra de contato
             if (_shadow == null)
             {

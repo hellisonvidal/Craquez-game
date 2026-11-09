@@ -93,7 +93,8 @@ namespace Craquez
             if (st.fence) PitchFence(v, hl, hw);
             if (st.lights == 0) Floodlights(v, hl, hw, tier, night, st);
             else StyledLights(v, hl, hw, st, night);
-            Dugouts(v, hl, hw);
+            Dugouts(v, hl, hw, homeKit, awayKit);
+            PitchWear(v, sim, hl, hw);
             CornerFlags(v, hl, hw, homeKit.c1);
             Pitchside(v, hl, hw, home, away, homeKit, night, quality);
             if (st.ends) Screens(v, hl, hw, tier, home, away);
@@ -828,7 +829,7 @@ namespace Craquez
             }
         }
 
-        static void Dugouts(Venue v, float hl, float hw)
+        static void Dugouts(Venue v, float hl, float hw, Kit homeKit = null, Kit awayKit = null)
         {
             var k = new MeshKit();
             foreach (float s in new[] { -1f, 1f })
@@ -842,6 +843,55 @@ namespace Craquez
                 k.Box(c + new Vector3(0, -0.75f, 1.0f), new Vector3(6.6f, 0.45f, 0.6f));   // assento
             }
             k.Object("Bancos", Gfx.Lit(new Color(0.14f, 0.18f, 0.28f), null, 0.4f), v.root, false);
+            if (homeKit == null || awayKit == null) return;
+            // reservas sentados (agasalho na cor do time), o técnico de pé na área técnica e a mesa do 4º árbitro
+            foreach (float s in new[] { -1f, 1f })
+            {
+                var kit = s < 0f ? homeKit : awayKit;
+                var bodyK = new MeshKit();
+                var skinK = new MeshKit();
+                var c = new Vector3(s * 9f, 0f, hw + 3.2f);
+                for (int i = 0; i < 6; i++)
+                    Figure(bodyK, skinK, c + new Vector3(-2.6f + i * 1.05f, 0f, 1.05f), 180f, true);
+                Figure(bodyK, skinK, c + new Vector3(-s * 1.2f, 0f, -2.1f), 180f + s * 25f, false);   // técnico
+                bodyK.Object("Reservas " + (s < 0 ? "casa" : "visitante"), Gfx.Lit(Color.Lerp(kit.c1, Color.black, 0.25f), null, 0.3f), v.root, false);
+                skinK.Object("Reservas (pele)", Gfx.Lit(new Color(0.78f, 0.6f, 0.47f), null, 0.2f), v.root, false);
+                // área técnica: linha tracejada 1 m para os lados do banco e até 1 m da lateral
+                var lines = new MeshKit();
+                float x0 = c.x - 4.5f, x1 = c.x + 4.5f, zf = hw + 1f, zb = hw + 2.2f;
+                for (float z = zb; z > zf; z -= 0.6f)
+                {
+                    lines.Strip(new Vector3(x0, 0, z), new Vector3(x0, 0, Mathf.Max(zf, z - 0.35f)), 0.08f, 0.014f);
+                    lines.Strip(new Vector3(x1, 0, z), new Vector3(x1, 0, Mathf.Max(zf, z - 0.35f)), 0.08f, 0.014f);
+                }
+                for (float x = x0; x < x1; x += 0.6f) lines.Strip(new Vector3(x, 0, zf), new Vector3(Mathf.Min(x1, x + 0.35f), 0, zf), 0.08f, 0.014f);
+                lines.Object("Área técnica", Gfx.Lit(new Color(0.95f, 0.95f, 0.95f), null, 0.05f), v.root, false);
+            }
+            var table = new MeshKit();
+            table.Box(new Vector3(0f, 0.75f, hw + 3.6f), new Vector3(2.2f, 0.06f, 0.8f));
+            table.Box(new Vector3(0f, 0.37f, hw + 3.95f), new Vector3(2.2f, 0.74f, 0.06f));
+            table.Box(new Vector3(0.6f, 1.05f, hw + 3.5f), new Vector3(0.7f, 0.5f, 0.06f));   // placa de substituição
+            table.Object("Mesa do 4º árbitro", Gfx.Lit(new Color(0.12f, 0.12f, 0.14f), null, 0.4f), v.root, false);
+        }
+
+        /// <summary>
+        /// Gramado gasto onde mais se pisa: na pequena área (goleiros) e no círculo central, em manchas
+        /// suaves por cima do gramado (só cor, nada em relevo).
+        /// </summary>
+        static void PitchWear(Venue v, MatchSim sim, float hl, float hw)
+        {
+            var tex = Gfx.Radial(64, Color.white, new Color(1, 1, 1, 0), 1.3f);
+            var mat = Gfx.UnlitTransparent(new Color(0.42f, 0.36f, 0.22f, 0.28f), tex);
+            var k = new MeshKit();
+            void Patch(float x, float z, float w, float d)
+                => k.Quad(new Vector3(x - w, 0.009f, z - d), new Vector3(x - w, 0.009f, z + d), new Vector3(x + w, 0.009f, z + d), new Vector3(x + w, 0.009f, z - d));
+            foreach (float s in new[] { -1f, 1f })
+            {
+                Patch(s * (hl - 1.6f), 0f, 1.8f, 3.2f);     // onde o goleiro vive
+                Patch(s * (hl - 5.5f), 0f, 2.2f, 2.6f);     // marca do pênalti / pequena área
+            }
+            Patch(0f, 0f, 3f, 3f);
+            var go = k.Object("Gramado gasto", mat, v.root, false);
         }
 
         /// <summary>

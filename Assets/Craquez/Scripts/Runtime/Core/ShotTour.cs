@@ -131,6 +131,37 @@ namespace Craquez
                     bc.cinematic = false;
                 }
                 yield return Shot(tag + "_jogo2", 3f);
+                if (mc != null && mc.view != null && (tag == "campo_noite" || tag == "futsal"))
+                {
+                    // sequência da corrida: tempo fixo por quadro (1/30 s) e câmera de lado acompanhando o
+                    // atleta mais rápido no momento (dá para montar um GIF e ver a passada)
+                    var bc = mc.view.bcam;
+                    AthleteView best = null; float bv = 0f;
+                    foreach (var av in mc.view.athletes) if (!av.p.isKeeper && av.p.vel.magnitude > bv) { bv = av.p.vel.magnitude; best = av; }
+                    if (best != null)
+                    {
+                        Time.captureFramerate = 30;
+                        bc.cinematic = true;
+                        for (int f = 0; f < 36; f++)
+                        {
+                            var pp = best.transform.position;
+                            var side = Quaternion.Euler(0, 90, 0) * new Vector3(best.p.vel.x, 0f, best.p.vel.y).normalized;
+                            if (side.sqrMagnitude < 0.01f) side = Vector3.right;
+                            bc.cam.transform.position = bc.cinePos = pp + side * 4.2f + Vector3.up * 1.2f;
+                            bc.cineLook = pp + Vector3.up * 0.95f;
+                            bc.cam.transform.LookAt(bc.cineLook);
+                            bc.cam.fieldOfView = bc.cineFov = 40f;
+                            yield return new WaitForEndOfFrame();
+                            _n++;
+                            var tex = ScreenCapture.CaptureScreenshotAsTexture();
+                            File.WriteAllBytes(Path.Combine(Dir, $"{tag}_corrida_{f:00}.png"), tex.EncodeToPNG());
+                            Destroy(tex);
+                            yield return null;
+                        }
+                        Time.captureFramerate = 0;
+                        bc.cinematic = false;
+                    }
+                }
                 if (mc != null && tag == "campo_noite")
                 {
                     // defesas: chute de média distância no canto (mergulho) e outro na altura do peito (encaixe)
