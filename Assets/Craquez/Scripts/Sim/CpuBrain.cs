@@ -218,6 +218,17 @@ namespace Craquez.Sim
                         bool run = Vector2.Dot(option.vel, new Vector2(dir, 0f)) > 3f;
                         Press(ref f, run && Noise(sim, 16) > 0.4f ? InputFrame.Through : InputFrame.Pass, 8 + (int)(Noise(sim, 17) * 8f));
                     }
+                    else if (oppD < 2.2f && option != null && sim.LaneFree(p.team, p.position, option.position) < (sim.mode.id == GameModes.Field ? 1.1f : 0.7f))
+                    {
+                        // pressionado e sem linha de passe: protege a bola e sai para o lado oposto ao marcador
+                        // (antes tocava assim mesmo, por dentro do marcador, e perdia a bola)
+                        var away = (p.position - opp.position).Norm();
+                        var side = new Vector2(-away.y, away.x);
+                        if (Vector2.Dot(side, toGoal) < 0f) side = -side;
+                        f.move = (away * 0.7f + side * 0.5f).Norm();
+                        f.buttons |= InputFrame.Shield;
+                        f.buttons &= ~InputFrame.Sprint;
+                    }
                     else if (oppD < 2.2f && option != null && Noise(sim, 2) < (0.05f + skill * 0.06f) * (1.5f - sty.dribble * 0.9f))
                     {
                         // pressionado: toca para o companheiro mais livre (não para uma direção qualquer)

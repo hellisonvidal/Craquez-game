@@ -30,6 +30,8 @@ namespace Craquez.Sim
         public int id, team, index;
         /// <summary>Anti-giro da IA: última direção pedida, giro acumulado e tempo de "seguir reto".</summary>
         public Vector2 aiLastIntent;
+        /// <summary>Giro acumulado do corpo (graus, decai em ~1 s): limita voltas seguidas no mesmo sentido.</summary>
+        public float bodyTurnAcc;
         public float aiTurnAcc, aiStraightT;
         public bool isKeeper;
         public int number = 1;
@@ -56,6 +58,8 @@ namespace Craquez.Sim
         /// saveSide = lado do mergulho no eixo y do campo; saveH = altura das mãos no alvo; saveDist = quanto precisa ir de lado.
         /// </summary>
         public int saveKind;
+        /// <summary>Ponte (mergulho lateral: rasteira, meia-altura ou no ângulo). O salto no alto (6) é de pé.</summary>
+        public bool Diving => saveKind >= 3 && saveKind <= 5;
         /// <summary>Cartões: amarelos recebidos e expulsão (fica fora de campo; no futsal volta outro em 2 min).</summary>
         public int yellows;
         public bool sentOff;

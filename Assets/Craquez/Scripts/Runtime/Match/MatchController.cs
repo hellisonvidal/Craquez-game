@@ -15,7 +15,7 @@ namespace Craquez
         enum Phase { Ceremony, Playing, Paused, Ended, Goal, Halftime }
 
         /// <summary>Ritmo da partida: o jogo todo (simulação, animações, bola) roda um pouco mais rápido que o tempo real.</summary>
-        public const float GameSpeed = 1.18f;
+        public const float GameSpeed = 1.26f;
         public MatchConfig cfg;
         public MatchSim sim;
         public MatchView view;

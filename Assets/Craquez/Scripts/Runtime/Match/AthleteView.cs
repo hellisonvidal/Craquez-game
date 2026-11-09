@@ -527,7 +527,7 @@ namespace Craquez
             var ballW = W(sim.ball.pos, sim.ball.z + 0.11f);
             Vector3 target;
             var chest = rig.spine.position;
-            if (_saveKindV >= 3)
+            if (_saveKindV >= 3 && _saveKindV <= 5)
             {
                 // mergulho: braços esticados "acima da cabeça" no plano do voo, puxando para a bola
                 var along = Quaternion.AngleAxis(-_saveSideV * (_saveKindV == 5 ? 18f : 6f), transform.forward) * (transform.up * 0.2f + transform.right * _saveSideV * 0.0f);
@@ -553,7 +553,7 @@ namespace Craquez
                 _pose.Rotate(lo, Quaternion.Slerp(Quaternion.identity, Quaternion.FromToRotation(hd.position - lo.position, handT - lo.position), w));
             }
             // pernas na ponte: juntas e esticadas, a de cima um pouco dobrada
-            if (_saveKindV >= 3)
+            if (_saveKindV >= 3 && _saveKindV <= 5)
             {
                 rig.bones.TryGetValue(_saveSideV > 0 ? "calf_l" : "calf_r", out var topCalf);
                 _pose.Rotate(topCalf, Quaternion.AngleAxis(25f * w, transform.right));
