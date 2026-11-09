@@ -1,13 +1,30 @@
-## Craquez 2.4.1
+## Craquez 2.5.0
 
-Jogo de futebol feito 100% com inteligência artificial, **gratuito**. Android, Windows e Linux.
+Jogo de futebol feito 100% com inteligência artificial, **gratuito**. Por enquanto, só Android.
 
-### Downloads
-- **Android**: `Craquez-v2.4.1.apk` (instale permitindo "fontes desconhecidas")
-- **Windows**: `Craquez-v2.4.1-Instalador-Windows.exe` (instalador) ou `Craquez-v2.4.1-Windows.zip` (portátil)
-- **Linux**: `Craquez-v2.4.1-Linux.tar.gz` → extraia e rode `./Craquez` (ou `./instalar.sh` para o atalho no menu)
+### Download
+- **Android**: `Craquez-v2.5.0.apk` (instale permitindo "fontes desconhecidas")
 
 ### Novidades
+- **Corrida de verdade**: as pernas seguem curvas de quadril e joelho medidas em caminhada, trote e
+  pique (no pique o apoio é curto, o quadril estende no impulso e o joelho recolhe alto); o ritmo das
+  passadas acompanha a velocidade (~1,4 ciclo/s no trote, ~2,1 no pique) e o corpo sobe na fase de voo
+  entre uma passada e outra. Antes as pernas balançavam em senoides, com ar de robô.
+- **Goleiro encaixando nos chutes**: as mãos desenhadas vão exatamente para onde a simulação calcula
+  as mãos dele e, com a bola chegando, para a própria bola.
+- **Cara a cara como no futebol real (~40%)**: o atacante sozinho conduz até perto e finaliza rápido,
+  colocado; o goleiro sai fechando o ângulo e abafa a bola rasteira (por cima dele, passa). Antes o
+  atacante chutava de ~20 m ou o goleiro tomava quase tudo, conforme o caso. Medido em 120 lances por
+  modalidade: campo 44%, society 34%, futsal 27% (gol menor). Referência: ~38% das chances claras
+  viram gol nas grandes ligas.
+- **Mira em gol pequeno**: no futsal o chute colocado não sai mais pela linha de fundo.
+- **Estádios**: reservas sentados nos bancos com o agasalho do time, técnico de pé na área técnica
+  (com as linhas tracejadas), mesa do 4º árbitro com a placa de substituição e o gramado gasto na
+  pequena área, na marca do pênalti e no círculo central — nada disso tapa o campo.
+- **Só Android por enquanto**: Windows e Linux saem quando a versão for aprovada.
+
+## Versão 2.4.1
+
 - **Goleiro sem mergulho à toa**: bola perto do corpo (até ~1,25 braço) é defendida de pé, inclinando;
   o mergulho é decidido na hora, com a leitura já certa (antes às vezes ele mergulhava no ângulo para
   uma bola que vinha quase nele). Chutes de longe bem colocados voltam a entrar de vez em quando
