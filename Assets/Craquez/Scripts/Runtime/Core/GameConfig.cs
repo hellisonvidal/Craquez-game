@@ -57,6 +57,13 @@ namespace Craquez
         }
         public static readonly string[] PlayerTagNames = { "Controlados e bola", "Todos", "Desligado" };
 
+        /// <summary>Faixa no rodapé com a escalação dos dois times (número e nome; destaca quem está com a bola).</summary>
+        public static bool LineupBar
+        {
+            get => PlayerPrefs.GetInt("lineup_bar", 1) == 1;
+            set { PlayerPrefs.SetInt("lineup_bar", value ? 1 : 0); PlayerPrefs.Save(); }
+        }
+
         public static bool Vibration
         {
             get => PlayerPrefs.GetInt("vibration", 1) == 1;

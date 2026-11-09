@@ -110,6 +110,19 @@ namespace Craquez
                 yield return new WaitForSecondsRealtime(1f);
                 yield return Shot(tag + "_inicio", 2.5f);
                 yield return Shot(tag + "_jogo", 6f);
+                if (weather == "chuva" && mc != null && mc.sim.puddles.Count > 0)
+                {
+                    // poça de perto: anéis da chuva e o reflexo
+                    var bc = mc.view.bcam;
+                    var pd = mc.sim.puddles[0];
+                    bc.cinematic = true;
+                    bc.cam.transform.position = bc.cinePos = new Vector3(pd.x + 5f, 2.6f, pd.y - 5f);
+                    bc.cineLook = new Vector3(pd.x, 0f, pd.y);
+                    bc.cam.transform.LookAt(bc.cineLook);
+                    bc.cam.fieldOfView = bc.cineFov = 45f;
+                    yield return Shot(tag + "_poca", 1.2f);
+                    bc.cinematic = false;
+                }
                 // close em um atleta (verifica corpo, uniforme e animação)
                 if (mc != null && mc.view != null && mc.view.athletes.Count > 3)
                 {
@@ -240,6 +253,24 @@ namespace Craquez
                     bc.cam.transform.LookAt(bc.cineLook);
                     bc.cam.fieldOfView = bc.cineFov = 62f;
                     yield return Shot("estadio_" + m, 1.2f);
+                    // de fora: vista aérea do entorno e a esplanada na altura de quem chega
+                    if (m == 1 || m == 2 || m == 6 || m == 13)
+                    {
+                        bc.showAll = true;
+                        bc.cam.transform.position = bc.cinePos = new Vector3(-hl * 1.4f, 70f, -hw * 3.6f);
+                        bc.cineLook = new Vector3(0f, 0f, 0f);
+                        bc.cam.transform.LookAt(bc.cineLook);
+                        bc.cam.fieldOfView = bc.cineFov = 55f;
+                        yield return Shot("estadio_" + m + "_aereo", 1.2f);
+                        float pzv = mc.view.venue.plazaZ;
+                        bc.cam.transform.position = bc.cinePos = new Vector3(hl * 0.35f, 1.7f, -(pzv + 9f));
+                        bc.cineLook = new Vector3(0f, 7f, -(pzv - 11f));
+                        bc.cam.transform.LookAt(bc.cineLook);
+                        bc.cam.fieldOfView = bc.cineFov = 60f;
+                        yield return Shot("estadio_" + m + "_esplanada", 1f);
+                        bc.showAll = false;
+                        bc.cam.fieldOfView = bc.cineFov = 62f;
+                    }
                     bc.cam.transform.position = bc.cinePos = new Vector3(0f, 3f, -hw - 2f);
                     bc.cineLook = new Vector3(hl * 0.9f, 7f, 0f);
                     bc.cam.transform.LookAt(bc.cineLook);

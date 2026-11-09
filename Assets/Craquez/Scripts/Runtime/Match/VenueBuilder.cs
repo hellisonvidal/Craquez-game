@@ -25,6 +25,10 @@ namespace Craquez
         public float tunnelDepth, tunnelHalfW;
         public string name = "";
         public float standDist = 12f;
+        /// <summary>Até onde vai o entorno do estádio (esplanada, avenida, estacionamento): a cidade e a paisagem começam depois.</summary>
+        public float outerR;
+        /// <summary>Meio da esplanada do lado da tribuna (z negativo), para as tomadas de fora.</summary>
+        public float plazaZ;
         /// <summary>Arquibancadas para as bandeiras da torcida: fileiras do lado de lá, atrás dos gols (0 = não há) e meia largura do lado de lá.</summary>
         public int flagRowsLong = 6, flagRowsEnd = 4;
         public float flagSpanLong;
@@ -97,6 +101,7 @@ namespace Craquez
             PitchWear(v, sim, hl, hw);
             CornerFlags(v, hl, hw, homeKit.c1);
             Pitchside(v, hl, hw, home, away, homeKit, night, quality);
+            Exterior(v, hl, hw, st, model, homeKit, night, quality, seed);
             if (st.ends) Screens(v, hl, hw, tier, home, away);
             if (st.scene == 0) { if (quality >= 1) City(v, hl, hw, tier, night, seed); }
             else Scenery(v, hl, hw, st, night, seed, quality);
@@ -214,7 +219,7 @@ namespace Craquez
             var winTex = WindowsTex(night, (int)(seed % 997));
             var bld = new MeshKit();
             var roofs = new MeshKit();
-            float r0 = hl + v.standDist + 70f;
+            float r0 = Mathf.Max(hl + v.standDist + 70f, v.outerR / 0.85f + 14f);   // depois do estacionamento
             int n = 70;
             for (int i = 0; i < n; i++)
             {

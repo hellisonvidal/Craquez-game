@@ -1410,6 +1410,7 @@ namespace Craquez
                     break;
                 case 2:
                     Add(UiKit.Cycler(list, "Nomes dos atletas", Settings.PlayerTagNames, Settings.PlayerTags, i => Settings.PlayerTags = i));
+                    Add(UiKit.Cycler(list, "Escalações no rodapé", new[] { "Ligado", "Desligado" }, Settings.LineupBar ? 0 : 1, i => Settings.LineupBar = i == 0));
                     Add(UiKit.Cycler(list, "Faltas", new[] { "Cena antes da cobrança", "Cobrança rápida" }, Settings.QuickRestarts ? 1 : 0, i => { Settings.QuickRestarts = i == 1; _cfg.quickRestarts = i == 1; }));
                     break;
                 case 4:

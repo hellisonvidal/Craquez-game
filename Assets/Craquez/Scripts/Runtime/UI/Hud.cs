@@ -100,6 +100,7 @@ namespace Craquez.UI
                 _power[t].sprite = _stamina[t].sprite;
                 pbg.gameObject.SetActive(false);
             }
+            Lineup(root, ta, tb);
             // aviso (falta, escanteio, clima...)
             _toastBox = UiKit.Image(root, new Color(0.02f, 0.03f, 0.07f, 0.85f), Theme.Round, "aviso").rectTransform.At(0.5f, 1, 640, 60, 0, -40);
             _toastCg = _toastBox.gameObject.AddComponent<CanvasGroup>();
@@ -280,6 +281,7 @@ namespace Craquez.UI
             }
             SetPieceHint();
             PlayerTags();
+            LineupUpdate();
             _toastT -= Time.unscaledDeltaTime;
             _toastCg.alpha = Mathf.Clamp01(_toastT * 3f);
             _goalT -= Time.unscaledDeltaTime;
@@ -312,6 +314,110 @@ namespace Craquez.UI
             if (want == _setPieceShown) return;
             _setPieceShown = want;
             _setPiece.text = want < 0 ? "" : InputRouter.SetPieceHelp(devices[_sim.setPieceTeam], want == 1, want == 2 ? "ESCANTEIO" : want == 3 ? "LATERAL" : "FALTA");
+        }
+
+        // ------------------------------------------------------------ escalações no rodapé
+        RectTransform _lineup;
+        CanvasGroup _lineupCg;
+        readonly Text[] _lineupNames = new Text[2];
+        int _lineupKey = int.MinValue;
+        readonly System.Text.StringBuilder _sb = new System.Text.StringBuilder(512);
+
+        /// <summary>
+        /// Faixa no pé da tela, entre os quadros dos jogadores controlados: uma linha por time com a cor
+        /// do uniforme, a sigla e os números e nomes dos atletas em campo (quem está com a bola em
+        /// destaque; expulsos apagados). O texto encolhe para caber numa linha.
+        /// </summary>
+        void Lineup(RectTransform root, TeamData ta, TeamData tb)
+        {
+            _lineup = UiKit.Image(root, new Color(0.02f, 0.03f, 0.07f, 0.78f), Theme.RoundSmall, "escalações").rectTransform;
+            _lineup.anchorMin = new Vector2(0f, 0f);
+            _lineup.anchorMax = new Vector2(1f, 0f);
+            _lineup.pivot = new Vector2(0.5f, 0f);
+            _lineup.offsetMin = new Vector2(460f, 8f);
+            _lineup.offsetMax = new Vector2(-460f, 72f);
+            _lineup.GetComponent<Image>().raycastTarget = false;
+            _lineupCg = _lineup.gameObject.AddComponent<CanvasGroup>();
+            _lineupCg.blocksRaycasts = false;
+            _lineupCg.interactable = false;
+            for (int t = 0; t < 2; t++)
+            {
+                var row = UiKit.Rect(_lineup, "time" + t);
+                row.anchorMin = new Vector2(0f, t == 0 ? 0.5f : 0f);
+                row.anchorMax = new Vector2(1f, t == 0 ? 1f : 0.5f);
+                row.offsetMin = new Vector2(8f, t == 0 ? 1f : 4f);
+                row.offsetMax = new Vector2(-10f, t == 0 ? -4f : -1f);
+                var k = _kits[t];
+                var c1 = UiKit.Image(row, k.c1, null, "cor").rectTransform;
+                c1.anchorMin = new Vector2(0f, 0.12f); c1.anchorMax = new Vector2(0f, 0.88f);
+                c1.pivot = new Vector2(0f, 0.5f);
+                c1.sizeDelta = new Vector2(12f, 0f);
+                c1.anchoredPosition = Vector2.zero;
+                c1.GetComponent<Image>().raycastTarget = false;
+                var c2 = UiKit.Image(c1, k.c2, null, "cor2").rectTransform;
+                c2.Place(0f, 0f, 1f, 0.35f);
+                c2.GetComponent<Image>().raycastTarget = false;
+                var abbr = UiKit.Label(row, (t == 0 ? ta : tb).shortName, 20, Theme.Head, Theme.Text, TextAnchor.MiddleLeft);
+                abbr.rectTransform.Place(0f, 0f, 0f, 1f, 18f, 0f, 0f, 0f);
+                abbr.rectTransform.sizeDelta = new Vector2(62f, 0f);
+                abbr.rectTransform.pivot = new Vector2(0f, 0.5f);
+                abbr.rectTransform.anchoredPosition = new Vector2(18f, 0f);
+                abbr.raycastTarget = false;
+                var names = UiKit.Label(row, "", 18, Theme.BodyBold, new Color(0.88f, 0.9f, 0.95f), TextAnchor.MiddleLeft);
+                names.rectTransform.Place(0f, 0f, 1f, 1f, 84f, 0f, 0f, 0f);
+                names.supportRichText = true;
+                names.horizontalOverflow = HorizontalWrapMode.Wrap;
+                names.verticalOverflow = VerticalWrapMode.Truncate;
+                names.resizeTextForBestFit = true;
+                names.resizeTextMinSize = 10;
+                names.resizeTextMaxSize = 18;
+                names.raycastTarget = false;
+                _lineupNames[t] = names;
+            }
+        }
+
+        void LineupUpdate()
+        {
+            if (_lineup == null) return;
+            bool cine = view != null && view.bcam != null && view.bcam.cinematic;
+            bool on = Settings.LineupBar && !cine;
+            _lineupCg.alpha = Mathf.MoveTowards(_lineupCg.alpha, on ? 1f : 0f, Time.unscaledDeltaTime * 4f);
+            if (_lineupCg.alpha <= 0f) return;
+            // entre os quadros dos jogadores controlados (que só aparecem para quem é humano)
+            float l = _pbox[0].gameObject.activeSelf ? 440f : 40f, r = _pbox[1].gameObject.activeSelf ? 440f : 40f;
+            if (!Mathf.Approximately(_lineup.offsetMin.x, l) || !Mathf.Approximately(-_lineup.offsetMax.x, r))
+            {
+                _lineup.offsetMin = new Vector2(l, _lineup.offsetMin.y);
+                _lineup.offsetMax = new Vector2(-r, _lineup.offsetMax.y);
+            }
+            // só remonta o texto quando algo muda (dono da bola, controlado, expulsões)
+            int key = _sim.ball.owner * 7919 + _sim.Controlled(0).id * 131 + _sim.Controlled(1).id * 17;
+            foreach (var p in _sim.players) if (p.sentOff) key = key * 31 + p.id + 1;
+            if (key == _lineupKey) return;
+            _lineupKey = key;
+            string hl = "#" + ColorUtility.ToHtmlStringRGB(Theme.Accent2);
+            for (int t = 0; t < 2; t++)
+            {
+                _sb.Length = 0;
+                bool first = true;
+                foreach (var p in _sim.players)
+                {
+                    if (p.team != t) continue;
+                    if (!first) _sb.Append("<color=#5c6375>  ·  </color>");
+                    first = false;
+                    bool owner = p.id == _sim.ball.owner;
+                    bool ctrl = _pbox[t].gameObject.activeSelf && _sim.Controlled(t).id == p.id;
+                    if (p.sentOff) _sb.Append("<color=#6b7080>").Append(p.number).Append(' ').Append(Surname(p.name)).Append("</color>");
+                    else if (owner) _sb.Append("<color=").Append(hl).Append(">").Append(p.number).Append(' ').Append(Surname(p.name)).Append("</color>");
+                    else
+                    {
+                        _sb.Append("<color=#9aa3b8>").Append(p.number).Append("</color> ");
+                        if (ctrl) _sb.Append("<color=#ffffff>").Append(Surname(p.name)).Append("</color>");
+                        else _sb.Append(Surname(p.name));
+                    }
+                }
+                _lineupNames[t].text = _sb.ToString();
+            }
         }
     }
 }
