@@ -2405,20 +2405,42 @@ namespace Craquez.Sim
             var to = target - p.position;
             float d = to.magnitude;
             bool moving = p.vel.magnitude > 0.5f;
-            if (d < (moving ? 0.3f : 0.6f))
+            bool fieldM = mode.id == GameModes.Field;
+            // longe do lance (fora da jogada): ajustes calmos — anda/trota, só sai do lugar quando o
+            // alvo se afasta de verdade e para sem ficar "acertando" a posição o tempo todo
+            float bd = ball.pos.Dist(p.position);
+            float near = fieldM ? 16f : halfLen * 0.32f, farB = fieldM ? 36f : halfLen * 0.75f;
+            float idle = urgent || p.isKeeper ? 0f : Mathf.Clamp01((bd - near) / (farB - near));
+            // atacando: quem está na linha da bola ou à frente dela segue fazendo as infiltrações
+            if (idle > 0f && possTeam == p.team && (p.position.x - ball.pos.x) * TeamDir(p.team) > -5f) idle *= 0.3f;
+            if (mode.id == GameModes.Futsal) idle = 0f;   // quadra pequena: todo mundo está na jogada
+            else if (!fieldM) idle *= 0.5f;
+            float stopR = moving ? Mathf.Lerp(0.3f, fieldM ? 1.0f : 0.5f, idle) : Mathf.Lerp(0.6f, fieldM ? 2.4f : 1.2f, idle);
+            if (d < stopR)
             {
                 p.intent = Vector2.zero;
                 if (ball.pos.Dist(p.position) > 0.1f)
                     p.facing = V2.RotateToward(p.facing, (ball.pos - p.position).Norm(), 0.05f);
             }
-            else p.intent = (to / d) * Mathf.Clamp(d / (urgent ? 1.2f : mode.id == GameModes.Field ? 4f : 2.4f), 0.15f, 1f);   // quadra: tudo mais perto, chega mais rápido   // indo na bola: chega forte, não freia antes
+            else
+            {
+                p.intent = (to / d) * Mathf.Clamp(d / (urgent ? 1.2f : fieldM ? 4f : 2.4f), 0.15f, 1f);   // quadra: tudo mais perto, chega mais rápido   // indo na bola: chega forte, não freia antes
+                if (idle > 0f)
+                {
+                    // andando (perto do lugar), trotando (médio) ou correndo só se estiver bem fora de posição
+                    float cap = d < (fieldM ? 6f : 3f) ? 0.3f : d < (fieldM ? 15f : 7f) ? 0.48f : 0.7f;
+                    float mag = p.intent.magnitude;
+                    float lim = Mathf.Lerp(1f, cap, idle);
+                    if (mag > lim) p.intent *= lim / mag;
+                }
+            }
             // chegando rápido num alvo que ficou de lado/para trás: freia primeiro (antes ele não
             // conseguia fazer a curva e ficava orbitando o ponto, rodando sem parar)
             float v = p.vel.magnitude;
             if (!urgent && v > 1.4f && d > 0.01f && d < v * v / 5f + 0.6f && Vector2.Dot(p.vel / v, to / d) < 0.55f)
                 p.intent = Vector2.zero;
             float lazy = 1.35f - 0.7f * p.work;   // quem tem mais disposição pega o pique antes
-            p.wantSprint = urgent || (d > (p.sprinting ? 7f : 11f) * lazy && p.stamina > 0.25f);
+            p.wantSprint = urgent || (d > (p.sprinting ? 7f : 11f) * lazy * (1f + idle) && p.stamina > 0.25f);
             p.faceBall = !urgent && d < 10f && ball.pos.Dist(p.position) < 35f;
         }
 
