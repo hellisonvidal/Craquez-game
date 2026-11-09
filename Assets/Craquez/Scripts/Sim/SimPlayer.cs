@@ -32,6 +32,8 @@ namespace Craquez.Sim
         public Vector2 aiLastIntent;
         /// <summary>Giro acumulado do corpo (graus, decai em ~1 s): limita voltas seguidas no mesmo sentido.</summary>
         public float bodyTurnAcc;
+        /// <summary>Goleiro saindo no cara a cara (fecha o ângulo, já armado: reage mais rápido).</summary>
+        public bool oneOnOne;
         public float aiTurnAcc, aiStraightT;
         public bool isKeeper;
         public int number = 1;

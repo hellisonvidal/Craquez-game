@@ -1308,7 +1308,7 @@ namespace Craquez.Sim
             float dir = TeamDir(p.team);
             float gx = halfLen * dir;
             float aimY;
-            if (Mathf.Abs(aim.y) > 0.2f) aimY = Mathf.Clamp(aim.y * 1.4f, -1f, 1f) * goalHalf * 0.8f;
+            if (Mathf.Abs(aim.y) > 0.2f) aimY = Mathf.Clamp(aim.y * 1.4f, -1f, 1f) * goalHalf * (goalHalf < 2f ? 0.68f : 0.8f);
             else
             {
                 // sem mira: canto longe do goleiro (adiantado para um lado) ou, com ele no meio, o segundo pau
@@ -1320,7 +1320,7 @@ namespace Craquez.Sim
             if (finesse)
             {
                 float side = Mathf.Abs(aimY) > 0.1f ? Mathf.Sign(aimY) : 1f;
-                aimY = side * goalHalf * 0.84f;
+                aimY = side * goalHalf * (goalHalf < 2f ? 0.6f : 0.84f);   // (gol pequeno: com a curva, 84% saía pela linha de fundo)
             }
             var target = new Vector2(gx + dir * 0.5f, aimY);
             var to = target - ball.pos;
@@ -2221,11 +2221,14 @@ namespace Craquez.Sim
             Vector2 target = goal;
             bool urgent = false;
             p.keeperSet = false;
+            if (ball.owner < 0 && tick - lastShotTick > 40) p.oneOnOne = false;
+            if (ball.owner >= 0 && players[ball.owner].team == p.team) p.oneOnOne = false;
             var toBall = ball.pos - goal;
             bool threat = false;
             // reação: o goleiro lê a trajetória ~0,15-0,27 s depois do chute (bons goleiros antes;
             // com jogadores na frente, a bola aparece tarde)
             int react = Mathf.RoundToInt(Mathf.Lerp(21f, 13f, p.defense)) - (p.Has(Trait.Reflexo) ? 2 : 0) + (Screened(p) ? 4 : 0);
+            if (p.oneOnOne) react = Mathf.Max(8, react - 3);   // cara a cara: já está armado esperando o chute
             bool reacting = tick - lastShotTick < react;
             if (ball.owner < 0 && ball.vel.x * dir < -5f && !reacting)
             {
@@ -2323,9 +2326,16 @@ namespace Craquez.Sim
                         if (m.team == p.team && !m.isKeeper && V2.ClosestOnSegment(m.position, ball.pos, goal).Dist(m.position) < 1.2f && (m.position - goal).magnitude < toBall.magnitude) covered = true;
                     if (!covered)
                     {
-                        float rush = Mathf.Min(toBall.magnitude * (0.35f + 0.15f * p.defense), mode.id == GameModes.Field ? 7f : 3.5f);
+                        // sai fechando o ângulo, com decisão (o goleiro de verdade encurta até 2-4 m do
+                        // atacante no cara a cara); bem perto, abafa baixo (corpo espalhado no chão)
+                        bool fieldK = mode.id == GameModes.Field;
+                        float rush = Mathf.Min(toBall.magnitude * (0.5f + 0.15f * p.defense), fieldK ? 10f : mode.id == GameModes.Futsal ? 3f : halfLen * 0.25f);
                         target = goal + toBall.normalized * rush;
-                        urgent = toBall.magnitude < (mode.id == GameModes.Field ? 9f : 5f);
+                        urgent = toBall.magnitude < (fieldK ? 16f : halfLen * 0.5f);
+                        p.oneOnOne = true;
+                        float dAtt = own.position.Dist(p.position);
+                        if (dAtt < (fieldK ? 2.4f : 1.8f) && p.saveKind == 0 && ball.z < 0.4f)
+                            StartSave(p, 2, Mathf.Sign(ball.pos.y - p.position.y), 0.2f, 0.4f, 0.55f);
                     }
                 }
                 bool ownDistribution = ball.lastTouchId == p.id && lastPasser == p.id && tick - passTick < 150;
@@ -3134,7 +3144,8 @@ namespace Craquez.Sim
                         dHand = Mathf.Min(dHand, DistToSegment(q, sh, hands));
                         if (p.Diving) dBody = Mathf.Min(dBody, DistToSegment(q, feet, sh));
                         // de pé, o corpo inteiro fecha o espaço até ~1,9 m
-                        else if (q.z < 1.8f) dBody = Mathf.Min(dBody, new Vector2(q.x - p.position.x, q.y - p.position.y).magnitude - 0.1f);
+                        // (abafando no chão o corpo só cobre a bola rasteira; por cima dele, passa)
+                        else if (q.z < (p.saveKind == 2 ? 0.45f : 1.8f)) dBody = Mathf.Min(dBody, new Vector2(q.x - p.position.x, q.y - p.position.y).magnitude - (p.saveKind == 2 ? -0.35f : 0.1f));
                     }
                     float dk = Mathf.Min(dHand, dBody);
                     if (dk > hr + (p.Has(Trait.Reflexo) ? 0.06f : 0f)) continue;
@@ -3178,6 +3189,8 @@ namespace Craquez.Sim
                         // tirar a bola do pé do atacante dentro da área (saída nos pés)
                         var o = players[ball.owner];
                         if (o.team == p.team || o.hold > 0f || d0 >= ownerD - 0.05f || tick - takeTick < 20) continue;
+                        // do pé do atacante só se a bola estiver solta dele (toque longo) ou abafando no chão
+                        if (o.position.Dist(ball.pos) < 0.6f && p.saveKind != 2) continue;
                     }
                     if (d0 < bestD) { bestD = d0; best = p; }
                     continue;
