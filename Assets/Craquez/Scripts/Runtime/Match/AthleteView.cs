@@ -804,7 +804,15 @@ namespace Craquez
             }
             _gkReady = Mathf.MoveTowards(_gkReady, threat, dt * 3f);
             float w = _gkReady;
-            if (w <= 0.01f) return;
+            // goleiro se ajeitando devagar (de lado, de costas): passadas curtas desenhadas, joelhos
+            // sempre dobrados para a frente (os clipes de andar de costas/de lado entortavam as pernas)
+            float mv = p.vel.magnitude;
+            bool shuffle = can && mv > 0.25f && mv < 3.4f && (anim == null || anim.ActionWeight < 0.3f)
+                && Vector2.Dot(p.vel / mv, p.facing) < 0.75f;
+            _gkShuffle = Mathf.MoveTowards(_gkShuffle, shuffle ? 1f : 0f, dt * 6f);
+            if (_gkShuffle > 0f) _gkStep += dt * Mathf.Max(mv, 0.8f) / 0.9f;   // ~0,45 m por passo
+            float legW = Mathf.Max(w, _gkShuffle);
+            if (legW <= 0.01f) return;
             var right = transform.right; var up = transform.up; var fwd = transform.forward;
             float t = Time.time * 2.2f + _phaseOff;
             float bounce = Mathf.Sin(t * 3f) * 3f * w;   // pequenos ajustes na ponta dos pés
@@ -818,11 +826,17 @@ namespace Craquez
                 {
                     float ps = Mathf.Sign(Vector3.Dot(th.position - rig.pelvis.position, right));
                     var lat = right * ps * 0.22f;
-                    var thighDir = (Quaternion.AngleAxis(-(32f + bounce), right) * -up + lat).normalized;
-                    _pose.Rotate(th, Quaternion.Slerp(Quaternion.identity, Quaternion.FromToRotation(cf.position - th.position, thighDir), w));
-                    var calfDir = (Quaternion.AngleAxis(-(32f + bounce) + 62f, right) * -up + lat * 0.6f).normalized;
-                    _pose.Rotate(cf, Quaternion.Slerp(Quaternion.identity, Quaternion.FromToRotation(ft.position - cf.position, calfDir), w));
+                    // passo: uma perna de cada vez sobe (quadril e joelho dobram mais) e vai na direção do movimento
+                    float lift = Mathf.Max(0f, Mathf.Sin((_gkStep + (side < 0 ? 0f : 0.5f)) * Mathf.PI * 2f)) * _gkShuffle;
+                    var mvW = new Vector3(p.vel.x, 0f, p.vel.y);
+                    var reach = mvW.sqrMagnitude > 0.01f ? mvW.normalized * 0.18f * lift : Vector3.zero;
+                    float hip = 30f + bounce * w + 18f * lift, knee = 58f + 34f * lift;
+                    var thighDir = (Quaternion.AngleAxis(-hip, right) * -up + lat + reach).normalized;
+                    _pose.Rotate(th, Quaternion.Slerp(Quaternion.identity, Quaternion.FromToRotation(cf.position - th.position, thighDir), legW));
+                    var calfDir = (Quaternion.AngleAxis(-hip + knee, right) * -up + lat * 0.6f + reach * 0.5f).normalized;
+                    _pose.Rotate(cf, Quaternion.Slerp(Quaternion.identity, Quaternion.FromToRotation(ft.position - cf.position, calfDir), legW));
                 }
+                if (w <= 0.01f) continue;
                 rig.bones.TryGetValue("upperarm" + sfx, out var ua);
                 rig.bones.TryGetValue("lowerarm" + sfx, out var la);
                 rig.bones.TryGetValue("hand" + sfx, out var hd);
@@ -836,9 +850,12 @@ namespace Craquez
                 }
             }
             rig.bones.TryGetValue("spine_01", out var sp1);
-            _pose.Rotate(sp1, Quaternion.AngleAxis(16f * w, right));
-            _pose.Rotate(rig.spine, Quaternion.AngleAxis(6f * w, right));
+            float tw = Mathf.Max(w, _gkShuffle * 0.5f);
+            _pose.Rotate(sp1, Quaternion.AngleAxis(16f * tw, right));
+            _pose.Rotate(rig.spine, Quaternion.AngleAxis(6f * tw, right));
         }
+
+        float _gkShuffle, _gkStep;
 
         // ------------------------------------------------------------ passada desenhada
         float _gPhase, _procW;
