@@ -229,7 +229,7 @@ namespace Craquez
     {
         Mesh _mesh;
         Vector3[] _rest, _cur;
-        float _w, _h, _top, _t, _phase, _sweepAmp, _sweepFreq, _restCycle, _prevAng, _angVel;
+        float _w, _h, _top, _t, _phase, _sweepAmp, _sweepFreq, _restCycle, _prevAng, _angVel, _ph, _hypeS, _ph2;
         bool _waved;
         Quaternion _base;
         public float hype;
@@ -281,13 +281,19 @@ namespace Craquez
             if (_waved)
             {
                 // agita em ciclos (pausa um pouco e volta); no gol/lance de perigo, agita sem parar e mais forte
+                // a empolgação chega aos poucos (sem trancos) e o ritmo só acelera um pouco
+                _hypeS = Mathf.MoveTowards(_hypeS, Mathf.Clamp01(hype), dt * 0.8f);
                 float cyc = Mathf.Repeat(_t + _phase * 3f, _restCycle) / _restCycle;
-                float active = Mathf.Max(Mathf.SmoothStep(0f, 1f, Mathf.Clamp01(Mathf.Sin(cyc * Mathf.PI) * 2.2f - 0.4f)), Mathf.Clamp01(hype));
-                float amp = _sweepAmp * (0.7f + 0.5f * Mathf.Clamp01(hype)) * active;
-                float fr = _sweepFreq * (1f + 0.5f * Mathf.Clamp01(hype));
+                float active = Mathf.Max(Mathf.SmoothStep(0f, 1f, Mathf.Clamp01(Mathf.Sin(cyc * Mathf.PI) * 2.2f - 0.4f)), _hypeS);
+                float amp = _sweepAmp * (0.7f + 0.4f * _hypeS) * active;
+                float fr = _sweepFreq * (1f + 0.25f * _hypeS);
+                // fase integrada: antes era tempo × frequência, e quando a frequência mudava (lance de
+                // perigo, gol) a fase dava um salto proporcional ao tempo de jogo — a bandeira "disparava"
+                _ph += dt * fr * Mathf.PI * 2f;
+                if (_ph > 1000f) _ph -= Mathf.PI * 2f * 150f;
                 // varredura em "8": vai e volta com um pouco de inclinação para a frente
-                ang = Mathf.Sin(_t * fr * Mathf.PI * 2f + _phase) * amp;
-                float lean = Mathf.Sin(_t * fr * Mathf.PI * 4f + _phase) * amp * 0.12f;
+                ang = Mathf.Sin(_ph + _phase) * amp;
+                float lean = Mathf.Sin(_ph * 2f + _phase) * amp * 0.12f;
                 transform.rotation = _base * Quaternion.AngleAxis(ang, Vector3.forward) * Quaternion.AngleAxis(lean, Vector3.right);
             }
             _angVel = Mathf.Lerp(_angVel, (ang - _prevAng) / dt, 1f - Mathf.Exp(-dt * 10f));
@@ -295,13 +301,15 @@ namespace Craquez
             // pano: arrasta atrás do movimento (curva no plano), ondula (fora do plano) e cai um pouco
             float drag = Mathf.Clamp(_angVel * 0.0045f, -0.9f, 0.9f);
             float speed = Mathf.Clamp01(Mathf.Abs(_angVel) / 80f);
-            float flutter = 0.1f + 0.18f * speed + 0.08f * Mathf.Clamp01(hype);
+            float flutter = 0.1f + 0.18f * speed + 0.08f * _hypeS;
+            _ph2 += dt * (6f + 4f * speed);   // (também integrada: a ondulação não "dispara")
+            if (_ph2 > 1000f) _ph2 -= Mathf.PI * 2f * 150f;
             for (int k = 0; k < _rest.Length; k++)
             {
                 var b = _rest[k];
                 float x = b.x / _w;           // 0 no mastro, 1 na ponta
                 float yb = (_top - b.y) / _h; // 0 em cima, 1 embaixo
-                float z = Mathf.Sin(_t * (6f + 4f * speed) - x * 5.5f + _phase) * flutter * x * _w * 0.35f
+                float z = Mathf.Sin(_ph2 - x * 5.5f + _phase) * flutter * x * _w * 0.35f
                         + Mathf.Sin(_t * 9.3f - x * 9f + yb * 2f) * 0.03f * x * _w;
                 float dy = -drag * x * x * _w * 0.55f - x * _w * 0.1f * (1f - speed) * yb;
                 float dx = -Mathf.Abs(drag) * x * x * _w * 0.12f;

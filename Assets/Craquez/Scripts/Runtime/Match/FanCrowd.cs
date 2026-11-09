@@ -90,7 +90,9 @@ namespace Craquez
                     tri.Add(i); tri.Add(i + 1); tri.Add(i + 2); tri.Add(i); tri.Add(i + 2); tri.Add(i + 3);
                 }
                 Face(P(-1, -1, 1), P(-1, 1, 1), P(1, 1, 1), P(1, -1, 1), Vector3.forward);
-                // (sem a face de trás: os torcedores olham para o campo; economiza memória)
+                // face de trás também: vistos de lado/de trás (câmera atrás do gol, drone) os torcedores
+                // "sumiam" — só apareciam as laterais finas
+                Face(P(1, -1, -1), P(1, 1, -1), P(-1, 1, -1), P(-1, -1, -1), Vector3.back);
                 Face(P(1, -1, 1), P(1, 1, 1), P(1, 1, -1), P(1, -1, -1), Vector3.right);
                 Face(P(-1, -1, -1), P(-1, 1, -1), P(-1, 1, 1), P(-1, -1, 1), Vector3.left);
                 Face(P(-1, 1, 1), P(-1, 1, -1), P(1, 1, -1), P(1, 1, 1), Vector3.up);
@@ -131,32 +133,40 @@ namespace Craquez
             var p = s.pos;
             if (s.lod)
             {
-                // fileiras do fundo: tronco e cabeça (as pernas ficam escondidas pela fileira da frente)
-                body.Box(p + q * new Vector3(0f, 1.0f * hgt, 0f), new Vector3(0.44f, 0.8f * hgt, 0.24f), q, shirt);
-                body.Box(p + q * new Vector3(0f, 1.56f * hgt, 0f), new Vector3(0.22f, 0.26f, 0.22f), q, skin);
-                arms[1].Box(p + q * new Vector3(0f, 1.75f * hgt, 0.02f), new Vector3(0.62f, 0.5f * hgt, 0.1f), q, skin);
-                arms[2].Box(p + q * new Vector3(0f, 1.25f * hgt, 0.16f), new Vector3(0.3f, 0.12f, 0.12f), q, skin);
-                arms[3].Box(p + q * new Vector3(0f, 1.66f * hgt, 0.0f), new Vector3(0.5f, 0.12f, 0.12f), q, skin);
+                // fileiras do fundo: tronco (com ombros) e cabeça (as pernas ficam escondidas pela fileira da frente)
+                body.Box(p + q * new Vector3(0f, 1.02f * hgt, 0f), new Vector3(0.52f, 0.82f * hgt, 0.32f), q, shirt);
+                body.Box(p + q * new Vector3(0f, 1.36f * hgt, 0f), new Vector3(0.6f, 0.16f, 0.32f), q, shirt);
+                body.Box(p + q * new Vector3(0f, 1.6f * hgt, 0f), new Vector3(0.25f, 0.28f, 0.25f), q, skin);
+                body.Box(p + q * new Vector3(0f, 1.76f * hgt, -0.01f), new Vector3(0.27f, 0.07f, 0.27f), q, hair);
+                arms[0].Box(p + q * new Vector3(0f, 1.08f * hgt, 0.02f), new Vector3(0.66f, 0.5f * hgt, 0.16f), q, shirt);
+                arms[1].Box(p + q * new Vector3(0f, 1.8f * hgt, 0.02f), new Vector3(0.72f, 0.52f * hgt, 0.14f), q, skin);
+                arms[2].Box(p + q * new Vector3(0f, 1.28f * hgt, 0.2f), new Vector3(0.34f, 0.15f, 0.16f), q, skin);
+                arms[3].Box(p + q * new Vector3(0f, 1.7f * hgt, 0.0f), new Vector3(0.58f, 0.15f, 0.15f), q, skin);
                 return;
             }
-            // pernas e tênis
-            body.Box(p + q * new Vector3(0f, 0.42f * hgt, 0f), new Vector3(0.3f, 0.84f * hgt, 0.2f), q, pants);
-            body.Box(p + q * new Vector3(0f, 0.04f, 0.04f), new Vector3(0.32f, 0.08f, 0.28f), q, r.NextDouble() < 0.5 ? 14 : 15);
-            // tronco com a barra na segunda cor
-            body.Box(p + q * new Vector3(0f, 1.12f * hgt, 0f), new Vector3(0.42f, 0.56f * hgt, 0.24f), q, shirt);
-            body.Box(p + q * new Vector3(0f, 0.86f * hgt, 0f), new Vector3(0.43f, 0.06f, 0.25f), q, shirt2);
-            // cabeça, cabelo (ou boné na cor do time)
-            body.Box(p + q * new Vector3(0f, 1.55f * hgt, 0f), new Vector3(0.22f, 0.25f, 0.22f), q, skin);
-            if (r.NextDouble() < 0.25) body.Box(p + q * new Vector3(0f, 1.7f * hgt, 0.03f), new Vector3(0.25f, 0.07f, 0.3f), q, shirt);
-            else if (r.NextDouble() < 0.85) body.Box(p + q * new Vector3(0f, 1.68f * hgt, -0.01f), new Vector3(0.24f, 0.06f, 0.24f), q, hair);
+            // duas pernas e tênis (antes um bloco só, fino)
             for (int side = -1; side <= 1; side += 2)
             {
-                arms[0].Box(p + q * new Vector3(side * 0.27f, 1.1f * hgt, 0.02f), new Vector3(0.11f, 0.56f * hgt, 0.12f), q, shirt, new Vector3(-8f, 0f, side * 6f));
-                arms[1].Box(p + q * new Vector3(side * 0.3f, 1.66f * hgt, 0.02f), new Vector3(0.11f, 0.58f * hgt, 0.12f), q, skin, new Vector3(0f, 0f, -side * 18f));
+                body.Box(p + q * new Vector3(side * 0.1f, 0.43f * hgt, 0f), new Vector3(0.17f, 0.86f * hgt, 0.2f), q, pants);
+                body.Box(p + q * new Vector3(side * 0.1f, 0.045f, 0.05f), new Vector3(0.17f, 0.09f, 0.3f), q, r.NextDouble() < 0.5 ? 14 : 15);
+            }
+            // tronco mais encorpado (peito e ombros) com a barra na segunda cor
+            body.Box(p + q * new Vector3(0f, 1.12f * hgt, 0f), new Vector3(0.5f, 0.58f * hgt, 0.3f), q, shirt);
+            body.Box(p + q * new Vector3(0f, 1.38f * hgt, 0f), new Vector3(0.58f, 0.14f, 0.3f), q, shirt);
+            body.Box(p + q * new Vector3(0f, 0.86f * hgt, 0f), new Vector3(0.51f, 0.07f, 0.31f), q, shirt2);
+            // pescoço, cabeça, cabelo (ou boné na cor do time)
+            body.Box(p + q * new Vector3(0f, 1.47f * hgt, 0f), new Vector3(0.12f, 0.08f, 0.12f), q, skin);
+            body.Box(p + q * new Vector3(0f, 1.6f * hgt, 0f), new Vector3(0.24f, 0.27f, 0.25f), q, skin);
+            if (r.NextDouble() < 0.25) body.Box(p + q * new Vector3(0f, 1.75f * hgt, 0.03f), new Vector3(0.27f, 0.08f, 0.33f), q, shirt);
+            else if (r.NextDouble() < 0.85) body.Box(p + q * new Vector3(0f, 1.74f * hgt, -0.01f), new Vector3(0.26f, 0.07f, 0.27f), q, hair);
+            for (int side = -1; side <= 1; side += 2)
+            {
+                arms[0].Box(p + q * new Vector3(side * 0.33f, 1.1f * hgt, 0.02f), new Vector3(0.14f, 0.58f * hgt, 0.15f), q, shirt, new Vector3(-8f, 0f, side * 6f));
+                arms[1].Box(p + q * new Vector3(side * 0.36f, 1.7f * hgt, 0.02f), new Vector3(0.13f, 0.6f * hgt, 0.14f), q, skin, new Vector3(0f, 0f, -side * 18f));
                 // palmas: antebraços para a frente, mãos se encontrando diante do peito
-                arms[2].Box(p + q * new Vector3(side * 0.14f, 1.3f * hgt, 0.2f), new Vector3(0.1f, 0.1f, 0.36f), q, skin, new Vector3(-20f, -side * 30f, 0f));
+                arms[2].Box(p + q * new Vector3(side * 0.16f, 1.3f * hgt, 0.22f), new Vector3(0.13f, 0.13f, 0.38f), q, skin, new Vector3(-20f, -side * 30f, 0f));
                 // mãos na cabeça: cotovelos abertos para os lados e para cima
-                arms[3].Box(p + q * new Vector3(side * 0.24f, 1.6f * hgt, 0.0f), new Vector3(0.1f, 0.4f * hgt, 0.11f), q, skin, new Vector3(0f, 0f, side * 55f));
+                arms[3].Box(p + q * new Vector3(side * 0.27f, 1.64f * hgt, 0.0f), new Vector3(0.13f, 0.42f * hgt, 0.13f), q, skin, new Vector3(0f, 0f, side * 55f));
             }
         }
 
@@ -175,7 +185,11 @@ namespace Craquez
         public static void Build(Transform parent, Quaternion rot, List<List<Spot>> groups, Color h1, Color h2, Color a1, Color a2, int seed, bool mixed)
         {
             if (groups == null || groups.Count == 0) return;
-            var mat = Gfx.Lit(Color.white, Palette(h1, h2, a1, a2, HomeKits, AwayKits), 0.05f);
+            // um pouco de luz própria (a mesma paleta): debaixo da cobertura, na sombra, a torcida ficava
+            // quase preta e alguns blocos mal apareciam
+            var pal = Palette(h1, h2, a1, a2, HomeKits, AwayKits);
+            var mat = Gfx.Emissive(Color.white, new Color(0.22f, 0.22f, 0.22f), pal);
+            mat.SetFloat("_Smoothness", 0.05f);
             int gi = 0;
             foreach (var g in groups)
             {

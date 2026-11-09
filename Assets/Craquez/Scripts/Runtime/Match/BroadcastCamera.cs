@@ -59,6 +59,8 @@ namespace Craquez
         public bool cinematic;
         public Vector3 cinePos, cineLook;
         public float cineFov = 40f;
+        /// <summary>Entrada dos vestiários (do lado da câmera): só aparece nas cenas (cerimônia, replays).</summary>
+        public Transform entrance;
 
         public void Setup(Camera c, MatchSim s, int m)
         {
@@ -227,6 +229,7 @@ namespace Craquez
             _baseFov = cam.fieldOfView;
             cam.fieldOfView = FitAspect(_baseFov, cam.aspect);
             UpdateOccluders(cinematic ? cineLook : _focus);
+            if (entrance != null && entrance.gameObject.activeSelf != cinematic) entrance.gameObject.SetActive(cinematic);
         }
 
         float _baseFov;
@@ -278,20 +281,22 @@ namespace Craquez
             float height, back, fov;
             switch (kind)
             {
-                case Kind.TvClose: height = field ? 11f : 7f; back = field ? 28f : 15f; fov = 34f; break;
+                case Kind.TvClose: height = field ? 9f : 7f; back = field ? 19f : 15f; fov = field ? 32f : 34f; break;
                 case Kind.Tactical: height = field ? 42f : 20f; back = field ? 36f : 18f; fov = 38f; break;
                 case Kind.Pitchside: height = field ? 2.6f : 2.1f; back = field ? 10f : 5f; fov = 46f; break;
                 case Kind.Wide: height = field ? 30f : 14f; back = field ? 58f : 24f; fov = 34f; break;   // o campo todo
                 // aberta aproximada: alta como a aberta (vê a jogada e o posicionamento), mas fechada
                 // na bola — atletas grandes o bastante para ver os detalhes
                 case Kind.WideClose: height = field ? 21f : 11f; back = field ? 40f : 18f; fov = field ? 24f : 30f; break;
-                default: height = field ? 18f : 10f; back = field ? 38f : 16f; fov = field ? 31f : 38f; break;
+                // TV (padrão): no campo, mais perto do jogo e de frente (antes 18 m de altura a 38 m da
+                // lateral: os atletas ficavam pequenos)
+                default: height = field ? 13f : 10f; back = field ? 26f : 16f; fov = field ? 30f : 38f; break;
             }
             height *= zk;
             back *= zk;
             fov -= nearGoal * 4f;
             _dist = Mathf.Lerp(_dist <= 0 ? back : _dist, back * (1f - nearGoal * 0.1f), 1f - Mathf.Exp(-dt * 1.5f));
-            var pos = new Vector3(_focus.x * (kind == Kind.Pitchside ? 0.95f : 0.82f), height, -(hw + _dist) + _focus.z * 0.25f);
+            var pos = new Vector3(_focus.x * (kind == Kind.Pitchside ? 0.95f : field && (kind == Kind.Tv || kind == Kind.TvClose) ? 0.9f : 0.82f), height, -(hw + _dist) + _focus.z * 0.25f);
             pos += ShakeOffset(dt, 0.25f);
             cam.transform.position = pos;
             var look = _focus + Vector3.up * (kind == Kind.Pitchside ? 1.1f : 0.6f);

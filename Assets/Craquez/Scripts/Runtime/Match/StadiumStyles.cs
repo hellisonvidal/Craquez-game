@@ -283,31 +283,11 @@ namespace Craquez
             k.Object("Arco", Gfx.Lit(new Color(0.92f, 0.92f, 0.94f), null, 0.5f, 0.5f), v.root, true);
         }
 
-        /// <summary>Faixa de camarotes / LED no meio de cada arquibancada.</summary>
-        static void StandBand(Venue v, float hl, float hw, StadiumStyle st, bool night)
-        {
-            if (st.band.a <= 0f) return;
-            int r = st.rows / 2;
-            float y = 1.1f + r * 0.42f, d = hw + 7.5f + r * 0.8f - 0.05f;
-            var k = new MeshKit();
-            void Face(float len, float dist, float yaw)
-            {
-                var rot = Quaternion.Euler(0, yaw, 0);
-                var a = rot * new Vector3(-len / 2, y, -dist);
-                var b = rot * new Vector3(len / 2, y, -dist);
-                k.Quad(a, b, b + Vector3.up * 0.75f, a + Vector3.up * 0.75f);
-            }
-            Face((hl + 9f) * 2f, d, 180f);
-            if (st.ends)
-            {
-                float de = hl + 9f + r * 0.8f - 0.05f;
-                Face((hw + 7.5f) * 2f, de, 90f);
-                Face((hw + 7.5f) * 2f, de, -90f);
-            }
-            var m = st.led ? Gfx.Emissive(Color.black, st.band * (night ? 3f : 2f)) : Gfx.Lit(st.band, null, 0.4f);
-            if (st.led) v.neonMats.Add(m);
-            k.Object("Faixa de camarotes", m, v.root, false);
-        }
+        /// <summary>
+        /// (Antes: faixa de camarotes / LED de 0,75 m no meio de cada arquibancada. Retirada: vista da
+        /// câmera, ela passava na frente da torcida como uma tarja. A cor do estádio fica na testeira.)
+        /// </summary>
+        static void StandBand(Venue v, float hl, float hw, StadiumStyle st, bool night) { }
 
         /// <summary>Luz na beirada da cobertura (refletores em linha) ou postes baixos nas laterais.</summary>
         static void StyledLights(Venue v, float hl, float hw, StadiumStyle st, bool night)

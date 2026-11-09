@@ -1035,13 +1035,6 @@ namespace Craquez
             }
             float sideFix = Mathf.Abs(side) > 4f ? side - Mathf.Sign(side) * 4f : 0f;
             if (Mathf.Abs(sideFix) > 0.1f) _pose.Rotate(rig.spine, Quaternion.AngleAxis(sideFix * 0.8f * w, fwd));
-            // ombros mais baixos (o modelo deixava os ombros "encolhidos", altos demais)
-            foreach (var cn in new[] { "clavicle_l", "clavicle_r" })
-            {
-                if (!rig.bones.TryGetValue(cn, out var clv) || clv.childCount == 0) continue;
-                float cs = Mathf.Sign(Vector3.Dot(clv.GetChild(0).position - rig.spine.position, right));
-                _pose.Rotate(clv, Quaternion.AngleAxis(-cs * 17f, fwd));   // linha dos ombros bem abaixo da cabeça
-            }
             // peito aberto: o topo da coluna levemente para trás (ombros não caem para a frente)
             _pose.Rotate(rig.spine, Quaternion.AngleAxis(-3f * w * (1f - Mathf.Clamp01(spd / 7f)), right));
         }
@@ -1082,7 +1075,7 @@ namespace Craquez
 
         void FeetFirm()
         {
-            if (p.slide > 0f || (p.isKeeper && p.dive > 0f) || p.down > 0f) return;
+            if (p.slide > 0f || (p.isKeeper && (p.dive > 0f || p.Diving || _saveRec > 0f)) || p.down > 0f) return;
             PoseFix.Feet(rig, transform, _pose, anim != null ? anim.ActionWeight : 0f);
         }
 
@@ -1114,7 +1107,12 @@ namespace Craquez
             float err = lowest - lift;
             // suaviza para não tremer, mas corrige rápido
             _ground = Mathf.Lerp(_ground, err, 1f - Mathf.Exp(-Time.deltaTime * 18f));
-            if (p.slide <= 0f && !(p.isKeeper && p.dive > 0f) && p.stun < 0.5f && p.down <= 0f)
+            // (goleiro em qualquer fase da defesa — voo, queda, deitado, levantando — fica fora: antes,
+            // deitado com as pernas no alto, o corpo era puxado para baixo até o pé tocar o chão e
+            // metade dele sumia dentro do gramado)
+            bool keeperSave = p.isKeeper && (p.dive > 0f || p.saveKind > 0 || _saveRec > 0f);
+            if (keeperSave) _ground = Mathf.Lerp(_ground, 0f, 1f - Mathf.Exp(-Time.deltaTime * 10f));
+            if (p.slide <= 0f && !keeperSave && p.stun < 0.5f && p.down <= 0f)
                 rig.model.position -= Vector3.up * _ground;
             // sombra de contato
             if (_shadow == null)
@@ -1146,9 +1144,36 @@ namespace Craquez
             if (_uaR != null) _uaR.localPosition = _uaRBase * 0.88f;
         }
 
+        /// <summary>
+        /// Ombros baixos, acompanhando o fim do pescoço: as clavículas descem ~24° e o pescoço fica um
+        /// pouco mais longo. Vale em todos os estados (antes só na postura de pé: na comemoração, na
+        /// queda e nas defesas os ombros voltavam a ficar quase na altura do pescoço).
+        /// </summary>
+        void LowerShoulders()
+        {
+            if (rig.spine == null) return;
+            if (_neckT == null && rig.bones.TryGetValue("neck_01", out _neckT)) _neckPos0 = _neckT.localPosition;
+            if (_neckT != null) _neckT.localPosition = _neckPos0 * 1.12f;
+            var fwd = transform.forward;
+            var right = transform.right;
+            // nos braços para cima (comemoração, salto do goleiro) desce menos, para o braço não "quebrar"
+            float k = (_celebrate > 0f && _armsUp > 0.3f) || (p.isKeeper && p.saveKind > 0) ? 0.45f : 1f;
+            foreach (var cn in Clavicles)
+            {
+                if (!rig.bones.TryGetValue(cn, out var clv) || clv.childCount == 0) continue;
+                float cs = Mathf.Sign(Vector3.Dot(clv.GetChild(0).position - rig.spine.position, right));
+                _pose.Rotate(clv, Quaternion.AngleAxis(-cs * 24f * k, fwd));
+            }
+        }
+
+        Transform _neckT;
+        Vector3 _neckPos0;
+        static readonly string[] Clavicles = { "clavicle_l", "clavicle_r" };
+
         void LateUpdate()
         {
             if (rig != null) NarrowShoulders();
+            if (rig != null && p != null) LowerShoulders();
             if (p != null && rig != null)
             {
                 // ações (cortes, fintas, giro) mantêm um pouco do balanço do quadril; locomoção, nada

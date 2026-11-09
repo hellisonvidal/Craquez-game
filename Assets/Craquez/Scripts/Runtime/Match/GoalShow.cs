@@ -160,7 +160,7 @@ namespace Craquez
             if (imp > 1.5f && _view.venue != null)
             {
                 var bw = new Vector3(_sim.ball.pos.x, _sim.ball.z + _sim.ball.radius, _sim.ball.pos.y);
-                foreach (var n in _view.venue.nets) n.Hit(bw, imp * 1.4f);
+                foreach (var n in _view.venue.nets) n.Hit(bw, imp * 0.45f);   // (o bolsão vem da bola: MatchView chama Press)
                 if (imp > 6f) Sfx.Net();
             }
             Vector2 sPos = _scorer >= 0 ? _sim.players[_scorer].position : _spot;

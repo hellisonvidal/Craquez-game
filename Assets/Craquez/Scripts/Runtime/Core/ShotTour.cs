@@ -133,8 +133,33 @@ namespace Craquez
                 yield return Shot(tag + "_jogo2", 3f);
                 if (mc != null && tag == "campo_noite")
                 {
-                    // gol forçado: bola entrando no canto (rede balançando) e a comemoração sem corte
+                    // defesas: chute de média distância no canto (mergulho) e outro na altura do peito (encaixe)
                     var sim = mc.sim;
+                    var bcK = mc.view.bcam;
+                    foreach (var (yT, zT, nm) in new[] { (2.6f, 0.4f, "goleiro_mergulho"), (0.2f, 1.4f, "goleiro_encaixe"), (0.6f, 2.0f, "goleiro_alto") })
+                    {
+                        float gxK = sim.halfLen;
+                        SimPlayer gkK = null;
+                        foreach (var q in sim.players) if (q.isKeeper && Mathf.Sign(-sim.halfLen * sim.TeamDir(q.team)) == 1f) gkK = q;
+                        if (gkK == null) break;
+                        gkK.position = new Vector2(gxK - 1.5f, 0f); gkK.vel = Vector2.zero; gkK.saveKind = 0;
+                        var from = new Vector2(gxK - 20f, 3f);
+                        var tgt = new Vector2(gxK - 1.5f, yT);
+                        var dd = tgt - from; float tt = dd.magnitude / 24f;
+                        sim.ball.owner = -1; sim.ball.pos = from; sim.ball.vel = dd / tt; sim.ball.z = 0.11f;
+                        sim.ball.vz = (zT + 0.5f * SimBall.G * tt * tt - 0.11f) / tt;
+                        sim.ball.lastTouchTeam = 1 - gkK.team; sim.lastShotTick = sim.tick;
+                        bcK.cinematic = true;
+                        bcK.cam.transform.position = bcK.cinePos = new Vector3(gxK - 9f, 2.4f, -7f);
+                        bcK.cineLook = new Vector3(gxK - 1.5f, 1.0f, 0f);
+                        bcK.cam.transform.LookAt(bcK.cineLook);
+                        bcK.cam.fieldOfView = bcK.cineFov = 40f;
+                        yield return Shot(nm, 0.62f);
+                        yield return Shot(nm + "2", 0.35f);
+                        bcK.cinematic = false;
+                        yield return new WaitForSecondsRealtime(1.5f);
+                    }
+                    // gol forçado: bola entrando no canto (rede balançando) e a comemoração sem corte
                     sim.ball.owner = -1;
                     sim.ball.pos = new Vector2(sim.halfLen - 1.2f, 1.5f);
                     sim.ball.vel = new Vector2(24f, 0.5f);
@@ -182,6 +207,21 @@ namespace Craquez
                     bc.cineLook = new Vector3(hl * 0.9f, 7f, 0f);
                     bc.cam.transform.LookAt(bc.cineLook);
                     yield return Shot("estadio_" + m + "_fundo", 1f);
+                    // túnel dos vestiários, gol de perto (traves e rede) e a torcida da frente
+                    var tz = mc.view.venue.tunnel.z;
+                    bc.cam.transform.position = bc.cinePos = new Vector3(2.5f, 2.2f, tz + 9f);
+                    bc.cineLook = new Vector3(0f, 1.6f, tz - 4f);
+                    bc.cam.transform.LookAt(bc.cineLook);
+                    bc.cam.fieldOfView = bc.cineFov = 48f;
+                    if (m == 1 || m == 6) yield return Shot("estadio_" + m + "_tunel", 1f);
+                    bc.cam.transform.position = bc.cinePos = new Vector3(hl - 7f, 2.0f, -6f);
+                    bc.cineLook = new Vector3(hl + 1f, 1.2f, 0f);
+                    bc.cam.transform.LookAt(bc.cineLook);
+                    if (m == 1) yield return Shot("estadio_gol_perto", 0.8f);
+                    bc.cam.transform.position = bc.cinePos = new Vector3(0f, 6f, hw + 2f);
+                    bc.cineLook = new Vector3(6f, 9f, hw + 16f);
+                    bc.cam.transform.LookAt(bc.cineLook);
+                    if (m == 1 || m == 9) yield return Shot("estadio_" + m + "_torcida", 0.8f);
                     bc.cinematic = false;
                 }
                 _app.Tour_EndMatch();

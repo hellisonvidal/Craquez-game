@@ -102,6 +102,7 @@ namespace Craquez
             var roots = new System.Collections.Generic.List<Transform> { venue.root };
             if (_occRoots != null) roots.AddRange(_occRoots);
             bcam.SetOccluders(roots.ToArray());
+            bcam.entrance = venue.entrance;
             bcam.SnapToBall();
             weather = gameObject.AddComponent<WeatherFx>();
             string wk = c.weather == "aleatorio" ? WeatherFx.Kinds[(int)(c.seed % 5)] : c.weather;
@@ -459,7 +460,7 @@ namespace Craquez
                     _silence = homeGoal ? 0f : 6f;
                     bcam.Shake(0.6f);
                     foreach (var n in venue.nets)
-                        n.Hit(new Vector3(sim.ball.pos.x, sim.ball.z + 0.3f, sim.ball.pos.y), sim.ball.Speed * 0.35f);   // o tranco forte vem quando a bola chega ao fundo
+                        n.Hit(new Vector3(sim.ball.pos.x, sim.ball.z + 0.3f, sim.ball.pos.y), sim.ball.Speed * 0.15f);   // (o bolsão vem da própria bola: Press)
                     break;
             }
         }
@@ -546,7 +547,8 @@ namespace Craquez
             {
                 var bw = new Vector3(sim.ball.pos.x, sim.ball.z + BallCatalog.Radius(sim.mode.id), sim.ball.pos.y);
                 var bv = new Vector3(sim.ball.vel.x, sim.ball.vz, sim.ball.vel.y);
-                foreach (var n in venue.nets) n.Touch(bw, bv, 0.35f);
+                // a rede envolve a bola (raio real da bola)
+                foreach (var n in venue.nets) n.Press(bw, bv, BallCatalog.Radius(sim.mode.id));
             }
             if (sim == null) return;
             // bola interpolada + rotação pelo rolamento

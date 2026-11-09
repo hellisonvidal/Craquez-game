@@ -1,20 +1,53 @@
-## Craquez 2.3.1
+## Craquez 2.4.0
 
 Jogo de futebol feito 100% com inteligência artificial, **gratuito**. Android, Windows e Linux.
 
 ### Downloads
-- **Android**: `Craquez-v2.3.1.apk` (instale permitindo "fontes desconhecidas")
-- **Windows**: `Craquez-v2.3.1-Instalador-Windows.exe` (instalador) ou `Craquez-v2.3.1-Windows.zip` (portátil)
-- **Linux**: `Craquez-v2.3.1-Linux.tar.gz` → extraia e rode `./Craquez` (ou `./instalar.sh` para o atalho no menu)
+- **Android**: `Craquez-v2.4.0.apk` (instale permitindo "fontes desconhecidas")
+- **Windows**: `Craquez-v2.4.0-Instalador-Windows.exe` (instalador) ou `Craquez-v2.4.0-Windows.zip` (portátil)
+- **Linux**: `Craquez-v2.4.0-Linux.tar.gz` → extraia e rode `./Craquez` (ou `./instalar.sh` para o atalho no menu)
 
 ### Novidades
-- **Corpo**: mãos ~32% menores que o modelo original e linha dos ombros bem mais baixa.
+- **Goleiro sem gols bobos de longe**: ele defende de onde está (antes, adiantado, corria de costas
+  até a linha do gol enquanto a bola vinha e mergulhava voando para trás); só recua quando a bola vai
+  passar por cima das mãos. No salto para a bola alta as mãos vão na bola (antes iam para o lado,
+  como num mergulho), no encaixe as mãos alcançam a bola até o comprimento do braço, e a leitura do
+  chute se corrige enquanto a bola viaja. Em partidas CPU x CPU, os gols de fora da área caíram de
+  ~1 em 11 chutes para ~1 em 100.
+- **Goleiro não some mais na queda**: deitado depois do mergulho ele não é mais puxado para dentro do
+  gramado, e os pés não ficam presos ao chão durante a defesa.
+- **Reposição do goleiro**: rolada firme no pé do companheiro, arremesso por cima em arco baixo e
+  chutão num ângulo de verdade, com o alcance calculado pela física da bola (antes a bola subia
+  quase na vertical e caía curta, no meio dos adversários); escolhe quem está sozinho. O goleiro não
+  pega mais de novo a própria reposição (no futsal ele rolava a bola, corria atrás e agarrava outra vez).
+- **Sem giros tentando passar para trás**: pressionado e sem linha de passe, o atleta protege a bola
+  e sai para o lado contrário ao marcador; o passe para trás vem depois de girar o corpo com a bola;
+  o passe nunca vai "por dentro" do marcador colado; ninguém dá voltas seguidas no mesmo sentido.
+  No futsal, os passes perdidos caíram de 37% para 23% e os giros, quase pela metade.
+- **Jogo um pouco mais rápido e passes mais fortes** (na quadra, o passe curto saía a ~4,5 m/s).
+- **Rede de verdade**: a bola afunda a rede até ~60 cm, freia suave, a rede devolve devagar e a bola
+  escorrega para baixo; o pano envolve a bola (malha mais fina) e volta balançando.
+- **Traves completas**: barras de cima ligando o travessão aos apoios de trás e a barra de trás.
+- **Túnel dos vestiários em 3D**: corredor de verdade atrás da porta (piso, paredes com a faixa do
+  clube, luminárias, fundo iluminado); os times saem lá de dentro na cerimônia.
+- **Câmera do campo mais perto do jogo**, de frente (TV e TV Próxima).
+- **Ombros mais baixos**, acompanhando o fim do pescoço, em todas as situações (antes, na comemoração,
+  nas quedas e nas defesas, voltavam a ficar altos).
+- **Torcedores 3D encorpados**: ombros, duas pernas, braços mais grossos, vistos de qualquer lado e
+  sem sumir na sombra da cobertura.
+- **Bandeiras sem "disparar"**: o ritmo muda aos poucos (antes, num lance de perigo, a bandeira
+  acelerava de repente).
+- **Coberturas dos cantos** na mesma altura das outras (não viram mais uma faixa na frente da torcida).
+- **Corpo**: mãos ~32% menores que o modelo original.
 - **Visão livre**: bandeiras, torcedores da rua e do society, e os elementos extras do cenário também
   somem quando tapam o jogo; ninguém mais fica do lado da câmera na rua.
 - **Torcida 3D interativa**: palmas no ritmo quando o time ataca, mãos na cabeça no chute que passa
   perto (e alívio do outro lado), protesto na falta, os blocos perto do lance se agitam mais, braços
   para cima e pulos no gol e na ola.
 - **Menos bandeiras** (26 no estádio, 11 nos ginásios, 6 no society).
+
+## Versão 2.3.1
+
 - **Jogadores sem rodar**: quem chega rápido no lugar freia antes de virar (antes ficava orbitando
   o ponto); devagar e sem a bola, o atleta fica de frente para o jogo e dá passos de lado em vez de
   girar a cada empurrão; a IA e a condução da CPU não giram mais em espiral; o corpo vira com

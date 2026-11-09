@@ -3128,10 +3128,12 @@ namespace Craquez.Sim
                     }
                     float dk = Mathf.Min(dHand, dBody);
                     if (dk > hr + (p.Has(Trait.Reflexo) ? 0.06f : 0f)) continue;
-                    if (ball.owner < 0 && ball.Speed > 14f && dHand < dBody && dHand > hr * 0.65f)
+                    // (ponta dos dedos só esticado: no mergulho e no salto; de frente, a bola no corpo é
+                    // agarrada ou espalmada — antes até bola no meio do corpo "raspava" e entrava)
+                    if (ball.owner < 0 && ball.Speed > 14f && dHand < dBody && dHand > hr * 0.6f && (p.Diving || p.saveKind == 6))
                     {
                         // ponta dos dedos: desvia em vez de segurar
-                        float miss = Mathf.Clamp01((dHand / hr - 0.65f) / 0.35f) * Mathf.Clamp01((ball.Speed - 14f) / 14f) * (1.1f - p.defense * 0.5f);
+                        float miss = Mathf.Clamp01((dHand / hr - 0.6f) / 0.35f) * Mathf.Clamp01((ball.Speed - 13f) / 13f) * (1.25f - p.defense * 0.5f);
                         if (rng.Chance(miss))
                         {
                             // ponta dos dedos: impulso na direção da normal do contato (da mão para a bola),
@@ -3145,6 +3147,13 @@ namespace Craquez.Sim
                             float solid = Mathf.Lerp(1f, 0.45f, Mathf.Clamp01((dHand / hr - 0.65f) / 0.35f)) * (0.8f + 0.3f * p.defense);
                             if (vn3 < 0f) v3 -= n3 * vn3 * 1.2f * solid;
                             v3 *= rng.Range(0.78f, 0.9f);
+                            // a ponta dos dedos tira a bola para o lado de fora do gol (rente à trave) e
+                            // segura parte da força para dentro; às vezes ainda entra
+                            float gxK = -halfLen * TeamDir(p.team);
+                            float yOut = Mathf.Abs(ball.pos.y) > 0.2f ? Mathf.Sign(ball.pos.y) : p.saveSide;
+                            v3.y += yOut * rng.Range(0.8f, 3f) * (0.6f + 0.4f * p.defense);
+                            if ((v3.x * TeamDir(p.team)) < 0f) v3.x *= rng.Range(0.7f, 0.92f);
+                            if (hands.z > goalH * 0.75f) v3.z += rng.Range(1.5f, 3f);   // no alto: por cima do travessão
                             ball.vel = new Vector2(v3.x, v3.y);
                             ball.vz = v3.z;
                             ball.lastTouchTeam = p.team;
@@ -3683,40 +3692,89 @@ namespace Craquez.Sim
         }
 
         /// <summary>
-        /// A rede segura a bola: fundo inclinado (mais fundo embaixo), laterais e teto. O choque
-        /// tira quase toda a velocidade (a rede cede e devolve só um pouco).
+        /// A rede segura a bola: fundo inclinado (mais fundo embaixo), laterais e teto. A rede é um
+        /// tecido que cede: a bola afunda até ~0,5 m no fundo (menos nas laterais e no teto), freia
+        /// suave (mola amortecida, integrada de forma implícita) e devolve só um pouco; encostada,
+        /// escorrega para baixo com atrito. Antes ela parava seca no plano do fundo.
         /// </summary>
+        public float NetPenetration;   // quanto a bola está afundando a rede agora (para o desenho)
+        bool _netContact;
+
+        float SoftWall(ref float pos, ref float vel, float wallPos, float sgn, float give, float K, float C)
+        {
+            // pos/vel na coordenada do eixo; sgn = sentido "para fora" da rede. A bola já andou o passo
+            // inteiro: volta ao ponto em que encostou no pano e integra a mola só no tempo que passou
+            // encostada (em subpassos: a frenagem dura ~0,1 s, poucos passos de 60 Hz)
+            float pen = (pos - wallPos) * sgn;
+            if (pen <= 0f) return 0f;
+            float vin = vel * sgn;
+            float tIn = DT;
+            if (vin > 0.01f && !_netWasIn) { tIn = Mathf.Min(DT, pen / vin); pen = 0f; }
+            else pen = Mathf.Min(pen, give);
+            const int sub = 8;
+            float h = tIn / sub;
+            for (int i = 0; i < sub; i++)
+            {
+                float a = -K * pen - (vin > 0f ? C : C * 5f) * vin;   // voltando, a rede amortece mais (devolve pouco)
+                vin += a * h;
+                pen += vin * h;
+                if (pen > give) { pen = give; if (vin > 0f) vin = 0f; }
+                if (pen < 0f) { pen = 0f; if (vin < 0f) vin *= 0.5f; break; }
+            }
+            pos = wallPos + sgn * pen;
+            vel = vin * sgn;
+            return pen;
+        }
+
+        bool _netWasIn;
+
         float KeepBallInNet()
         {
             float impact = 0f;
             float depth = mode.goalDepth;
-            if (Mathf.Abs(ball.pos.x) <= halfLen) return 0f;
+            if (Mathf.Abs(ball.pos.x) <= halfLen) { _netContact = false; NetPenetration = 0f; return 0f; }
             float sx = Mathf.Sign(ball.pos.x);
+            float gk = Mathf.Clamp(goalH / 2.44f, 0.6f, 1f);
             float back = halfLen + Mathf.Lerp(depth, depth * 0.35f, Mathf.Clamp01(ball.z / Mathf.Max(0.1f, goalH))) - ball.radius;
-            if (Mathf.Abs(ball.pos.x) > back)
+            float vinBack = ball.vel.x * sx;
+            float pen = 0f;
+            float px = ball.pos.x, vx = ball.vel.x;
+            if ((px - back) * sx > 0f)
             {
-                float vin = ball.vel.x * sx;
-                if (vin > 0f)
-                {
-                    impact = Mathf.Sqrt(vin * vin + ball.vz * ball.vz * 0.3f);
-                    ball.vel.x = -sx * vin * 0.08f;
-                    ball.vel.y *= 0.45f;
-                    ball.vz *= 0.35f;
-                    ball.spin *= 0.3f;
-                }
-                ball.pos.x = sx * back;
+                if (!_netContact && vinBack > 0f) impact = Mathf.Sqrt(vinBack * vinBack + ball.vz * ball.vz * 0.3f);
+                _netContact = true;
+                pen = SoftWall(ref px, ref vx, back, sx, 0.65f * gk, 900f, 30f);
+                _netWasIn = pen > 0f;
+                ball.pos.x = px; ball.vel.x = vx;
+                // encostada na rede: atrito no pano (a bola perde o efeito e escorrega para baixo)
+                ball.vel.y *= 1f - 2.5f * DT;
+                if (ball.vz > 0f) ball.vz *= 1f - 4f * DT;
+                ball.spin *= 1f - 4f * DT;
             }
+            else { _netContact = false; _netWasIn = false; }
             float side = goalHalf - ball.radius;
             if (Mathf.Abs(ball.pos.y) > side)
             {
-                if (ball.vel.y * Mathf.Sign(ball.pos.y) > 0f) { impact = Mathf.Max(impact, Mathf.Abs(ball.vel.y) * 0.6f); ball.vel.y *= -0.15f; ball.vel.x *= 0.6f; }
-                ball.pos.y = Mathf.Sign(ball.pos.y) * side;
+                float sy = Mathf.Sign(ball.pos.y);
+                if (ball.vel.y * sy > 0f) impact = Mathf.Max(impact, Mathf.Abs(ball.vel.y) * 0.6f);
+                float py = ball.pos.y, vy = ball.vel.y;
+                bool was = _netWasIn; _netWasIn = Mathf.Abs(ball.vel.y) < 0.5f;   // (lateral: encosta devagar)
+                pen = Mathf.Max(pen, SoftWall(ref py, ref vy, sy * side, sy, 0.25f * gk, 1600f, 45f));
+                _netWasIn = was;
+                ball.pos.y = py; ball.vel.y = vy;
+                ball.vel.x *= 1f - 2f * DT;
             }
-            if (ball.z > goalH - ball.radius)
+            float top = goalH - ball.radius;
+            if (ball.z > top)
             {
-                ball.z = goalH - ball.radius;
-                if (ball.vz > 0f) { impact = Mathf.Max(impact, ball.vz * 0.5f); ball.vz *= -0.1f; }
+                if (ball.vz > 0f) impact = Mathf.Max(impact, ball.vz * 0.5f);
+                float pz = ball.z, vz = ball.vz;
+                bool was2 = _netWasIn; _netWasIn = false;
+                pen = Mathf.Max(pen, SoftWall(ref pz, ref vz, top, 1f, 0.22f, 1600f, 45f));
+                _netWasIn = was2;
+                ball.z = pz; ball.vz = vz;
             }
+            NetPenetration = pen;
             return impact;
         }
     }

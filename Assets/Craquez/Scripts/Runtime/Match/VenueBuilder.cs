@@ -18,6 +18,11 @@ namespace Craquez
         public readonly List<Material> ledMats = new List<Material>();
         public Material pitchMat, pitchMat2;
         public Vector3 tunnel;
+        /// <summary>Fundo do corredor dos vestiários (de onde os atletas saem) e o comprimento dele.</summary>
+        public Vector3 tunnelInside;
+        /// <summary>Grupo da entrada dos vestiários (prédio, porta, corredor, túnel).</summary>
+        public Transform entrance;
+        public float tunnelDepth, tunnelHalfW;
         public string name = "";
         public float standDist = 12f;
         /// <summary>Arquibancadas para as bandeiras da torcida: fileiras do lado de lá, atrás dos gols (0 = não há) e meia largura do lado de lá.</summary>
@@ -458,6 +463,17 @@ namespace Craquez
                 k.Cylinder(new Vector3(gx, 0.02f, gw), new Vector3(gx + s * gd, 0.02f, gw), br, 8);
                 k.Cylinder(new Vector3(gx + s * gd, 0, -gw), new Vector3(gx + s * gd * 0.35f, gh, -gw), br, 8);
                 k.Cylinder(new Vector3(gx + s * gd, 0, gw), new Vector3(gx + s * gd * 0.35f, gh, gw), br, 8);
+                // em cima: do travessão até os apoios de trás e a barra de trás (antes faltavam: o teto
+                // da rede ficava solto e o gol parecia incompleto)
+                k.Cylinder(new Vector3(gx, gh, -gw), new Vector3(gx + s * gd * 0.35f, gh, -gw), br, 8);
+                k.Cylinder(new Vector3(gx, gh, gw), new Vector3(gx + s * gd * 0.35f, gh, gw), br, 8);
+                k.Cylinder(new Vector3(gx + s * gd * 0.35f, gh, -gw), new Vector3(gx + s * gd * 0.35f, gh, gw), br, 8);
+                // e as quinas (sem frestas entre os tubos)
+                foreach (float zc in new[] { -gw, gw })
+                {
+                    k.Cylinder(new Vector3(gx + s * gd * 0.35f, gh - br, zc), new Vector3(gx + s * gd * 0.35f, gh + br, zc), br * 1.3f, 8);
+                    k.Cylinder(new Vector3(gx + s * gd, 0f, zc), new Vector3(gx + s * gd, 0.06f, zc), br * 1.3f, 8);
+                }
                 k.Object("Trave", postMat, v.root);
                 if (futsal) ks.Object("Trave (faixas)", stripeMat, v.root);
                 if (withNets)
@@ -593,7 +609,7 @@ namespace Craquez
                         for (int r = band * 10; r < Mathf.Min(front3d, band * 10 + 10); r++)
                         {
                             float y1 = 1.1f + (r + 1) * rise, d = dist + r * step + step * 0.5f;
-                            for (float x = xa + (float)frng.NextDouble() * 0.3f; x < xb; x += 0.68f + (float)frng.NextDouble() * 0.12f)
+                            for (float x = xa + (float)frng.NextDouble() * 0.3f; x < xb; x += 0.74f + (float)frng.NextDouble() * 0.12f)
                             {
                                 if (frng.NextDouble() > style.occupancy) continue;
                                 int team = side == 3 && !mixed ? 1 : 0;
@@ -698,9 +714,11 @@ namespace Craquez
                     if (style.roof >= 2 && szc > 0f)
                     {
                         var rk = new MeshKit();
-                        float ry = 1.1f + rows * rise + 6f;
-                        rk.Box(new Vector3(sxc * (hl + gapX + rows * step * 0.5f), ry, szc * (hw + gapZ + rows * step * 0.5f)), new Vector3(rows * step * 1.1f, 0.6f, rows * step * 1.1f));
-                        rk.Object("Cobertura do canto " + c, Gfx.Emissive(style.roofC, night ? new Color(0.1f, 0.1f, 0.11f) : new Color(0.16f, 0.17f, 0.18f)), v.root, true);
+                        // na mesma altura e recuo das coberturas das arquibancadas (antes ficava 4 m mais baixa e
+                        // clara: vista da câmera, virava uma faixa na frente da torcida do canto)
+                        float ry = 1.1f + rows * rise + 10f;
+                        rk.Box(new Vector3(sxc * (hl + gapX + rows * step * 0.72f), ry, szc * (hw + gapZ + rows * step * 0.72f)), new Vector3(rows * step * 0.62f, 0.4f, rows * step * 0.62f));
+                        rk.Object("Cobertura do canto " + c, Gfx.Lit((style.roofC.a > 0f ? style.roofC : new Color(0.85f, 0.86f, 0.9f)) * 0.55f, null, 0.2f), v.root, true);
                     }
                 }
                 var k = new MeshKit();
@@ -720,13 +738,23 @@ namespace Craquez
             float W = 26f, front = hw + gapZ - 0.3f, back = hw + gapZ + rows * step + 1.5f;
             float top = 1.1f + rows * rise + 3.2f;
             var body = new MeshKit();
-            body.Box(new Vector3(0, top / 2f, -(front + back) / 2f), new Vector3(W, top, back - front), 3f);
+            // vão no térreo para o corredor dos vestiários (antes o prédio maciço tapava a porta logo atrás)
+            float hole = 5.4f, holeH = 3.9f;
+            float sideW = (W - hole) / 2f;
+            body.Box(new Vector3(-(hole / 2f + sideW / 2f), top / 2f, -(front + back) / 2f), new Vector3(sideW, top, back - front), 3f);
+            body.Box(new Vector3(hole / 2f + sideW / 2f, top / 2f, -(front + back) / 2f), new Vector3(sideW, top, back - front), 3f);
+            body.Box(new Vector3(0, holeH + (top - holeH) / 2f, -(front + back) / 2f), new Vector3(hole + 0.02f, top - holeH, back - front), 3f);
+            body.Box(new Vector3(0, holeH / 2f, -(back - 0.5f)), new Vector3(hole + 0.02f, holeH, 1f), 3f);
             // laje entre os andares (sombra marcada na fachada)
             for (float y = 7f; y < top - 2f; y += 4.2f)
                 body.Box(new Vector3(0, y, -front + 0.25f), new Vector3(W + 0.4f, 0.35f, 0.6f));
             // pilares da fachada
             for (int i = 0; i <= 6; i++)
-                body.Box(new Vector3(-W / 2f + i * W / 6f, top / 2f, -front + 0.3f), new Vector3(0.6f, top, 0.7f));
+            {
+                float px = -W / 2f + i * W / 6f;
+                if (Mathf.Abs(px) < hole / 2f + 0.4f) { body.Box(new Vector3(px, (top + holeH) / 2f, -front + 0.3f), new Vector3(0.6f, top - holeH, 0.7f)); continue; }   // (não fecha a porta)
+                body.Box(new Vector3(px, top / 2f, -front + 0.3f), new Vector3(0.6f, top, 0.7f));
+            }
             var structure = st.structure.a > 0f ? st.structure : new Color(0.55f, 0.56f, 0.6f);
             body.Object("Tribuna central", Gfx.Lit(Color.Lerp(structure, Color.white, 0.12f), Gfx.Asphalt(256, Color.white, 29, 0.04f), 0.25f), v.root, quality >= 1);
             // camarotes e imprensa: faixas de vidro iluminadas (à noite, acesas)
@@ -804,24 +832,29 @@ namespace Craquez
         /// </summary>
         static void Entrance(Venue v, float frontZ, Color accent, bool stadium, bool night)
         {
+            // tudo da entrada num grupo: durante o jogo a câmera de TV fica atrás dele e ele some
+            // inteiro (antes a porta e o corredor apareciam na parte de baixo da tela)
+            var grp = new GameObject("Entrada dos vestiários").transform;
+            grp.SetParent(v.root, false);
+            v.entrance = grp;
             float W = stadium ? 22f : 7f, H = stadium ? 6.5f : 3.4f, D = stadium ? 10f : 3f;
             float doorW = stadium ? 4.6f : 1.8f, doorH = stadium ? 3.1f : 2.3f;
             var wall = new MeshKit();
-            // corpo do prédio e marquise sobre a porta
-            wall.Box(new Vector3(0, H / 2, frontZ - D / 2 - 0.02f), new Vector3(W, H, D), 3f);
+            // corpo do prédio em volta de um corredor de verdade (antes era um bloco maciço com um
+            // corredor pintado na porta: de perto parecia uma parede)
+            float cw = doorW + 0.3f, ch = doorH + 0.35f, cd = D - 0.4f;
+            float side = (W - cw) / 2f;
+            wall.Box(new Vector3(-(cw / 2 + side / 2), H / 2, frontZ - D / 2 - 0.02f), new Vector3(side, H, D), 3f);
+            wall.Box(new Vector3(cw / 2 + side / 2, H / 2, frontZ - D / 2 - 0.02f), new Vector3(side, H, D), 3f);
+            wall.Box(new Vector3(0, ch + (H - ch) / 2, frontZ - D / 2 - 0.02f), new Vector3(cw + 0.02f, H - ch, D), 3f);
             wall.Box(new Vector3(0, doorH + 0.25f, frontZ + 0.7f), new Vector3(doorW + 1.6f, 0.22f, 1.6f));
-            wall.Object("Vestiários", Gfx.Lit(new Color(0.62f, 0.63f, 0.66f), Gfx.Asphalt(256, Color.white, 23, 0.04f), 0.2f), v.root, true);
-            // boca do túnel (escura) e faixa de vidro das janelas
-            // vão da porta com o corredor iluminado lá dentro (dá a ideia de profundidade: os atletas
-            // saem de algum lugar) e as duas folhas da porta abertas para fora, presas no batente
-            var dark = new MeshKit();
-            dark.Quad(new Vector3(-doorW / 2, 0, frontZ + 0.01f), new Vector3(-doorW / 2, doorH, frontZ + 0.01f), new Vector3(doorW / 2, doorH, frontZ + 0.01f), new Vector3(doorW / 2, 0, frontZ + 0.01f), new Vector2(0, 0), new Vector2(1, 1));
-            dark.Object("Corredor dos vestiários", Gfx.Emissive(Color.white, night ? new Color(0.75f, 0.7f, 0.6f) : new Color(0.55f, 0.52f, 0.46f), CorridorTex()), v.root, false);
+            wall.Object("Vestiários", Gfx.Lit(new Color(0.62f, 0.63f, 0.66f), Gfx.Asphalt(256, Color.white, 23, 0.04f), 0.2f), grp, true);
+            Corridor(v, frontZ, cw, ch, cd, accent, night);
             var frame = new MeshKit();
             frame.Box(new Vector3(-doorW / 2 - 0.08f, doorH / 2, frontZ + 0.06f), new Vector3(0.16f, doorH + 0.1f, 0.14f));
             frame.Box(new Vector3(doorW / 2 + 0.08f, doorH / 2, frontZ + 0.06f), new Vector3(0.16f, doorH + 0.1f, 0.14f));
             frame.Box(new Vector3(0, doorH + 0.07f, frontZ + 0.06f), new Vector3(doorW + 0.32f, 0.14f, 0.14f));
-            frame.Object("Batente", Gfx.Lit(new Color(0.22f, 0.23f, 0.26f), null, 0.5f, 0.6f), v.root, false);
+            frame.Object("Batente", Gfx.Lit(new Color(0.22f, 0.23f, 0.26f), null, 0.5f, 0.6f), grp, false);
             float leafW = doorW / 2f;
             foreach (float sx in new[] { -1f, 1f })
             {
@@ -832,7 +865,7 @@ namespace Craquez
                 var leaf = new MeshKit();
                 leaf.Box(Vector3.zero, new Vector3(leafW - 0.04f, doorH - 0.04f, 0.06f));
                 leaf.Box(new Vector3(-sx * (leafW / 2 - 0.18f), 0.05f, 0.05f), new Vector3(0.04f, 0.3f, 0.05f));   // puxador
-                var lg = leaf.Object("Porta do vestiário", Gfx.Lit(Color.Lerp(accent, new Color(0.2f, 0.22f, 0.26f), 0.4f), null, 0.4f, 0.2f), v.root, false);
+                var lg = leaf.Object("Porta do vestiário", Gfx.Lit(Color.Lerp(accent, new Color(0.2f, 0.22f, 0.26f), 0.4f), null, 0.4f, 0.2f), grp, false);
                 lg.transform.localPosition = c;
                 lg.transform.localRotation = q;
                 // janelinha de vidro na folha
@@ -847,7 +880,7 @@ namespace Craquez
                     glass.Quad(new Vector3(sx > 0 ? doorW / 2 + 1.2f : -W / 2 + 0.8f, H - 2.3f, frontZ + 0.012f), new Vector3(sx > 0 ? doorW / 2 + 1.2f : -W / 2 + 0.8f, H - 0.8f, frontZ + 0.012f),
                         new Vector3(sx > 0 ? W / 2 - 0.8f : -doorW / 2 - 1.2f, H - 0.8f, frontZ + 0.012f), new Vector3(sx > 0 ? W / 2 - 0.8f : -doorW / 2 - 1.2f, H - 2.3f, frontZ + 0.012f));
                 var glow = night ? new Color(0.9f, 0.85f, 0.65f) * 0.6f : new Color(0.08f, 0.12f, 0.18f);
-                glass.Object("Janelas", Gfx.Emissive(new Color(0.15f, 0.22f, 0.3f), glow), v.root, false);
+                glass.Object("Janelas", Gfx.Emissive(new Color(0.15f, 0.22f, 0.3f), glow), grp, false);
             }
             // letreiro
             var sign = new MeshKit();
@@ -855,7 +888,7 @@ namespace Craquez
             sign.Quad(new Vector3(-sw / 2, sy, frontZ + 0.02f), new Vector3(-sw / 2, sy + sh, frontZ + 0.02f), new Vector3(sw / 2, sy + sh, frontZ + 0.02f), new Vector3(sw / 2, sy, frontZ + 0.02f), new Vector2(0, 0), new Vector2(1, 1));
             var tex = Gfx.Led(new[] { "VESTIARIOS" }, new[] { Color.Lerp(accent, Color.black, 0.55f) }, 512, 64);
             var sm = Gfx.Emissive(Color.white, new Color(0.8f, 0.8f, 0.8f), tex);
-            sign.Object("Letreiro dos vestiários", sm, v.root, false);
+            sign.Object("Letreiro dos vestiários", sm, grp, false);
             if (!stadium) return;
             // túnel inflável/sanfonado: arcos na cor do time, aberto do lado do campo
             var tun = new MeshKit();
@@ -876,8 +909,56 @@ namespace Craquez
                     float a0 = Mathf.PI * i / seg, a1 = Mathf.PI * (i + 1) / seg;
                     ribs.Cylinder(new Vector3(Mathf.Cos(a0) * (r + 0.04f), Mathf.Sin(a0) * (doorH + 0.19f), z), new Vector3(Mathf.Cos(a1) * (r + 0.04f), Mathf.Sin(a1) * (doorH + 0.19f), z), 0.06f, 6);
                 }
-            tun.Object("Túnel inflável", Gfx.Lit(Color.Lerp(accent, Color.white, 0.08f), null, 0.35f), v.root, false);
-            ribs.Object("Arcos do túnel", Gfx.Lit(Color.Lerp(accent, Color.black, 0.35f), null, 0.4f), v.root, false);
+            tun.Object("Túnel inflável", Gfx.Lit(Color.Lerp(accent, Color.white, 0.08f), null, 0.35f), grp, false);
+            ribs.Object("Arcos do túnel", Gfx.Lit(Color.Lerp(accent, Color.black, 0.35f), null, 0.4f), grp, false);
+        }
+
+        /// <summary>
+        /// Corredor dos vestiários em 3D, visto pela porta: piso claro, paredes com a faixa na cor do
+        /// clube, teto com luminárias e, no fundo, a porta do vestiário iluminada. Os atletas saem dele.
+        /// </summary>
+        static void Corridor(Venue v, float frontZ, float w, float h, float depth, Color accent, bool night)
+        {
+            var grp = v.entrance != null ? v.entrance : v.root;
+            float x0 = -w / 2f, x1 = w / 2f, z0 = frontZ + 0.02f, z1 = frontZ - depth;
+            // (cada face nos dois sentidos: vista de dentro e de fora sem buracos)
+            void Q2(MeshKit k, Vector3 a, Vector3 b, Vector3 c, Vector3 d, Vector2 uv1) { k.Quad(a, b, c, d, Vector2.zero, uv1); k.Quad(d, c, b, a, Vector2.zero, uv1); }
+            var floor = new MeshKit();
+            Q2(floor, new Vector3(x0, 0.015f, z0), new Vector3(x0, 0.015f, z1), new Vector3(x1, 0.015f, z1), new Vector3(x1, 0.015f, z0), new Vector2(w / 2f, depth / 2f));
+            floor.Object("Piso do corredor", Gfx.Lit(new Color(0.55f, 0.56f, 0.6f), Gfx.Asphalt(256, Color.white, 41, 0.02f), 0.55f), grp, false);
+            var walls = new MeshKit();
+            Q2(walls, new Vector3(x0, 0, z0), new Vector3(x0, h, z0), new Vector3(x0, h, z1), new Vector3(x0, 0, z1), new Vector2(depth / 3f, 1f));
+            Q2(walls, new Vector3(x1, 0, z1), new Vector3(x1, h, z1), new Vector3(x1, h, z0), new Vector3(x1, 0, z0), new Vector2(depth / 3f, 1f));
+            Q2(walls, new Vector3(x0, h, z0), new Vector3(x1, h, z0), new Vector3(x1, h, z1), new Vector3(x0, h, z1), new Vector2(1f, depth / 3f));
+            walls.Object("Paredes do corredor", Gfx.Lit(new Color(0.78f, 0.79f, 0.82f), null, 0.3f), grp, false);
+            // faixa na cor do clube ao longo das paredes e rodapé escuro
+            var band = new MeshKit();
+            foreach (float sx in new[] { x0 + 0.01f, x1 - 0.01f })
+            {
+                Q2(band, new Vector3(sx, 0.9f, z0), new Vector3(sx, 1.25f, z0), new Vector3(sx, 1.25f, z1), new Vector3(sx, 0.9f, z1), Vector2.one);
+            }
+            band.Object("Faixa do corredor", Gfx.Lit(Color.Lerp(accent, Color.black, 0.15f), null, 0.4f), grp, false);
+            // luminárias no teto e o fundo iluminado (porta do vestiário aberta)
+            var lamps = new MeshKit();
+            for (float z = z0 - 1.2f; z > z1 + 0.8f; z -= 2.2f)
+                Q2(lamps, new Vector3(-w * 0.18f, h - 0.02f, z + 0.35f), new Vector3(w * 0.18f, h - 0.02f, z + 0.35f), new Vector3(w * 0.18f, h - 0.02f, z - 0.35f), new Vector3(-w * 0.18f, h - 0.02f, z - 0.35f), Vector2.one);
+            lamps.Object("Luminárias do corredor", Gfx.Emissive(Color.white, new Color(2.2f, 2.15f, 2f)), grp, false);
+            var end = new MeshKit();
+            Q2(end, new Vector3(x1, 0, z1 + 0.01f), new Vector3(x1, h, z1 + 0.01f), new Vector3(x0, h, z1 + 0.01f), new Vector3(x0, 0, z1 + 0.01f), Vector2.one);
+            end.Object("Fundo do corredor", Gfx.Emissive(Color.white, night ? new Color(0.95f, 0.9f, 0.8f) : new Color(0.8f, 0.76f, 0.68f), CorridorTex()), grp, false);
+            // luz de verdade dentro do corredor (ilumina os atletas saindo)
+            var lgo = new GameObject("Luz do corredor");
+            lgo.transform.SetParent(grp, false);
+            lgo.transform.localPosition = new Vector3(0, h - 0.4f, (z0 + z1) / 2f);
+            var l = lgo.AddComponent<Light>();
+            l.type = LightType.Point;
+            l.range = depth + 2f;
+            l.intensity = 1.6f;
+            l.color = new Color(1f, 0.96f, 0.88f);
+            l.shadows = LightShadows.None;
+            v.tunnelInside = new Vector3(0, 0, z1 + 0.8f);
+            v.tunnelDepth = depth;
+            v.tunnelHalfW = w / 2f;
         }
 
         static Texture2D _corridor;
@@ -1817,8 +1898,10 @@ namespace Craquez
             go.transform.SetParent(parent, false);
             var n = go.AddComponent<GoalNet>();
             n._side = side;
+            n._depth = gd;
             var k = new MeshKit();
-            int nx = 16, ny = 8;
+            // malha mais fina (a bola, de 22 cm, passava entre os nós e a rede não a envolvia)
+            int nx = 30, ny = 13;
             float x0 = gx, x1 = gx + side * gd;
             // fundo (inclinado), teto e laterais em grade
             for (int i = 0; i < nx; i++)
@@ -1905,6 +1988,54 @@ namespace Craquez
             foreach (var r in _rest) frontX = _side > 0 ? Mathf.Min(frontX, r.x) : Mathf.Max(frontX, r.x);
             _pinned = new bool[N];
             for (int i = 0; i < N; i++) _pinned[i] = _rest[i].y < 0.02f || Mathf.Abs(_rest[i].x - frontX) < 0.02f;
+            // direção "para fora" de cada nó (fundo, laterais, teto): é para onde a bola empurra o pano
+            float zMax = 0f, yMax = 0f;
+            foreach (var r in _rest) { zMax = Mathf.Max(zMax, Mathf.Abs(r.z)); yMax = Mathf.Max(yMax, r.y); }
+            _out = new Vector3[N];
+            for (int i = 0; i < N; i++)
+            {
+                var r = _rest[i];
+                if (Mathf.Abs(Mathf.Abs(r.z) - zMax) < 0.02f) _out[i] = new Vector3(0f, 0f, Mathf.Sign(r.z));
+                else if (Mathf.Abs(r.y - yMax) < 0.02f && Mathf.Abs(r.x - frontX) < _depth * 0.36f) _out[i] = Vector3.up;
+                else _out[i] = new Vector3(_side, 0.25f, 0f).normalized;
+            }
+        }
+
+        Vector3[] _out;
+        float _depth = 2f;
+
+        /// <summary>
+        /// Bola dentro do gol: o pano em volta dela é empurrado para fora até a superfície da bola
+        /// (bolsão que envolve a bola, mais largo quanto mais fundo ela afunda) e, quando ela sai, o
+        /// tecido volta balançando pela mola da malha.
+        /// </summary>
+        public void Press(Vector3 worldBall, Vector3 worldVel, float radius)
+        {
+            if (_node == null) Weld();
+            var b = transform.InverseTransformPoint(worldBall);
+            var bv = transform.InverseTransformVector(worldVel);
+            bool any = false;
+            for (int i = 0; i < _rest.Length; i++)
+            {
+                if (_pinned[i]) continue;
+                var n = _out[i];
+                var rel = b - _rest[i];
+                float pen = Vector3.Dot(rel, n) + radius + 0.02f;   // quanto a bola passou do pano neste nó
+                if (pen <= 0f) continue;
+                float lat2 = (rel - n * Vector3.Dot(rel, n)).sqrMagnitude;
+                float spread = 0.16f + pen * 0.55f;                   // bolsão: alarga com a profundidade
+                float w = Mathf.Exp(-lat2 / (2f * spread * spread));
+                float want = Mathf.Min(pen * w, 0.75f);
+                float cur = Vector3.Dot(_disp[i], n);
+                if (cur >= want) continue;
+                _disp[i] += n * (want - cur);
+                // o pano vai junto com a bola (e guarda o embalo para balançar depois)
+                float vn = Vector3.Dot(bv, n);
+                var vt = _vel[i] - n * Vector3.Dot(_vel[i], n);
+                _vel[i] = vt + n * Mathf.Max(vn, 0f) * w;
+                any = true;
+            }
+            if (any) _awake = Mathf.Max(_awake, 3f);
         }
 
         /// <summary>Bola entrou: empurrão forte na direção do chute, que se espalha e volta balançando.</summary>
@@ -1972,7 +2103,7 @@ namespace Craquez
                     _vel[i] += acc * h;
                     _vel[i] *= 1f / (1f + 0.6f * h * _vel[i].magnitude);          // arrasto do ar no tecido
                     _disp[i] += _vel[i] * h;
-                    if (_disp[i].sqrMagnitude > 0.49f) { _disp[i] = _disp[i].normalized * 0.7f; _vel[i] *= 0.5f; }   // o fio não estica sem limite
+                    if (_disp[i].sqrMagnitude > 0.64f) { _disp[i] = _disp[i].normalized * 0.8f; _vel[i] *= 0.5f; }   // o fio não estica sem limite
                     // a rede não atravessa para dentro do gol além do pano original
                     if (_disp[i].x * _side < -0.25f) { _disp[i].x = -0.25f * _side; _vel[i].x = 0f; }
                 }

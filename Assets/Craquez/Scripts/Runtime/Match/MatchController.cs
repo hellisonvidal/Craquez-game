@@ -113,6 +113,17 @@ namespace Craquez
                 var p = a.p;
                 float side = p.team == 0 ? -1f : 1f;
                 p.position = new Vector2(side * (1.2f + p.index * 0.05f), view.venue.tunnel.z + 1.5f + p.index * 0.9f);
+                var vn = view.venue;
+                if (vn.tunnelDepth > 1f)
+                {
+                    // em fila dupla dentro do corredor dos vestiários (o capitão na frente); quem não cabe
+                    // espera logo na saída
+                    float doorZ = vn.tunnelInside.z - 0.8f + vn.tunnelDepth;
+                    float z = doorZ - 0.6f - p.index * 0.85f;
+                    float lane = Mathf.Min(0.9f, vn.tunnelHalfW - 0.35f);
+                    if (z < vn.tunnelInside.z) z = doorZ + 0.8f + (vn.tunnelInside.z - z);
+                    p.position = new Vector2(side * lane, z);
+                }
                 p.facing = new Vector2(0, 1);
                 a.Snap();
             }
