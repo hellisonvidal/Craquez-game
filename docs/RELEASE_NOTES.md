@@ -1,4 +1,47 @@
-## Craquez 2.5.0
+## Craquez 2.6.0
+
+Jogo de futebol feito 100% com inteligência artificial, **gratuito**. Por enquanto, só Android.
+
+### Download
+- **Android**: `Craquez-v2.6.0.apk` (instale permitindo "fontes desconhecidas")
+
+### Novidades
+- **Arena de treino** (novo cartão TREINO em Jogar): você conduz um atacante contra o goleiro, sem
+  relógio; a cada gol, defesa ou bola fora, uma bola nova aparece no seu pé em outro ponto.
+- **Sorteio do juiz**: lados e saída de bola decididos na moeda, com o juiz e os capitães no círculo
+  central durante a cerimônia (opção "Lado do campo": sorteio ou fixo).
+- **Seletor de locais com foto de verdade**, vista de fora (estádios, ginásios, society e ruas); os
+  ginásios ganharam o lado de fora (paredes com a faixa do clube, janelas altas, telhado em arco,
+  marquise, calçada e estacionamento).
+- **Tiro de meta sem corte**: o goleiro olha a bola sair, vai buscá-la (ou pega outra no cone atrás
+  do gol), traz nas mãos, coloca na marca e cobra. **Cones com bolas de reposição** em volta do campo.
+- **Reposição com as mãos por combinação de botões**: Passe = rolada; Passe + Colocado = por cima,
+  curto; Alto = arremesso longo; Enfiada = arremesso rápido (contra-ataque); Chute = chutão;
+  Chute + Colocado = bate-pronto baixo; Proteger + Passe = solta a bola no pé (dica na tela). A CPU
+  também usa o arremesso rápido no contra-ataque.
+- **Goleiro no tempo certo**: arma a defesa em cima da hora conforme a distância da bola (bola no
+  corpo, sem pular; salto só acima da cabeça) e reage ao chute como gente (cara a cara mantido em ~40%).
+- **Goleiro se ajeitando** com passadas curtas e joelhos dobrados (as pernas não entortam mais).
+- **Faltas mais reais**: a vítima sente a pancada e às vezes um companheiro (ou quem fez a falta) vem
+  dar a mão para levantar.
+- **Contato físico**: na trombada, quem perde o choque é jogado para longe do contato e se recupera;
+  ombro a ombro em velocidade, os dois inclinam um contra o outro.
+- **Jogadores fora da jogada** andam ou trotam até a posição e param sem ficar "acertando" o lugar
+  (antes corriam o tempo todo e trocavam de direção a cada instante).
+- **Banco vivo**: técnicos acompanhando o lance na área técnica e orientando o time; reservas de
+  colete aquecendo atrás dos gols.
+- **Traves refinadas** (tubos elípticos, suportes curvos por fora da rede no campo e no society).
+- **Chuva, poças e nevasca**: poças só com chuva forte que persiste ou temporal (secam com sol;
+  chuva comum só deixa a bola mais rápida), sem os "ladrilhos" sobre elas; a bola para dentro d'água;
+  novo clima **Nevasca** com neve densa, vento e campo coberto.
+- **HUD**: só o quadro de quem está com a bola (mandante à esquerda, visitante à direita), sem nomes
+  sobre a cabeça; escalações no rodapé.
+- **Bola no gramado**: sombra de contato do tamanho da bola (a mancha grande fazia a bola parecer
+  afundada).
+- **Sem riscos escuros na quadra/campo** (sombra de estruturas que somem para não tapar a câmera) e
+  **sem papel picado** na comemoração.
+
+## Versão 2.5.0
 
 Jogo de futebol feito 100% com inteligência artificial, **gratuito**. Por enquanto, só Android.
 
