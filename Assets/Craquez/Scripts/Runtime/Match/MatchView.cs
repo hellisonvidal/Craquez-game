@@ -105,7 +105,7 @@ namespace Craquez
             bcam.entrance = venue.entrance;
             bcam.SnapToBall();
             weather = gameObject.AddComponent<WeatherFx>();
-            string wk = c.weather == "aleatorio" ? WeatherFx.Kinds[(int)(c.seed % 5)] : c.weather;
+            string wk = c.weather == "aleatorio" ? WeatherFx.Kinds[(int)(c.seed % (uint)WeatherFx.Kinds.Length)] : c.weather;
             if (s.mode.id == GameModes.Futsal) wk = "sol";   // ginásio coberto
             weather.Setup(wk, c.dynamicWeather && s.mode.id != GameModes.Futsal, c.seed, cam, sun, venue.pitchMat);
             weather.pitch2 = venue.pitchMat2;
@@ -206,6 +206,8 @@ namespace Craquez
             RenderSettings.ambientLight = sky;
         }
 
+        Material _ballShadowMat;
+
         void BuildBall(int q)
         {
             // esfera lisa (64 x 32) com o mesmo mapeamento da textura dos gomos
@@ -221,7 +223,8 @@ namespace Craquez
             Destroy(sh.GetComponent<Collider>());
             sh.transform.SetParent(transform, false);
             sh.transform.rotation = Quaternion.Euler(90, 0, 0);
-            sh.GetComponent<MeshRenderer>().sharedMaterial = Gfx.UnlitTransparent(new Color(0, 0, 0, 0.45f), Gfx.Radial(64, Color.white, new Color(1, 1, 1, 0), 1.5f));
+            _ballShadowMat = Gfx.UnlitTransparent(new Color(0, 0, 0, 0.32f), Gfx.Radial(64, Color.white, new Color(1, 1, 1, 0), 1.5f));
+            sh.GetComponent<MeshRenderer>().sharedMaterial = _ballShadowMat;
             sh.GetComponent<MeshRenderer>().shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
             _ballShadow = sh.transform;
         }
@@ -568,8 +571,11 @@ namespace Craquez
                 _ball.position = bp;
                 _ball.rotation = _ballRot;
                 _ballShadow.position = new Vector3(bp.x, 0.015f, bp.z);
-                float hz = Mathf.Clamp01(1f - sim.ball.z / 6f);
-                _ballShadow.localScale = Vector3.one * Mathf.Lerp(0.6f, 0.3f, hz);
+                // sombra de contato pequena (o tamanho da bola): a mancha grande e escura em volta
+                // fazia a bola parecer afundada no gramado; no alto ela se espalha e some
+                float hz = Mathf.Clamp01(sim.ball.z / 3f);
+                _ballShadow.localScale = Vector3.one * Mathf.Lerp(sim.ball.radius * 2.4f, sim.ball.radius * 5f, hz);
+                if (_ballShadowMat != null) { var sc = new Color(0f, 0f, 0f, 0.32f * (1f - hz)); _ballShadowMat.color = sc; _ballShadowMat.SetColor("_BaseColor", sc); }
             }
             // marcadores dos jogadores controlados
             PlaceMarker(_marker0, 0);

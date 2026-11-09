@@ -48,7 +48,7 @@ namespace Craquez
             var tb = Teams.Get(c.teamB);
             sim = new MatchSim();
             // clima mexe na física da bola: chuva = mais rápida; neve = mais lenta
-            string w = c.weather == "aleatorio" ? WeatherFx.Kinds[(int)(c.seed % 5)] : c.weather;
+            string w = c.weather == "aleatorio" ? WeatherFx.Kinds[(int)(c.seed % (uint)WeatherFx.Kinds.Length)] : c.weather;
             sim.rollScale = RollFor(c.mode, w);
             sim.startSwapped = c.swapSides;
             sim.streetPlayers = c.streetPlayers;
@@ -96,7 +96,7 @@ namespace Craquez
         }
 
         static float RollFor(string mode, string w) =>
-            mode == GameModes.Futsal ? 1f : w == "chuva" ? 0.85f : w == "tempestade" ? 0.8f : w == "neve" ? 1.35f : 1f;
+            mode == GameModes.Futsal ? 1f : w == "chuva" ? 0.85f : w == "tempestade" ? 0.8f : w == "neve" ? 1.35f : w == "nevasca" ? 1.6f : 1f;
 
         // ------------------------------------------------------------- cerimônia
         void StartCeremony()
@@ -426,9 +426,8 @@ namespace Craquez
             }
             else if (page == 13)
             {
-                first = UiKit.Cycler(list, "Nomes dos atletas", Settings.PlayerTagNames, Settings.PlayerTags, i => Settings.PlayerTags = i);
+                first = UiKit.Cycler(list, "Escalações no rodapé", new[] { "Ligado", "Desligado" }, Settings.LineupBar ? 0 : 1, i => Settings.LineupBar = i == 0);
                 UiKit.Size(first, 72, 72);
-                UiKit.Size(UiKit.Cycler(list, "Escalações no rodapé", new[] { "Ligado", "Desligado" }, Settings.LineupBar ? 0 : 1, i => Settings.LineupBar = i == 0), 72, 72);
                 UiKit.Size(UiKit.Cycler(list, "Gráficos", Settings.QualityNames, Settings.Quality, i => { Settings.Quality = i; UrpSetup.Quality(i); UrpSetup.Camera(_cam, i); }), 72, 72);
                 if (cfg.mode != GameModes.Futsal)
                     UiKit.Size(UiKit.Cycler(list, "Clima dinâmico", new[] { "Ligado", "Desligado" }, view.weather.dynamic ? 0 : 1, i => view.weather.dynamic = i == 0), 72, 72);

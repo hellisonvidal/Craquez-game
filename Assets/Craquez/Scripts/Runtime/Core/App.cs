@@ -733,8 +733,8 @@ namespace Craquez
         static readonly string[] SideOpts = { "Você x CPU", "Você x Amigo (local)", "CPU x CPU (assistir)" };
         static readonly string[] DiffOpts = { "Amador", "Profissional", "Craque", "Lenda" };
         static readonly float[] DiffVals = { 0.3f, 0.55f, 0.75f, 0.95f };
-        static readonly string[] WeatherOpts = { "Ensolarado", "Nublado", "Chuva", "Tempestade", "Neve", "Aleatório" };
-        static readonly string[] WeatherIds = { "sol", "nublado", "chuva", "tempestade", "neve", "aleatorio" };
+        static readonly string[] WeatherOpts = { "Ensolarado", "Nublado", "Chuva", "Tempestade", "Neve", "Nevasca", "Aleatório" };
+        static readonly string[] WeatherIds = { "sol", "nublado", "chuva", "tempestade", "neve", "nevasca", "aleatorio" };
         static readonly string[] TodOpts = { "Dia", "Fim de tarde", "Noite" };
         static readonly string[] TodIds = { "dia", "tarde", "noite" };
 
@@ -1409,7 +1409,6 @@ namespace Craquez
                     Add(UiKit.Cycler(list, "Zoom da câmera", BroadcastCamera.Zooms, Settings.CameraZoom + 2, i => Settings.CameraZoom = i - 2));
                     break;
                 case 2:
-                    Add(UiKit.Cycler(list, "Nomes dos atletas", Settings.PlayerTagNames, Settings.PlayerTags, i => Settings.PlayerTags = i));
                     Add(UiKit.Cycler(list, "Escalações no rodapé", new[] { "Ligado", "Desligado" }, Settings.LineupBar ? 0 : 1, i => Settings.LineupBar = i == 0));
                     Add(UiKit.Cycler(list, "Faltas", new[] { "Cena antes da cobrança", "Cobrança rápida" }, Settings.QuickRestarts ? 1 : 0, i => { Settings.QuickRestarts = i == 1; _cfg.quickRestarts = i == 1; }));
                     break;
