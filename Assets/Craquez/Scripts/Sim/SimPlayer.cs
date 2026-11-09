@@ -64,6 +64,10 @@ namespace Craquez.Sim
         public bool Diving => saveKind >= 3 && saveKind <= 5;
         /// <summary>Fração da defesa (0..1) em que a bola deve chegar às mãos: o corpo e os braços chegam ao máximo ali.</summary>
         public float saveContact = 0.4f;
+        /// <summary>Goleiro cobrando tiro de meta: a bola fica no chão (hold é só o tempo de espera, não está nas mãos).</summary>
+        public bool goalKick;
+        /// <summary>Goleiro com a bola nas mãos (não vale para o tiro de meta, com a bola no chão).</summary>
+        public bool InHands => hold > 0f && !goalKick;
         /// <summary>Cartões: amarelos recebidos e expulsão (fica fora de campo; no futsal volta outro em 2 min).</summary>
         public int yellows;
         public bool sentOff;

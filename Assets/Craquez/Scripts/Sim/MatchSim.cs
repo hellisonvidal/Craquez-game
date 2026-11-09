@@ -457,6 +457,7 @@ namespace Craquez.Sim
                 p.vel = Vector2.zero;
                 p.facing = new Vector2(TeamDir(p.team), 0);
                 p.stun = p.slide = p.hold = p.dive = p.kickCd = 0f;
+                p.goalKick = false;
                 p.windup = 0f;
                 p.skill = Skill.None;
             }
@@ -523,7 +524,7 @@ namespace Craquez.Sim
             taker.stun = 0; taker.slide = 0;
             ball.owner = taker.id;
             ball.lastTouchTeam = t;
-            if (taker.isKeeper) taker.hold = 1.6f;
+            if (taker.isKeeper) { taker.hold = 1.6f; taker.goalKick = mode.id != GameModes.Futsal; }   // futsal: tiro de meta com as mãos (regra)
             else ctrl[t].player = taker.id;
             // tiro de meta e escanteio: corte de cena, todos já nas posições do reinício
             bool cut = kind == "goalkick" || kind == "corner" || (!quickRestarts && (kind == "freekick" || kind == "offside"));
@@ -689,7 +690,7 @@ namespace Craquez.Sim
                 p.facing = walkUpFacing;
                 ball.owner = p.id;
                 ball.vel = Vector2.zero;
-                if (p.isKeeper && !setPiece && !cornerKick) p.hold = 1.6f;
+                if (p.isKeeper && !setPiece && !cornerKick) { p.hold = 1.6f; p.goalKick = mode.id != GameModes.Futsal; }
                 walkUpTaker = -1;
                 return;
             }
@@ -1043,6 +1044,12 @@ namespace Craquez.Sim
                         && aim.sqrMagnitude > 0.01f && Vector2.Dot(aim.Norm(), toBox.Norm()) > 0.2f)
                     { CrossToBox(p, aim, power); return; }
                 }
+                if (p.isKeeper && !p.InHands && aim.sqrMagnitude > 0.01f)
+                {
+                    // goleiro com a bola no chão: lançamento longo com alcance da física para quem está lá na frente
+                    var m = KeeperFootChoice(p, true, 0.5f, out int how);
+                    if (how == 1 && m != null && Vector2.Dot(aim.Norm(), (m.position - p.position).Norm()) > 0.75f) { LongKick(p, m); return; }
+                }
                 if (TryChip(p, aim, power)) return;
                 Pass(p, aim, power, false, true);
             }
@@ -1110,6 +1117,7 @@ namespace Craquez.Sim
 
         void ReleaseBall(SimPlayer p)
         {
+            p.goalKick = false;
             kickoffPass = false;
             setPiece = false;
             throwIn = false;
@@ -1286,8 +1294,8 @@ namespace Craquez.Sim
                 ball.spin = 0f;
                 ball.slideT = v0 > 14f ? 0.1f : 0f;
             }
-            bool fromHands = p.hold > 0f;
-            if (p.hold > 0f || ball.z > 0.5f) ball.z = Mathf.Max(ball.z, 0.3f);
+            bool fromHands = p.InHands;
+            if (fromHands || ball.z > 0.5f) ball.z = Mathf.Max(ball.z, 0.3f);
             ReleaseBall(p);
             if (fromHands)
             {
@@ -2249,22 +2257,33 @@ namespace Craquez.Sim
                 SteerTo(p, new Vector2(gx + dir * 0.3f, 0), false);
                 return;
             }
+            if (ball.owner != p.id) p.heldT = 0f;
             if (ball.owner == p.id)
             {
                 p.intent = Vector2.zero;
                 p.facing = new Vector2(dir, 0);
                 // com a bola nas mãos: dá alguns passos à frente (sem sair da área) antes de repor
-                if (p.hold > 0.6f && Mathf.Abs(p.position.x - gx) < Mathf.Max(2f, mode.boxDepth - 3f)) p.intent = new Vector2(dir * 0.3f, 0f);
+                if (p.InHands && p.hold > 0.6f && Mathf.Abs(p.position.x - gx) < Mathf.Max(2f, mode.boxDepth - 3f)) p.intent = new Vector2(dir * 0.3f, 0f);
                 if (!frozen && p.hold > 0f)
                 {
                     p.hold -= DT;
                     p.heldT += DT;
                     // ninguém livre: espera mais um pouco (até 4 s no futsal, 5 s nos outros)
                     float maxHold = mode.id == GameModes.Futsal ? 3.6f : 5f;
-                    if (p.hold <= 0f && !KeeperDistribute(p, p.heldT >= maxHold)) p.hold = 0.3f;
+                    if (p.hold <= 0f)
+                    {
+                        bool done = p.goalKick ? KeeperFootPlay(p, p.heldT >= maxHold * 0.7f) : KeeperDistribute(p, p.heldT >= maxHold);
+                        if (!done) p.hold = 0.3f;
+                    }
                     if (ball.owner != p.id) p.heldT = 0f;
                 }
-                else if (!frozen && state == MatchState.Playing) Pass(p, new Vector2(dir, 0), 0.5f, false, true);
+                else if (!frozen && state == MatchState.Playing)
+                {
+                    // bola nos pés (recuo, bola dominada fora das mãos): toca para quem está livre ou,
+                    // pressionado e sem ninguém, afasta para a frente — antes tocava às cegas em frente
+                    p.heldT += DT;
+                    if (KeeperFootPlay(p, p.heldT > 1.2f)) p.heldT = 0f;
+                }
                 return;
             }
             Vector2 target = goal;
@@ -2550,6 +2569,109 @@ namespace Craquez.Sim
             if (best != null) KeeperThrow(p, best);
             else Pass(p, new Vector2(dir, rng.Range(-0.3f, 0.3f)), 0.75f, false, true);
             return true;
+        }
+
+        /// <summary>
+        /// Goleiro com a bola no chão (tiro de meta, recuo): passe rasteiro para um companheiro livre e
+        /// com a linha do passe aberta (de preferência aberto pelos lados, nunca pelo meio colado na
+        /// área); ninguém livre ou pressionado: lançamento longo para quem está sozinho lá na frente,
+        /// com o alcance da física da bola. Sem ninguém e sem pressão, espera (devolve false).
+        /// </summary>
+        public SimPlayer KeeperFootChoice(SimPlayer p, bool force, float jitter, out int how)
+        {
+            // how: 0 = passe rasteiro, 1 = lançamento longo, 2 = por cima (curto), -1 = espera
+            how = -1;
+            float dir = TeamDir(p.team);
+            bool field = mode.id == GameModes.Field;
+            float shortMax = field ? 34f : halfLen * 1.1f, shortMin = field ? 6f : 2.5f;
+            float needFree = field ? 5f : 2.6f, needLane = field ? 2.5f : 1.5f;
+            float pressD = float.MaxValue;
+            foreach (var o in players) if (o.team != p.team && !o.sentOff) pressD = Mathf.Min(pressD, o.position.Dist(p.position));
+            bool pressed = pressD < (field ? 7f : mode.id == GameModes.Futsal ? 5f : 3.5f);
+            SimPlayer best = null, far = null, safest = null;
+            float bestS = float.MinValue, farS = float.MinValue, safeS = float.MinValue;
+            int k = 0;
+            foreach (var m in players)
+            {
+                if (m.team != p.team || m == p || m.sentOff || m.isKeeper) continue;
+                float jit = jitter * (0.5f + 0.5f * Mathf.Sin(++k * 12.9898f + jitter * 78.233f));
+                float free = float.MaxValue;
+                int crowd = 0;
+                foreach (var o in players)
+                {
+                    if (o.team == p.team || o.sentOff) continue;
+                    float od = o.position.Dist(m.position);
+                    free = Mathf.Min(free, od);
+                    if (od < (field ? 9f : 5f)) crowd++;
+                }
+                float d = m.position.Dist(p.position);
+                float ahead = (m.position.x - p.position.x) * dir;
+                float lane = LaneFree(p.team, p.position, m.position);
+                // passe curto: livre, linha aberta, e não atravessando a frente do próprio gol
+                bool central = Mathf.Abs(m.position.y) < (field ? 8f : halfW * 0.35f) && ahead < (field ? 22f : halfLen * 0.45f);
+                if (d > shortMin && d < shortMax && ahead > -2f && free > needFree && lane > needLane && !(central && free < needFree * 1.6f))
+                {
+                    float sc = Mathf.Min(free, 12f) + Mathf.Min(lane, 6f) * 0.6f - d * 0.05f + ahead * 0.04f + jit * 0.5f;
+                    if (sc > bestS) { bestS = sc; best = m; }
+                }
+                if (ahead > 2f)
+                {
+                    float ss = Mathf.Min(free, 10f) + Mathf.Min(lane, 5f) * 0.5f;
+                    if (ss > safeS) { safeS = ss; safest = m; }
+                }
+                // lançamento: o mais sozinho entre os que estão bem à frente
+                if (ahead < (field ? 25f : halfLen * 0.5f)) continue;
+                float fs = Mathf.Min(free, 10f) * 0.8f - crowd * 1.2f + Mathf.Min(ahead, field ? 60f : halfLen) * 0.04f + jit * 0.4f;
+                if (fs > farS) { farS = fs; far = m; }
+            }
+            if (best != null && (!pressed || LaneFree(p.team, p.position, best.position) > needLane * 1.3f)) { how = 0; return best; }
+            if (!force && !pressed) return null;
+            if (far != null && mode.id != GameModes.Futsal) { how = 1; return far; }
+            // futsal (ou ninguém lá na frente): para o companheiro mais livre adiante, por cima se a linha estiver fechada
+            if (safest != null) { how = mode.id != GameModes.Futsal && LaneFree(p.team, p.position, safest.position) < needLane ? 2 : 0; return safest; }
+            how = 2;
+            return null;
+        }
+
+        bool KeeperFootPlay(SimPlayer p, bool force)
+        {
+            var m = KeeperFootChoice(p, force, rng.Range(0f, 1f), out int how);
+            if (how < 0) return false;
+            if (m == null) { Pass(p, new Vector2(TeamDir(p.team), 0f), 0.8f, false, true); return true; }
+            if (how == 1) LongKick(p, m);
+            else Pass(p, (m.position - p.position).Norm(), how == 2 ? 0.6f : 0.55f, false, how == 2);
+            return true;
+        }
+
+        /// <summary>
+        /// Lançamento longo com a bola no chão (tiro de meta, goleiro com a bola nos pés): arco de ~30°
+        /// até a frente do companheiro escolhido, com o alcance calculado pela física da bola.
+        /// </summary>
+        void LongKick(SimPlayer p, SimPlayer m)
+        {
+            float dir = TeamDir(p.team);
+            bool field = mode.id == GameModes.Field;
+            float maxR = field ? 62f * (0.88f + 0.2f * p.passing) : halfLen * 1.3f;
+            // na frente dele, para onde está correndo (e um pouco para o ataque)
+            var target = m.position + m.vel * (field ? 1.8f : 1.1f) + new Vector2(dir * (field ? 2f : 1f), 0f);
+            target.x = Mathf.Clamp(target.x, -halfLen + 8f, halfLen - 8f);
+            target.y = Mathf.Clamp(target.y, -halfW + 3f, halfW - 3f);
+            var to = target - ball.pos;
+            float d = Mathf.Min(to.magnitude, maxR);
+            var dirv = to.normalized.Rotated(rng.Gauss() * 0.03f * (1.3f - p.passing));
+            float ang = field ? 30f : 26f, h0 = 0.11f;
+            float v0 = SolveLoft(d * rng.Range(0.96f, 1.03f), ang, h0, out _);
+            ball.z = h0;
+            ball.vel = dirv * (v0 * Mathf.Cos(ang * Mathf.Deg2Rad));
+            ball.vz = v0 * Mathf.Sin(ang * Mathf.Deg2Rad);
+            ball.spin = rng.Gauss() * 0.3f;
+            ball.slideT = 0f;
+            passReceiver = m.id; passReceiverT = 4f; passTick = tick; lastPasser = p.id; passFrom = ball.pos;
+            ReleaseBall(p);
+            protectTeam = p.team;
+            protectT = 0.4f;
+            p.kickKind = InputFrame.Lob;
+            Emit("kick", p.team, p.id, "lob", power: 1f);
         }
 
         /// <summary>
@@ -3397,6 +3519,7 @@ namespace Craquez.Sim
                 }
                 ball.owner = p.id;
                 p.hold = 2.2f;
+                p.goalKick = false;
                 p.vel *= 0.3f;
                 // goleiro com a bola nas mãos: adversários se afastam (não podem disputar)
                 foreach (var o in players)

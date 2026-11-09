@@ -409,7 +409,7 @@ namespace Craquez
             }
             // goleiro em posição de espera (joelhos flexionados, peso na ponta dos pés) quando o
             // adversário vem com a bola, e deslocando de lado acompanhando o lance
-            if (p.isKeeper && p.hold <= 0f && p.dive <= 0f && view.sim.ball.owner >= 0)
+            if (p.isKeeper && !p.InHands && p.dive <= 0f && view.sim.ball.owner >= 0)
             {
                 var ow = view.sim.players[view.sim.ball.owner];
                 if (ow.team != p.team && ow.position.Dist(p.position) < (view.sim.mode.id == GameModes.Field ? 24f : 12f)) guard = true;
@@ -697,7 +697,7 @@ namespace Craquez
         /// </summary>
         void Gait()
         {
-            if (rig.spine == null || p.down > 0f || p.slide > 0f || (p.isKeeper && (p.saveKind > 0 || p.hold > 0f)) || _celebrate > 0f) return;
+            if (rig.spine == null || p.down > 0f || p.slide > 0f || (p.isKeeper && (p.saveKind > 0 || p.InHands)) || _celebrate > 0f) return;
             float act = anim != null ? anim.ActionWeight : 0f;
             float w = (1f - act) * (1f - _procW);   // a passada desenhada (ProcGait) já cuida de braços e pernas
             if (w <= 0.05f) return;
@@ -791,7 +791,7 @@ namespace Craquez
         {
             float dt = Time.deltaTime;
             var sim = view.sim;
-            bool can = p.isKeeper && rig.pelvis != null && rig.spine != null && p.saveKind == 0 && _saveRec <= 0f && p.hold <= 0f && p.down <= 0f;
+            bool can = p.isKeeper && rig.pelvis != null && rig.spine != null && p.saveKind == 0 && _saveRec <= 0f && !p.InHands && p.down <= 0f;
             float threat = 0f;
             if (can)
             {
@@ -895,7 +895,7 @@ namespace Craquez
         void ProcGait()
         {
             float dt = Time.deltaTime;
-            bool skip = rig.spine == null || rig.pelvis == null || p.down > 0f || p.slide > 0f || (p.isKeeper && (p.saveKind > 0 || p.hold > 0f || _saveRec > 0f)) || _celebrate > 0f;
+            bool skip = rig.spine == null || rig.pelvis == null || p.down > 0f || p.slide > 0f || (p.isKeeper && (p.saveKind > 0 || p.InHands || _saveRec > 0f)) || _celebrate > 0f;
             float spd = _animSpd;
             var right = transform.right; var up = transform.up; var fwd = transform.forward;
             var lv = transform.InverseTransformDirection(new Vector3(p.vel.x, 0f, p.vel.y));
@@ -1145,7 +1145,7 @@ namespace Craquez
 
         void ArmsDown()
         {
-            if (_celebrate > 0f || (p.isKeeper && (p.dive > 0f || p.hold > 0f)) || p.down > 0f) return;
+            if (_celebrate > 0f || (p.isKeeper && (p.dive > 0f || p.InHands)) || p.down > 0f) return;
             PoseFix.Arms(rig, transform, _pose, 1f - (anim != null ? anim.ActionWeight * 0.5f : 0f), p.vel.magnitude);
         }
 
@@ -1378,7 +1378,7 @@ namespace Craquez
         void KeeperHold()
         {
             var sim = view.sim;
-            bool holding = p.isKeeper && p.hold > 0f && sim.ball.owner == p.id;
+            bool holding = p.isKeeper && p.InHands && sim.ball.owner == p.id;
             _holdW = Mathf.MoveTowards(_holdW, holding ? 1f : 0f, Time.deltaTime / 0.12f);
             if (_holdW <= 0.001f || rig.spine == null) return;
             var fwd = transform.forward;

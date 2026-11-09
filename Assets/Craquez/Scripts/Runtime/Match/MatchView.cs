@@ -561,7 +561,7 @@ namespace Craquez
                 var d = bp - _ball.position;
                 d.y = 0;
                 // nas mãos do goleiro a bola não gira (ele a reposiciona em LateUpdate)
-                bool held = sim.ball.owner >= 0 && sim.players[sim.ball.owner].isKeeper && sim.players[sim.ball.owner].hold > 0f;
+                bool held = sim.ball.owner >= 0 && sim.players[sim.ball.owner].isKeeper && sim.players[sim.ball.owner].InHands;
                 if (!held && d.sqrMagnitude > 1e-6f && d.magnitude < 1.5f)
                 {
                     var axis = Vector3.Cross(Vector3.up, d.normalized);

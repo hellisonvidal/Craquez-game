@@ -10,7 +10,7 @@ namespace Craquez.Sim
     {
         public int team;
         public float skill;
-        int _holdBtn, _holdTicks, _cooldown, _skillCd, _carryT;
+        int _holdBtn, _holdTicks, _cooldown, _skillCd, _carryT, _gkFeetT;
         Vector2 _carry;
         bool _finesse;
 
@@ -172,6 +172,27 @@ namespace Craquez.Sim
                     f.move = new Vector2(dir, (Noise(sim, 45) - 0.5f) * 1.4f).Norm();
                     Press(ref f, InputFrame.Pass, 10);
                 }
+                return f;
+            }
+            if (sim.ball.owner != p.id || !p.isKeeper) _gkFeetT = 0;
+            if (sim.ball.owner == p.id && p.isKeeper && !p.InHands)
+            {
+                // goleiro com a bola nos pés: passe para quem está livre e com a linha aberta, ou
+                // lançamento para o mais sozinho lá na frente — nunca sai driblando nem chuta a esmo
+                if (_holdBtn != 0 || _cooldown > 0) return f;
+                _gkFeetT++;
+                var m = sim.KeeperFootChoice(p, _gkFeetT > (sim.mode.id == GameModes.Futsal ? 8 : 70), Noise(sim, 61), out int how);
+                if (how < 0) return f;   // espera um companheiro se desmarcar (até ~1 s)
+                _gkFeetT = 0;
+                if (how != 0 && sim.mode.id == GameModes.Futsal)
+                {
+                    // quadra: sem ninguém livre de verdade, o melhor passe possível (linha aberta) rente ao chão
+                    var o2 = BestOption(sim, p, out float s2);
+                    if (o2 != null && s2 > 0f) { m = o2; how = 0; }
+                }
+                f.move = m != null ? (m.position - p.position).Norm() : new Vector2(dir, 0f);
+                if (how == 0) Press(ref f, InputFrame.Pass, 8);
+                else Press(ref f, InputFrame.Lob, how == 1 ? 26 : 14);
                 return f;
             }
             if (sim.ball.owner == p.id)
