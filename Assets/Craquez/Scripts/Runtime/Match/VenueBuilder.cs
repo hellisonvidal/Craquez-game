@@ -1378,6 +1378,87 @@ namespace Craquez
             return pal[Mathf.Abs(variant) % pal.Length];
         }
 
+        /// <summary>
+        /// Lado de fora do ginásio (visto nas tomadas abertas e no seletor de locais): paredes externas
+        /// com faixa na cor do clube e janelas altas, telhado em arco, marquise da entrada, calçada,
+        /// estacionamento e postes. Tudo virado para fora: de dentro não aparece.
+        /// </summary>
+        static void HallExterior(Venue v, float W, float D, float H, Kit homeKit, int variant, bool night)
+        {
+            float X = W + 0.35f, Z = D + 0.35f, top = H + 0.4f;
+            var wall = new MeshKit();
+            var band = new MeshKit();
+            var glass = new MeshKit();
+            var roof = new MeshKit();
+            // paredes (normais para fora)
+            void Face(Vector3 a, Vector3 b)
+            {
+                float len = (b - a).magnitude;
+                // (ordem b, a: a normal fica para fora do ginásio)
+                wall.Quad(b, a, a + Vector3.up * top, b + Vector3.up * top, Vector2.zero, new Vector2(len / 8f, top / 8f));
+                var outN = Vector3.Cross(b - a, Vector3.up).normalized * -0.06f;
+                // faixa do clube a 2/3 da altura e janelas altas logo abaixo do telhado
+                var y0b = Vector3.up * (top * 0.62f) + outN; var y1b = Vector3.up * (top * 0.62f + 1.4f) + outN;
+                band.Quad(b + y0b, a + y0b, a + y1b, b + y1b);
+                for (float t = 2f; t < len - 3f; t += 5f)
+                {
+                    var p0 = Vector3.Lerp(a, b, t / len) + outN;
+                    var p1 = Vector3.Lerp(a, b, (t + 3.2f) / len) + outN;
+                    glass.Quad(p1 + Vector3.up * (top - 3.4f), p0 + Vector3.up * (top - 3.4f), p0 + Vector3.up * (top - 1.2f), p1 + Vector3.up * (top - 1.2f));
+                }
+            }
+            Face(new Vector3(-X, 0, -Z), new Vector3(X, 0, -Z));
+            Face(new Vector3(X, 0, Z), new Vector3(-X, 0, Z));
+            Face(new Vector3(X, 0, -Z), new Vector3(X, 0, Z));
+            Face(new Vector3(-X, 0, Z), new Vector3(-X, 0, -Z));
+            // telhado em arco ao longo do comprimento (de uma lateral à outra), visto de cima
+            int seg = 12;
+            float rise = Z * 0.22f;
+            for (int i = 0; i < seg; i++)
+            {
+                float z0 = -Z - 0.6f + (2f * Z + 1.2f) * i / seg, z1 = -Z - 0.6f + (2f * Z + 1.2f) * (i + 1) / seg;
+                float y0 = top + rise * (1f - Mathf.Pow(z0 / (Z + 0.6f), 2f)), y1 = top + rise * (1f - Mathf.Pow(z1 / (Z + 0.6f), 2f));
+                roof.Quad(new Vector3(-X - 0.6f, y0, z0), new Vector3(-X - 0.6f, y1, z1), new Vector3(X + 0.6f, y1, z1), new Vector3(X + 0.6f, y0, z0), new Vector2(0, i / (float)seg), new Vector2(X / 4f, (i + 1f) / seg));
+            }
+            // empenas (as pontas do arco) nas duas cabeceiras
+            foreach (float sx in new[] { -1f, 1f })
+                for (int i = 0; i < seg; i++)
+                {
+                    float z0 = -Z + 2f * Z * i / seg, z1 = -Z + 2f * Z * (i + 1) / seg;
+                    float y0 = top + rise * (1f - Mathf.Pow(z0 / (Z + 0.6f), 2f)), y1 = top + rise * (1f - Mathf.Pow(z1 / (Z + 0.6f), 2f));
+                    var a0 = new Vector3(sx * X, top, z0); var a1 = new Vector3(sx * X, top, z1);
+                    if (sx < 0) wall.Quad(a0, a1, new Vector3(sx * X, y1, z1), new Vector3(sx * X, y0, z0));
+                    else wall.Quad(a1, a0, new Vector3(sx * X, y0, z0), new Vector3(sx * X, y1, z1));
+                }
+            // marquise da entrada (lado de lá) e calçada + estacionamento em volta
+            var canopy = new MeshKit();
+            canopy.Box(new Vector3(0f, 4.2f, Z + 3f), new Vector3(16f, 0.4f, 6f));
+            foreach (float sx in new[] { -7.5f, 7.5f }) canopy.Box(new Vector3(sx, 2.1f, Z + 5.6f), new Vector3(0.4f, 4.2f, 0.4f));
+            var ground = new MeshKit();
+            Ring(ground, X, Z, X + 14f, Z + 14f, -0.005f, 4f);
+            var lot = new MeshKit();
+            Ring(lot, X + 14f, Z + 14f, X + 40f, Z + 34f, -0.008f, 8f);
+            var poles = new MeshKit();
+            var lamps = new MeshKit();
+            for (float x = -X; x <= X; x += 14f)
+                foreach (float sz in new[] { -1f, 1f })
+                {
+                    var b = new Vector3(x, 0f, sz * (Z + 12f));
+                    poles.Cylinder(b, b + Vector3.up * 7f, 0.1f, 6);
+                    lamps.Box(b + Vector3.up * 7f, new Vector3(0.8f, 0.16f, 0.8f));
+                }
+            var structure = Color.Lerp(homeKit.c1, new Color(0.82f, 0.82f, 0.8f), 0.82f);
+            wall.Object("Ginásio (fora)", Gfx.Lit(structure, Gfx.Asphalt(256, Color.white, 41 + variant, 0.03f), 0.2f), v.root, false);
+            band.Object("Faixa do ginásio", night ? Gfx.Emissive(homeKit.c1 * 0.7f, homeKit.c1 * 1.2f) : Gfx.Lit(homeKit.c1, null, 0.35f), v.root, false);
+            glass.Object("Janelas altas", Gfx.Emissive(new Color(0.1f, 0.14f, 0.2f), night ? new Color(1f, 0.92f, 0.75f) * 0.8f : new Color(0.05f, 0.08f, 0.12f)), v.root, false);
+            roof.Object("Telhado", Gfx.Lit(new Color(0.62f, 0.64f, 0.68f), HallPanels(variant), 0.45f, 0.4f), v.root, false);
+            canopy.Object("Marquise", Gfx.Lit(Color.Lerp(homeKit.c1, Color.black, 0.2f), null, 0.3f), v.root, false);
+            ground.Object("Calçada do ginásio", Gfx.Lit(new Color(0.72f, 0.7f, 0.66f), PaverTex(variant), 0.12f), v.root, false);
+            lot.Object("Estacionamento do ginásio", Gfx.Lit(new Color(0.27f, 0.27f, 0.29f), Gfx.Asphalt(256, Color.white, 61, 0.3f), 0.25f), v.root, false);
+            poles.Object("Postes do ginásio", Gfx.Lit(new Color(0.55f, 0.57f, 0.6f), null, 0.5f, 0.6f), v.root, false);
+            lamps.Object("Luminárias do ginásio", night ? Gfx.Emissive(Color.white, new Color(2f, 1.9f, 1.6f)) : Gfx.Lit(new Color(0.85f, 0.86f, 0.88f), null, 0.6f), v.root, false);
+        }
+
         static void BuildFutsalHall(Venue v, MatchSim sim, TeamData home, TeamData away, Kit homeKit, Kit awayKit, (Color court, Color surround, int kind) pp, Material courtMat, Material surMat, int variant, bool night, int quality)
         {
             float hl = sim.halfLen, hw = sim.halfW;
@@ -1442,6 +1523,7 @@ namespace Craquez
             for (float x = -W + 6f; x <= W - 6f; x += 10f)
                 sky.Box(new Vector3(x, H - 0.05f, 0f), new Vector3(2.2f, 0.1f, D * 1.7f));
             sky.Object("Claraboias", Gfx.Emissive(Color.white, night ? new Color(0.5f, 0.55f, 0.65f) : new Color(2.2f, 2.3f, 2.4f)), v.root, false);
+            HallExterior(v, W, D, H, homeKit, variant, night);
             // tesouras metálicas do telhado
             var steel = new MeshKit();
             for (float x = -W + 4f; x <= W - 4f; x += 7f)

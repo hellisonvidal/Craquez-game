@@ -823,7 +823,17 @@ namespace Craquez
                 int vi = VenueIdx();
                 venueCount.text = (vi + 1) + " / " + VenueCount();
                 venueTex = MenuArt.Venue(_cfg.mode, vi, home != null ? home.c1 : Theme.Accent);
-                venueImg.texture = venueTex;
+                // foto de verdade do local, de fora (montada fora da vista na primeira vez; até lá, o desenho)
+                var shot = VenueShot.Cached(_cfg.mode, vi, _cfg.teamA);
+                venueImg.texture = shot != null ? shot : venueTex;
+                if (shot == null)
+                {
+                    string modeAt = _cfg.mode;
+                    StartCoroutine(VenueShot.Render(_cfg.mode, vi, _cfg.teamA, _cfg.teamB, _cfg.streetPlayers, tex =>
+                    {
+                        if (venueImg != null && _cfg.mode == modeAt && VenueIdx() == vi) venueImg.texture = tex;
+                    }));
+                }
                 // de noite, o desenho escurece e azula
                 venueImg.color = _cfg.timeOfDay == "noite" ? new Color(0.55f, 0.62f, 0.85f) : _cfg.timeOfDay == "tarde" ? new Color(1f, 0.86f, 0.72f) : Color.white;
                 venueName.text = _cfg.mode != GameModes.Field ? VenueNames(_cfg.mode)[_cfg.venue % VenueNames(_cfg.mode).Length]
