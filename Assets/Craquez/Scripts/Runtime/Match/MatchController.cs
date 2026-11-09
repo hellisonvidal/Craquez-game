@@ -283,6 +283,7 @@ namespace Craquez
                 if ((pressed & InputFrame.Pause) != 0) { Pause(); return; }
             }
             _acc += dt;
+            if (view != null && view.weather != null) sim.SetPitch(view.weather.Water, view.weather.SnowCover);
             while (_acc >= MatchSim.DT)
             {
                 _acc -= MatchSim.DT;

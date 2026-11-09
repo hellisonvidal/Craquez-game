@@ -500,12 +500,14 @@ namespace Craquez
             {
                 case 3: case 4: case 5:
                 {
-                    // impulso (0-15%), voo (15-55%), queda e corpo no chão (55-100%)
+                    // impulso, voo com o corpo esticado JUNTO com a chegada da bola (cu = instante do
+                    // contato previsto pela simulação), depois a queda e o corpo no chão
+                    float cu = Mathf.Clamp(p.saveContact, 0.12f, 0.75f);
                     float peak = _saveKindV == 3 ? 0.22f : _saveKindV == 4 ? 0.55f : 0.95f;
                     float lay = _saveKindV == 3 ? 88f : _saveKindV == 4 ? 80f : 70f;
-                    float k = Smooth(u / 0.3f);
+                    float k = Smooth(u / (cu * 0.9f));
                     roll = -_saveSideV * lay * k;
-                    float fly = u < 0.6f ? Mathf.Sin(Mathf.Clamp01(u / 0.6f) * Mathf.PI) * peak : 0f;
+                    float fly = u < cu * 2f ? Mathf.Sin(Mathf.Clamp01(u / (cu * 2f)) * Mathf.PI) * peak : 0f;
                     lift = fly + 0.28f * k;   // deitado de lado, o quadril fica a ~0,3 m do chão
                     pitch = -8f * k;          // peito um pouco virado para a bola
                     break;
@@ -514,8 +516,8 @@ namespace Craquez
                     pitch = 34f * Smooth(u / 0.35f);
                     lift = -0.1f * Smooth(u / 0.35f);
                     break;
-                case 6:   // salto no alto
-                    lift = Mathf.Sin(Mathf.Clamp01(u / 0.7f) * Mathf.PI) * 0.45f;
+                case 6:   // salto no alto: no ponto mais alto quando a bola chega
+                    lift = Mathf.Sin(Mathf.Clamp01(u / (Mathf.Clamp(p.saveContact, 0.12f, 0.75f) * 2f)) * Mathf.PI) * 0.45f;
                     pitch = -6f;
                     break;
                 default:  // encaixe de frente: corpo atrás da bola, leve flexão
@@ -528,7 +530,8 @@ namespace Craquez
         /// <summary>Braços na defesa: as duas mãos vão juntas na bola (ou no ponto do mergulho).</summary>
         void SaveArms()
         {
-            float w = p.saveKind > 0 ? Smooth(_saveU / 0.18f) : _saveRec / 0.45f;
+            // braços chegam na bola no instante do contato (antes já estavam esticados logo no início)
+            float w = p.saveKind > 0 ? Smooth(_saveU / Mathf.Max(0.08f, Mathf.Clamp(p.saveContact, 0.12f, 0.75f) * 0.85f)) : _saveRec / 0.45f;
             if (!p.isKeeper || _saveKindV == 0 || w <= 0.001f || rig.spine == null) return;
             var sim = view.sim;
             var ballW = W(sim.ball.pos, sim.ball.z + 0.11f);
@@ -847,9 +850,9 @@ namespace Craquez
         static readonly float[] HipWalk = { 0f, 24f, 0.15f, 15f, 0.5f, -10f, 0.62f, -6f, 0.75f, 18f, 0.88f, 27f, 1f, 24f };
         static readonly float[] KneeWalk = { 0f, 5f, 0.15f, 17f, 0.4f, 5f, 0.6f, 38f, 0.72f, 60f, 0.88f, 12f, 1f, 5f };
         static readonly float[] HipJog = { 0f, 28f, 0.18f, 6f, 0.38f, -14f, 0.55f, 6f, 0.75f, 34f, 0.88f, 39f, 1f, 28f };
-        static readonly float[] KneeJog = { 0f, 18f, 0.12f, 38f, 0.38f, 18f, 0.55f, 76f, 0.68f, 96f, 0.85f, 40f, 0.95f, 18f, 1f, 18f };
+        static readonly float[] KneeJog = { 0f, 16f, 0.12f, 30f, 0.38f, 18f, 0.55f, 76f, 0.68f, 96f, 0.85f, 40f, 0.95f, 17f, 1f, 16f };
         static readonly float[] HipSprint = { 0f, 36f, 0.12f, 10f, 0.25f, -18f, 0.45f, 12f, 0.65f, 60f, 0.78f, 68f, 0.9f, 50f, 1f, 36f };
-        static readonly float[] KneeSprint = { 0f, 24f, 0.08f, 36f, 0.25f, 22f, 0.45f, 112f, 0.56f, 124f, 0.75f, 62f, 0.9f, 26f, 1f, 24f };
+        static readonly float[] KneeSprint = { 0f, 20f, 0.08f, 30f, 0.25f, 22f, 0.45f, 112f, 0.56f, 124f, 0.75f, 62f, 0.9f, 24f, 1f, 20f };
 
         /// <summary>Curva por pontos (fase, valor), interpolação suave (Catmull-Rom), periódica.</summary>
         static float Curve(float[] k, float u)
@@ -1006,7 +1009,8 @@ namespace Craquez
                 // a mão nunca passa da altura do peito (antebraço no máximo ~20° acima da horizontal)
                 elbow = Mathf.Clamp(elbow, 8f, 110f - swing);
                 if (clv != null) _pose.Rotate(clv, Quaternion.AngleAxis(-ps * swing * 0.08f * run * W, up));   // ombro acompanha
-                float abd = _armCarry * 0.45f + 4f + (hasBall ? 7f : 0f) + lateral * 6f;
+                // braços junto ao corpo (antes abriam para os lados, com as mãos no alto, como equilibrista)
+                float abd = _armCarry * 0.25f + 2f + (hasBall ? 3.5f : 0f) + lateral * 5f;
                 // plano do balanço: gira um pouco para dentro (o braço cruza à frente do corpo)
                 var swingAxis = Quaternion.AngleAxis(ps * cross, up) * right;
                 var upDir = Quaternion.AngleAxis(-swing, swingAxis) * -up;
@@ -1315,7 +1319,10 @@ namespace Craquez
         void Cloth()
         {
             if (rig == null || rig.pelvis == null || (rig.shirt == null && rig.shorts == null)) return;
-            float dt = Mathf.Max(1e-4f, Time.deltaTime);
+            // passo limitado (quadro lento, engasgo, pausa): a mola do tecido era integrada com o tempo do
+            // quadro inteiro e, num quadro longo, ficava instável e explodia — o deslocamento crescia sem
+            // parar, o uniforme era esticado para longe ou virava NaN e sumia ("jogador sem roupa")
+            float dt = Mathf.Clamp(Time.deltaTime, 1e-4f, 1f / 30f);
             if (_mpb == null) { _mpb = new MaterialPropertyBlock(); _clothPos = rig.pelvis.position; _clothPhase = (p != null ? p.id : 0) * 1.37f; }
             var pos = rig.pelvis.position;
             var vel = (pos - _clothPos) / dt;
@@ -1328,8 +1335,19 @@ namespace Craquez
             target.y = Mathf.Clamp(target.y, -0.02f, 0.02f);
             target = Vector3.ClampMagnitude(target, 0.025f);
             // mola com amortecimento crítico: o tecido acompanha sem ficar balançando (o corpo não parece gelatina)
-            _clothDragV += ((target - _clothDrag) * 260f - _clothDragV * 32f) * dt;
-            _clothDrag += _clothDragV * dt;
+            // subpassos de no máximo 1/120 s (estável para qualquer taxa de quadros)
+            int nSub = Mathf.CeilToInt(dt * 120f);
+            float h = dt / nSub;
+            for (int i = 0; i < nSub; i++)
+            {
+                _clothDragV += ((target - _clothDrag) * 260f - _clothDragV * 32f) * h;
+                _clothDrag += _clothDragV * h;
+            }
+            if (float.IsNaN(_clothDrag.x) || float.IsNaN(_clothDrag.y) || float.IsNaN(_clothDrag.z) || float.IsNaN(_clothDragV.x)
+                || float.IsNaN(_clothVel.x) || float.IsInfinity(_clothDrag.x))
+            { _clothDrag = Vector3.zero; _clothDragV = Vector3.zero; _clothVel = Vector3.zero; }
+            _clothDrag = Vector3.ClampMagnitude(_clothDrag, 0.04f);
+            _clothDragV = Vector3.ClampMagnitude(_clothDragV, 2f);
             float spd = new Vector2(_clothVel.x, _clothVel.z).magnitude;
             float flutAmp = 0.0004f + Mathf.Min(spd, 9f) * 0.00025f;   // só a barra tremula de leve
             float freq = 9f + spd * 1.3f;

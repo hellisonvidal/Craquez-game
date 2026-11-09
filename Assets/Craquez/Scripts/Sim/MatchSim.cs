@@ -208,7 +208,56 @@ namespace Craquez.Sim
                 }
             }
             kickoffTeam = 0;
+            MakePuddles(seed);
             ResetForKickoff(0);
+        }
+
+        // ------------------------------------------------------------ piso (chuva e neve)
+        /// <summary>Água acumulada no gramado (0..1: as poças crescem com ela) e neve acumulada (0..1).</summary>
+        public float water, snow;
+        /// <summary>Poças: x, y (campo) e raio máximo (m). Sempre nos mesmos lugares para a mesma partida.</summary>
+        public readonly List<Vector3> puddles = new List<Vector3>();
+
+        /// <summary>Raio atual de uma poça (cresce com a água acumulada; seca abaixo de ~25%).</summary>
+        public float PuddleRadius(int i) => puddles[i].z * Mathf.Clamp01((water - 0.22f) / 0.6f);
+
+        /// <summary>Profundidade da poça no ponto (0 = seco .. 1 = no meio de uma poça cheia).</summary>
+        public float PuddleAt(Vector2 at)
+        {
+            float best = 0f;
+            for (int i = 0; i < puddles.Count; i++)
+            {
+                float r = PuddleRadius(i);
+                if (r < 0.2f) continue;
+                float d = new Vector2(puddles[i].x - at.x, puddles[i].y - at.y).magnitude;
+                if (d < r) best = Mathf.Max(best, Mathf.Clamp01((1f - d / r) * 1.6f) * Mathf.Clamp01(water * 1.2f));
+            }
+            return best;
+        }
+
+        /// <summary>Clima: água e neve acumuladas no gramado (o jogo atualiza a cada quadro).</summary>
+        public void SetPitch(float waterNow, float snowNow)
+        {
+            water = Mathf.Clamp01(waterNow);
+            snow = Mathf.Clamp01(snowNow);
+        }
+
+        void MakePuddles(uint seed)
+        {
+            puddles.Clear();
+            if (mode.id == GameModes.Futsal) return;   // ginásio coberto
+            var r = new SimRng(seed * 7919u + 17u);
+            int n = mode.id == GameModes.Field ? 11 : 6;
+            for (int i = 0; i < n; i++)
+            {
+                // a água junta onde mais se pisa (pequenas áreas, meio) e em pontos baixos ao acaso
+                float x, y;
+                if (i < 2) { x = (i == 0 ? -1f : 1f) * (halfLen - Mathf.Max(3f, mode.boxDepth * 0.3f)) + r.Range(-1.5f, 1.5f); y = r.Range(-3f, 3f); }
+                else if (i == 2) { x = r.Range(-3f, 3f); y = r.Range(-3f, 3f); }
+                else { x = r.Range(-halfLen * 0.85f, halfLen * 0.85f); y = r.Range(-halfW * 0.8f, halfW * 0.8f); }
+                float rad = mode.id == GameModes.Field ? r.Range(1.2f, 3.2f) : r.Range(0.7f, 1.8f);
+                puddles.Add(new Vector3(x, y, rad));
+            }
         }
 
         /// <summary>Clima mudou no meio do jogo: bola mais rápida na chuva, mais lenta na neve.</summary>
@@ -2286,13 +2335,15 @@ namespace Craquez.Sim
                             {
                                 // encaixe: de frente, baixo (cai sobre a bola) ou saltando no alto
                                 if (tK < 0.45f)
-                                    StartSave(p, zK < 0.45f ? 2 : zK > 1.75f ? 6 : 1, Mathf.Sign(lat), zK, side, Mathf.Max(0.35f, tK + 0.25f));
+                                    StartSave(p, zK < 0.45f ? 2 : zK > 1.75f ? 6 : 1, Mathf.Sign(lat), zK, side, Mathf.Max(0.35f, tK + 0.25f), tK);
                             }
                             else if (tK < Mathf.Lerp(0.4f, 0.5f, p.defense))   // mergulho na hora (antes decidia cedo, com a leitura ainda errada)
                             {
                                 // ponte: rasteira, meia-altura ou no ângulo
                                 int kind = zK < 0.55f ? 3 : zK > 1.45f ? 5 : 4;
-                                StartSave(p, kind, Mathf.Sign(lat), zK, side, 0.95f);
+                                // o voo dura o bastante para o corpo chegar esticado JUNTO com a bola (antes o pico do
+                                // pulo vinha num instante fixo e o goleiro caía antes da bola chegar)
+                                StartSave(p, kind, Mathf.Sign(lat), zK, side, 0.95f, tK);
                                 p.dive = 0.6f;
                                 // impulso lateral: o necessário para as mãos chegarem, até o limite da impulsão
                                 float need = Mathf.Max(0f, side - DiveReach(p, kind) * 0.85f) / Mathf.Max(0.18f, tK);
@@ -2335,7 +2386,7 @@ namespace Craquez.Sim
                         p.oneOnOne = true;
                         float dAtt = own.position.Dist(p.position);
                         if (dAtt < (fieldK ? 2.4f : 1.8f) && p.saveKind == 0 && ball.z < 0.4f)
-                            StartSave(p, 2, Mathf.Sign(ball.pos.y - p.position.y), 0.2f, 0.4f, 0.55f);
+                            StartSave(p, 2, Mathf.Sign(ball.pos.y - p.position.y), 0.2f, 0.4f, 0.55f, 0.2f);
                     }
                 }
                 bool ownDistribution = ball.lastTouchId == p.id && lastPasser == p.id && tick - passTick < 150;
@@ -2361,8 +2412,9 @@ namespace Craquez.Sim
 
         static float Lerp01(float a, float b, float t) => Mathf.Lerp(a, b, Mathf.Clamp01(t));
 
-        void StartSave(SimPlayer p, int kind, float side, float h, float dist, float secs)
+        void StartSave(SimPlayer p, int kind, float side, float h, float dist, float secs, float contactT = -1f)
         {
+            p.saveContact = Mathf.Clamp((contactT > 0f ? contactT : secs * 0.4f) / Mathf.Max(0.05f, secs), 0.12f, 0.75f);
             p.saveKind = kind;
             p.saveSide = side == 0f ? 1f : side;
             p.saveH = h;
@@ -2391,6 +2443,7 @@ namespace Craquez.Sim
             {
                 float u = 1f - p.saveT / p.saveTotal;
                 // esticando: chega ao alcance máximo em ~0,25 s e mantém no voo
+                // esticado por completo no instante previsto do contato
                 float ext = DiveReach(p, p.saveKind) * Mathf.Sin(Mathf.Clamp01(u * 2.6f) * Mathf.PI * 0.5f);
                 float hz = p.saveKind == 3 ? 0.22f : p.saveKind == 5 ? Mathf.Clamp(p.saveH, 1.5f, 2.55f) : Mathf.Clamp(p.saveH, 0.6f, 1.5f);
                 radius = 0.3f;
@@ -2731,6 +2784,7 @@ namespace Craquez.Sim
                 maxS *= 1f - 0.4f * back - 0.15f * side;
             }
             if (p.burst > 0f) maxS *= 1.07f;
+            if (water > 0.25f || snow > 0.05f) maxS *= (1f - 0.12f * PuddleAt(p.position)) * (1f - 0.1f * snow);   // poça e neve pesam
             if (p.offBalance > 0f) maxS *= 0.3f;
             if (p.isKeeper && p.Diving && p.saveT > 0f)
             {
@@ -3591,6 +3645,9 @@ namespace Craquez.Sim
             if (ball.owner >= 0 && players[ball.owner].hold > 0f) return;
             if (throwIn && ball.owner == throwInTaker) return;   // bola nas mãos do cobrador do lateral
             var prev = ball.pos;
+            ball.puddle = ball.z < 0.15f ? PuddleAt(ball.pos) : 0f;
+            ball.snowCover = snow;
+            ball.wet = water;
             if (ball.Step(DT, mode) && ball.Speed > 4f) Emit("bounce");
             Posts();
             GoalAndBounds(prev);

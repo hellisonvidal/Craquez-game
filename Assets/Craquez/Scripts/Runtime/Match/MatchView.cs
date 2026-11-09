@@ -109,6 +109,9 @@ namespace Craquez
             if (s.mode.id == GameModes.Futsal) wk = "sol";   // ginásio coberto
             weather.Setup(wk, c.dynamicWeather && s.mode.id != GameModes.Futsal, c.seed, cam, sun, venue.pitchMat);
             weather.pitch2 = venue.pitchMat2;
+            // poças da chuva (as mesmas da simulação); já cheias se a partida começa chovendo
+            s.SetPitch(weather.Water, weather.SnowCover);
+            PuddleFx.Create(venue.root, s, weather, this);
             UrpSetup.Camera(cam, q);
             Sfx.Crowd(s.mode.id == GameModes.Field ? 0.55f : 0.3f, s.mode.id == GameModes.Field ? 0.25f : 0f);
             FanCrowd.Hype = 0f; FanCrowd.GoalT = 0f; FanCrowd.GoalTeam = -1; FanCrowd.OlaStart = -100f; FanCrowd.ShotT = 0f; FanCrowd.FoulT = 0f;

@@ -96,8 +96,14 @@ namespace Craquez
             _cam = cam;
             _splash = Splashes();
             Target(out _cloud, out _rainK, out _snowK, out _storm);
+            // jogo que já começa na chuva/neve: o gramado já tem água/neve acumulada
+            Water = kind == "tempestade" ? 0.85f : kind == "chuva" ? 0.55f : 0f;
+            SnowCover = kind == "neve" ? 0.55f : 0f;
             Apply(0f);
         }
+
+        /// <summary>Água acumulada no gramado (0..1: as poças crescem com ela) e neve acumulada (0..1).</summary>
+        public float Water, SnowCover;
 
         ParticleSystem Particles(Camera cam, bool rain)
         {
@@ -176,6 +182,13 @@ namespace Craquez
             }
             Target(out var tc, out var tr, out var ts, out var tst);
             float k = dt <= 0f ? 1f : Mathf.Min(1f, dt * 0.35f);   // transição de ~5 s
+            if (dt > 0f)
+            {
+                // a chuva enche o gramado aos poucos (temporal mais rápido) e ele seca devagar; a neve
+                // acumula enquanto neva e derrete devagar
+                Water = Mathf.Clamp01(Water + dt * (_rainK * 0.004f + _storm * 0.005f) - dt * 0.0015f * (1f - Mathf.Clamp01(_rainK * 3f)));
+                SnowCover = Mathf.Clamp01(SnowCover + dt * _snowK * 0.0035f - dt * 0.001f * (1f - Mathf.Clamp01(_snowK * 3f)));
+            }
             _cloud = Mathf.Lerp(_cloud, tc, k);
             _rainK = Mathf.Lerp(_rainK, tr, k);
             _snowK = Mathf.Lerp(_snowK, ts, k);
@@ -242,5 +255,6 @@ namespace Craquez
 
         public string Label => Labels[Mathf.Max(0, System.Array.IndexOf(Kinds, kind))];
         public float Rain => _rainK;
+        public float Storm => _storm;
     }
 }
