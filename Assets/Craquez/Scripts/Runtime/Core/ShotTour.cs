@@ -209,6 +209,38 @@ namespace Craquez
                         bcK.cinematic = false;
                         yield return new WaitForSecondsRealtime(1.5f);
                     }
+                    // chute de verdade (do pé do atacante) e a reação do goleiro, quadro a quadro (1/30 s)
+                    {
+                        float gxS = sim.halfLen;
+                        SimPlayer gkS = null, att = null;
+                        foreach (var q in sim.players) if (q.isKeeper && Mathf.Sign(-sim.halfLen * sim.TeamDir(q.team)) == 1f) gkS = q;
+                        if (gkS != null) foreach (var q in sim.players) if (q.team != gkS.team && !q.isKeeper) { att = q; break; }
+                        if (gkS != null && att != null)
+                        {
+                            foreach (var q in sim.players) if (q != gkS && q != att) q.position = new Vector2(-sim.halfLen * 0.4f, q.position.y * 0.5f);
+                            gkS.position = new Vector2(gxS - 1.2f, 0f); gkS.vel = Vector2.zero; gkS.saveKind = 0;
+                            att.position = new Vector2(gxS - 17f, -4f); att.vel = new Vector2(3f, 0.5f); att.facing = new Vector2(1f, 0.25f).normalized;
+                            sim.ball.owner = att.id; sim.ball.pos = att.position + att.facing * 0.45f; sim.ball.vel = att.vel; sim.ball.z = 0f;
+                            sim.TourShoot(att, new Vector2(1f, 0.32f).normalized, 0.75f);
+                            Time.captureFramerate = 30;
+                            bcK.cinematic = true;
+                            bcK.cam.transform.position = bcK.cinePos = new Vector3(gxS - 9f, 3.2f, -15f);
+                            bcK.cineLook = new Vector3(gxS - 8f, 0.9f, 0f);
+                            bcK.cam.transform.LookAt(bcK.cineLook);
+                            bcK.cam.fieldOfView = bcK.cineFov = 52f;
+                            for (int f = 0; f < 30; f++)
+                            {
+                                yield return new WaitForEndOfFrame();
+                                var tex = ScreenCapture.CaptureScreenshotAsTexture();
+                                File.WriteAllBytes(Path.Combine(Dir, $"chute_defesa_{f:00}.png"), tex.EncodeToPNG());
+                                Destroy(tex);
+                                yield return null;
+                            }
+                            Time.captureFramerate = 0;
+                            bcK.cinematic = false;
+                            yield return new WaitForSecondsRealtime(1.5f);
+                        }
+                    }
                     // gol forçado: bola entrando no canto (rede balançando) e a comemoração sem corte
                     sim.ball.owner = -1;
                     sim.ball.pos = new Vector2(sim.halfLen - 1.2f, 1.5f);

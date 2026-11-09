@@ -1024,6 +1024,9 @@ namespace Craquez.Sim
             Emit("windup", p.team, p.id, KindName(kind));
         }
 
+        /// <summary>Roteiro de screenshots: o atleta chuta (com o gesto de preparação normal).</summary>
+        public void TourShoot(SimPlayer p, Vector2 aim, float power) { if (ball.owner == p.id) BeginWindup(p, InputFrame.Shoot, power, aim, false); }
+
         public static string KindName(int kind)
             => kind == InputFrame.Shoot ? "shot" : kind == InputFrame.Lob ? "lob" : kind == InputFrame.Through ? "through" : "pass";
 
@@ -2353,10 +2356,11 @@ namespace Craquez.Sim
                             if (side <= armReach * 1.25f || (stepIn && tK > 0.32f))
                             {
                                 // encaixe: de frente, baixo (cai sobre a bola) ou saltando no alto
-                                if (tK < 0.45f)
-                                    StartSave(p, zK < 0.45f ? 2 : zK > 1.75f ? 6 : 1, Mathf.Sign(lat), zK, side, Mathf.Max(0.35f, tK + 0.25f), tK);
+                                // (bola no corpo: arma as mãos em cima da hora; salto só se passar da cabeça)
+                                if (tK < Mathf.Lerp(0.26f, 0.42f, Mathf.Clamp01(side / Mathf.Max(0.1f, armReach * 1.25f))))
+                                    StartSave(p, zK < 0.45f ? 2 : zK > 2.0f ? 6 : 1, Mathf.Sign(lat), zK, side, Mathf.Max(0.35f, tK + 0.25f), tK);
                             }
-                            else if (tK < Mathf.Lerp(0.4f, 0.5f, p.defense))   // mergulho na hora (antes decidia cedo, com a leitura ainda errada)
+                            else if (tK < Mathf.Lerp(0.4f, 0.5f, p.defense) * Mathf.Clamp(0.55f + side * 0.2f, 0.7f, 1f))   // mergulho na hora: mais perto do corpo, mais em cima da hora
                             {
                                 // ponte: rasteira, meia-altura ou no ângulo
                                 int kind = zK < 0.55f ? 3 : zK > 1.45f ? 5 : 4;
