@@ -585,6 +585,18 @@ namespace Craquez
                     var C = new Vector3(len / 2, y1, -d0);
                     var D = new Vector3(-len / 2, y1, -d0);
                     var uv = RowUV(r, len, tw, 512);
+                    if (side == 0)
+                    {
+                        // lado da tribuna central: vão na largura do corredor dos vestiários (a arquibancada
+                        // atravessava o corredor e aparecia pela porta)
+                        const float hx = 3.2f;
+                        float um = Mathf.Lerp(uv.a.x, uv.b.x, 0.5f - hx / len), un = Mathf.Lerp(uv.a.x, uv.b.x, 0.5f + hx / len);
+                        k.Quad(A, new Vector3(-hx, y0, -d0), new Vector3(-hx, y1, -d0), D, uv.a, new Vector2(um, uv.b.y));
+                        k.Quad(new Vector3(hx, y0, -d0), B, C, new Vector3(hx, y1, -d0), new Vector2(un, uv.a.y), uv.b);
+                        back.Quad(D, new Vector3(-hx, y1, -d0), new Vector3(-hx, y1, -d1), new Vector3(-len / 2, y1, -d1), new Vector2(0, 0), new Vector2(len / 8f, step / 4f));
+                        back.Quad(new Vector3(hx, y1, -d0), C, new Vector3(len / 2, y1, -d1), new Vector3(hx, y1, -d1), new Vector2(0, 0), new Vector2(len / 8f, step / 4f));
+                        continue;
+                    }
                     k.Quad(A, B, C, D, uv.a, uv.b);
                     // piso do degrau: concreto (antes usava a textura da torcida e virava listras)
                     back.Quad(D, C, new Vector3(len / 2, y1, -d1), new Vector3(-len / 2, y1, -d1), new Vector2(0, 0), new Vector2(len / 4f, step / 4f));
@@ -612,6 +624,7 @@ namespace Craquez
                             for (float x = xa + (float)frng.NextDouble() * 0.3f; x < xb; x += 0.74f + (float)frng.NextDouble() * 0.12f)
                             {
                                 if (frng.NextDouble() > style.occupancy) continue;
+                                if (side == 0 && Mathf.Abs(x) < 3.6f) continue;   // (vão do corredor dos vestiários)
                                 int team = side == 3 && !mixed ? 1 : 0;
                                 if (mixed && frng.NextDouble() < 0.35) team = 1;
                                 grp.Add(new FanCrowd.Spot { pos = new Vector3(x, y1, -d), yaw = 0f, team = team, lod = r >= 10 });
@@ -635,6 +648,12 @@ namespace Craquez
                     for (int a = 0; a < nA; a++)
                     {
                         float xa = -len / 2 + a * len / nA + (a > 0 ? 0.65f : 0f), xb = -len / 2 + (a + 1) * len / nA - (a < nA - 1 ? 0.65f : 0f);
+                        if (side == 0 && xa < 3.6f && xb > -3.6f)
+                        {
+                            // (vão do corredor: corta o bloco de silhuetas que passaria por ele)
+                            if (xa > -3.6f && xb < 3.6f) continue;
+                            if (xa < -3.6f) xb = Mathf.Min(xb, -3.6f); else xa = Mathf.Max(xa, 3.6f);
+                        }
                         float ua = off + (xa + len / 2) / len * uSpan, ub = off + (xb + len / 2) / len * uSpan;
                         pplG[(r / 2) % 3].Quad(new Vector3(xa, y1, -d), new Vector3(xb, y1, -d), new Vector3(xb, y1 + hh, -d), new Vector3(xa, y1 + hh, -d),
                             new Vector2(ua, 0f), new Vector2(ub, 1f));

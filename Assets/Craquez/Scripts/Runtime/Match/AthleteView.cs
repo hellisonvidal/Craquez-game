@@ -377,6 +377,13 @@ namespace Craquez
             {
                 var sp = SavePose(dt);
                 pitch += sp.x; roll += sp.y; lift += sp.z;
+                if (_saveKindV >= 3 && _saveKindV <= 5)
+                {
+                    // o corpo gira em torno do quadril, não dos pés: sem isto o desenho "voava" ~0,7 m além
+                    // de onde estão as mãos na simulação (o goleiro parecia passar por cima da bola)
+                    var rightYaw = Quaternion.Euler(0f, _yaw, 0f) * Vector3.right;
+                    pos -= rightYaw * (_saveSideV * 0.95f * Mathf.Sin(Mathf.Abs(sp.y) * Mathf.Deg2Rad) * 0.5f);
+                }
             }
             else if (p.down > 0f)
             {
