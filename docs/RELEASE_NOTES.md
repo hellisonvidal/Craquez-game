@@ -1,13 +1,24 @@
-## Craquez 2.4.0
+## Craquez 2.4.1
 
 Jogo de futebol feito 100% com inteligência artificial, **gratuito**. Android, Windows e Linux.
 
 ### Downloads
-- **Android**: `Craquez-v2.4.0.apk` (instale permitindo "fontes desconhecidas")
-- **Windows**: `Craquez-v2.4.0-Instalador-Windows.exe` (instalador) ou `Craquez-v2.4.0-Windows.zip` (portátil)
-- **Linux**: `Craquez-v2.4.0-Linux.tar.gz` → extraia e rode `./Craquez` (ou `./instalar.sh` para o atalho no menu)
+- **Android**: `Craquez-v2.4.1.apk` (instale permitindo "fontes desconhecidas")
+- **Windows**: `Craquez-v2.4.1-Instalador-Windows.exe` (instalador) ou `Craquez-v2.4.1-Windows.zip` (portátil)
+- **Linux**: `Craquez-v2.4.1-Linux.tar.gz` → extraia e rode `./Craquez` (ou `./instalar.sh` para o atalho no menu)
 
 ### Novidades
+- **Goleiro sem mergulho à toa**: bola perto do corpo (até ~1,25 braço) é defendida de pé, inclinando;
+  o mergulho é decidido na hora, com a leitura já certa (antes às vezes ele mergulhava no ângulo para
+  uma bola que vinha quase nele). Chutes de longe bem colocados voltam a entrar de vez em quando
+  (~3%, como no futebol de verdade), mas não os "bobos".
+- **Mergulho na tela gira pelo quadril**: o corpo desenhado fica onde estão as mãos na simulação
+  (antes "voava" ~0,7 m além e parecia passar por cima da bola).
+- **Cruzamento de verdade**: passe alto da ponta, perto da linha de fundo, apontando para a área,
+  procura quem está na área (o melhor no cabeceio).
+
+## Versão 2.4.0
+
 - **Goleiro sem gols bobos de longe**: ele defende de onde está (antes, adiantado, corria de costas
   até a linha do gol enquanto a bola vinha e mergulhava voando para trás); só recua quando a bola vai
   passar por cima das mãos. No salto para a bola alta as mãos vão na bola (antes iam para o lado,

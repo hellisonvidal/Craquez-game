@@ -209,8 +209,9 @@ namespace Craquez
                     yield return Shot("estadio_" + m + "_fundo", 1f);
                     // túnel dos vestiários, gol de perto (traves e rede) e a torcida da frente
                     var tz = mc.view.venue.tunnel.z;
-                    bc.cam.transform.position = bc.cinePos = new Vector3(2.5f, 2.2f, tz + 9f);
-                    bc.cineLook = new Vector3(0f, 1.6f, tz - 4f);
+                    // (como na cerimônia: mira na frente da porta; mirando atrás dela, a tribuna some)
+                    bc.cam.transform.position = bc.cinePos = new Vector3(3f, 3.5f, tz + 18f);
+                    bc.cineLook = new Vector3(0f, 2.2f, tz + 6f);
                     bc.cam.transform.LookAt(bc.cineLook);
                     bc.cam.fieldOfView = bc.cineFov = 48f;
                     if (m == 1 || m == 6) yield return Shot("estadio_" + m + "_tunel", 1f);

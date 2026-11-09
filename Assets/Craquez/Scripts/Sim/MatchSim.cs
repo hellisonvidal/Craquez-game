@@ -986,6 +986,14 @@ namespace Craquez.Sim
             else if (kind == InputFrame.Lob)
             {
                 if (setPiece && !kickIn && p.id == setPieceTaker) { CrossToBox(p, aim, power); return; }
+                // passe alto da ponta, perto da linha de fundo, apontando para a área: cruzamento
+                {
+                    float gxC = halfLen * TeamDir(p.team);
+                    var toBox = new Vector2(gxC, 0f) - ball.pos;
+                    if (mode.keeper && Mathf.Abs(ball.pos.y) > mode.boxHalf * 0.55f && Mathf.Abs(gxC - ball.pos.x) < Mathf.Max(12f, mode.boxDepth * 1.7f)
+                        && aim.sqrMagnitude > 0.01f && Vector2.Dot(aim.Norm(), toBox.Norm()) > 0.2f)
+                    { CrossToBox(p, aim, power); return; }
+                }
                 if (TryChip(p, aim, power)) return;
                 Pass(p, aim, power, false, true);
             }
@@ -2248,7 +2256,7 @@ namespace Craquez.Sim
                     // leitura imperfeita: chute forte e de longe engana mais (o goleiro ruim mais ainda), mas
                     // ele corrige a leitura conforme a bola chega (de longe sobra tempo para se ajeitar)
                     float readErr = ((p.id * 7919 + lastShotTick * 31) % 1000 / 1000f - 0.5f) * 2f;
-                    float settle = Mathf.Lerp(1f, 0.25f, Mathf.Clamp01(((tick - lastShotTick) * DT - 0.25f) / 0.45f));
+                    float settle = Mathf.Lerp(1f, 0.5f, Mathf.Clamp01(((tick - lastShotTick) * DT - 0.25f) / 0.45f));
                     float yK = ball.pos.y + ball.vel.y * tK + readErr * settle * Mathf.Clamp01(ball.Speed / 30f) * Mathf.Lerp(0.55f, 0.2f, p.defense);
                     float zK = Mathf.Max(0f, ball.z + ball.vz * tK - 0.5f * SimBall.G * tK * tK);
                     float yCross = ball.pos.y + ball.vel.y * tCross;
@@ -2269,13 +2277,15 @@ namespace Craquez.Sim
                         bool stepIn = side - armReach < (tK - 0.15f) * Lerp01(1.5f, 2.2f, p.defense);
                         if (p.saveKind == 0 && !wide)
                         {
-                            if (side <= armReach || (stepIn && tK > 0.32f))
+                            // perto do corpo (até ~1,4 braço): defende de pé, inclinando — antes ele às vezes
+                            // mergulhava no ângulo para uma bola que vinha quase nele e ela passava por baixo
+                            if (side <= armReach * 1.25f || (stepIn && tK > 0.32f))
                             {
                                 // encaixe: de frente, baixo (cai sobre a bola) ou saltando no alto
                                 if (tK < 0.45f)
                                     StartSave(p, zK < 0.45f ? 2 : zK > 1.75f ? 6 : 1, Mathf.Sign(lat), zK, side, Mathf.Max(0.35f, tK + 0.25f));
                             }
-                            else if (tK < Mathf.Lerp(0.5f, 0.62f, p.defense))
+                            else if (tK < Mathf.Lerp(0.4f, 0.5f, p.defense))   // mergulho na hora (antes decidia cedo, com a leitura ainda errada)
                             {
                                 // ponte: rasteira, meia-altura ou no ângulo
                                 int kind = zK < 0.55f ? 3 : zK > 1.45f ? 5 : 4;
@@ -2383,7 +2393,7 @@ namespace Craquez.Sim
                 // encaixe/baixa/salto: as mãos vão na bola (até o comprimento do braço para o lado e
                 // para cima/baixo). Antes ficavam presas no meio do peito e a bola a 40 cm passava.
                 float gs = Mathf.Clamp(goalHalf / 3.66f, 0.6f, 1f);
-                float arm = (0.62f + 0.1f * p.defense) * gs;
+                float arm = (0.72f + 0.12f * p.defense) * gs;   // braço + inclinação do tronco
                 hy += Mathf.Clamp(ball.pos.y - p.position.y, -arm, arm);
                 hzStand = Mathf.Clamp(ball.z + ball.radius, p.saveKind == 2 ? 0.1f : 0.35f, p.saveKind == 2 ? 0.7f : 2.0f);
             }
