@@ -33,6 +33,11 @@ Jogo de futebol feito 100% com inteligência artificial, **gratuito**. Android, 
 - **Câmera do campo mais perto do jogo**, de frente (TV e TV Próxima).
 - **Ombros mais baixos**, acompanhando o fim do pescoço, em todas as situações (antes, na comemoração,
   nas quedas e nas defesas, voltavam a ficar altos).
+- **Atletas do tamanho certo**: cada modelo agora é levado à altura sorteada, de 1,68 a 1,93 m
+  (média ~1,80 m). Antes a escala era aplicada sobre modelos que já tinham 1,81–1,95 m e alguns
+  passavam de 2 m, parecendo grandes demais para o campo.
+- **Tiro de meta da CPU**: toca no companheiro livre ou lança para quem está sozinho lá na frente
+  (antes tocava para a frente numa direção sorteada).
 - **Torcedores 3D encorpados**: ombros, duas pernas, braços mais grossos, vistos de qualquer lado e
   sem sumir na sombra da cobertura.
 - **Bandeiras sem "disparar"**: o ritmo muda aos poucos (antes, num lance de perigo, a bandeira

@@ -119,6 +119,40 @@ namespace Craquez.Sim
                     return f;
                 }
                 if (Noise(sim, 40) > 0.012f) return f;
+                if (p.isKeeper)
+                {
+                    // tiro de meta / reposição com os pés: companheiro livre por perto (passe) ou lançamento
+                    // para quem está sozinho lá na frente — nunca um chutão sem destino
+                    var opt = BestOption(sim, p, out float os);
+                    SimPlayer far = null; float farS = float.MinValue;
+                    foreach (var m in sim.players)
+                    {
+                        if (m.team != p.team || m == p || m.isKeeper || m.sentOff) continue;
+                        float ahead = (m.position.x - p.position.x) * dir;
+                        if (ahead < sim.halfLen * 0.35f) continue;
+                        float free = 99f;
+                        foreach (var o in sim.players) if (o.team != p.team && !o.sentOff) free = Mathf.Min(free, o.position.Dist(m.position));
+                        float sc = Mathf.Min(free, 10f) + ahead * 0.03f;
+                        if (sc > farS) { farS = sc; far = m; }
+                    }
+                    bool shortOk = opt != null && os > 1.6f && opt.position.Dist(p.position) < sim.halfLen * 0.6f;
+                    if (shortOk && (far == null || Noise(sim, 48) < 0.65f))
+                    {
+                        f.move = (opt.position - p.position).Norm();
+                        Press(ref f, InputFrame.Pass, 10);
+                    }
+                    else if (far != null)
+                    {
+                        f.move = (far.position - p.position).Norm();
+                        Press(ref f, InputFrame.Lob, 22 + (int)(Noise(sim, 44) * 10f));
+                    }
+                    else
+                    {
+                        f.move = new Vector2(dir, 0f);
+                        Press(ref f, InputFrame.Lob, 26);
+                    }
+                    return f;
+                }
                 float r = Noise(sim, 41);
                 if (sim.setPieceShot && dg < 28f && r < 0.45f + p.shot * 0.3f)
                 {

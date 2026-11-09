@@ -129,7 +129,14 @@ namespace Craquez
             var rig = root.AddComponent<AthleteRig>();
             rig.Init(inst.transform);
             rig.Physique(look.build, look.frame);
-            inst.transform.localScale = Vector3.one * look.scale;
+            // altura de verdade: cada modelo tem uma altura própria (cabeça em repouso de 1,60 a 1,74 m,
+            // ou seja, 1,81 a 1,95 m no topo), e a escala sorteada ia de 0,91 a 1,09 — saíam atletas de
+            // até 2,10 m, grandes demais para o campo. Agora a escala leva cada um à altura sorteada,
+            // de 1,68 a 1,93 m (média ~1,80 m).
+            float u = Mathf.InverseLerp(0.91f, 1.09f, look.scale);
+            float tall = Mathf.Lerp(1.68f, 1.93f, u);
+            float modelH = rig.head != null ? rig.head.position.y - root.transform.position.y + 0.21f : 1.85f;
+            inst.transform.localScale = Vector3.one * Mathf.Clamp(tall / Mathf.Max(1.2f, modelH), 0.82f, 1.08f);
             // mãos do modelo eram grandes demais para o corpo: ~32% menores
             foreach (var hn in new[] { "hand_l", "hand_r" })
                 if (rig.bones.TryGetValue(hn, out var hb)) hb.localScale = hb.localScale * 0.68f;
