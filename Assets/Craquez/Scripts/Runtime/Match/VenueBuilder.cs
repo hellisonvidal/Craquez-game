@@ -451,34 +451,75 @@ namespace Craquez
                 var ks = new MeshKit();
                 float gx = hl * s, gh = m.goalHeight, gw = m.goalWidth / 2, gd = m.goalDepth;
                 float r = m.id == GameModes.Field ? 0.06f : 0.045f;
+                // tubo elíptico (traves oficiais: ~12 cm de largura, mais fundas que largas)
+                void Ell(MeshKit kk, Vector3 a0, Vector3 a1, float ra, float rb, Vector3 bAxis, int seg = 18)
+                {
+                    var ax = (a1 - a0).normalized;
+                    var vb = Vector3.ProjectOnPlane(bAxis, ax).normalized;
+                    var va = Vector3.Cross(ax, vb);
+                    for (int i = 0; i < seg; i++)
+                    {
+                        float t0 = i / (float)seg * Mathf.PI * 2f, t1 = (i + 1) / (float)seg * Mathf.PI * 2f;
+                        var d0 = va * (Mathf.Cos(t0) * ra) + vb * (Mathf.Sin(t0) * rb);
+                        var d1 = va * (Mathf.Cos(t1) * ra) + vb * (Mathf.Sin(t1) * rb);
+                        kk.Quad(a0 + d0, a0 + d1, a1 + d1, a1 + d0);
+                    }
+                }
+                var depthAx = new Vector3(s, 0f, 0f);
                 void Bar(Vector3 a0, Vector3 a1, float rad, bool striped)
                 {
-                    if (!striped) { k.Cylinder(a0, a1, rad, 16); return; }
+                    // largura r ao longo da linha do gol, profundidade 1,15 r (o desenho fica mais "cheio")
+                    if (!striped) { Ell(k, a0, a1, rad, rad * 1.15f, depthAx); return; }
                     float len = (a1 - a0).magnitude;
                     int n = Mathf.Max(1, Mathf.RoundToInt(len / 0.2f));
                     for (int i = 0; i < n; i++)
-                        ((i & 1) == 0 ? k : ks).Cylinder(Vector3.Lerp(a0, a1, i / (float)n), Vector3.Lerp(a0, a1, (i + 1) / (float)n), rad, 16);
+                        Ell((i & 1) == 0 ? k : ks, Vector3.Lerp(a0, a1, i / (float)n), Vector3.Lerp(a0, a1, (i + 1) / (float)n), rad, rad * 1.15f, depthAx);
                 }
-                Bar(new Vector3(gx, 0, -gw - r), new Vector3(gx, gh + r, -gw - r), r, futsal);
-                Bar(new Vector3(gx, 0, gw + r), new Vector3(gx, gh + r, gw + r), r, futsal);
+                Bar(new Vector3(gx, 0, -gw - r), new Vector3(gx, gh + r * 2f, -gw - r), r, futsal);
+                Bar(new Vector3(gx, 0, gw + r), new Vector3(gx, gh + r * 2f, gw + r), r, futsal);
                 Bar(new Vector3(gx, gh + r, -gw - 2 * r), new Vector3(gx, gh + r, gw + 2 * r), r, futsal);
-                // armação de trás (ferro fino) e base no chão
-                float br = r * 0.45f;
-                k.Cylinder(new Vector3(gx + s * gd, 0.02f, -gw), new Vector3(gx + s * gd, 0.02f, gw), br, 8);
-                k.Cylinder(new Vector3(gx, 0.02f, -gw), new Vector3(gx + s * gd, 0.02f, -gw), br, 8);
-                k.Cylinder(new Vector3(gx, 0.02f, gw), new Vector3(gx + s * gd, 0.02f, gw), br, 8);
-                k.Cylinder(new Vector3(gx + s * gd, 0, -gw), new Vector3(gx + s * gd * 0.35f, gh, -gw), br, 8);
-                k.Cylinder(new Vector3(gx + s * gd, 0, gw), new Vector3(gx + s * gd * 0.35f, gh, gw), br, 8);
-                // em cima: do travessão até os apoios de trás e a barra de trás (antes faltavam: o teto
-                // da rede ficava solto e o gol parecia incompleto)
-                k.Cylinder(new Vector3(gx, gh, -gw), new Vector3(gx + s * gd * 0.35f, gh, -gw), br, 8);
-                k.Cylinder(new Vector3(gx, gh, gw), new Vector3(gx + s * gd * 0.35f, gh, gw), br, 8);
-                k.Cylinder(new Vector3(gx + s * gd * 0.35f, gh, -gw), new Vector3(gx + s * gd * 0.35f, gh, gw), br, 8);
-                // e as quinas (sem frestas entre os tubos)
-                foreach (float zc in new[] { -gw, gw })
+                float br = r * (street ? 0.5f : 0.55f);
+                // base no chão (atrás) e as laterais da base
+                k.Cylinder(new Vector3(gx + s * gd, br, -gw), new Vector3(gx + s * gd, br, gw), br, 10);
+                k.Cylinder(new Vector3(gx + s * r, br, -gw - r), new Vector3(gx + s * gd, br, -gw), br, 10);
+                k.Cylinder(new Vector3(gx + s * r, br, gw + r), new Vector3(gx + s * gd, br, gw), br, 10);
+                bool stanchions = m.id == GameModes.Field || m.id == GameModes.Society;
+                if (stanchions)
                 {
-                    k.Cylinder(new Vector3(gx + s * gd * 0.35f, gh - br, zc), new Vector3(gx + s * gd * 0.35f, gh + br, zc), br * 1.3f, 8);
-                    k.Cylinder(new Vector3(gx + s * gd, 0f, zc), new Vector3(gx + s * gd, 0.06f, zc), br * 1.3f, 8);
+                    // suportes curvos por fora da rede (como nos estádios): do alto da trave até a base de trás
+                    foreach (float zc in new[] { -gw - r * 0.4f, gw + r * 0.4f })
+                    {
+                        int segs = 12;
+                        Vector3 prev = new Vector3(gx + s * r, gh + r, zc);
+                        for (int i = 1; i <= segs; i++)
+                        {
+                            float t = i / (float)segs * Mathf.PI * 0.5f;
+                            var pt = new Vector3(gx + s * (r + (gd - r) * Mathf.Sin(t)), (gh + r) * Mathf.Cos(t) + br * Mathf.Sin(t), zc);
+                            k.Cylinder(prev, pt, br, 10);
+                            prev = pt;
+                        }
+                        // junta com a trave e com a base (sem frestas)
+                        k.Cylinder(new Vector3(gx + s * r * 0.5f, gh + r, zc), new Vector3(gx + s * r * 1.6f, gh + r, zc), br * 1.25f, 10);
+                        k.Cylinder(new Vector3(gx + s * gd, 0f, zc), new Vector3(gx + s * gd, br * 2.4f, zc), br * 1.3f, 10);
+                    }
+                    // borda de cima da rede (cordão) na mesma linha de antes
+                    k.Cylinder(new Vector3(gx + s * gd * 0.35f, gh, -gw), new Vector3(gx + s * gd * 0.35f, gh, gw), br * 0.3f, 6);
+                    k.Cylinder(new Vector3(gx, gh, -gw), new Vector3(gx + s * gd * 0.35f, gh, -gw), br * 0.3f, 6);
+                    k.Cylinder(new Vector3(gx, gh, gw), new Vector3(gx + s * gd * 0.35f, gh, gw), br * 0.3f, 6);
+                }
+                else
+                {
+                    // gols pequenos (futsal, rua): armação de tubo em caixa
+                    k.Cylinder(new Vector3(gx + s * gd, 0, -gw), new Vector3(gx + s * gd * 0.35f, gh, -gw), br, 10);
+                    k.Cylinder(new Vector3(gx + s * gd, 0, gw), new Vector3(gx + s * gd * 0.35f, gh, gw), br, 10);
+                    k.Cylinder(new Vector3(gx, gh, -gw), new Vector3(gx + s * gd * 0.35f, gh, -gw), br, 10);
+                    k.Cylinder(new Vector3(gx, gh, gw), new Vector3(gx + s * gd * 0.35f, gh, gw), br, 10);
+                    k.Cylinder(new Vector3(gx + s * gd * 0.35f, gh, -gw), new Vector3(gx + s * gd * 0.35f, gh, gw), br, 10);
+                    foreach (float zc in new[] { -gw, gw })
+                    {
+                        k.Cylinder(new Vector3(gx + s * gd * 0.35f, gh - br, zc), new Vector3(gx + s * gd * 0.35f, gh + br, zc), br * 1.3f, 10);
+                        k.Cylinder(new Vector3(gx + s * gd, 0f, zc), new Vector3(gx + s * gd, br * 2.4f, zc), br * 1.3f, 10);
+                    }
                 }
                 k.Object("Trave", postMat, v.root);
                 if (futsal) ks.Object("Trave (faixas)", stripeMat, v.root);
