@@ -96,6 +96,7 @@ namespace Craquez
             }
             if (s.mode.id == GameModes.Field) BuildReferee(parent, q);
             BuildBall(q);
+            BuildStations();
             _marker0 = Marker(new Color(0.1f, 0.85f, 1f));
             _marker1 = Marker(new Color(1f, 0.55f, 0.1f));
             bcam = cam.gameObject.GetComponent<BroadcastCamera>();
@@ -210,6 +211,53 @@ namespace Craquez
         }
 
         Material _ballShadowMat;
+        readonly List<Transform> _stationBalls = new List<Transform>();
+        float[] _stationHidden;
+        Transform _decoy;
+
+        /// <summary>Cones com bolas de reposição em volta do campo (as mesmas posições da simulação).</summary>
+        void BuildStations()
+        {
+            var st = sim.BallStations();
+            _stationHidden = new float[st.Count];
+            if (st.Count == 0) return;
+            var cones = new MeshKit();
+            for (int i = 0; i < st.Count; i++)
+            {
+                var c = new Vector3(st[i].x, 0f, st[i].y);
+                // cone de treino baixo com a "boca" em cima onde a bola fica apoiada
+                const int seg = 14;
+                for (int k = 0; k < seg; k++)
+                {
+                    float a0 = k / (float)seg * Mathf.PI * 2f, a1 = (k + 1) / (float)seg * Mathf.PI * 2f;
+                    Vector3 P(float r, float a, float y) => c + new Vector3(Mathf.Cos(a) * r, y, Mathf.Sin(a) * r);
+                    cones.Quad(P(0.17f, a0, 0f), P(0.17f, a1, 0f), P(0.07f, a1, 0.3f), P(0.07f, a0, 0.3f));
+                    cones.Quad(P(0.22f, a1, 0.012f), P(0.22f, a0, 0.012f), c + Vector3.up * 0.012f, c + Vector3.up * 0.012f);
+                }
+                var b = Instantiate(_ball.gameObject, transform).transform;
+                b.name = "Bola do cone";
+                b.position = c + Vector3.up * (0.3f + sim.ball.radius * 0.75f);
+                b.rotation = Quaternion.Euler(i * 37f, i * 71f, 0f);
+                _stationBalls.Add(b);
+            }
+            cones.Object("Cones das bolas", Gfx.Lit(new Color(1f, 0.45f, 0.08f), null, 0.35f), transform, true);
+        }
+
+        void StationsTick()
+        {
+            if (_stationHidden == null) return;
+            for (int i = 0; i < _stationHidden.Length; i++)
+            {
+                if (_stationHidden[i] <= 0f) continue;
+                _stationHidden[i] -= Time.deltaTime;
+                if (_stationHidden[i] <= 0f)
+                {
+                    // o gandula recolheu a bola que saiu e repôs a do cone
+                    _stationBalls[i].gameObject.SetActive(true);
+                    if (_decoy != null) _decoy.gameObject.SetActive(false);
+                }
+            }
+        }
 
         void BuildBall(int q)
         {
@@ -445,6 +493,22 @@ namespace Craquez
                         }
                     }
                     break;
+                case "spareball":
+                    // o goleiro pega a bola do cone; a que saiu fica lá fora até o gandula recolher
+                    if (e.skill >= 0 && e.skill < _stationBalls.Count && _stationBalls[e.skill] != null)
+                    {
+                        _stationBalls[e.skill].gameObject.SetActive(false);
+                        _stationHidden[e.skill] = 25f;
+                        if (_decoy == null)
+                        {
+                            _decoy = Instantiate(_ball.gameObject, transform).transform;
+                            _decoy.name = "Bola fora de jogo";
+                        }
+                        _decoy.gameObject.SetActive(true);
+                        _decoy.position = new Vector3(sim.spareFrom.x, sim.ball.radius, sim.spareFrom.y);
+                        _decoy.rotation = _ball.rotation;
+                    }
+                    break;
                 case "card":
                     ShowCard(e.kind == "yellow" ? new Color(1f, 0.85f, 0.1f) : new Color(0.85f, 0.08f, 0.1f));
                     break;
@@ -549,6 +613,7 @@ namespace Craquez
         void Update()
         {
             LateCard();
+            StationsTick();
             // bola dentro do gol encostando na rede
             if (sim != null && venue != null && Mathf.Abs(sim.ball.pos.x) > sim.halfLen - 0.05f)
             {

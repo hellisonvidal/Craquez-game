@@ -501,6 +501,8 @@ namespace Craquez.Sim
 
         void SetupRestart(int t, Vector2 spot, string kind)
         {
+            var outPos = ball.pos;   // onde a bola saiu (tiro de meta: o goleiro vai buscá-la)
+            gkFetch = -1;
             spot.x = Mathf.Clamp(spot.x, -halfLen, halfLen);
             spot.y = Mathf.Clamp(spot.y, -halfW, halfW);
             ball.pos = spot; ball.vel = Vector2.zero; ball.z = 0; ball.vz = 0; ball.spin = 0; ball.slideT = 0;
@@ -529,8 +531,11 @@ namespace Craquez.Sim
             ball.lastTouchTeam = t;
             if (taker.isKeeper) { taker.hold = 1.6f; taker.goalKick = mode.id != GameModes.Futsal; }   // futsal: tiro de meta com as mãos (regra)
             else ctrl[t].player = taker.id;
+            // tiro de meta (campo e society): sem corte — o goleiro olha a bola sair, vai buscá-la, traz
+            // nas mãos até a pequena área, coloca no chão e cobra
+            bool fetch = kind == "goalkick" && taker.isKeeper && mode.id != GameModes.Futsal && mode.id != GameModes.Street;
             // tiro de meta e escanteio: corte de cena, todos já nas posições do reinício
-            bool cut = kind == "goalkick" || kind == "corner" || (!quickRestarts && (kind == "freekick" || kind == "offside"));
+            bool cut = !fetch && (kind == "goalkick" || kind == "corner" || (!quickRestarts && (kind == "freekick" || kind == "offside")));
             if (cut)
                 foreach (var p in players)
                 {
@@ -621,6 +626,39 @@ namespace Craquez.Sim
             }
             else if (cut && (cornerKick || kind == "goalkick" || ((kind == "freekick" || kind == "offside") && setPiece)))
                 BeginWalkUp(taker, kind);
+            if (fetch)
+            {
+                float gxL = Mathf.Sign(spot.x) * halfLen;
+                gkFetch = taker.id;
+                gkFetchT = 0f;
+                gkFetchSpot = spot;
+                gkFetchFacing = taker.facing;
+                // a bola parou logo depois da linha (na boca do gol, na linha: o goleiro não entra no gol)
+                bool mouth = Mathf.Abs(outPos.y) < goalHalf + 0.8f;
+                float beyond = mouth ? 0.15f : Mathf.Clamp(Mathf.Abs(outPos.x) - halfLen, 0.6f, 2.2f);
+                gkFetchBall = new Vector2(gxL + Mathf.Sign(gxL) * beyond, Mathf.Clamp(outPos.y, -halfW + 1f, halfW - 1f));
+                // longe (perto da bandeirinha): pega uma bola no cone atrás do gol, a que saiu fica lá
+                float best = taker.position.Dist(gkFetchBall) - 2f;
+                int pick = -1;
+                var st = BallStations();
+                for (int i = 0; i < st.Count; i++)
+                {
+                    if (Mathf.Sign(st[i].x) != Mathf.Sign(gxL) || Mathf.Abs(st[i].x) < halfLen) continue;
+                    float d = taker.position.Dist(st[i]);
+                    if (d < best) { best = d; pick = i; }
+                }
+                if (pick >= 0)
+                {
+                    spareFrom = gkFetchBall;
+                    gkFetchBall = st[pick];
+                    Emit("spareball", t, taker.id, null, false, 0f, pick);
+                }
+                taker.position = takerBefore;
+                taker.hold = 0f;
+                taker.goalKick = false;
+                ball.owner = -1;
+                ball.pos = gkFetchBall;
+            }
             protectTeam = t;
             protectT = 2.5f;
             offsideIds.Clear();
@@ -628,12 +666,95 @@ namespace Craquez.Sim
             noOffsideKick = kind == "throwin" || kind == "corner" || kind == "goalkick";
             state = MatchState.Restart;
             stateTimer = cut ? (kind == "freekick" ? 1.6f : 1.1f) : (quickRestarts ? 0.35f : 0.7f);
+            if (fetch) stateTimer = 30f;   // (termina quando a bola estiver colocada)
             if (walkUpTaker >= 0 && walkUpFast) stateTimer += Mathf.Min(2.2f, walkUpTo.Dist(players[walkUpTaker].position) / 4.5f + 0.2f);
             else if (walkUpTaker >= 0) stateTimer += WalkUpTime + walkUpWait;
             Emit("whistle", t, -1, kind);
         }
 
         const float WalkUpTime = 2.2f;
+
+        /// <summary>
+        /// Cones com bolas de reposição em volta do campo (campo e society): dois atrás de cada gol e
+        /// três em cada lateral. O goleiro pega a bola do cone quando está mais perto que a que saiu.
+        /// </summary>
+        public System.Collections.Generic.List<Vector2> BallStations()
+        {
+            var l = new System.Collections.Generic.List<Vector2>();
+            if (mode.id != GameModes.Field && mode.id != GameModes.Society) return l;
+            bool field = mode.id == GameModes.Field;
+            foreach (float sx in new[] { -1f, 1f })
+                foreach (float sy in new[] { -1f, 1f })
+                    l.Add(new Vector2(sx * (halfLen + (field ? 2.4f : 1.4f)), sy * (goalHalf + (field ? 5f : 3f))));
+            foreach (float sy in new[] { -1f, 1f })
+                foreach (float fx in new[] { -0.55f, 0f, 0.55f })
+                    l.Add(new Vector2(fx * halfLen + (fx == 0f ? 6f : 0f), sy * (halfW + (field ? 2f : 1.4f))));
+            return l;
+        }
+
+        /// <summary>Bola que saiu e ficou lá fora (o goleiro pegou outra no cone): onde ela parou.</summary>
+        public Vector2 spareFrom;
+
+        /// <summary>Goleiro buscando a bola do tiro de meta (-1 = não); onde ela está, onde vai ser cobrado.</summary>
+        public int gkFetch = -1;
+        float gkFetchT;
+        Vector2 gkFetchBall, gkFetchSpot, gkFetchFacing;
+
+        /// <summary>
+        /// Tiro de meta sem corte: olha a bola sair (~0,7 s), vai até ela trotando, pega com as mãos,
+        /// leva até a pequena área andando, coloca no chão e se prepara para cobrar.
+        /// </summary>
+        void StepGkFetch()
+        {
+            var p = players[gkFetch];
+            gkFetchT += DT;
+            p.wantSprint = false;
+            bool carrying = ball.owner == p.id;
+            if (gkFetchT < 0.7f)
+            {
+                p.intent = Vector2.zero;
+                p.facing = V2.RotateToward(p.facing, (ball.pos - p.position).Norm(), 4f * DT);
+            }
+            else if (!carrying)
+            {
+                var to = gkFetchBall - p.position;
+                float d = to.magnitude;
+                p.intent = d > 0.05f ? to / d * Mathf.Clamp(d * 0.4f, 0.3f, 0.7f) : Vector2.zero;
+                if (d > 0.05f) p.facing = V2.RotateToward(p.facing, to / d, 6f * DT);
+                if (d < 0.75f || gkFetchT > 7f)
+                {
+                    // abaixa e pega a bola
+                    ball.owner = p.id;
+                    p.hold = 60f;
+                    p.goalKick = false;
+                    p.vel *= 0.3f;
+                }
+            }
+            else
+            {
+                var placeAt = gkFetchSpot - gkFetchFacing * 0.5f;
+                var to = placeAt - p.position;
+                float d = to.magnitude;
+                p.intent = d > 0.05f ? to / d * Mathf.Clamp(d * 0.3f, 0.12f, 0.3f) : Vector2.zero;   // anda firme (~2 m/s) e freia chegando
+                if (d > 0.4f) p.facing = V2.RotateToward(p.facing, to / d, 6f * DT);
+                if (d < 0.3f || gkFetchT > 13f)
+                {
+                    // coloca a bola no chão na marca e se ajeita para a cobrança
+                    p.position = placeAt;
+                    p.vel = Vector2.zero;
+                    p.intent = Vector2.zero;
+                    p.facing = gkFetchFacing;
+                    ball.pos = gkFetchSpot;
+                    ball.vel = Vector2.zero; ball.z = 0f; ball.vz = 0f;
+                    ball.owner = p.id;
+                    p.hold = 1.4f;
+                    p.goalKick = true;
+                    gkFetch = -1;
+                    stateTimer = 0.5f;
+                }
+            }
+            if (ball.owner != p.id) { ball.vel = Vector2.zero; ball.z = 0f; ball.vz = 0f; }
+        }
 
         /// <summary>
         /// O cobrador começa a alguns metros da bola e vai até ela andando (a bola fica no lugar, sem dono).
@@ -714,8 +835,9 @@ namespace Craquez.Sim
                     stateTimer -= DT;
                     for (int t = 0; t < 2; t++) ctrl[t].prev = frames != null && t < frames.Length ? frames[t].buttons : 0;
                     AiAll(true);
-                    foreach (var p in players) if (p.id != walkUpTaker) p.intent *= 0.3f;
+                    foreach (var p in players) if (p.id != walkUpTaker && p.id != gkFetch) p.intent *= 0.3f;
                     if (walkUpTaker >= 0) StepWalkUp();
+                    if (gkFetch >= 0) StepGkFetch();
                     foreach (var p in players) MovePlayer(p);
                     Dribble();
                     if (stateTimer <= 0f && walkUpTaker < 0)
@@ -2978,7 +3100,7 @@ namespace Craquez.Sim
             }
             if (p.isKeeper && p.dive > 0f) maxS = Mathf.Lerp(3.6f, 4.8f, p.defense);
             else if (p.isKeeper && p.keeperSet) maxS = Mathf.Min(maxS, Mathf.Lerp(2.0f, 2.9f, p.defense));   // passadas laterais
-            if (p.hold > 0f) maxS *= 0.4f;
+            if (p.hold > 0f && gkFetch != p.id) maxS *= 0.4f;
             var targetV = intent * maxS;
             float spd = p.vel.magnitude;
             float acc = Mathf.Lerp(5f, 8.5f, p.accel) * (p.burst > 0f ? 1.6f : 1f) * (p.offBalance > 0f ? 0.4f : 1f) * (0.82f + 0.18f * p.stamina);
@@ -3209,6 +3331,12 @@ namespace Craquez.Sim
         {
             if (ball.owner < 0) return;
             var o = players[ball.owner];
+            if (o.isKeeper && o.hold > 0f && o.goalKick)
+            {
+                // tiro de meta: a bola fica parada no chão, na marca (não nas mãos)
+                ball.z = 0f; ball.vz = 0f; ball.vel = Vector2.zero;
+                return;
+            }
             if (o.isKeeper && o.hold > 0f)
             {
                 if (o.saveT > 0f && o.Diving)
