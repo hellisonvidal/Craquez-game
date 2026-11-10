@@ -574,6 +574,7 @@ namespace Craquez
             BigCard(grid, "COMPETIÇÕES", titles > 0 ? titles + (titles == 1 ? " TÍTULO" : " TÍTULOS") : Competitions.All.Length + " COMPETIÇÕES", "Ligas, copas e torneios de seleções", TrophyArt.Texture(wc.trophy, wc.c1, wc.c2, 512), 1f, new Color(0.98f, 0.7f, 0.15f), ShowCompetitions);
             var lc = Competitions.All[4];
             BigCard(grid, "MURAL DE TROFÉUS", titles + (titles == 1 ? " TÍTULO" : " TÍTULOS"), "As suas conquistas", TrophyArt.Texture(lc.trophy, lc.c1, lc.c2, 512, titles == 0), 1f, new Color(0.85f, 0.55f, 0.2f), ShowTrophyWall);
+            BigCard(grid, "ON-LINE", Craquez.Sim.Net.Online.Enabled ? "JOGAR" : "EM BREVE", "Partidas contra amigos pela internet", ModeArt(MenuArt.Kind.Society), 512f / 560f, new Color(0.55f, 0.3f, 0.9f), ShowOnline);
             BigCard(grid, "CONFIGURAÇÕES", "OPÇÕES", "Som, câmera, partida, vídeo e option file", _settingsArt ??= MenuArt.SettingsArt(), 512f / 560f, new Color(0.35f, 0.5f, 0.9f), ShowOptions);
             // sair do jogo sem precisar fechar o app à força (também pelo voltar do menu principal)
             // aviso de versão nova (a checagem roda sozinha ao abrir o jogo)
@@ -635,11 +636,30 @@ namespace Craquez
             _modeButtons[GameModes.Society] = BigCard(grid, "SOCIETY", "7 x 7", "Grama sintética  •  " + VenueBuilder.SocietyNames.Length + " campos", ModeArt(MenuArt.Kind.Society), 512f / 560f, new Color(0.02f, 0.71f, 0.83f), () => ShowKind(GameModes.Society));
             _modeButtons[GameModes.Street] = BigCard(grid, "RUA", "3 A 5 POR LADO", "Times de rua  •  " + VenueBuilder.StreetNames.Length + " ruas", ModeArt(MenuArt.Kind.Street), 512f / 560f, new Color(0.93f, 0.28f, 0.6f), () => { _lastMode = GameModes.Street; Choose(GameModes.Street, false); });
             _modeButtons["treino"] = BigCard(grid, "TREINO", "ARENA", "Você contra o goleiro  •  chute à vontade", ModeArt(MenuArt.Kind.Field), 512f / 560f, new Color(0.55f, 0.42f, 0.95f), () => { _lastMode = "treino"; ShowTrainingPicker(); });
-            // on-line: a base (lockstep) já existe, mas fica desligado até estar perfeito
-            var online = UiKit.Button(root, Craquez.Sim.Net.Online.Enabled ? "ON-LINE" : "ON-LINE  •  em breve", () => { }, 26, new Color(0.1f, 0.12f, 0.2f, 0.85f));
-            online.GetComponent<RectTransform>().At(0.5f, 0f, 420, 64, 0, 120);
-            online.interactable = Craquez.Sim.Net.Online.Enabled;
             UiKit.Select(_lastMode != null && _modeButtons.TryGetValue(_lastMode, out var lb) && lb != null ? lb : first);
+        }
+
+        /// <summary>
+        /// On-line: a base da partida pela internet (lockstep: cada aparelho simula, só os comandos viajam) já
+        /// existe e é testada; falta o servidor de encontro. Até lá, a tela explica o que vem e como vai ser.
+        /// </summary>
+        void ShowOnline()
+        {
+            var root = Page("ON-LINE");
+            _back = ShowModes;
+            Title(root, "ON-LINE", Craquez.Sim.Net.Online.Enabled ? "Partidas pela internet" : "Em preparação");
+            var card = UiKit.Panel(root).rectTransform.Place(0.12f, 0, 0.88f, 1, 0, 190, 0, 300);
+            var txt = UiKit.Label(card,
+                "Jogue contra um amigo pela internet, cada um no seu aparelho.\n\n" +
+                "•  Partida rápida: o jogo encontra um adversário do seu nível.\n" +
+                "•  Sala com código: crie uma sala e passe o código para o amigo.\n" +
+                "•  Mesmo jogo nos dois aparelhos: só os comandos viajam pela rede, então a partida é leve e fiel.\n\n" +
+                (Craquez.Sim.Net.Online.Enabled ? "" : "O motor da partida on-line já está pronto e testado; falta ligar o servidor. Em breve!"),
+                30, Theme.Body, Theme.Text, TextAnchor.UpperLeft);
+            txt.rectTransform.Place(0, 0, 1, 1, 40, 40, 40, 40);
+            var back = UiKit.Button(root, "‹  Voltar", ShowModes, 30);
+            back.GetComponent<RectTransform>().At(0.5f, 0f, 360, 80, 0, 160);
+            UiKit.Select(back);
         }
 
         string _lastMode;
@@ -843,7 +863,7 @@ namespace Craquez
                 // deixava o jogo pesado); um por local, guardado na memória
                 string vkey = _cfg.mode + "/" + vi + "/" + (home != null ? Teams.Hex(home.c1) : "");
                 if (!_venueArt.TryGetValue(vkey, out var art) || art == null)
-                    _venueArt[vkey] = art = MenuArt.Venue(_cfg.mode, vi, home != null ? home.c1 : Color.white, 960, 540);
+                    _venueArt[vkey] = art = VenueArt.Exterior(_cfg.mode, vi, home != null ? home.c1 : Color.white, 960, 540);   // visto de fora
                 venueImg.texture = art;
                 venueImg.color = Color.white;
                 if (venueLoading != null) venueLoading.gameObject.SetActive(false);

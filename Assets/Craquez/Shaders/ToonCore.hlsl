@@ -19,6 +19,7 @@ float _ClothInflate;       // folga (m)
 float4 _ClothBand;         // x = altura (y do mundo) onde o tecido começa a soltar, y = altura da barra
 float4 _ClothDrag;         // xyz = deslocamento da barra (m, mundo) pelo movimento
 float4 _ClothFlutter;      // x = amplitude (m), y = frequência, z = fase
+float _OutlineMul;         // espessura do contorno desta peça (0 = padrão)
 
 float4 _ClothTuck;         // camisa por dentro do calção: x = altura da cintura (y do mundo), y = quanto entra (m)
 
@@ -195,6 +196,9 @@ ToonVaryings OutlineVert(ToonAttributes v)
 #if defined(CRAQUEZ_ATHLETE)
     w *= 0.6;   // atletas: traço fino (só separa a silhueta do fundo)
 #endif
+    // por peça (camisa, calção): traço ainda mais fino nas bordas da roupa — a gola, as mangas e a
+    // cintura não parecem peças emendadas no corpo
+    if (_OutlineMul > 0.0) w *= _OutlineMul;
     posWS += nWS * w;
     o.positionWS = posWS;
     o.positionCS = TransformWorldToHClip(posWS);

@@ -52,7 +52,7 @@ namespace Craquez
             var tb = Teams.Get(c.teamB);
             sim = new MatchSim();
             // clima mexe na física da bola: chuva = mais rápida; neve = mais lenta
-            string w = c.weather == "aleatorio" ? WeatherFx.Kinds[(int)(c.seed % (uint)WeatherFx.Kinds.Length)] : c.weather;
+            string w = c.WeatherKind();
             sim.rollScale = RollFor(c.mode, w);
             sim.startSwapped = c.swapSides;
             sim.training = c.training;
@@ -498,7 +498,20 @@ namespace Craquez
                         for (int t = 0; t < 2; t++) if (_cpu[t] == null) InputRouter.Rumble(_dev[t], 0.8f, 0.9f, 0.6f, this);
                         break;
                     }
-                    // (sem avisos de texto durante o jogo: apito, juiz, torcida e câmera contam o lance)
+                    case "card":
+                    {
+                        // cartão: aviso com o nome do jogador (o juiz também ergue o cartão em campo)
+                        if (e.id >= 0 && e.id < sim.players.Count && !attract)
+                        {
+                            var cp = sim.players[e.id];
+                            hud.Toast((e.kind == "red" ? "CARTÃO VERMELHO" : "CARTÃO AMARELO") + "  •  " + cp.number + " " + cp.name.ToUpperInvariant(), 2.6f);
+                        }
+                        break;
+                    }
+                    case "added":
+                        if (!attract) hud.Toast("ACRÉSCIMOS  •  +" + e.kind + (sim.mode.id == GameModes.Field ? " min" : ""), 3f);
+                        break;
+                    // (sem outros avisos de texto durante o jogo: apito, juiz, torcida e câmera contam o lance)
                     case "tackle":
                         if (e.ok && _cpu[e.team] == null) InputRouter.Rumble(_dev[e.team], 0.4f, 0.2f, 0.15f, this);
                         break;

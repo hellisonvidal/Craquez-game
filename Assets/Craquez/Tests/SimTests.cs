@@ -56,7 +56,7 @@ namespace Craquez.Tests
             foreach (uint seed in new uint[] { 42, 43 })   // (uma partida só pode, por acaso, não ter chutes)
             {
                 var sim = NewMatch(mode, seed);
-                Play(sim, 60 * 400);
+                Play(sim, 60 * 480);   // (com os acréscimos de cada tempo)
                 Assert.AreEqual(MatchState.Fulltime, sim.state);
                 Assert.IsFalse(float.IsNaN(sim.ball.pos.x));
                 shots += sim.statsShots[0] + sim.statsShots[1];
