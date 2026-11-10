@@ -59,7 +59,7 @@ namespace Craquez.UI
         }
 
         /// <summary>Cópia legível de uma textura (as importadas não permitem GetPixel).</summary>
-        static Texture2D Readable(Texture2D src)
+        public static Texture2D Readable(Texture2D src)
         {
             if (src == null) return null;
             if (src.isReadable) return src;

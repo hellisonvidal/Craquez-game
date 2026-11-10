@@ -32,6 +32,11 @@ namespace Craquez
             var bandMat = night ? Gfx.Emissive(club * 0.6f, club * 1.4f) : Gfx.Lit(club, null, 0.35f);
             var gateMat = Gfx.Emissive(new Color(0.05f, 0.05f, 0.06f), night ? new Color(1f, 0.82f, 0.55f) * 0.55f : new Color(0.03f, 0.03f, 0.035f));
             var metalMat = Gfx.Lit(new Color(0.62f, 0.64f, 0.68f), null, 0.5f, 0.6f);
+            var look = LookOf(model, seed);
+            var accent = look.accent.a > 0f ? look.accent : club;
+            var altWall = FacadeWall(look, structure, accent, (int)(seed % 977), out var detailMat, night);
+            if (look.facade != 0 && altWall != null) wallMat = altWall;
+            if (look.accent.a > 0f) bandMat = night ? Gfx.Emissive(accent * 0.6f, accent * 1.4f) : Gfx.Lit(accent, null, 0.35f);
             var signMat = Gfx.Lit(club2.grayscale > 0.85f || Mathf.Abs(club2.grayscale - club.grayscale) < 0.15f ? Color.Lerp(club, Color.white, 0.75f) : club2, null, 0.3f);
 
             for (int side = 0; side < 4; side++)
@@ -54,7 +59,9 @@ namespace Craquez
                 var gates = new MeshKit();
                 var metal = new MeshKit();
                 var signs = new MeshKit();
-                if (facade)
+                var detail = new MeshKit();
+                if (facade && look.facade != 0) AltFacade(look, wall, detail, band, gates, W, S, L, len, H);
+                else if (facade)
                 {
                     // pele da fachada (UV em metros: 8 m por repetição) e o teto do corredor externo
                     wall.Quad(W(L, 0f, 0f), W(-L, 0f, 0f), W(-L, H, 0f), W(L, H, 0f), Vector2.zero, new Vector2(len / 8f, H / 8f));
@@ -85,6 +92,7 @@ namespace Craquez
                 if (wall.Count > 0) wall.Object("Fachada" + sfx, wallMat, v.root, quality >= 1);
                 if (conc.Count > 0) conc.Object("Pilares e lajes" + sfx, concreteMat, v.root, quality >= 1);
                 if (band.Count > 0) band.Object("Faixa da fachada" + sfx, bandMat, v.root, false);
+                if (detail.Count > 0 && detailMat != null) detail.Object("Detalhes da fachada" + sfx, detailMat, v.root, quality >= 1);
                 gates.Object("Portões" + sfx, gateMat, v.root, false);
                 signs.Object("Placas dos portões" + sfx, signMat, v.root, false);
                 metal.Object("Catracas" + sfx, metalMat, v.root, false);
@@ -127,6 +135,8 @@ namespace Craquez
                 }
             }
 
+            ExteriorLandmarks(v, look, st, Xo, Zo, hw, structure, accent, night, quality);
+
             // ---------------- chão de fora: esplanada, avenida e estacionamento
             float pz = 22f, road = 12f;
             float Xi = Xo + 2f, Zi = Zo + 2f;                          // borda da fachada
@@ -135,7 +145,8 @@ namespace Craquez
             v.plazaZ = Zi + pz * 0.5f;
             var plaza = new MeshKit();
             Ring(plaza, Xi - 2.2f, Zi - 2.2f, Xp, Zp, 0.005f, 6f);
-            plaza.Object("Esplanada", Gfx.Lit(night ? new Color(0.36f, 0.36f, 0.37f) : new Color(0.74f, 0.72f, 0.68f), PaverTex((int)(seed % 331)), 0.12f), v.root, false);
+            var plazaC = look.plaza.a > 0f ? look.plaza : new Color(0.74f, 0.72f, 0.68f);
+            plaza.Object("Esplanada", Gfx.Lit(night ? plazaC * 0.5f : plazaC, PaverTex((int)(seed % 331)), 0.12f), v.root, false);
             var asphalt = new MeshKit();
             Ring(asphalt, Xp, Zp, Xr, Zr, 0.01f, 8f);
             // estacionamentos: atrás da arquibancada de lá e atrás dos gols

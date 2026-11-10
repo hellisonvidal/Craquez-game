@@ -1055,12 +1055,13 @@ namespace Craquez
             if (showB && cam != null)
             {
                 Vector3 top = av.rig != null && av.rig.head != null ? av.rig.head.position : av.transform.position + Vector3.up * 1.75f;
-                b.position = new Vector3(av.transform.position.x, top.y + 0.75f, av.transform.position.z);
+                b.position = new Vector3(av.transform.position.x, top.y + 0.5f, av.transform.position.z);
                 b.rotation = Quaternion.LookRotation(b.position - cam.transform.position, Vector3.up);
                 // do mesmo tamanho na tela de perto e de longe (até um limite)
                 float dist = Vector3.Distance(cam.transform.position, b.position);
-                float k = Mathf.Clamp(dist / 22f, 0.7f, 2.4f);
-                b.localScale = new Vector3(0.62f, 0.775f, 1f) * k;
+                // (menor: ~metade do tamanho de antes, ainda legível de longe)
+                float k = Mathf.Clamp(dist / 22f, 0.6f, 2.0f);
+                b.localScale = new Vector3(0.62f, 0.775f, 1f) * 0.55f * k;
             }
         }
 
