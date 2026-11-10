@@ -178,6 +178,23 @@ jobs:
           done
           ls -la "$GITHUB_WORKSPACE/shots"
           grep -E "Exception|Error|\[shots\]" "$GITHUB_WORKSPACE"/shots/player-*.log | head -80 || true
+      # fotografa todos os locais (montagem 3D de verdade, vista de fora) para o seletor de locais:
+      # as imagens são copiadas para Assets/Craquez/Resources/Locais
+      - name: Imagens dos locais
+        if: matrix.targetPlatform == 'StandaloneLinux64'
+        run: |
+          cd build/StandaloneLinux64
+          mkdir -p "$GITHUB_WORKSPACE/locais"
+          timeout 900 xvfb-run -a -s "-screen 0 1280x720x24" ./Craquez -force-glcore -screen-fullscreen 0 -screen-width 1280 -screen-height 720 \
+            -logFile "$GITHUB_WORKSPACE/locais/player.log" --venues="$GITHUB_WORKSPACE/locais" || echo "fotos dos locais: código $?"
+          ls "$GITHUB_WORKSPACE/locais" | head -100
+          grep -E "Exception|\[locais\]" "$GITHUB_WORKSPACE/locais/player.log" | tail -20 || true
+      - uses: actions/upload-artifact@v4
+        if: matrix.targetPlatform == 'StandaloneLinux64'
+        with:
+          name: Craquez-locais
+          path: locais
+          retention-days: 14
       - uses: actions/upload-artifact@v4
         if: matrix.targetPlatform == 'StandaloneLinux64'
         with:

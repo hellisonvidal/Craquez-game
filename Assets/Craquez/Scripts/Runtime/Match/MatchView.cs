@@ -126,6 +126,8 @@ namespace Craquez
             // tudo o que é cenário (estrutura, torcida, bandeiras, gente da rua, extras) some quando tapa o jogo
             var roots = new System.Collections.Generic.List<Transform> { venue.root };
             if (_occRoots != null) roots.AddRange(_occRoots);
+            // malhas que dão a volta no campo viram pedaços (só some o que tapa, não o cenário inteiro)
+            VenueSplit.Split(roots, s.halfLen, s.halfW);
             bcam.SetOccluders(roots.ToArray());
             bcam.entrance = venue.entrance;
             bcam.SnapToBall();
@@ -964,6 +966,10 @@ namespace Craquez
                             bcam.Scene(b + outward * (field ? 6.5f : 4f) + Vector3.up * (field ? 2.4f : 1.9f), Vector3.Lerp(b, box, 0.45f), sim.stateTimer * 0.92f, field ? 44f : 50f);
                         }
                     }
+                    break;
+                case "balltoss":
+                    // o gandula/torcedor devolve a bola com as mãos (som do lançamento, sem chute)
+                    Sfx.Touch();
                     break;
                 case "spareball":
                     // o goleiro pega a bola do cone; a que saiu fica lá fora até o gandula recolher

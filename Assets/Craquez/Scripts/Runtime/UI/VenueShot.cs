@@ -78,14 +78,17 @@ namespace Craquez.UI
             }
         }
 
-        public static IEnumerator Render(string mode, int idx, int teamA, int teamB, int streetPlayers, System.Action<Texture> done)
+        public static IEnumerator Render(string mode, int idx, int teamA, int teamB, int streetPlayers, System.Action<Texture> done, bool bake = false)
         {
             string key = Key(mode, idx, teamA);
-            if (_cache.TryGetValue(key, out var have) && have != null) { done?.Invoke(have); yield break; }
-            var disk = LoadDisk(key);
-            if (disk != null) { _cache[key] = disk; done?.Invoke(disk); yield break; }
+            if (!bake)
+            {
+                if (_cache.TryGetValue(key, out var have) && have != null) { done?.Invoke(have); yield break; }
+                var disk = LoadDisk(key);
+                if (disk != null) { _cache[key] = disk; done?.Invoke(disk); yield break; }
+            }
             while (_busy) yield return null;
-            if (_cache.TryGetValue(key, out have) && have != null) { done?.Invoke(have); yield break; }
+            if (!bake && _cache.TryGetValue(key, out var have2) && have2 != null) { done?.Invoke(have2); yield break; }
             _busy = true;
             yield return null;   // a tela já mostra o desenho; monta no quadro seguinte
             GameObject holder = null, camGo = null, lightGo = null;
@@ -107,7 +110,8 @@ namespace Craquez.UI
                 else VenueBuilder.Stadium(sim, home, away, kits[0], kits[1], false, 0, holder.transform, idx);
                 foreach (var t in holder.GetComponentsInChildren<Transform>(true)) t.gameObject.layer = Layer;
                 foreach (var l in holder.GetComponentsInChildren<Light>(true)) l.enabled = false;   // (luzes do teto do ginásio)
-                rt = new RenderTexture(768, 432, 24, RenderTextureFormat.ARGB32) { name = "Local " + key, antiAliasing = 1 };
+                rt = bake ? new RenderTexture(1280, 720, 24, RenderTextureFormat.ARGB32) { name = "Local " + key, antiAliasing = 4 }
+                    : new RenderTexture(768, 432, 24, RenderTextureFormat.ARGB32) { name = "Local " + key, antiAliasing = 1 };
                 camGo = new GameObject("Câmera da foto do local");
                 var cam = camGo.AddComponent<Camera>();
                 cam.cullingMask = 1 << Layer;
@@ -123,7 +127,7 @@ namespace Craquez.UI
                 Vector3 pos = mode == GameModes.Field ? new Vector3(-hl * 1.5f, 72f, -hw * 3.7f)
                     : mode == GameModes.Futsal ? new Vector3(-hl * 2.6f, 34f, -hw * 4.4f)
                     : mode == GameModes.Society ? new Vector3(-hl * 1.7f, 30f, -hw * 3.2f)
-                    : new Vector3(-hl * 2.2f, 20f, -hw * 3.4f);
+                    : new Vector3(-hl * 0.9f, 58f, -hw * 2.0f);   // rua: do alto, dentro do anel de prédios (de fora, os prédios tapavam a quadra)
                 var origin = holder.transform.position;
                 cam.transform.position = origin + pos;
                 cam.transform.LookAt(origin + new Vector3(0f, mode == GameModes.Futsal ? 6f : 0f, 0f));
@@ -133,7 +137,7 @@ namespace Craquez.UI
                 sun.intensity = 1.25f;
                 sun.color = new Color(1f, 0.97f, 0.92f);
                 sun.cullingMask = 1 << Layer;
-                sun.shadows = LightShadows.None;
+                sun.shadows = bake ? LightShadows.Soft : LightShadows.None;   // (imagem pronta do CI: com sombras)
                 lightGo.transform.rotation = Quaternion.Euler(48f, -35f, 0f);
             }
             catch (System.Exception ex)
@@ -179,8 +183,11 @@ namespace Craquez.UI
                 photo = new Texture2D(rt.width, rt.height, TextureFormat.RGB24, false) { name = "Local " + key, wrapMode = TextureWrapMode.Clamp };
                 photo.ReadPixels(new Rect(0, 0, rt.width, rt.height), 0, 0);
                 photo.Apply(false, false);
-                SaveDisk(key, photo);
-                photo.Apply(false, true);   // sem cópia na memória do processador
+                if (!bake)
+                {
+                    SaveDisk(key, photo);
+                    photo.Apply(false, true);   // sem cópia na memória do processador
+                }
                 RenderTexture.active = prev;
             }
             catch (System.Exception ex) { Debug.LogWarning("[local] cópia da foto falhou: " + ex.Message); photo = null; }
@@ -189,7 +196,7 @@ namespace Craquez.UI
             Object.Destroy(holder);
             rt.Release();
             Object.Destroy(rt);
-            if (photo != null) _cache[key] = photo;
+            if (photo != null && !bake) _cache[key] = photo;
             _busy = false;
             yield return null;
             Resources.UnloadUnusedAssets();   // texturas e malhas do local montado só para a foto

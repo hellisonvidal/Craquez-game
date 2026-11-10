@@ -1340,6 +1340,52 @@ namespace Craquez
         }
 
         /// <summary>
+        /// Telas de proteção do ginásio (como nos de verdade): atrás dos gols, altas, e nas laterais acima
+        /// da mureta das arquibancadas, presas num cabo com postes finos. A tela do lado da câmera é uma
+        /// peça separada: nas câmeras de lado ela some (não fica entre o usuário e o jogo) e aparece nas
+        /// tomadas de trás do gol, nas de fora e nos replays.
+        /// </summary>
+        static void ProtectionNets(Venue v, float hl, float hw, float zSide)
+        {
+            float xe = hl + 2.6f, ze = zSide, endH = 7f, sideH = 5.6f, sideY = 1.05f;
+            var netMat = Gfx.Transparent(new Color(0.1f, 0.11f, 0.13f, 0.92f), Gfx.Net(128, 12f, 2.4f));   // (fios mais grossos: de longe a tela fina sumia)
+            void Panel(MeshKit k, Vector3 a, Vector3 b, float y0, float y1)
+            {
+                float len = (b - a).magnitude;
+                var uv1 = new Vector2(len / 1.1f, (y1 - y0) / 1.1f);
+                var A = a + Vector3.up * y0; var B = b + Vector3.up * y0; var Cc = b + Vector3.up * y1; var D = a + Vector3.up * y1;
+                k.Quad(A, D, Cc, B, Vector2.zero, uv1);
+                k.Quad(B, Cc, D, A, Vector2.zero, uv1);   // (as duas faces: vista de dentro e de fora)
+            }
+            var ends = new MeshKit();
+            var far = new MeshKit();
+            var near = new MeshKit();
+            var posts = new MeshKit();
+            var nearPosts = new MeshKit();
+            foreach (float sx in new[] { -1f, 1f })
+            {
+                Panel(ends, new Vector3(sx * xe, 0, -ze), new Vector3(sx * xe, 0, ze), 0.02f, endH);
+                for (float z = -ze; z <= ze + 0.01f; z += ze / 2f) posts.Cylinder(new Vector3(sx * xe, 0, z), new Vector3(sx * xe, endH + 0.2f, z), 0.035f, 5);
+                posts.Cylinder(new Vector3(sx * xe, endH, -ze), new Vector3(sx * xe, endH, ze), 0.012f, 4);
+            }
+            Panel(far, new Vector3(-xe, 0, ze), new Vector3(xe, 0, ze), sideY, sideY + sideH);
+            Panel(near, new Vector3(xe, 0, -ze), new Vector3(-xe, 0, -ze), sideY, sideY + sideH);
+            for (float x = -xe; x <= xe + 0.01f; x += xe / 3f)
+            {
+                posts.Cylinder(new Vector3(x, sideY, ze), new Vector3(x, sideY + sideH + 0.2f, ze), 0.03f, 5);
+                nearPosts.Cylinder(new Vector3(x, sideY, -ze), new Vector3(x, sideY + sideH + 0.2f, -ze), 0.03f, 5);
+            }
+            posts.Cylinder(new Vector3(-xe, sideY + sideH, ze), new Vector3(xe, sideY + sideH, ze), 0.012f, 4);
+            nearPosts.Cylinder(new Vector3(-xe, sideY + sideH, -ze), new Vector3(xe, sideY + sideH, -ze), 0.012f, 4);
+            ends.Object("Telas de proteção (fundos)", netMat, v.root, false);
+            far.Object("Tela de proteção (lateral)", netMat, v.root, false);
+            near.Object("Tela de proteção (câmera)", netMat, v.root, false);
+            var steel = Gfx.Lit(new Color(0.3f, 0.31f, 0.34f), null, 0.5f, 0.7f);
+            posts.Object("Postes das telas", steel, v.root, false);
+            nearPosts.Object("Postes das telas (câmera)", steel, v.root, false);
+        }
+
+        /// <summary>
         /// Ginásio poliesportivo: linhas de vôlei (amarelas) e de basquete (escuras) pintadas por
         /// baixo das linhas do futsal, mais finas, como nas quadras de verdade.
         /// </summary>
@@ -1642,6 +1688,7 @@ namespace Craquez
                 for (float x = -sx; x <= sx; x += 2.5f) rail.Cylinder(new Vector3(x, 1f, (start - 0.1f) * sz), new Vector3(x, 2.0f, (start - 0.1f) * sz), 0.025f, 5);
                 rail.Object("Guarda-corpo " + (sz > 0 ? "(fundo)" : "(câmera)"), Gfx.Lit(new Color(0.75f, 0.77f, 0.8f), null, 0.6f, 0.8f), v.root, false);
             }
+            ProtectionNets(v, hl, hw, hw + 3.85f);
             // placar suspenso no centro
             var sb = new MeshKit();
             sb.Box(new Vector3(0, H - 4.5f, 0), new Vector3(4.2f, 2.2f, 4.2f), 1f);

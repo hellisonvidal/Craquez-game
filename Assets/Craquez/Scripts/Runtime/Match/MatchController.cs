@@ -600,6 +600,7 @@ namespace Craquez
                 for (int i = 0; i <= 10; i++) vols.Add(i * 10 + "%");
                 first = UiKit.Cycler(list, "Volume", vols, Mathf.RoundToInt(Settings.Volume * 10), i => Settings.Volume = i / 10f);
                 UiKit.Size(first, 72, 72);
+                UiKit.Size(UiKit.Cycler(list, "Barulho da torcida", Sfx.CrowdNames, Sfx.CrowdIndex, i => Sfx.CrowdLevel = i * 0.25f), 72, 72);
                 UiKit.Size(UiKit.Cycler(list, "Vibração", new[] { "Ligada", "Desligada" }, Settings.Vibration ? 0 : 1, i => Settings.Vibration = i == 0), 72, 72);
                 UiKit.Size(UiKit.Button(list, "‹  Voltar", () => PausePage(1)), 72, 72);
             }
@@ -732,7 +733,7 @@ namespace Craquez
                 28, Theme.BodyBold, Theme.Text, TextAnchor.MiddleCenter);
             stats.rectTransform.Place(0, 0.6f, 1, 0.68f);
             UiKit.Shadow(stats, 2);
-            var panel = UiKit.Panel(dim.transform).rectTransform.At(0.5f, 0.06f, 760, 470);
+            var panel = UiKit.Panel(dim.transform).rectTransform.At(0.5f, 0.04f, 760, 560);
             panel.pivot = new Vector2(0.5f, 0f);
             var list = UiKit.Rect(panel, "lista").Place(0, 0, 1, 1, 40, 30, 40, 30);
             UiKit.VList(list, 12, 0, false);
@@ -741,6 +742,7 @@ namespace Craquez
             UiKit.Size(UiKit.Button(list, "Substituições", () => SubsPage(-1)), 76, 76);
             UiKit.Size(UiKit.Button(list, "Equipes e táticas", () => PausePage(2)), 76, 76);
             UiKit.Size(UiKit.Button(list, "Configurações", () => PausePage(1)), 76, 76);
+            UiKit.Size(UiKit.Button(list, "Sair para o menu principal", () => { _beforePause = Phase.Playing; Resume(); onExit?.Invoke(); }), 76, 76);
             UiKit.Select(go);
         }
 
