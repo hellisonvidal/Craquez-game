@@ -13,6 +13,8 @@ namespace Craquez
         public MatchSim sim;
         public MatchConfig cfg;
         public Venue venue;
+        /// <summary>Marcas de carrinho e de freada no gramado (só grama).</summary>
+        public TurfMarks Turf;
         public BroadcastCamera bcam;
         public Camera cam;
         public WeatherFx weather;
@@ -110,6 +112,7 @@ namespace Craquez
                 av.Setup(p, rig, this);
                 athletes.Add(av);
             }
+            if (s.mode.id == GameModes.Field || s.mode.id == GameModes.Society) Turf = TurfMarks.Create(transform, s.mode.id == GameModes.Society);
             if (s.mode.id == GameModes.Field && !c.training) { BuildReferee(parent, q); BuildAssistants(parent, q); }
             if (s.mode.id == GameModes.Field && !c.training) BuildBench(parent, q);
             BuildBall(q);

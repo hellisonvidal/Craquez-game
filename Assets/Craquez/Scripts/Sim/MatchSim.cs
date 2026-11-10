@@ -146,6 +146,8 @@ namespace Craquez.Sim
         public int streetPlayers = 3;
         /// <summary>Rua com golzinho (ver GameModes.SmallGoalStreets).</summary>
         public bool smallGoals;
+        /// <summary>Rua com gol grande e goleiro (um dos jogadores de cada time vai para o gol).</summary>
+        public bool streetKeeper;
         /// <summary>Tick do último chute (tempo de reação do goleiro).</summary>
         public int lastShotTick = -1000;
         /// <summary>Falta em que o juiz vai ajudar a vítima a levantar (id da vítima, -1 = não).</summary>
@@ -164,7 +166,22 @@ namespace Craquez.Sim
         public void Setup(string modeId, TeamSetup a, TeamSetup b, uint seed, float secondsPerHalf)
         {
             mode = GameModes.Get(modeId, streetPlayers);
-            if (modeId == GameModes.Street && smallGoals)
+            if (modeId == GameModes.Street && streetKeeper)
+            {
+                // rua com gol de futsal e goleiro: um dos N vai para o gol, os outros na formação de N-1
+                mode.keeper = true;
+                mode.goalWidth = 3.2f; mode.goalHeight = 2.0f; mode.goalDepth = 1.0f;
+                mode.boxDepth = 5.5f; mode.boxHalf = 7f; mode.penaltyDist = 6f;
+                int outN = Mathf.Max(3, streetPlayers - 1);   // (mínimo goleiro + 3)
+                var forms0 = GameModes.Formations(GameModes.Street);
+                forms0.TryGetValue(GameModes.StreetDefault(outN), out var outF);
+                if (outF == null || outF.Length != outN) outF = new Vector2[outN];
+                var f = new Vector2[outN + 1];
+                f[0] = new Vector2(-0.95f, 0f);
+                for (int i = 0; i < outN; i++) f[i + 1] = outF[i];
+                mode.formation = f;
+            }
+            else if (modeId == GameModes.Street && smallGoals)
             {
                 // golzinho de rua (trave improvisada): bem mais estreito e baixo
                 mode.goalWidth *= 0.62f;
@@ -1694,7 +1711,7 @@ namespace Craquez.Sim
             err *= 1f + Mathf.Max(0f, body - 0.6f) * 0.9f;
             err *= StrikeFactor(p);
             // rua (sem goleiro): chute de longe é muito menos preciso (saía gol demais, 11-16 por jogo)
-            if (mode.id == GameModes.Street) err *= 1.6f + Mathf.Clamp01((d - 5f) / 10f) * 0.9f;
+            if (mode.id == GameModes.Street && !mode.keeper) err *= 1.6f + Mathf.Clamp01((d - 5f) / 10f) * 0.9f;
             if (finesse) err *= 0.65f;
             dirv = dirv.Rotated(rng.Gauss() * err);
             float curl = 0f;
@@ -1801,7 +1818,7 @@ namespace Craquez.Sim
                 if (p.pullT < 0.05f + DT) Emit("pull", p.team, p.id, null, false, 0f, o.id);
                 // o juiz vê: segurar muito vira falta (agarrão)
                 float foulRate = 0.12f + p.pullT * 0.5f + (p.pullT > 1.0f ? 1.2f : 0f);
-                if (rng.Chance(DT * foulRate)) { p.pulling = -1; Foul(p, o); return; }
+                if (rng.Chance(DT * foulRate)) { p.pulling = -1; Foul(p, o, true); return; }
             }
         }
 
@@ -1895,7 +1912,10 @@ namespace Craquez.Sim
             p.facing = new Vector2(0f, 1f);
         }
 
-        public void Foul(SimPlayer offender, SimPlayer victim)
+        public void Foul(SimPlayer offender, SimPlayer victim) => Foul(offender, victim, false);
+
+        /// <param name="holding">agarrão/puxão de camisa: a vítima é segurada (para ou tropeça), não derrubada</param>
+        public void Foul(SimPlayer offender, SimPlayer victim, bool holding)
         {
             if (state != MatchState.Playing) return;
             offender.stun = Mathf.Max(offender.stun, 0.8f);
@@ -1917,6 +1937,28 @@ namespace Craquez.Sim
             // carrinho: tropeça por cima da perna e cai para a frente
             victim.fallTrip = offender.slide > 0f;
             if (victim.fallTrip) victim.fallKind = 1;
+            // sem contato visível (agarrão, ou o infrator a mais de ~1,1 m): ninguém vai ao chão "sozinho" —
+            // a vítima é segurada e para (às vezes tropeça e cai sentada, para trás, por pouco tempo)
+            bool far = offender.position.Dist(victim.position) > 1.1f + (offender.slide > 0f ? 0.9f : 0f);
+            if (holding || far)
+            {
+                if (rng.Chance(0.6f))
+                {
+                    victim.down = 0f; victim.downTotal = 0f;
+                    victim.stun = 0.5f;
+                    victim.vel *= 0.25f;
+                }
+                else
+                {
+                    victim.fallKind = 0;   // puxado para trás
+                    victim.fallDir = -victim.facing;
+                    victim.fallLight = true;
+                    victim.fallRoll = false;
+                    victim.down = victim.downTotal = rng.Range(0.9f, 1.3f);
+                    victim.stun = victim.down + 0.1f;
+                    victim.vel = victim.vel * 0.2f - victim.facing * 0.8f;
+                }
+            }
             if (ball.owner == victim.id || ball.owner == offender.id)
             {
                 ball.owner = -1;

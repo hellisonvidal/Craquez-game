@@ -42,7 +42,7 @@ namespace Craquez
         public static bool Bevel = true;
 
         /// <summary>Quad com a face virada para <paramref name="outward"/> (inverte a ordem se precisar).</summary>
-        void QuadOut(Vector3 a, Vector3 b, Vector3 c, Vector3 d, Vector3 outward, Vector2 uv0, Vector2 uv1)
+        public void QuadOut(Vector3 a, Vector3 b, Vector3 c, Vector3 d, Vector3 outward, Vector2 uv0, Vector2 uv1)
         {
             var n = Vector3.Cross(b - a, d - a);
             if (n.sqrMagnitude < 1e-12f) n = Vector3.Cross(c - a, b - a) * -1f;

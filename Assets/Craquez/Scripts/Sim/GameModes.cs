@@ -35,6 +35,9 @@ namespace Craquez.Sim
         /// <summary>Ruas com golzinho (trave improvisada, menor): gaiola, morro, beco, campinho de terra, linha do trem.</summary>
         public static readonly int[] SmallGoalStreets = { 1, 4, 8, 11, 14 };
 
+        /// <summary>Ruas com gol grande (de futsal) e goleiro: quadrão do conjunto, várzea de terra, arena da vila.</summary>
+        public static readonly int[] KeeperStreets = { 15, 16, 17 };
+
         /// <summary>Formação padrão da rua para o número de jogadores.</summary>
         public static string StreetDefault(int players) => players >= 7 ? "2-3-2" : players == 6 ? "2-2-2" : players >= 5 ? "2-1-2" : players == 4 ? "2-2" : "1-2";
 

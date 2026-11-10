@@ -68,6 +68,7 @@ namespace Craquez
             }
             sim.streetPlayers = c.streetPlayers;
             sim.smallGoals = c.mode == GameModes.Street && System.Array.IndexOf(GameModes.SmallGoalStreets, c.venue) >= 0;
+            sim.streetKeeper = c.mode == GameModes.Street && System.Array.IndexOf(GameModes.KeeperStreets, c.venue) >= 0;
             sim.quickRestarts = c.quickRestarts;
             sim.Setup(c.mode, new TeamSetup { data = ta, tactics = c.tacticsA }, new TeamSetup { data = tb, tactics = c.tacticsB }, c.seed, c.SecondsPerHalf);
             sim.humanSide = new[] { c.sideA != Side.Cpu, c.sideB != Side.Cpu };
@@ -375,6 +376,7 @@ namespace Craquez
             fresh.firstKickoff = sim.firstKickoff;
             fresh.streetPlayers = sim.streetPlayers;
             fresh.smallGoals = sim.smallGoals;
+            fresh.streetKeeper = sim.streetKeeper;
             fresh.Setup(cfg.mode, new TeamSetup { data = ta, tactics = cfg.tacticsA }, new TeamSetup { data = tb, tactics = cfg.tacticsB }, cfg.seed, cfg.SecondsPerHalf);
             for (int k = 0; k < sim.players.Count; k++)
             {

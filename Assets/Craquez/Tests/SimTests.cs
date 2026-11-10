@@ -797,13 +797,17 @@ namespace Craquez.Tests
         }
 
         /// <summary>Quedas: toda queda tem causa (falta, trombada, bicicleta) e não são frequentes demais.</summary>
-        [Test] public void FallsHaveCause()
+        [TestCase("field")]
+        [TestCase("futsal")]
+        [TestCase("society")]
+        [TestCase("street")]
+        public void FallsHaveCause(string mode)
         {
             int falls = 0, fouls = 0, bumpFalls = 0, other = 0;
             float minutes = 0f;
             for (uint seed = 1; seed <= 3; seed++)
             {
-                var sim = NewMatch(GameModes.Field, seed);
+                var sim = NewMatch(mode, seed);
                 var a = new CpuBrain(0, 0.7f); var b = new CpuBrain(1, 0.7f);
                 var was = new bool[sim.players.Count];
                 for (int i = 0; i < 60 * 300 && sim.state != MatchState.Fulltime; i++)
@@ -820,7 +824,7 @@ namespace Craquez.Tests
                 }
                 minutes += 300f / 60f;
             }
-            System.Console.WriteLine($"[quedas] {falls} quedas em {minutes:F0} min de jogo simulado: {fouls} faltas, {bumpFalls} por trombada, {other} sem causa");
+            System.Console.WriteLine($"[quedas {mode}] {falls} quedas em {minutes:F0} min de jogo simulado: {fouls} faltas, {bumpFalls} por trombada, {other} sem causa");
             Assert.AreEqual(0, other, "jogador caiu sem falta, trombada ou bicicleta");
         }
 
@@ -846,6 +850,26 @@ namespace Craquez.Tests
             Assert.Greater(steps, 60 * 30);
             Assert.IsFalse(sa.Desynced || sb.Desynced, "dessincronizou no passo " + Mathf.Max(sa.DesyncTick, sb.DesyncTick));
             Assert.AreEqual(simA.StateHash(), simB.StateHash(), "as duas partidas terminaram diferentes");
+        }
+
+        /// <summary>Rua com gol grande: há um goleiro por time e a partida tem chutes e defesas.</summary>
+        [Test] public void StreetWithKeeper()
+        {
+            var sim = new MatchSim { streetPlayers = 5, streetKeeper = true };
+            sim.Setup(GameModes.Street, new TeamSetup { data = Teams.Get(0) }, new TeamSetup { data = Teams.Get(1) }, 3, 120f);
+            int keepers = 0;
+            foreach (var p in sim.players) if (p.isKeeper) keepers++;
+            Assert.AreEqual(2, keepers, "um goleiro por time");
+            Assert.Greater(sim.goalHalf * 2f, 3f, "gol grande");
+            var a = new CpuBrain(0, 0.7f); var b = new CpuBrain(1, 0.7f);
+            int shots = 0;
+            for (int i = 0; i < 60 * 240 && sim.state != MatchState.Fulltime; i++)
+            {
+                sim.Step(new[] { a.MakeInput(sim), b.MakeInput(sim) });
+                foreach (var e in sim.events) if (e.type == "kick" && e.kind == "shot") shots++;
+            }
+            System.Console.WriteLine($"[rua com goleiro] {shots} chutes, placar {sim.score[0]} x {sim.score[1]}");
+            Assert.Greater(shots, 3);
         }
 
         [Test] public void JsonRoundTrip()

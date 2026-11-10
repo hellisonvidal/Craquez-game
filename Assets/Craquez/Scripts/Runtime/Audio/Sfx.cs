@@ -168,7 +168,7 @@ namespace Craquez
         public static void Whistle() => Play(_i?._whistle, 0.6f);
         public static void WhistleLong() => Play(_i?._whistleLong, 0.6f);
         public static void WhistleEnd() => Play(_i?._whistleEnd, 0.65f);
-        public static void Net() => Play(_i?._net, 0.6f);
+        public static void Net() => Play(_i?._net, 0.75f);
         public static void Post() => Play(_i?._post, 0.7f);
         /// <summary>Bater de asas (pombos levantando voo).</summary>
         public static void Flutter() => Play(_i?._flutter, 0.22f, 0.85f + Random.value * 0.3f);
@@ -344,26 +344,37 @@ namespace Craquez
         /// Bola na rede: baque abafado do couro no náilon + o "chuá" do tecido (ruído em banda média
         /// com o tremor das cordas), cauda curta das cordas assentando.
         /// </summary>
+        /// <summary>
+        /// Bola na rede: a pancada surda da bola no náilon, o "chuá" (ruído em banda que desce de ~2 kHz a
+        /// ~500 Hz enquanto o pano estufa) e o chacoalhar dos fios e da armação depois, cada vez mais fraco.
+        /// </summary>
         static AudioClip NetSwish(System.Random r)
         {
-            int n = (int)(0.75f * Rate);
+            int n = (int)(1.0f * Rate);
             var d = new float[n];
-            float lp1 = 0, lp2 = 0, hp = 0, prev = 0;
-            float k1 = 1f - Mathf.Exp(-2 * Mathf.PI * 3800f / Rate), k2 = 1f - Mathf.Exp(-2 * Mathf.PI * 700f / Rate);
+            float lpA = 0, lpB = 0, prev = 0;
+            float click = 0f;
             for (int i = 0; i < n; i++)
             {
                 float t = i / (float)Rate;
                 float w = (float)(r.NextDouble() * 2 - 1);
-                lp1 += (w - lp1) * k1;            // passa-baixa ~3,8 kHz
-                lp2 += (lp1 - lp2) * k2;          // tira os graves: banda ~0,7-3,8 kHz
-                float band = lp1 - lp2;
-                hp = band;
-                float swishEnv = Mathf.Min(1f, t * 60f) * Mathf.Exp(-t * 5.5f);
-                float flutter = 0.65f + 0.35f * Mathf.Sin(2 * Mathf.PI * (21f - t * 10f) * t);   // cordas vibrando
-                float thump = Mathf.Sin(2 * Mathf.PI * (95f - 30f * t) * t) * Mathf.Exp(-t * 22f) * 0.55f;
-                float rustle = (t > 0.18f ? band * Mathf.Exp(-(t - 0.18f) * 9f) * 0.25f * (0.5f + 0.5f * Mathf.Sin(t * 90f)) : 0f);
-                float s = hp * swishEnv * flutter * 1.6f + thump + rustle;
-                d[i] = Mathf.Lerp(prev, s, 0.85f);
+                // filtro de banda que desce (o pano estufando abafa o som)
+                float hi = Mathf.Lerp(2400f, 650f, Mathf.Clamp01(t / 0.35f)), lo = hi * 0.25f;
+                float k1 = 1f - Mathf.Exp(-2 * Mathf.PI * hi / Rate), k2 = 1f - Mathf.Exp(-2 * Mathf.PI * lo / Rate);
+                lpA += (w - lpA) * k1;
+                lpB += (lpA - lpB) * k2;
+                float band = lpA - lpB;
+                float swish = band * Mathf.Min(1f, t * 90f) * Mathf.Exp(-t * 6.5f) * 2.1f;
+                // pancada: bola batendo no pano (grave e curta)
+                float thump = Mathf.Sin(2 * Mathf.PI * (78f - 34f * t) * t) * Mathf.Exp(-t * 26f) * 0.75f
+                            + Mathf.Sin(2 * Mathf.PI * 160f * t) * Mathf.Exp(-t * 45f) * 0.2f;
+                // fios chacoalhando: estalinhos esparsos que rareiam
+                float rate = 900f * Mathf.Exp(-t * 4f);
+                if (r.NextDouble() < rate / Rate) click = (float)(r.NextDouble() * 0.5 + 0.5) * (r.NextDouble() < 0.5 ? 1f : -1f);
+                click *= 0.82f;
+                float rattle = click * 0.22f * Mathf.Exp(-t * 3f) * (t > 0.06f ? 1f : 0f);
+                float s2 = swish + thump + rattle;
+                d[i] = Mathf.Lerp(prev, s2, 0.9f);
                 prev = d[i];
             }
             return Make("rede", d);
