@@ -525,6 +525,9 @@ namespace Craquez
         /// cachecol no pescoço ou esticado acima da cabeça, braços para cima e bandeiras.
         /// <paramref name="cheer"/> 0-1 = quantos estão de braços erguidos (1 = comemoração de gol).
         /// </summary>
+        /// <summary>Silhuetas da torcida com capa de chuva (e sem bandeiras): defina antes de montar o local.</summary>
+        public static bool CrowdRain;
+
         public static Texture2D CrowdPeople(int w, int h, Color home, Color home2, Color away, int seed, float cheer = 0f, bool stripes = false, float awayShare = 0.18f)
         {
             var t = Tex(w, h, true);
@@ -548,8 +551,16 @@ namespace Craquez
                 float wide = (kid ? 0.8f : 0.9f + Hash(i, 12, seed) * 0.25f);
                 bool armsUp = Hash(i, 7, seed) > 0.72f - cheer * 0.68f;
                 bool scarfUp = !armsUp && Hash(i, 13, seed) > 0.9f - cheer * 0.2f;   // cachecol esticado acima da cabeça
-                bool cap = Hash(i, 14, seed) > 0.82f;
-                bool flag = Hash(i, 8, seed) > 0.95f;
+                bool cap = Hash(i, 14, seed) > 0.82f || (CrowdRain && Hash(i, 16, seed) < 0.7f);
+                bool flag = !CrowdRain && Hash(i, 8, seed) > 0.95f;
+                if (CrowdRain && Hash(i, 16, seed) < 0.7f)
+                {
+                    // capa de chuva por cima da camisa (amarela, azul, transparente, vermelha)
+                    float k = Hash(i, 17, seed);
+                    shirt = k < 0.3f ? new Color(0.98f, 0.82f, 0.12f) : k < 0.55f ? new Color(0.18f, 0.42f, 0.85f) : k < 0.8f ? new Color(0.86f, 0.9f, 0.92f) : new Color(0.82f, 0.16f, 0.14f);
+                    shirt2 = shirt;
+                    striped = false;
+                }
                 float lean = (Hash(i, 15, seed) - 0.5f) * 0.12f;
                 for (int y = 0; y < h; y++)
                     for (int x = Mathf.Max(0, cx - pw * 2); x < Mathf.Min(w, cx + pw * 2); x++)

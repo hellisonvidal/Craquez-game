@@ -120,11 +120,15 @@ namespace Craquez
             _music.Play();
         }
 
+        public const bool MusicEnabled = false;
+
         /// <summary>Trilha sonora dos menus (liga/desliga com fade).</summary>
         public static void MenuMusic(bool on)
         {
             if (_i == null || _i._music == null) return;
-            _i._musicTarget = on && Settings.Music ? Mathf.Clamp01(Settings.MusicVolume) : 0f;
+            // trilha desligada por enquanto (o autor vai compor músicas novas, livres de direitos):
+            // troque MusicEnabled para true quando houver faixas novas em Resources/Audio/Music
+            _i._musicTarget = MusicEnabled && on && Settings.Music ? Mathf.Clamp01(Settings.MusicVolume) : 0f;
             _inMenus = on;
             if (on) { _i._crowdTarget = _i._chantTarget = _i._drumTarget = 0f; }   // menus: sem ambiente de torcida
             if (_i._musicTarget > 0f && !_i._music.isPlaying)

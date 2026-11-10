@@ -52,6 +52,13 @@ namespace Craquez
             c[14] = Color.white; c[15] = new Color(0.06f, 0.06f, 0.07f);
             for (int i = 0; i < 8; i++) c[16 + i] = casual[i];
             for (int i = 24; i < 64; i++) c[i] = Color.gray;
+            // capas de chuva (amarela, azul, transparente-esbranquiçada, vermelha, verde, preta) e guarda-chuvas
+            Color[] coats = { new Color(0.98f, 0.82f, 0.12f), new Color(0.18f, 0.42f, 0.85f), new Color(0.86f, 0.9f, 0.92f), new Color(0.82f, 0.16f, 0.14f), new Color(0.2f, 0.55f, 0.3f), new Color(0.1f, 0.1f, 0.12f) };
+            Color[] umbs = { new Color(0.08f, 0.08f, 0.1f), new Color(0.75f, 0.12f, 0.15f), new Color(0.12f, 0.3f, 0.7f), new Color(0.95f, 0.75f, 0.1f), new Color(0.15f, 0.5f, 0.3f), new Color(0.6f, 0.25f, 0.6f) };
+            for (int i = 0; i < 6; i++) { c[40 + i] = coats[i]; c[46 + i] = umbs[i]; }
+            c[52] = new Color(0.12f, 0.09f, 0.07f);   // barba
+            c[53] = new Color(0.97f, 0.97f, 0.97f);   // olhos (branco)
+            c[54] = new Color(0.04f, 0.04f, 0.05f);   // pupila / boca
             // camisas dos 4 uniformes de cada time: 24-31 mandante (c1,c2 por uniforme), 32-39 visitante
             for (int k = 0; k < 4; k++)
             {
@@ -133,6 +140,7 @@ namespace Craquez
             var p = s.pos;
             if (s.lod)
             {
+                if (Rain && r.NextDouble() < 0.7) shirt = 40 + r.Next(6);   // capa de chuva
                 // fileiras do fundo: tronco (com ombros) e cabeça (as pernas ficam escondidas pela fileira da frente)
                 body.Box(p + q * new Vector3(0f, 1.02f * hgt, 0f), new Vector3(0.52f, 0.82f * hgt, 0.32f), q, shirt);
                 body.Box(p + q * new Vector3(0f, 1.36f * hgt, 0f), new Vector3(0.6f, 0.16f, 0.32f), q, shirt);
@@ -144,29 +152,73 @@ namespace Craquez
                 arms[3].Box(p + q * new Vector3(0f, 1.7f * hgt, 0.0f), new Vector3(0.58f, 0.15f, 0.15f), q, skin);
                 return;
             }
-            // duas pernas e tênis (antes um bloco só, fino)
+            bool coat = Rain && r.NextDouble() < 0.7;
+            bool umbrella = Rain && !coat ? r.NextDouble() < 0.45 : Rain && r.NextDouble() < 0.12;
+            int coatC = 40 + r.Next(6);
+            int top = coat ? coatC : shirt;
+            // duas pernas e tênis
             for (int side = -1; side <= 1; side += 2)
             {
-                body.Box(p + q * new Vector3(side * 0.1f, 0.43f * hgt, 0f), new Vector3(0.17f, 0.86f * hgt, 0.2f), q, pants);
-                body.Box(p + q * new Vector3(side * 0.1f, 0.045f, 0.05f), new Vector3(0.17f, 0.09f, 0.3f), q, r.NextDouble() < 0.5 ? 14 : 15);
+                body.Box(p + q * new Vector3(side * 0.1f, 0.43f * hgt, 0f), new Vector3(0.16f, 0.86f * hgt, 0.19f), q, pants);
+                body.Box(p + q * new Vector3(side * 0.1f, 0.045f, 0.05f), new Vector3(0.16f, 0.09f, 0.29f), q, r.NextDouble() < 0.5 ? 14 : 15);
             }
-            // tronco mais encorpado (peito e ombros) com a barra na segunda cor
-            body.Box(p + q * new Vector3(0f, 1.12f * hgt, 0f), new Vector3(0.5f, 0.58f * hgt, 0.3f), q, shirt);
-            body.Box(p + q * new Vector3(0f, 1.38f * hgt, 0f), new Vector3(0.58f, 0.14f, 0.3f), q, shirt);
-            body.Box(p + q * new Vector3(0f, 0.86f * hgt, 0f), new Vector3(0.51f, 0.07f, 0.31f), q, shirt2);
-            // pescoço, cabeça, cabelo (ou boné na cor do time)
-            body.Box(p + q * new Vector3(0f, 1.47f * hgt, 0f), new Vector3(0.12f, 0.08f, 0.12f), q, skin);
-            body.Box(p + q * new Vector3(0f, 1.6f * hgt, 0f), new Vector3(0.24f, 0.27f, 0.25f), q, skin);
-            if (r.NextDouble() < 0.25) body.Box(p + q * new Vector3(0f, 1.75f * hgt, 0.03f), new Vector3(0.27f, 0.08f, 0.33f), q, shirt);
-            else if (r.NextDouble() < 0.85) body.Box(p + q * new Vector3(0f, 1.74f * hgt, -0.01f), new Vector3(0.26f, 0.07f, 0.27f), q, hair);
+            // tronco em V (cintura mais estreita que o peito) com ombros arredondados
+            body.Box(p + q * new Vector3(0f, 0.96f * hgt, 0f), new Vector3(0.42f, 0.26f * hgt, 0.27f), q, top);
+            body.Box(p + q * new Vector3(0f, 1.2f * hgt, 0f), new Vector3(0.5f, 0.36f * hgt, 0.3f), q, top);
+            body.Box(p + q * new Vector3(0f, 1.39f * hgt, 0f), new Vector3(0.56f, 0.1f, 0.29f), q, top);
+            if (!coat) body.Box(p + q * new Vector3(0f, 0.84f * hgt, 0f), new Vector3(0.43f, 0.06f, 0.28f), q, shirt2);
+            else body.Box(p + q * new Vector3(0f, 0.7f * hgt, 0f), new Vector3(0.46f, 0.24f * hgt, 0.3f), q, coatC);   // capa até a coxa
+            // pescoço e cabeça com rosto: olhos, sobrancelha, nariz, boca, orelhas (às vezes barba)
+            body.Box(p + q * new Vector3(0f, 1.47f * hgt, 0f), new Vector3(0.11f, 0.08f, 0.11f), q, skin);
+            var hc = p + q * new Vector3(0f, 1.6f * hgt, 0f);
+            body.Box(hc, new Vector3(0.22f, 0.27f, 0.24f), q, skin);
+            body.Box(hc + q * new Vector3(0f, -0.03f, 0.125f), new Vector3(0.05f, 0.07f, 0.04f), q, skin);              // nariz
+            for (int e = -1; e <= 1; e += 2)
+            {
+                body.Box(hc + q * new Vector3(e * 0.05f, 0.03f, 0.121f), new Vector3(0.045f, 0.025f, 0.01f), q, 53);        // olho
+                body.Box(hc + q * new Vector3(e * 0.05f, 0.03f, 0.125f), new Vector3(0.02f, 0.022f, 0.01f), q, 54);          // pupila
+                body.Box(hc + q * new Vector3(e * 0.05f, 0.065f, 0.122f), new Vector3(0.06f, 0.015f, 0.012f), q, hair);    // sobrancelha
+            }
+            body.Box(hc + q * new Vector3(0f, -0.08f, 0.121f), new Vector3(0.07f, 0.018f, 0.01f), q, 54);                 // boca
+            if (r.NextDouble() < 0.18) body.Box(hc + q * new Vector3(0f, -0.09f, 0.06f), new Vector3(0.21f, 0.09f, 0.14f), q, 52);   // barba
+            if (coat)
+            {
+                // capuz da capa cobrindo a cabeça
+                body.Box(hc + q * new Vector3(0f, 0.06f, -0.02f), new Vector3(0.27f, 0.2f, 0.28f), q, coatC);
+                body.Box(hc + q * new Vector3(0f, 0.16f, 0.0f), new Vector3(0.25f, 0.06f, 0.26f), q, coatC);
+            }
+            else if (r.NextDouble() < 0.25) body.Box(hc + q * new Vector3(0f, 0.15f, 0.03f), new Vector3(0.25f, 0.08f, 0.32f), q, shirt);   // boné
+            else if (r.NextDouble() < 0.85)
+            {
+                body.Box(hc + q * new Vector3(0f, 0.14f, -0.01f), new Vector3(0.24f, 0.07f, 0.26f), q, hair);
+                body.Box(hc + q * new Vector3(0f, 0.05f, -0.11f), new Vector3(0.23f, 0.17f, 0.05f), q, hair);   // cabelo atrás
+            }
+            if (umbrella)
+            {
+                // guarda-chuva aberto: cabo e copa (gomos em cruz), na mão direita (braços baixos)
+                int uc = 46 + r.Next(6);
+                var top0 = p + q * new Vector3(0.2f, 2.05f * hgt, 0.05f);
+                body.Box(p + q * new Vector3(0.2f, 1.62f * hgt, 0.05f), new Vector3(0.025f, 0.85f * hgt, 0.025f), q, 15);
+                body.Box(top0, new Vector3(1.0f, 0.06f, 0.55f), q, uc);
+                body.Box(top0, new Vector3(0.55f, 0.06f, 1.0f), q, uc);
+                body.Box(top0 + Vector3.up * 0.06f, new Vector3(0.72f, 0.06f, 0.72f), q, uc);
+                // só a pose de braços baixos (quem segura o guarda-chuva não pula com os braços para cima)
+                for (int k = 0; k < Poses; k++)
+                    for (int side = -1; side <= 1; side += 2)
+                        arms[k].Box(p + q * new Vector3(side * 0.31f, 1.1f * hgt, 0.02f), new Vector3(0.13f, 0.56f * hgt, 0.14f), q, top, new Vector3(-8f, 0f, side * 6f));
+                return;
+            }
+            int sleeve = coat ? coatC : shirt;
             for (int side = -1; side <= 1; side += 2)
             {
-                arms[0].Box(p + q * new Vector3(side * 0.33f, 1.1f * hgt, 0.02f), new Vector3(0.14f, 0.58f * hgt, 0.15f), q, shirt, new Vector3(-8f, 0f, side * 6f));
-                arms[1].Box(p + q * new Vector3(side * 0.36f, 1.7f * hgt, 0.02f), new Vector3(0.13f, 0.6f * hgt, 0.14f), q, skin, new Vector3(0f, 0f, -side * 18f));
+                arms[0].Box(p + q * new Vector3(side * 0.32f, 1.1f * hgt, 0.02f), new Vector3(0.13f, 0.56f * hgt, 0.14f), q, sleeve, new Vector3(-8f, 0f, side * 6f));
+                arms[0].Box(p + q * new Vector3(side * 0.35f, 0.8f * hgt, 0.04f), new Vector3(0.1f, 0.1f, 0.1f), q, skin);   // mão
+                arms[1].Box(p + q * new Vector3(side * 0.34f, 1.62f * hgt, 0.02f), new Vector3(0.13f, 0.34f * hgt, 0.14f), q, sleeve, new Vector3(0f, 0f, -side * 18f));
+                arms[1].Box(p + q * new Vector3(side * 0.42f, 1.92f * hgt, 0.02f), new Vector3(0.11f, 0.26f * hgt, 0.12f), q, skin, new Vector3(0f, 0f, -side * 18f));
                 // palmas: antebraços para a frente, mãos se encontrando diante do peito
-                arms[2].Box(p + q * new Vector3(side * 0.16f, 1.3f * hgt, 0.22f), new Vector3(0.13f, 0.13f, 0.38f), q, skin, new Vector3(-20f, -side * 30f, 0f));
+                arms[2].Box(p + q * new Vector3(side * 0.16f, 1.3f * hgt, 0.22f), new Vector3(0.13f, 0.13f, 0.38f), q, coat ? coatC : skin, new Vector3(-20f, -side * 30f, 0f));
                 // mãos na cabeça: cotovelos abertos para os lados e para cima
-                arms[3].Box(p + q * new Vector3(side * 0.27f, 1.64f * hgt, 0.0f), new Vector3(0.13f, 0.42f * hgt, 0.13f), q, skin, new Vector3(0f, 0f, side * 55f));
+                arms[3].Box(p + q * new Vector3(side * 0.27f, 1.64f * hgt, 0.0f), new Vector3(0.13f, 0.42f * hgt, 0.13f), q, coat ? coatC : skin, new Vector3(0f, 0f, side * 55f));
             }
         }
 
@@ -177,6 +229,8 @@ namespace Craquez
 
         /// <summary>Kits dos dois times (os 4 uniformes) para a roupa dos torcedores; defina antes de Build.</summary>
         public static List<Craquez.Sim.Kit> HomeKits, AwayKits;
+        /// <summary>Partida com chuva: capas, capuzes e guarda-chuvas (defina antes de Build).</summary>
+        public static bool Rain;
 
         /// <summary>
         /// Cria os blocos de torcedores. <paramref name="groups"/>: uma lista de lugares por bloco (cada bloco

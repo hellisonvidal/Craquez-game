@@ -2240,7 +2240,9 @@ namespace Craquez
         {
             if (_node == null) Weld();
             var hit = transform.InverseTransformPoint(worldPoint);
-            float k = Mathf.Clamp(strength / 25f, 0.35f, 1.3f);
+            float k = Mathf.Clamp(strength / 22f, 0.5f, 1.5f);
+            // só a rede do gol onde a bola entrou (a outra fica a ~100 m)
+            if ((hit - _rest[0]).sqrMagnitude > 100f && Mathf.Abs(hit.x - _rest[0].x) > 8f) return;
             for (int i = 0; i < _rest.Length; i++)
             {
                 if (_pinned[i]) continue;
@@ -2248,7 +2250,7 @@ namespace Craquez
                 float d2 = (_rest[i] - hit).sqrMagnitude;
                 float w = Mathf.Exp(-d2 * 2.2f) + 0.25f * Mathf.Exp(-d2 * 0.35f);
                 var radial = _rest[i] - hit; radial.x = 0f;
-                _vel[i] += (new Vector3(_side * 3.4f, -0.4f, 0f) + radial * 0.5f) * (w * k);
+                _vel[i] += (new Vector3(_side * 5.2f, 0.6f, 0f) + radial * 0.9f) * (w * k);
             }
             _awake = 5f;
         }
@@ -2283,7 +2285,8 @@ namespace Craquez
             int N = _rest.Length;
             // tecido de náilon: volta devagar ao lugar (mola fraca), a onda corre pela malha e o
             // amortecimento tira o "tremido" (antes era duro e vibrava como borracha)
-            const float kRest = 14f, kNbr = 160f, damp = 3.2f;
+            // (mola entre nós menor e menos amortecimento: o pano estufa e balança umas vezes antes de parar)
+            const float kRest = 11f, kNbr = 110f, damp = 1.9f;
             int sub = 4;
             float h = dt / sub;
             for (int s = 0; s < sub; s++)
@@ -2298,7 +2301,7 @@ namespace Craquez
                     acc.x += _side * breeze * 40f * Mathf.Clamp01(_rest[i].y);   // o vento empurra o fundo
                     acc.y -= 0.6f + 2.5f * Mathf.Clamp01(Mathf.Abs(_disp[i].x) * 2f);   // caimento: estufado, o pano pesa
                     _vel[i] += acc * h;
-                    _vel[i] *= 1f / (1f + 0.6f * h * _vel[i].magnitude);          // arrasto do ar no tecido
+                    _vel[i] *= 1f / (1f + 0.35f * h * _vel[i].magnitude);         // arrasto do ar no tecido
                     _disp[i] += _vel[i] * h;
                     if (_disp[i].sqrMagnitude > 0.64f) { _disp[i] = _disp[i].normalized * 0.8f; _vel[i] *= 0.5f; }   // o fio não estica sem limite
                     // a rede não atravessa para dentro do gol além do pano original

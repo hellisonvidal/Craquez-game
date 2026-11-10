@@ -66,6 +66,12 @@ namespace Craquez
             _night = c.timeOfDay == "noite";
             Lighting(c.timeOfDay, s.mode.id, q);
             FanCrowd.HomeKits = home.kits; FanCrowd.AwayKits = away.kits;   // torcedores com os uniformes dos times
+            {
+                string wk0 = c.weather == "aleatorio" ? WeatherFx.Kinds[(int)(c.seed % (uint)WeatherFx.Kinds.Length)] : c.weather;
+                // chuva na arquibancada: capas, capuzes e guarda-chuvas; nada de bandeiras
+                FanCrowd.Rain = s.mode.id != GameModes.Futsal && (wk0 == "chuva" || wk0 == "tempestade");
+                Gfx.CrowdRain = FanCrowd.Rain;
+            }
             if (c.training) venue = VenueBuilder.TrainingGround(s, home, kits[0], _night, q, transform);   // só o campo: sem torcida, placar, juiz
             else if (s.mode.id == GameModes.Futsal) venue = VenueBuilder.Futsal(s, home, away, kits[0], kits[1], c.venue, _night, q, transform);
             else if (s.mode.id == GameModes.Street) venue = VenueBuilder.Street(s, home, away, kits[0], kits[1], c.venue, _night, q, transform);
@@ -396,14 +402,49 @@ namespace Craquez
                 }
         }
 
+        public bool HasBench => _coaches.Count > 0;
+        public float BenchX(int team) => (team == 0 ? -1f : 1f) * 9f;
+
+        int _celTeam = -1;
+        Vector2 _celSpot;
+        float _celT;
+        bool _celStarted;
+
+        /// <summary>Gol comemorado no banco: técnico e reservas daquele time correm até o autor.</summary>
+        public void BenchCelebrate(int team, Vector2 spot, float seconds)
+        {
+            _celTeam = team; _celSpot = spot; _celT = seconds; _celStarted = false;
+        }
+
+        /// <summary>Durante a comemoração no banco: leva o técnico e os reservas até o autor do gol.</summary>
+        bool BenchJoin(AthleteView av, int team, int k, float dt)
+        {
+            if (_celT <= 0f || team != _celTeam) return false;
+            var p = av.p;
+            float ang = k * 1.9f + 0.6f;
+            var target = _celSpot + new Vector2(Mathf.Cos(ang), Mathf.Abs(Mathf.Sin(ang)) + 0.3f) * (0.9f + (k % 2) * 0.4f);
+            var to = target - p.position;
+            float d = to.magnitude;
+            var want = d > 0.3f ? to / d * Mathf.Min(6f, d * 2f) : Vector2.zero;
+            p.vel = Vector2.MoveTowards(p.vel, want, 8f * dt);
+            p.position += p.vel * dt;
+            if (d > 0.6f) p.facing = V2.RotateToward(p.facing, to / Mathf.Max(d, 0.01f), 6f * dt).Norm();
+            else p.facing = V2.RotateToward(p.facing, (_celSpot - p.position).Norm(), 4f * dt).Norm();
+            if (d < 1.4f && !av.Celebrating) av.Celebrate(_celT);
+            av.OnTick();
+            return true;
+        }
+
         void BenchStep()
         {
             if (_coaches.Count == 0) return;
+            if (_celT > 0f) { _celT -= MatchSim.DT; if (_celT <= 0f) _celTeam = -1; }
             float dt = MatchSim.DT, hw = sim.halfW, hl = sim.halfLen;
             bool live = sim.state == MatchState.Playing;
             for (int t = 0; t < _coaches.Count; t++)
             {
                 var av = _coaches[t];
+                if (BenchJoin(av, t, 0, dt)) continue;
                 var p = av.p;
                 float cx = (t == 0 ? -1f : 1f) * 9f;
                 // acompanha o lance de lado dentro da área técnica (até a beira), de frente para o jogo
@@ -437,8 +478,10 @@ namespace Craquez
                 av.OnTick();
             }
             // aquecimento atrás dos gols: trote de ida e volta e paradas para alongar
+            int wk = 1;
             foreach (var w in _warm)
             {
+                if (BenchJoin(w.av, w.team, wk++, dt)) continue;
                 var p = w.av.p;
                 float gx = (w.team == 0 ? -1f : 1f) * (hl + 4f);
                 float cyc = (float)(sim.tick * dt * 0.09f + w.phase);
@@ -678,13 +721,15 @@ namespace Craquez
                     // gol do mandante: o estádio explode; do visitante: só o setor visitante comemora
                     bool homeGoal = e.team == 0;
                     if (homeGoal) Sfx.Cheer(); else Sfx.Applause(0.45f);
-                    GoalParty(e.team);
+                    // (sem papel picado nem sinalizadores em nenhuma comemoração)
                     _crowd?.React(homeGoal ? "goal" : "silence");
                     _crowdHype = homeGoal ? 1.6f : 0f;
                     _silence = homeGoal ? 0f : 6f;
                     bcam.Shake(0.6f);
                     foreach (var n in venue.nets)
-                        n.Hit(new Vector3(sim.ball.pos.x, sim.ball.z + 0.3f, sim.ball.pos.y), sim.ball.Speed * 0.15f);   // (o bolsão vem da própria bola: Press)
+                        // força real do chute (antes ia multiplicada por 0,15: a rede mal mexia); a rede do outro
+                        // gol fica longe do ponto e quase não recebe nada
+                        n.Hit(new Vector3(sim.ball.pos.x, sim.ball.z + 0.3f, sim.ball.pos.y), Mathf.Max(sim.ball.Speed, 12f));
                     break;
             }
         }

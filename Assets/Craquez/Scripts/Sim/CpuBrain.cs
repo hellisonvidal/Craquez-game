@@ -10,6 +10,7 @@ namespace Craquez.Sim
     {
         public int team;
         public float skill;
+        int _throwWait;
         int _holdBtn, _holdTicks, _cooldown, _skillCd, _carryT, _gkFeetT;
         Vector2 _carry;
         bool _finesse;
@@ -58,15 +59,37 @@ namespace Craquez.Sim
                     f.buttons |= InputFrame.Pass;
                 return f;
             }
+            if (!(sim.throwIn && sim.ball.owner == p.id && p.id == sim.throwInTaker)) _throwWait = 0;
             if (sim.throwIn && sim.ball.owner == p.id && p.id == sim.throwInTaker)
             {
-                // lateral com as mãos: espera um instante e arremessa para a frente (longo perto da área)
+                // lateral com as mãos: espera os companheiros se apresentarem (~2-3 s, antes saía em meio
+                // segundo) e arremessa no mais livre; longo na área só se houver alguém livre lá
                 if (_holdBtn != 0 || _cooldown > 0) return f;
-                if (Noise(sim, 50) > 0.03f) return f;
+                _throwWait++;
+                if (_throwWait < 120 || (_throwWait < 200 && Noise(sim, 50) > 0.02f)) return f;
                 var g2 = new Vector2(sim.halfLen * dir, 0f);
-                bool nearBox = p.position.Dist(g2) < 30f;
-                f.move = new Vector2(dir * 0.7f, -Mathf.Sign(p.position.y) * 0.7f).Norm();
-                if (nearBox && Noise(sim, 51) < 0.5f) Press(ref f, InputFrame.Lob, 18);
+                SimPlayer mate = null; float best = float.MinValue; bool longOne = false;
+                foreach (var m in sim.players)
+                {
+                    if (m.team != p.team || m == p || m.isKeeper || m.sentOff) continue;
+                    float d = m.position.Dist(p.position);
+                    if (d < 3f || d > 26f) continue;
+                    float free = 99f;
+                    foreach (var o in sim.players) if (o.team != p.team && !o.sentOff) free = Mathf.Min(free, o.position.Dist(m.position));
+                    // adversário no caminho do arremesso
+                    foreach (var o in sim.players)
+                    {
+                        if (o.team == p.team || o.sentOff) continue;
+                        var ab = m.position - p.position; float tt = Mathf.Clamp01(Vector2.Dot(o.position - p.position, ab) / Mathf.Max(0.01f, ab.sqrMagnitude));
+                        if (tt > 0.15f && tt < 0.9f && o.position.Dist(p.position + ab * tt) < 1.5f) free -= 2f;
+                    }
+                    float sc = Mathf.Min(free, 6f) * 2f - Mathf.Max(0f, d - 14f) * 0.4f + (m.position.x - p.position.x) * dir * 0.1f;
+                    if (sc > best) { best = sc; mate = m; longOne = d > 16f; }
+                }
+                if (mate == null && _throwWait < 300) return f;   // ninguém livre: espera mais um pouco
+                f.move = mate != null ? (mate.position - p.position).Norm() : new Vector2(dir * 0.7f, -Mathf.Sign(p.position.y) * 0.7f).Norm();
+                _throwWait = 0;
+                if (longOne) Press(ref f, InputFrame.Lob, 18);
                 else Press(ref f, InputFrame.Pass, 8);
                 return f;
             }

@@ -141,6 +141,8 @@ namespace Craquez.Sim
         public bool startSwapped;
         /// <summary>Rua: jogadores por time (3, 4 ou 5; definir antes de Setup).</summary>
         public int streetPlayers = 3;
+        /// <summary>Rua com golzinho (ver GameModes.SmallGoalStreets).</summary>
+        public bool smallGoals;
         /// <summary>Tick do último chute (tempo de reação do goleiro).</summary>
         public int lastShotTick = -1000;
 
@@ -155,6 +157,12 @@ namespace Craquez.Sim
         public void Setup(string modeId, TeamSetup a, TeamSetup b, uint seed, float secondsPerHalf)
         {
             mode = GameModes.Get(modeId, streetPlayers);
+            if (modeId == GameModes.Street && smallGoals)
+            {
+                // golzinho de rua (trave improvisada): bem mais estreito e baixo
+                mode.goalWidth *= 0.62f;
+                mode.goalHeight *= 0.72f;
+            }
             mode.rollDecel *= rollScale;
             ball.radius = modeId == GameModes.Futsal ? 0.098f : 0.11f;   // futsal: bola tamanho 4
             halfLen = mode.length * 0.5f;
@@ -1247,6 +1255,36 @@ namespace Craquez.Sim
         void TryBlock(SimPlayer kicker)
         {
             var dirv = ball.vel.Norm();
+            if (mode.id == GameModes.Street && kicker.kickKind == InputFrame.Shoot)
+            {
+                // rua (sem goleiro): quem está na frente do chute, no caminho até o gol, se joga na bola
+                float toGoal = Mathf.Abs(halfLen * TeamDir(kicker.team) - ball.pos.x) + 1f;
+                foreach (var o in players)
+                {
+                    if (o.team == kicker.team || o.sentOff || o.stun > 0f || o.down > 0f) continue;
+                    var to = o.position - ball.pos;
+                    float along = Vector2.Dot(to, dirv);
+                    if (along < 1.7f || along > toGoal) continue;
+                    float lat = Mathf.Abs(dirv.x * to.y - dirv.y * to.x);
+                    if (lat > 1.15f) continue;
+                    float chance = (0.45f + 0.35f * o.defense) * (1f - lat / 1.15f * 0.45f) * Mathf.Lerp(1f, 0.7f, Mathf.Clamp01(along / 12f));
+                    if (rng.Chance(chance))
+                    {
+                        float spd = ball.vel.magnitude;
+                        var side = new Vector2(-dirv.y, dirv.x) * (rng.Chance(0.5f) ? 1f : -1f);
+                        // o desvio acontece quando a bola chega nele: posição de impacto
+                        ball.pos += dirv * Mathf.Max(0f, along - 0.4f);
+                        ball.vel = (-dirv * 0.3f + side * 0.7f).Norm() * spd * rng.Range(0.25f, 0.45f);
+                        ball.vz = rng.Range(0.5f, 3f);
+                        ball.z = Mathf.Min(ball.z, 0.6f);
+                        ball.spin = 0f;
+                        ball.lastTouchTeam = o.team;
+                        ball.lastTouchId = o.id;
+                        Emit("block", o.team, o.id);
+                        return;
+                    }
+                }
+            }
             foreach (var o in players)
             {
                 if (o.team == kicker.team || o.isKeeper || o.stun > 0f) continue;
@@ -1562,6 +1600,8 @@ namespace Craquez.Sim
             float body = Mathf.Abs(p.facing.AngleTo(dirv));
             err *= 1f + Mathf.Max(0f, body - 0.6f) * 0.9f;
             err *= StrikeFactor(p);
+            // rua (sem goleiro): chute de longe é muito menos preciso (saía gol demais, 11-16 por jogo)
+            if (mode.id == GameModes.Street) err *= 1.6f + Mathf.Clamp01((d - 5f) / 10f) * 0.9f;
             if (finesse) err *= 0.65f;
             dirv = dirv.Rotated(rng.Gauss() * err);
             float curl = 0f;

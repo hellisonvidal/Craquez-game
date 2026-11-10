@@ -64,6 +64,7 @@ namespace Craquez
                 sim.firstKickoff = 1 - tossWinner;
             }
             sim.streetPlayers = c.streetPlayers;
+            sim.smallGoals = c.mode == GameModes.Street && System.Array.IndexOf(GameModes.SmallGoalStreets, c.venue) >= 0;
             sim.quickRestarts = c.quickRestarts;
             sim.Setup(c.mode, new TeamSetup { data = ta, tactics = c.tacticsA }, new TeamSetup { data = tb, tactics = c.tacticsB }, c.seed, c.SecondsPerHalf);
             view = new GameObject("Partida").AddComponent<MatchView>();
@@ -312,6 +313,7 @@ namespace Craquez
             fresh.startSwapped = sim.startSwapped;
             fresh.firstKickoff = sim.firstKickoff;
             fresh.streetPlayers = sim.streetPlayers;
+            fresh.smallGoals = sim.smallGoals;
             fresh.Setup(cfg.mode, new TeamSetup { data = ta, tactics = cfg.tacticsA }, new TeamSetup { data = tb, tactics = cfg.tacticsB }, cfg.seed, cfg.SecondsPerHalf);
             for (int k = 0; k < sim.players.Count; k++)
             {

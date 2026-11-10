@@ -770,7 +770,7 @@ namespace Craquez
             foreach (var m in MinuteOpts) mins.Add(m + " minutos");
             UiKit.Size(UiKit.Cycler(list, "Duração", mins, Mathf.Max(0, System.Array.IndexOf(MinuteOpts, _cfg.minutes)), i => _cfg.minutes = MinuteOpts[i]), 50, 50);
             if (_cfg.mode == GameModes.Street)
-                UiKit.Size(UiKit.Cycler(list, "Formato", new[] { "3 x 3", "4 x 4", "5 x 5" }, Mathf.Clamp(_cfg.streetPlayers - 3, 0, 2), i =>
+                UiKit.Size(UiKit.Cycler(list, "Formato", new[] { "3 x 3", "4 x 4", "5 x 5", "6 x 6", "7 x 7" }, Mathf.Clamp(_cfg.streetPlayers - 3, 0, 4), i =>
                 {
                     _cfg.streetPlayers = 3 + i;
                     _cfg.tacticsA = new Tactics();
@@ -1337,15 +1337,16 @@ namespace Craquez
         System.Collections.Generic.Dictionary<string, object> _optSnap;
 
         /// <summary>Abas das configurações (submenus): som, câmera, partida e vídeo.</summary>
-        static readonly string[] OptionTabs = { "SOM", "CÂMERA", "PARTIDA", "VÍDEO", "OPTION FILE", "ATUALIZAÇÕES" };
+        static readonly string[] OptionTabs = { "SOM", "CÂMERA", "PARTIDA", "VÍDEO", "OPTION FILE", "ATUALIZAÇÕES", "CONTROLES" };
         static readonly string[] OptionTabInfo =
         {
-            "Volume, música dos menus e vibração",
+            "Volume e vibração",
             "Câmera da partida e zoom",
             "Nomes dos atletas e cobranças de falta",
             "Qualidade, tela, resolução e efeitos",
             "Times, elencos, uniformes e escudos",
             "Procurar uma versão nova do jogo",
+            "Layout dos botões do controle (quem chuta com bola, quadrado...) e personalização",
         };
         int _optTab;
 
@@ -1413,7 +1414,7 @@ namespace Craquez
                     Add(UiKit.Cycler(list, "Volume", vols, Mathf.RoundToInt(Settings.Volume * 10), i => Settings.Volume = i / 10f));
                     string[] mus = { "Desligada", "20%", "40%", "60%", "80%", "100%" };
                     int mi = Settings.Music ? Mathf.Clamp(Mathf.RoundToInt(Settings.MusicVolume * 5f), 1, 5) : 0;
-                    Add(UiKit.Cycler(list, "Música dos menus", mus, mi, i => { Settings.Music = i > 0; if (i > 0) Settings.MusicVolume = i / 5f; Sfx.MenuMusic(true); }));
+                    if (Sfx.MusicEnabled) Add(UiKit.Cycler(list, "Música dos menus", mus, mi, i => { Settings.Music = i > 0; if (i > 0) Settings.MusicVolume = i / 5f; Sfx.MenuMusic(true); }));
                     if (Application.isMobilePlatform)
                         Add(UiKit.Cycler(list, "Vibração", new[] { "Ligada", "Desligada" }, Settings.Vibration ? 0 : 1, i => Settings.Vibration = i == 0));
                     break;
@@ -1444,6 +1445,44 @@ namespace Craquez
                         ReloadOptionFile();
                         ShowOptions(4, false);
                     }, 28, new Color(0.4f, 0.12f, 0.15f)));
+                    break;
+                }
+                case 6:
+                {
+                    var map = Settings.PadMap;
+                    string cur = string.Concat(map[0], map[1], map[2], map[3]);
+                    int preset = 3;
+                    for (int k = 0; k < Settings.PadPresets.Length; k++) if (Settings.PadPresets[k][0] == cur) preset = k;
+                    bool ps = UnityEngine.InputSystem.Gamepad.current != null && InputRouter.IsPlayStation(UnityEngine.InputSystem.Gamepad.current);
+                    Add(UiKit.Cycler(list, "Layout", Settings.PadPresetNames, preset, i =>
+                    {
+                        if (i >= Settings.PadPresets.Length) return;
+                        var ps2 = Settings.PadPresets[i][0];
+                        Settings.PadMap = new[] { ps2[0] - '0', ps2[1] - '0', ps2[2] - '0', ps2[3] - '0' };
+                        InputRouter.InvalidateMap();
+                        ShowOptions(6, false);
+                    }));
+                    var faces = new string[4];
+                    for (int k = 0; k < 4; k++) faces[k] = InputRouter.FaceName(k, ps);
+                    for (int a = 0; a < 4; a++)
+                    {
+                        int aa = a;
+                        Add(UiKit.Cycler(list, InputRouter.ActionNames[a], faces, map[a], i =>
+                        {
+                            // troca com a ação que usava esse botão (cada botão faz uma coisa só)
+                            var m = Settings.PadMap;
+                            int other = System.Array.IndexOf(m, i);
+                            if (other >= 0 && other != aa) m[other] = m[aa];
+                            m[aa] = i;
+                            Settings.PadMap = m;
+                            InputRouter.InvalidateMap();
+                            ShowOptions(6, false);
+                        }));
+                    }
+                    Add(UiKit.Cycler(list, "Correr / colocado", new[] { ps ? "Correr no R2, colocado no R1" : "Correr no RT, colocado no RB", ps ? "Correr no R1, colocado no R2" : "Correr no RB, colocado no RT" },
+                        Settings.SprintOnShoulder ? 1 : 0, i => Settings.SprintOnShoulder = i == 1));
+                    var hint = UiKit.Label(list, InputRouter.Help(UnityEngine.InputSystem.Gamepad.all.Count > 0 ? DeviceKind.Gamepad1 : DeviceKind.Gamepad1), 22, Theme.Body, Theme.TextDim);
+                    hint.gameObject.AddComponent<LayoutElement>().minHeight = 70;
                     break;
                 }
                 case 5:

@@ -35,7 +35,7 @@ namespace Craquez.UI
                 var home = Teams.Get(teamA);
                 var away = Teams.Get(teamB);
                 var sim = new MatchSim();
-                if (mode == GameModes.Street) sim.streetPlayers = streetPlayers;
+                if (mode == GameModes.Street) { sim.streetPlayers = streetPlayers; sim.smallGoals = System.Array.IndexOf(GameModes.SmallGoalStreets, idx) >= 0; }
                 sim.Setup(mode, new TeamSetup { data = home }, new TeamSetup { data = away }, 1, 60f);
                 var kits = Teams.PickKits(home, away, 0, -1);
                 holder = new GameObject("Foto do local");

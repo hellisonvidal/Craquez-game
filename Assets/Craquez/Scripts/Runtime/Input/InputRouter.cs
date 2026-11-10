@@ -76,6 +76,24 @@ namespace Craquez
             return false;
         }
 
+        static readonly int[] ActionBits = { InputFrame.Pass, InputFrame.Shoot, InputFrame.Lob, InputFrame.Through };
+        public static readonly string[] ActionNames = { "Passe", "Chute", "Alto / cruzamento", "Enfiada" };
+        static int[] _map; static float _mapT = -1f;
+        /// <summary>Lê o layout salvo (no máximo uma vez por segundo: muda pelo menu de opções).</summary>
+        static int[] PadMapCached()
+        {
+            if (_map == null || Time.unscaledTime - _mapT > 1f) { _map = Settings.PadMap; _mapT = Time.unscaledTime; }
+            return _map;
+        }
+        public static void InvalidateMap() => _map = null;
+
+        static UnityEngine.InputSystem.Controls.ButtonControl Face(Gamepad g, int i) =>
+            i == 0 ? g.buttonSouth : i == 1 ? g.buttonEast : i == 2 ? g.buttonWest : g.buttonNorth;
+
+        /// <summary>Nome do botão da face (Xbox / PlayStation).</summary>
+        public static string FaceName(int i, bool ps) =>
+            ps ? (i == 0 ? "Cruz" : i == 1 ? "Bola" : i == 2 ? "Quadrado" : "Triângulo") : (i == 0 ? "A" : i == 1 ? "B" : i == 2 ? "X" : "Y");
+
         static Gamepad Pad(int i) => Gamepad.all.Count > i ? Gamepad.all[i] : null;
 
         public static bool IsPlayStation(Gamepad g) => g is DualShockGamepad || (g != null && g.description.manufacturer != null && g.description.manufacturer.Contains("Sony"));
@@ -97,14 +115,16 @@ namespace Craquez
                     if (g == null) break;
                     f.move = Dead(g.leftStick.ReadValue()) + Dpad(g);
                     f.rstick = Dead(g.rightStick.ReadValue());
-                    if (g.buttonSouth.isPressed) f.buttons |= InputFrame.Pass;
-                    if (g.buttonEast.isPressed) f.buttons |= InputFrame.Shoot;
-                    if (g.buttonWest.isPressed) f.buttons |= InputFrame.Lob;
-                    if (g.buttonNorth.isPressed) f.buttons |= InputFrame.Through;
-                    if (Trigger(g, true)) f.buttons |= InputFrame.Sprint;
+                    // layout escolhido em Configurações → Controles
+                    var map = PadMapCached();
+                    for (int a = 0; a < 4; a++)
+                        if (Face(g, map[a]).isPressed) f.buttons |= ActionBits[a];
+                    bool rt = Trigger(g, true), rb = g.rightShoulder.isPressed;
+                    bool swap = Settings.SprintOnShoulder;
+                    if (swap ? rb : rt) f.buttons |= InputFrame.Sprint;
+                    if (swap ? rt : rb) f.buttons |= InputFrame.Finesse;
                     if (g.leftShoulder.isPressed) f.buttons |= InputFrame.Switch;
                     if (Trigger(g, false)) f.buttons |= InputFrame.Shield;
-                    if (g.rightShoulder.isPressed) f.buttons |= InputFrame.Finesse;
                     if (g.startButton.isPressed) f.buttons |= InputFrame.Pause;
                     break;
                 }
@@ -203,9 +223,12 @@ namespace Craquez
             if (d == DeviceKind.Keyboard2)
                 return "Setas mover  •  Num1 passe  •  Num2 chute  •  Num3 alto  •  Num5 enfiada  •  Num0 correr\nNum4 trocar  •  Num6 proteger  •  Num9 colocado  •  Home/End/Del/PgDn: dribles";
             var g = Pad(d == DeviceKind.Gamepad1 ? 0 : 1);
-            if (IsPlayStation(g))
-                return "Cruz passe  •  Bola chute  •  Quadrado alto  •  Triângulo enfiada  •  R2 correr\nL1 trocar  •  L2 proteger/conter  •  R1 colocado  •  R3 (analógico direito): dribles";
-            return "A passe  •  B chute  •  X alto/cruzamento  •  Y enfiada  •  RT correr\nLB trocar  •  LT proteger/conter  •  RB colocado  •  Analógico direito: dribles";
+            bool ps = IsPlayStation(g);
+            var m = Settings.PadMap;
+            bool sh = Settings.SprintOnShoulder;
+            string run = ps ? (sh ? "R1" : "R2") : (sh ? "RB" : "RT"), fin = ps ? (sh ? "R2" : "R1") : (sh ? "RT" : "RB");
+            return FaceName(m[0], ps) + " passe  •  " + FaceName(m[1], ps) + " chute  •  " + FaceName(m[2], ps) + " alto/cruzamento  •  " + FaceName(m[3], ps) + " enfiada  •  " + run + " correr\n"
+                + (ps ? "L1" : "LB") + " trocar  •  " + (ps ? "L2" : "LT") + " proteger/conter  •  " + fin + " colocado  •  Analógico direito: dribles";
         }
 
         /// <summary>Opções da cobrança de falta (o chute direto só aparece perto do gol).</summary>
@@ -218,7 +241,10 @@ namespace Craquez
             else
             {
                 bool ps = IsPlayStation(Pad(d == DeviceKind.Gamepad1 ? 0 : 1));
-                pass = ps ? "Cruz" : "A"; cross = ps ? "Quadrado" : "X"; kick = ps ? "Bola" : "B"; curl = ps ? "R1 + Bola" : "RB + B";
+                var m = Settings.PadMap;
+                bool sh = Settings.SprintOnShoulder;
+                pass = FaceName(m[0], ps); cross = FaceName(m[2], ps); kick = FaceName(m[1], ps);
+                curl = (ps ? (sh ? "R2" : "R1") : (sh ? "RT" : "RB")) + " + " + kick;
             }
             string s = title + "   •   mire com o analógico   •   " + pass + " passe   •   " + cross + " cruzar na área";
             if (shot) s += "   •   " + kick + " chute direto (segure p/ força)   •   " + curl + " colocado";

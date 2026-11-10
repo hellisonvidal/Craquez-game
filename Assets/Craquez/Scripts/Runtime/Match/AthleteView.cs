@@ -381,6 +381,7 @@ namespace Craquez
 
         /// <summary>Comemoração: pulinhos e braços para cima por alguns segundos.</summary>
         public void Celebrate(float seconds) => _celebrate = Mathf.Max(_celebrate, seconds);
+        public bool Celebrating => _celebrate > 0f;
 
         void Update()
         {
