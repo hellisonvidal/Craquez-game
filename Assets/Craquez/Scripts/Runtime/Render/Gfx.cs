@@ -22,6 +22,7 @@ namespace Craquez
                     name == "Particles" ? "Universal Render Pipeline/Particles/Unlit" :
                     name.StartsWith("ToonOutline") ? "Craquez/ToonOutline" :
                     name.StartsWith("Athlete") ? "Craquez/Athlete" :
+                    name == "Crowd" ? "Craquez/Crowd" :
                     name == "LitTransparent" ? "Universal Render Pipeline/Lit" : "Craquez/Toon";
                 if (Shader.Find(shader) == null) shader = "Universal Render Pipeline/Lit";
                 var sh = Shader.Find(shader) ?? Shader.Find("Standard");
@@ -147,6 +148,18 @@ namespace Craquez
             Set(m, c, tex);
             m.SetFloat("_Cutoff", cutoff);
             m.SetFloat("_Smoothness", smooth);
+            return m;
+        }
+
+        /// <summary>Torcida animada por torcedor (shader Craquez/Crowd), com um pouco de luz própria.</summary>
+        public static Material Crowd(Texture tex, Color emission)
+        {
+            var m = new Material(Template("Crowd"));
+            Set(m, Color.white, tex);
+            m.EnableKeyword("_EMISSION");
+            m.SetColor("_EmissionColor", emission);
+            if (tex != null && m.HasProperty("_EmissionMap")) m.SetTexture("_EmissionMap", tex);
+            m.SetFloat("_Smoothness", 0.05f);
             return m;
         }
 

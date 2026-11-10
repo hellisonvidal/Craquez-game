@@ -20,6 +20,7 @@ namespace Craquez.Tests
         [TestCase("Craquez/Toon")]
         [TestCase("Craquez/ToonOutline")]
         [TestCase("Craquez/Athlete")]
+        [TestCase("Craquez/Crowd")]
         public void ToonCompila(string name)
         {
             var s = Shader.Find(name);

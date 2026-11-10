@@ -35,9 +35,26 @@ namespace Craquez
 
         public void Quad(Vector3 a, Vector3 b, Vector3 c, Vector3 d) => Quad(a, b, c, d, Vector2.zero, Vector2.one);
 
+        /// <summary>
+        /// Caixas com cantos chanfrados (arestas e quinas cortadas em 45°): as estruturas deixam de parecer
+        /// blocos quadrados. Vale para caixas a partir de 30 cm na menor medida (as pequenas ficam como estão).
+        /// </summary>
+        public static bool Bevel = true;
+
+        /// <summary>Quad com a face virada para <paramref name="outward"/> (inverte a ordem se precisar).</summary>
+        void QuadOut(Vector3 a, Vector3 b, Vector3 c, Vector3 d, Vector3 outward, Vector2 uv0, Vector2 uv1)
+        {
+            var n = Vector3.Cross(b - a, d - a);
+            if (n.sqrMagnitude < 1e-12f) n = Vector3.Cross(c - a, b - a) * -1f;
+            if (Vector3.Dot(n, outward) < 0f) Quad(d, c, b, a, uv0, uv1);
+            else Quad(a, b, c, d, uv0, uv1);
+        }
+
         /// <summary>Caixa alinhada aos eixos (centro, tamanho), UV em metros / uvScale.</summary>
         public void Box(Vector3 center, Vector3 size, float uvScale = 1f)
         {
+            float mn = Mathf.Min(size.x, Mathf.Min(size.y, size.z));
+            if (Bevel && mn >= 0.3f) { BevelBox(center, size, Mathf.Min(mn * 0.28f, 0.45f), uvScale); return; }
             var h = size * 0.5f;
             Vector3 P(float x, float y, float z) => center + new Vector3(x * h.x, y * h.y, z * h.z);
             Vector2 U(float a, float b) => new Vector2(a / uvScale, b / uvScale);
@@ -49,6 +66,56 @@ namespace Craquez
             Q(P(1, -1, -1), P(1, -1, 1), P(1, 1, 1), P(1, 1, -1), Vector2.zero, U(size.z, size.y));       // direita
             Q(P(-1, 1, -1), P(1, 1, -1), P(1, 1, 1), P(-1, 1, 1), Vector2.zero, U(size.x, size.z));       // topo
             Q(P(-1, -1, 1), P(1, -1, 1), P(1, -1, -1), P(-1, -1, -1), Vector2.zero, U(size.x, size.z));   // base
+        }
+
+        /// <summary>Caixa com arestas chanfradas de largura r: 6 faces, 12 chanfros e 8 quinas.</summary>
+        void BevelBox(Vector3 c, Vector3 size, float r, float uvScale)
+        {
+            var h = size * 0.5f;
+            Vector2 U(float a, float b) => new Vector2(a / uvScale, b / uvScale);
+            // faces: em cada eixo, o retângulo encolhido de r nas outras duas direções
+            for (int ax = 0; ax < 3; ax++)
+                for (int sg = -1; sg <= 1; sg += 2)
+                {
+                    int a1 = (ax + 1) % 3, a2 = (ax + 2) % 3;
+                    Vector3 P(float u, float v)
+                    {
+                        var p = Vector3.zero;
+                        p[ax] = sg * h[ax];
+                        p[a1] = u * (h[a1] - r);
+                        p[a2] = v * (h[a2] - r);
+                        return c + p;
+                    }
+                    var o = Vector3.zero; o[ax] = sg;
+                    QuadOut(P(-1, -1), P(1, -1), P(1, 1), P(-1, 1), o, Vector2.zero, U(size[a1], size[a2]));
+                }
+            // chanfros das 12 arestas
+            for (int ax = 0; ax < 3; ax++)            // eixo ao longo da aresta
+                for (int s1 = -1; s1 <= 1; s1 += 2)
+                    for (int s2 = -1; s2 <= 1; s2 += 2)
+                    {
+                        int a1 = (ax + 1) % 3, a2 = (ax + 2) % 3;
+                        Vector3 E(float along, bool onA1)
+                        {
+                            var p = Vector3.zero;
+                            p[ax] = along * (h[ax] - r);
+                            p[a1] = s1 * (onA1 ? h[a1] : h[a1] - r);
+                            p[a2] = s2 * (onA1 ? h[a2] - r : h[a2]);
+                            return c + p;
+                        }
+                        var o = Vector3.zero; o[a1] = s1; o[a2] = s2;
+                        QuadOut(E(-1, true), E(1, true), E(1, false), E(-1, false), o.normalized, Vector2.zero, U(size[ax], r * 1.4f));
+                    }
+            // quinas (triângulos)
+            for (int sx = -1; sx <= 1; sx += 2)
+                for (int sy = -1; sy <= 1; sy += 2)
+                    for (int sz = -1; sz <= 1; sz += 2)
+                    {
+                        var p1 = c + new Vector3(sx * h.x, sy * (h.y - r), sz * (h.z - r));
+                        var p2 = c + new Vector3(sx * (h.x - r), sy * h.y, sz * (h.z - r));
+                        var p3 = c + new Vector3(sx * (h.x - r), sy * (h.y - r), sz * h.z);
+                        QuadOut(p1, p2, p3, p3, new Vector3(sx, sy, sz), Vector2.zero, U(r, r));
+                    }
         }
 
         /// <summary>Faixa no chão de a até b com largura w (linhas do campo).</summary>
@@ -81,6 +148,8 @@ namespace Craquez
         /// <summary>Cilindro (traves, mastros, colunas). Eixo de a até b.</summary>
         public void Cylinder(Vector3 a, Vector3 b, float r, int seg = 10)
         {
+            // peças grossas mais redondas (postes e colunas com 6 lados pareciam prismas)
+            if (Bevel) seg = r >= 0.3f ? Mathf.Max(seg, 18) : r >= 0.12f ? Mathf.Max(seg, 12) : seg;
             var axis = (b - a).normalized;
             var u = Vector3.Cross(axis, Mathf.Abs(axis.y) > 0.9f ? Vector3.right : Vector3.up).normalized;
             var v = Vector3.Cross(axis, u);

@@ -29,6 +29,46 @@ namespace Craquez
             _yaw = Yaw(sp.facing);
             transform.position = _cur;
             InitFingers();
+            SkinnedMeshRenderer brow = null, lash = null;
+            foreach (var sr in rig.GetComponentsInChildren<SkinnedMeshRenderer>(true)) { if (sr.name == "Eyebrows") brow = sr; else if (sr.name == "Eyelashes") lash = sr; }
+            _face = new FaceDriver(sp.id * 31 + 7, rig.body, brow, lash);
+        }
+
+        FaceDriver _face;
+        float _effortT;
+
+        /// <summary>
+        /// Expressões: esforço no pique (sobrancelha franzida, boca entreaberta), cansaço (boca aberta,
+        /// ofegante), grito e sorriso no gol, careta de dor no chão, protesto, concentração na cobrança.
+        /// Só perto da câmera (de longe, rosto neutro e sem custo).
+        /// </summary>
+        void Expressions()
+        {
+            if (_face == null || !_face.Valid || rig.head == null) return;
+            var cam = view != null && view.bcam != null ? view.bcam.cam : null;
+            if (cam == null || (cam.transform.position - rig.head.position).sqrMagnitude > 34f * 34f) { _face.Neutral(); return; }
+            float dt = Time.deltaTime, t = Time.time + _phaseOff;
+            float spd = p.vel.magnitude;
+            float sprint = Mathf.Clamp01((spd - 5f) / 2.5f), tired = Mathf.Clamp01((0.55f - p.stamina) / 0.4f);
+            float act = anim != null ? anim.ActionWeight : 0f;
+            if (_kickBodyT > 0f || p.windup > 0f) _effortT = 0.6f; else _effortT = Mathf.Max(0f, _effortT - dt);
+            float jaw = 0.08f * Mathf.Max(0f, Mathf.Sin(t * 0.7f)), smile = 0.05f + 0.1f * Mathf.Max(0f, Mathf.Sin(t * 0.23f)), down = 0f, up = 0f;
+            bool shut = false;
+            // corrida: esforço cresce com a velocidade; cansado, boca aberta no ritmo da respiração
+            down = Mathf.Max(down, sprint * 0.65f + Mathf.Clamp01((spd - 3f) / 3f) * 0.2f);
+            jaw = Mathf.Max(jaw, sprint * 0.3f + tired * (0.35f + 0.25f * Mathf.Sin(t * 6.5f)));
+            if (sprint > 0.2f || tired > 0.2f) smile = 0f;
+            // chute/passe forte: dentes cerrados, olhar fixo
+            if (_effortT > 0f) { down = Mathf.Max(down, 0.8f); jaw = Mathf.Min(jaw, 0.12f); smile = 0f; }
+            // comemoração: grito com a boca bem aberta e sorriso
+            if (_celebrate > 0f) { smile = 1f; jaw = 0.55f + 0.35f * Mathf.Abs(Mathf.Sin(t * 3.2f)); down = 0f; up = 0.35f; }
+            // no chão (falta): dor
+            if (p.down > 0f && !p.isKeeper) { down = 1f; jaw = 0.45f + 0.2f * Mathf.Sin(t * 4f); smile = 0f; shut = p.down > 0.6f && Mathf.Sin(t * 1.3f) > 0.2f; }
+            // reclamando com o juiz / pedindo a bola
+            if (_protest > 0.2f) { down = Mathf.Max(down, 0.75f); jaw = Mathf.Max(jaw, 0.4f + 0.25f * Mathf.Abs(Mathf.Sin(t * 5f))); smile = 0f; }
+            // goleiro na defesa: olhos arregalados e boca firme
+            if (p.isKeeper && (p.saveKind > 0 || _gkReady > 0.4f)) { down = Mathf.Max(down, 0.5f); up = 0f; jaw = Mathf.Max(jaw, p.saveKind > 0 ? 0.35f : 0.05f); smile = 0f; }
+            _face.Update(dt, jaw, smile, down, up, shut);
         }
 
         // ------------------------------------------------------------ mãos relaxadas
@@ -36,6 +76,7 @@ namespace Craquez
         // ligação curvamos cada falange na direção da palma (como a mão solta de quem corre) e repomos
         // essa curva a cada quadro.
         Transform[] _fingers;
+        Transform _midL, _midR;
         Quaternion[] _fingerRot;
         static readonly string[] FingerNames = { "index", "middle", "ring", "pinky", "thumb" };
 
@@ -49,6 +90,7 @@ namespace Craquez
                 if (!rig.bones.TryGetValue("hand" + sfx, out var hd)) continue;
                 Transform F(string n) => FindDeep(hd, n);
                 var i1 = F("index_01" + sfx); var p1 = F("pinky_01" + sfx); var m1 = F("middle_01" + sfx); var m2 = F("middle_02" + sfx);
+                if (sfx == "_l") _midL = m1; else _midR = m1;
                 if (i1 == null || p1 == null || m1 == null || m2 == null) continue;
                 var fdir = (m2.position - m1.position).normalized;
                 // normal da palma: o mesmo produto vetorial dá a palma numa mão e as costas na outra (espelho)
@@ -1250,11 +1292,12 @@ namespace Craquez
             _bounce = Mathf.Lerp(walkB, runB, wJ) * W * (1f - Mathf.Max(back, lateral) * 0.6f) * (hasBall ? 0.7f : 1f);
             float uR = _gPhase, uL = Mathf.Repeat(_gPhase + 0.5f, 1f);
             // pelve: gira para o lado da perna que vai à frente; ombros no sentido contrário
-            float pelvisYaw = (HipAt(uR) - HipAt(uL)) * Mathf.Lerp(0.12f, 0.16f, run) * 0.5f;
+            // (andando o quadril quase não gira nem cai de lado: com mais, o atleta parecia "rebolar")
+            float pelvisYaw = (HipAt(uR) - HipAt(uL)) * Mathf.Lerp(0.06f, 0.15f, run) * 0.5f;
             _pose.Rotate(rig.pelvis, Quaternion.AngleAxis(-pelvisYaw * W, up));
             _pose.Rotate(rig.spine, Quaternion.AngleAxis(pelvisYaw * 1.6f * _twist * W, up));
             // queda lateral da pelve (lado da perna em balanço desce um pouco) e inclinação para a frente
-            float drop = (G(uR, 0.25f, 0.12f) - G(uL, 0.25f, 0.12f)) * Mathf.Lerp(3f, 1.5f, run);
+            float drop = (G(uR, 0.25f, 0.12f) - G(uL, 0.25f, 0.12f)) * Mathf.Lerp(1.2f, 1.1f, run);
             _pose.Rotate(rig.pelvis, Quaternion.AngleAxis(drop * W, fwd));
             rig.bones.TryGetValue("spine_01", out var sp1);
             // tronco: trote quase ereto (~2°), corrida rápida ~6°, pique intenso ~12° (o corpo "cai" para a frente)
@@ -1433,6 +1476,7 @@ namespace Craquez
             ProcGait();
             KeeperReady();
             Gait();
+            StillArms();
             ReceiveLeg();
             KickBody();
             FeetFirm();
@@ -1448,6 +1492,38 @@ namespace Craquez
                 var ax = transform.right;
                 _pose.Rotate(th, Quaternion.AngleAxis(-26f * k, ax));
                 _pose.Rotate(cf, Quaternion.AngleAxis(-16f * k, ax));
+            }
+        }
+
+        /// <summary>
+        /// Parado ou quase parado: braços soltos ao lado do corpo, cotovelo quase esticado e mão para
+        /// baixo (a captura deixava os antebraços erguidos, mãos para cima, como quem segura algo).
+        /// </summary>
+        void StillArms()
+        {
+            if (rig.spine == null || p.down > 0f || p.slide > 0f || _celebrate > 0f || seat > 0.3f || _restPose > 0.05f) return;
+            if (p.isKeeper && (p.saveKind > 0 || p.InHands || _gkReady > 0.05f)) return;
+            float act = anim != null ? anim.ActionWeight : 0f;
+            float w = (1f - Mathf.Clamp01((_animSpd - 0.5f) / 0.9f)) * (1f - act) * (1f - _procW);
+            if (w <= 0.01f) return;
+            var right = transform.right;
+            foreach (var sfx in LR)
+            {
+                rig.bones.TryGetValue("upperarm" + sfx, out var ua);
+                rig.bones.TryGetValue("lowerarm" + sfx, out var la);
+                rig.bones.TryGetValue("hand" + sfx, out var hd);
+                if (ua == null || la == null || hd == null) continue;
+                var upper = (la.position - ua.position).normalized;
+                // antebraço ~12° à frente do braço (cotovelo levemente dobrado), mão seguindo o antebraço
+                var want = (Quaternion.AngleAxis(-12f, right) * upper).normalized;
+                _pose.Rotate(la, Quaternion.Slerp(Quaternion.identity, Quaternion.FromToRotation(hd.position - la.position, want), w));
+                // punho neutro: a mão continua a linha do antebraço (nada de mão dobrada para cima)
+                var mid = sfx == "_l" ? _midL : _midR;
+                if (mid != null)
+                {
+                    var fore = (hd.position - la.position).normalized;
+                    _pose.Rotate(hd, Quaternion.Slerp(Quaternion.identity, Quaternion.FromToRotation(mid.position - hd.position, fore), w * 0.85f));
+                }
             }
         }
 
@@ -1631,6 +1707,7 @@ namespace Craquez
             Cloth();
             if (p == null || rig == null || rig.head == null) return;
             HeadAndNeck();
+            Expressions();
             Arms();
             SaveArms();
             KeeperHold();
