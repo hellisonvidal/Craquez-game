@@ -251,6 +251,10 @@ namespace Craquez
             if (_baseFov <= 0f) _baseFov = cam.fieldOfView;
             cam.fieldOfView = _baseFov;
             Move();
+            // plano de corte próximo conforme a distância do assunto: de perto (closes, replay) 0,8 m cortava a
+            // frente da mão mais próxima e sobrava só o contorno escuro — a mão virava um "borrão"
+            float subj = Vector3.Distance(cam.transform.position, cinematic ? cineLook : _focus);
+            cam.nearClipPlane = Mathf.Clamp(subj * 0.06f, 0.08f, 0.8f);
             _baseFov = cam.fieldOfView;
             cam.fieldOfView = FitAspect(_baseFov, cam.aspect);
             UpdateOccluders(cinematic ? cineLook : _focus);

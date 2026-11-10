@@ -6,6 +6,26 @@ namespace Craquez
     public static class Platform
     {
         static int _tv = -1;
+        static string _flavor;
+
+        /// <summary>
+        /// Versão do pacote: "" (celular), "tv" (versão para TV: Craquez TV, 32 e 64 bits, padrões de TV).
+        /// Vem do arquivo Resources/flavor.txt, gravado pelo CI na build da TV.
+        /// </summary>
+        public static string Flavor
+        {
+            get
+            {
+                if (_flavor == null)
+                {
+                    var t = Resources.Load<TextAsset>("flavor");
+                    _flavor = t != null ? t.text.Trim().ToLowerInvariant() : "";
+                }
+                return _flavor;
+            }
+        }
+
+        public static bool TvBuild => Flavor == "tv";
 
         /// <summary>Android TV / Google TV (inclusive caixas 4K): sem tela de toque, jogo com controle.</summary>
         public static bool IsTv
@@ -37,6 +57,9 @@ namespace Craquez
         {
             bool mobile = Application.isMobilePlatform;
             if (!mobile) return quality >= 3 ? 4320 : quality == 2 ? 2160 : 1440;
+            // TV (Google TV 4K, ex.: TCL C6K): desenha em 1080p e o FSR amplia para o 4K do painel; o
+            // processador da TV é de celular intermediário — mais que isso derruba o quadro
+            if (IsTv || TvBuild) return quality >= 2 ? 1440 : quality == 1 ? 1080 : 720;
             return quality >= 3 ? 1440 : quality == 2 ? 1080 : quality == 1 ? 900 : 720;   // (celular: menos pixels = menos calor; o FSR amplia)
         }
     }

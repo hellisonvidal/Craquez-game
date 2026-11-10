@@ -209,6 +209,7 @@ namespace Craquez
             cam.transform.position = pos;
             cam.transform.rotation = Quaternion.LookRotation(_pivot - pos);
             cam.fieldOfView = _fov;
+            cam.nearClipPlane = Mathf.Clamp(Vector3.Distance(pos, _pivot) * 0.06f, 0.05f, 0.8f);
         }
 
         Vector3 FocusPoint()

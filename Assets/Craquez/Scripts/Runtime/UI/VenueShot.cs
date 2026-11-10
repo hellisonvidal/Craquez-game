@@ -67,6 +67,7 @@ namespace Craquez.UI
             for (int i = 0; i < count; i++)
             {
                 while (hold != null && hold()) yield return new WaitForSecondsRealtime(1f);   // (nunca durante a partida)
+                if (i > 2 && Cached(mode, i, teamA) == null) yield return new WaitForSecondsRealtime(0.6f);   // folga para o menu
                 var have = Cached(mode, i, teamA);
                 if (have != null) { each?.Invoke(i, have); continue; }
                 Texture got = null;

@@ -451,6 +451,24 @@ namespace Craquez.Sim
             return Mathf.Abs(p.position.x - gx) < mode.boxDepth + 0.5f && Mathf.Abs(p.position.y) < mode.boxHalf + 0.5f;
         }
 
+        /// <summary>
+        /// Resumo do estado (on-line): posições e velocidades em milímetros, bola, placar e passo. Dois
+        /// aparelhos com o mesmo resumo estão na mesma partida.
+        /// </summary>
+        public int StateHash()
+        {
+            unchecked
+            {
+                int h = (int)2166136261;
+                void Add(int v) { h = (h ^ v) * 16777619; }
+                void V(Vector2 v) { Add(Mathf.RoundToInt(v.x * 1000f)); Add(Mathf.RoundToInt(v.y * 1000f)); }
+                Add(tick); Add(score[0]); Add(score[1]); Add((int)state);
+                V(ball.pos); V(ball.vel); Add(Mathf.RoundToInt(ball.z * 1000f)); Add(ball.owner);
+                foreach (var p in players) { V(p.position); V(p.vel); Add(Mathf.RoundToInt(p.stamina * 1000f)); }
+                return h;
+            }
+        }
+
         void Emit(string type, int team = -1, int id = -1, string kind = null, bool ok = false, float power = 0f, int skill = 0)
         {
             events.Add(new SimEvent { type = type, team = team, id = id, kind = kind, ok = ok, power = power, skill = skill });
@@ -1139,8 +1157,48 @@ namespace Craquez.Sim
                 else if (b == InputFrame.Through) c.helpT = 1.2f;
                 return;
             }
+            // finta de chute: segurando o chute, apertar passe cancela o chute e corta para o lado
+            if (c.charging == InputFrame.Shoot && b == InputFrame.Pass && ball.owner == p.id)
+            {
+                c.charging = 0;
+                c.charge = 0f;
+                FakeShot(p, c.aim);
+                return;
+            }
             c.charging = b;
             c.charge = 0f;
+        }
+
+        /// <summary>
+        /// Finta de chute: arma o chute e, no último instante, puxa a bola para o lado. Quem está à frente
+        /// (e o goleiro, se perto) "compra" a finta e se joga para bloquear — conforme o drible de quem finta
+        /// e a marcação de quem defende.
+        /// </summary>
+        public void FakeShot(SimPlayer p, Vector2 aim)
+        {
+            if (p.skill != Skill.None || p.skillCd > 0f || p.windup > 0f || p.hold > 0f || p.stun > 0f) return;
+            var fwd = p.facing.Norm();
+            var perp = new Vector2(-fwd.y, fwd.x);
+            float side = Vector2.Dot(aim, perp);
+            p.skill = Skill.Corte;
+            p.skillT = 0f;
+            p.skillDir = fwd;
+            p.skillSide = Mathf.Abs(side) > 0.1f ? Mathf.Sign(side) : (rng.Chance(0.5f) ? 1f : -1f);
+            p.skillCd = 0.7f;
+            Emit("skill", p.team, p.id, "fakeshot", skill: (int)Skill.Corte);
+            foreach (var o in players)
+            {
+                if (o.team == p.team || o.sentOff || o.stun > 0f) continue;
+                var to = o.position - p.position;
+                float reach = o.isKeeper ? 9f : 4.5f;
+                if (to.magnitude > reach || Vector2.Dot(to, fwd) < 0f) continue;
+                float chance = 0.35f + 0.4f * p.control - 0.3f * o.defense + (p.Has(Trait.Driblador) ? 0.1f : 0f) + (o.isKeeper ? -0.1f : 0f);
+                if (!rng.Chance(chance)) continue;
+                // compra a finta: trava para bloquear o chute (o goleiro se adianta)
+                o.offBalance = Mathf.Max(o.offBalance, o.isKeeper ? 0.55f : 0.75f);
+                o.vel = o.vel * 0.3f - fwd * (o.isKeeper ? 0.8f : 1.4f);
+                Emit("fooled", o.team, o.id);
+            }
         }
 
         void OnRelease(int t, SimPlayer p, int b)

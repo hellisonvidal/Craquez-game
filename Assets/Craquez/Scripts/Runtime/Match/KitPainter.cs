@@ -96,11 +96,16 @@ namespace Craquez
         /// Textura da peça. Na camisa, number &gt;= 0 pinta o número nas costas (grande) e no peito
         /// (pequeno) direto no tecido: ele dobra e acompanha a camisa (antes era uma placa solta).
         /// </summary>
+        /// <summary>Escudo de cada uniforme (definido pela partida antes de vestir os atletas): vai no peito, do lado esquerdo.</summary>
+        public static readonly Dictionary<Kit, Texture2D> Crests = new Dictionary<Kit, Texture2D>();
+
         public static Texture2D Paint(Mesh mesh, KitPart part, Kit kit, Axes ax, int size, int number = -1)
         {
+            Crests.TryGetValue(kit, out var crest);
+            if (part != KitPart.Shirt) crest = null;
             string baseKey = mesh.GetInstanceID() + ":" + part + Teams.Hex(kit.c1) + Teams.Hex(kit.c2) + Teams.Hex(kit.shorts) + Teams.Hex(kit.socks) + kit.pattern + (kit.sleeves.a > 0f ? Teams.Hex(kit.sleeves) : "") + (kit.trim.a > 0f ? Teams.Hex(kit.trim) : "") + ":" + size;
             if (part != KitPart.Shirt) number = -1;
-            string key = baseKey + (number >= 0 ? "#" + number : "");
+            string key = baseKey + (number >= 0 ? "#" + number : "") + (crest != null ? "@" + crest.GetInstanceID() : "");
             if (_cache.TryGetValue(key, out var cached) && cached != null) return cached;
             var info = Get(mesh);
             float topUp = float.MinValue;
@@ -118,7 +123,7 @@ namespace Craquez
                 _basePx[baseKey] = basePx;
             }
             var px = basePx;
-            if (number >= 0)
+            if (number >= 0 || crest != null)
             {
                 // só os triângulos perto das áreas do número são pintados de novo
                 px = (Color32[])basePx.Clone();
@@ -139,9 +144,23 @@ namespace Craquez
                         if (trim < 0.025f) return col;
                         float aa = 1.2f / size * 3f;
                         NumberUv(p, ax, info.center, topUp, out var uvB, out var uvF);
-                        float aB = NumberCover(number, uvB, aa, out float eB);
-                        float aF = NumberCover(number, uvF, aa * 2.5f, out float eF);
-                        if (busy && uvB.x > -0.12f && uvB.x < 1.12f && uvB.y > -0.08f && uvB.y < 1.08f)
+                        float aB = 0f, aF = 0f, eB = 0f, eF = 0f;
+                        if (number >= 0) { aB = NumberCover(number, uvB, aa, out eB); aF = NumberCover(number, uvF, aa * 2.5f, out eF); }
+                        // escudo bordado no lado esquerdo do peito (com um contorno fino, como um patch)
+                        if (crest != null)
+                        {
+                            Local(p, ax, info.center, topUp, out float rr2, out float dn2, out float ff2);
+                            if (ff2 > 0.02f)
+                            {
+                                float cu = 0.5f - (rr2 + 0.095f) / CrestSize, cv = 1f - (dn2 - 0.12f) / CrestSize;
+                                if (cu >= 0f && cu <= 1f && cv >= 0f && cv <= 1f)
+                                {
+                                    var ce = crest.GetPixelBilinear(cu, cv);
+                                    col = Color.Lerp(col, new Color(ce.r, ce.g, ce.b, 1f), ce.a);
+                                }
+                            }
+                        }
+                        if (busy && number >= 0 && uvB.x > -0.12f && uvB.x < 1.12f && uvB.y > -0.08f && uvB.y < 1.08f)
                         {
                             // placa com cantos arredondados e borda suave
                             float px0 = Mathf.Max(Mathf.Abs(uvB.x - 0.5f) - 0.52f, 0f), py0 = Mathf.Max(Mathf.Abs(uvB.y - 0.5f) - 0.48f, 0f);
@@ -169,7 +188,7 @@ namespace Craquez
             return col;
         }
 
-        const float BackNum = 0.25f, FrontNum = 0.09f;   // tamanho (m) do número nas costas e no peito
+        const float BackNum = 0.25f, FrontNum = 0.09f, CrestSize = 0.085f;   // tamanho (m) do número nas costas e no peito
 
         static void Local(Vector3 p, Axes ax, Vector3 center, float topUp, out float right, out float down, out float fwd)
         {
@@ -187,7 +206,7 @@ namespace Craquez
         {
             Local(p, ax, center, topUp, out float r, out float dn, out float f);
             bool back = f < 0f && Mathf.Abs(r) < BackNum * 0.75f && dn > 0.04f && dn < 0.16f + BackNum * 1.2f;
-            bool front = f > 0f && r > -0.2f && r < 0.02f && dn > 0.06f && dn < 0.3f;
+            bool front = f > 0f && r > -0.2f && r < 0.2f && dn > 0.06f && dn < 0.3f;
             return back || front;
         }
 
@@ -199,7 +218,9 @@ namespace Craquez
             // costas: visto de trás, a direita do atleta fica à direita de quem olha
             if (f < -0.02f) back = new Vector2(0.5f + r / BackNum, 1f - (dn - 0.1f) / BackNum);
             // peito, do lado esquerdo do atleta: visto de frente, a direita dele fica à esquerda de quem olha
-            if (f > 0.02f) front = new Vector2(0.5f - (r + 0.095f) / FrontNum, 1f - (dn - 0.13f) / FrontNum);
+            // peito: o número vai do lado direito do atleta (o escudo fica do lado esquerdo); visto de frente,
+            // a direita dele fica à esquerda de quem olha
+            if (f > 0.02f) front = new Vector2(0.5f - (r - 0.095f) / FrontNum, 1f - (dn - 0.13f) / FrontNum);
         }
 
         static float NumberCover(int n, Vector2 uv, float aa, out float edge)
