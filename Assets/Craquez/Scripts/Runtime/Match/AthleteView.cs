@@ -931,9 +931,9 @@ namespace Craquez
         static readonly float[] HipWalk = { 0f, 24f, 0.15f, 15f, 0.5f, -10f, 0.62f, -6f, 0.75f, 18f, 0.88f, 27f, 1f, 24f };
         static readonly float[] KneeWalk = { 0f, 5f, 0.15f, 17f, 0.4f, 5f, 0.6f, 38f, 0.72f, 60f, 0.88f, 12f, 1f, 5f };
         static readonly float[] HipJog = { 0f, 28f, 0.18f, 6f, 0.38f, -14f, 0.55f, 6f, 0.75f, 34f, 0.88f, 39f, 1f, 28f };
-        static readonly float[] KneeJog = { 0f, 16f, 0.12f, 30f, 0.38f, 18f, 0.55f, 76f, 0.68f, 96f, 0.85f, 40f, 0.95f, 17f, 1f, 16f };
+        static readonly float[] KneeJog = { 0f, 10f, 0.12f, 24f, 0.38f, 11f, 0.55f, 74f, 0.68f, 94f, 0.85f, 36f, 0.95f, 11f, 1f, 10f };   // (apoio mais esticado: corria "sentado")
         static readonly float[] HipSprint = { 0f, 36f, 0.12f, 10f, 0.25f, -18f, 0.45f, 12f, 0.65f, 60f, 0.78f, 68f, 0.9f, 50f, 1f, 36f };
-        static readonly float[] KneeSprint = { 0f, 20f, 0.08f, 30f, 0.25f, 22f, 0.45f, 112f, 0.56f, 124f, 0.75f, 62f, 0.9f, 24f, 1f, 20f };
+        static readonly float[] KneeSprint = { 0f, 14f, 0.08f, 25f, 0.25f, 15f, 0.45f, 110f, 0.56f, 122f, 0.75f, 58f, 0.9f, 18f, 1f, 14f };
 
         /// <summary>Curva por pontos (fase, valor), interpolação suave (Catmull-Rom), periódica.</summary>
         static float Curve(float[] k, float u)
@@ -1039,7 +1039,7 @@ namespace Craquez
             float drop = (G(uR, 0.25f, 0.12f) - G(uL, 0.25f, 0.12f)) * Mathf.Lerp(3f, 1.5f, run);
             _pose.Rotate(rig.pelvis, Quaternion.AngleAxis(drop * W, fwd));
             rig.bones.TryGetValue("spine_01", out var sp1);
-            _pose.Rotate(sp1, Quaternion.AngleAxis((Mathf.Lerp(2f, 7f, run) * (1f - back) + 6f * sprint) * W, right));
+            _pose.Rotate(sp1, Quaternion.AngleAxis((Mathf.Lerp(1.5f, 4.5f, run) * (1f - back) + 3.5f * sprint) * W, right));   // tronco mais ereto
             for (int side = -1; side <= 1; side += 2)
             {
                 string sfx = side < 0 ? "_l" : "_r";
