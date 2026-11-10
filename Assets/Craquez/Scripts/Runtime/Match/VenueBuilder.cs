@@ -741,7 +741,7 @@ namespace Craquez
                     for (float x = -len / 2; x <= len / 2 + 0.1f; x += len / 6f)
                         roof.Cylinder(new Vector3(x, 0, -far - 0.5f), new Vector3(x, ry, -far - 0.5f), 0.35f, 8);
                     // parte de baixo da cobertura recebe a luz refletida do campo (sem breu sobre a torcida)
-                    var gr = roof.Object("Cobertura " + side, Gfx.Lit((style.roofC.a > 0f ? style.roofC : new Color(0.85f, 0.86f, 0.9f)) * 0.55f, null, 0.2f), v.root, true);
+                    var gr = roof.Object("Cobertura " + side, Gfx.Lit((style.roofC.a > 0f ? style.roofC : new Color(0.85f, 0.86f, 0.9f)) * 0.72f, Gfx.MetalSheet(256, 5), 0.35f, 0.35f), v.root, true);
                     gr.transform.localRotation = Quaternion.Euler(0, yaw, 0);
                 }
             }
@@ -784,7 +784,7 @@ namespace Craquez
                         // clara: vista da câmera, virava uma faixa na frente da torcida do canto)
                         float ry = 1.1f + rows * rise + 10f;
                         rk.Box(new Vector3(sxc * (hl + gapX + rows * step * 0.72f), ry, szc * (hw + gapZ + rows * step * 0.72f)), new Vector3(rows * step * 0.62f, 0.4f, rows * step * 0.62f));
-                        rk.Object("Cobertura do canto " + c, Gfx.Lit((style.roofC.a > 0f ? style.roofC : new Color(0.85f, 0.86f, 0.9f)) * 0.55f, null, 0.2f), v.root, true);
+                        rk.Object("Cobertura do canto " + c, Gfx.Lit((style.roofC.a > 0f ? style.roofC : new Color(0.85f, 0.86f, 0.9f)) * 0.72f, Gfx.MetalSheet(256, 5), 0.35f, 0.35f), v.root, true);
                     }
                 }
                 var k = new MeshKit();

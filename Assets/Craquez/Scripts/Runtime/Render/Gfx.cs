@@ -435,6 +435,26 @@ namespace Craquez
             return t;
         }
 
+        /// <summary>Telha metálica ondulada (coberturas): frisos paralelos, emendas das chapas e leve sujeira.</summary>
+        public static Texture2D MetalSheet(int size, int seed)
+        {
+            var t = Tex(size, size);
+            var px = new Color32[size * size];
+            for (int y = 0; y < size; y++)
+                for (int x = 0; x < size; x++)
+                {
+                    float u = x / (float)size, v = y / (float)size;
+                    float rib = Mathf.Sin(u * Mathf.PI * 2f * 24f);
+                    float b = 0.86f + rib * 0.07f + (rib > 0.92f ? 0.06f : 0f);
+                    b += (Fbm(u * 2, v * 2, 2, seed, 3) - 0.5f) * 0.08f;
+                    if (Mathf.Abs(v * 3f - Mathf.Round(v * 3f)) < 0.01f) b *= 0.78f;   // emenda das chapas
+                    px[y * size + x] = new Color(b, b, b * 1.02f, 1f);
+                }
+            t.SetPixels32(px);
+            t.Apply(true);
+            return t;
+        }
+
         /// <summary>
         /// Concreto aparente de estádio (pré-moldado): claro e liso, com variação suave de tom, manchas leves
         /// de chuva escorrendo e as juntas das placas. Antes usava a textura de asfalto (cinza manchado).
