@@ -3,7 +3,7 @@ using UnityEngine;
 
 namespace Craquez.Sim
 {
-    public enum Skill { None, Knock, Drag, Roll, Stepover, Roulette }
+    public enum Skill { None, Knock, Drag, Roll, Stepover, Roulette, Elastico, Pedalada, Chapeu, Caneta, Corte }
 
     [System.Flags]
     public enum Trait
@@ -16,7 +16,11 @@ namespace Craquez.Sim
     public class SimPlayer
     {
         public const float Radius = 0.38f;
-        public static readonly float[] SkillTime = { 0f, 0.25f, 0.5f, 0.42f, 0.55f, 0.62f };
+        public static readonly float[] SkillTime = { 0f, 0.25f, 0.5f, 0.42f, 0.55f, 0.62f, 0.46f, 0.8f, 0.3f, 0.28f, 0.34f };
+        public static readonly string[] SkillNames = { "", "Toque à frente", "Puxada", "Arrastada", "Pedalada simples", "Roleta", "Elástico", "Pedalada", "Chapéu", "Caneta", "Corte" };
+
+        /// <summary>Jogada característica (drible próprio) — só alguns atletas de meio para a frente.</summary>
+        public Skill signature = Skill.None;
 
         public static readonly Dictionary<string, Trait> TraitNames = new Dictionary<string, Trait>
         {

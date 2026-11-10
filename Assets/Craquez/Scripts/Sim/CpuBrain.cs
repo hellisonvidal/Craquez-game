@@ -261,8 +261,17 @@ namespace Craquez.Sim
                     {
                         int kind = Noise(sim, 10) < 0.6f ? sty.favorite : (int)(Noise(sim, 11) * 4.99f);
                         float sd = Vector2.Dot(opp.position - p.position, new Vector2(-p.facing.y, p.facing.x)) > 0f ? -1f : 1f;   // sai pelo lado livre
-                        f.rstick = SkillStick(kind, p.facing, sd, out bool sh);
-                        if (sh) f.buttons |= InputFrame.Shield;
+                        if (p.signature != Skill.None && Noise(sim, 12) < 0.55f)
+                        {
+                            // o drible característico dele (colocado + analógico direito)
+                            f.rstick = new Vector2(-p.facing.y, p.facing.x) * sd;
+                            f.buttons |= InputFrame.Finesse;
+                        }
+                        else
+                        {
+                            f.rstick = SkillStick(kind, p.facing, sd, out bool sh);
+                            if (sh) f.buttons |= InputFrame.Shield;
+                        }
                         _skillCd = (int)Mathf.Lerp(70f, 35f, sty.dribble);
                     }
                     else if (ahead > 0.5f && sty.dribble > 0.55f && Noise(sim, 18) < 0.04f * sty.dribble)

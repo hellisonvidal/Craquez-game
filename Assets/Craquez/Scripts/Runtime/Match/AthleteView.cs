@@ -78,6 +78,7 @@ namespace Craquez
                 case "kick":
                     if (e.kind == "throw") { _throwT = 0.32f; _oneArm = false; _throwLow = false; break; }   // lateral com as mãos
                     if (e.kind == "drop") break;   // goleiro soltou a bola no pé: sem gesto de chute
+                    if (e.kind == "bicycle") { Bicycle(1.2f); break; }
                     if (e.kind == "gkthrow")
                     {
                         // goleiro: um braço só — por cima do ombro, ou rolando rente ao chão
@@ -106,6 +107,16 @@ namespace Craquez
                         case Skill.Roulette: anim.Play("Spin", 0.2f, 0.95f, 1.2f); break;
                         case Skill.Roll: anim.Play(p.skillSide > 0 ? "CutL" : "CutR", 0.2f, 0.7f, 1.3f); break;
                         case Skill.Stepover: anim.Play(p.skillSide > 0 ? "FeintR" : "FeintL", 0.3f, 0.9f, 1.4f); break;
+                        case Skill.Elastico: anim.Play(p.skillSide > 0 ? "CutR" : "CutL", 0.15f, 0.65f, 1.75f); break;
+                        case Skill.Pedalada: anim.Play(p.skillSide > 0 ? "FeintR" : "FeintL", 0.2f, 0.9f, 1.9f); break;
+                        case Skill.Corte: anim.Play(p.skillSide > 0 ? "CutL" : "CutR", 0.15f, 0.7f, 1.5f); break;
+                        case Skill.Chapeu:
+                        case Skill.Caneta:
+                        {
+                            float ctc = AthleteAnimator.KickContact("Pass");
+                            anim.Play("Pass", ctc - 0.06f, 0.55f, 1.5f, 0.04f);
+                            break;
+                        }
                     }
                     break;
                 case "bump":
@@ -228,6 +239,7 @@ namespace Craquez
         /// <summary>Pernas e braços na queda (por cima da animação).</summary>
         void FallLimbs()
         {
+            if (_bikeT > 0f) return;   // (na bicicleta as pernas são dela)
             if (_fallPhase == 0) { _fallW = Mathf.MoveTowards(_fallW, 0f, Time.deltaTime * 4f); if (_fallW <= 0f) return; }
             else _fallW = Mathf.MoveTowards(_fallW, 1f, Time.deltaTime * 8f);
             float u = FallState(out int ph);
@@ -380,6 +392,51 @@ namespace Craquez
         }
 
         /// <summary>Comemoração: pulinhos e braços para cima por alguns segundos.</summary>
+        float _bikeT, _bikeTotal;
+        /// <summary>Bicicleta: o corpo gira para trás no ar em torno do quadril, a perna do chute passa por
+        /// cima da cabeça, a outra encolhe, os braços abrem; cai de costas.</summary>
+        public void Bicycle(float seconds) { _bikeT = _bikeTotal = seconds; }
+        public bool InBicycle => _bikeT > 0f;
+        /// <summary>Fase da bicicleta 0..1 (o contato com a bola é em ~0,35).</summary>
+        float BikeU => _bikeTotal > 0f ? 1f - _bikeT / _bikeTotal : 1f;
+
+        /// <summary>Ângulo do corpo (para trás) e altura do quadril na bicicleta.</summary>
+        Vector2 BikeBody(float u)
+        {
+            // começa já no ar (o contato acontece logo): sobe girando, passa da horizontal, cai de costas
+            float pitch = u < 0.35f ? Mathf.Lerp(-35f, -150f, Mathf.SmoothStep(0f, 1f, u / 0.35f))
+                : u < 0.6f ? Mathf.Lerp(-150f, -120f, (u - 0.35f) / 0.25f)
+                : Mathf.Lerp(-120f, -88f, Mathf.SmoothStep(0f, 1f, (u - 0.6f) / 0.4f));
+            float hip = u < 0.35f ? Mathf.Lerp(1.15f, 1.75f, Mathf.Sin(u / 0.35f * Mathf.PI * 0.5f))
+                : u < 0.75f ? Mathf.Lerp(1.75f, 0.35f, Mathf.SmoothStep(0f, 1f, (u - 0.35f) / 0.4f)) : 0.3f;
+            return new Vector2(pitch, hip);
+        }
+
+        void BicycleLimbs()
+        {
+            if (_bikeT <= 0f || rig == null) return;
+            float u = BikeU;
+            float w = Mathf.Clamp01(Mathf.Min(u / 0.08f, (1f - u) / 0.2f));
+            var right = transform.right;
+            var fwd = transform.forward;
+            // perna do chute (direita) sobe por cima da cabeça e estica; a de apoio dobra para baixo
+            float kick = u < 0.35f ? Mathf.Lerp(-40f, -125f, u / 0.35f) : Mathf.Lerp(-125f, -60f, Mathf.Clamp01((u - 0.35f) / 0.4f));
+            rig.bones.TryGetValue("thigh_r", out var thR); rig.bones.TryGetValue("calf_r", out var cfR);
+            rig.bones.TryGetValue("thigh_l", out var thL); rig.bones.TryGetValue("calf_l", out var cfL);
+            _pose.Rotate(thR, Quaternion.AngleAxis(kick * w, right));
+            _pose.Rotate(cfR, Quaternion.AngleAxis(Mathf.Lerp(40f, 5f, Mathf.Clamp01(u / 0.33f)) * w, right));
+            _pose.Rotate(thL, Quaternion.AngleAxis(-35f * w, right));
+            _pose.Rotate(cfL, Quaternion.AngleAxis(80f * w, right));
+            // braços abertos para os lados (equilíbrio e amortecer a queda)
+            foreach (var sfx in new[] { "_l", "_r" })
+            {
+                rig.bones.TryGetValue("upperarm" + sfx, out var ua);
+                if (ua == null) continue;
+                float sd = Mathf.Sign(Vector3.Dot(ua.position - (rig.spine != null ? rig.spine.position : transform.position), right));
+                _pose.Rotate(ua, Quaternion.AngleAxis(-sd * 65f * w, fwd));
+            }
+        }
+
         public void Celebrate(float seconds) => _celebrate = Mathf.Max(_celebrate, seconds);
         public bool Celebrating => _celebrate > 0f;
 
@@ -447,6 +504,18 @@ namespace Craquez
             {
                 var fb = FallBody(pitch, roll, lift);
                 pitch = fb.x; roll = fb.y; lift = fb.z;
+            }
+            if (_bikeT > 0f)
+            {
+                _bikeT -= Time.deltaTime;
+                var bb = BikeBody(BikeU);
+                pitch = bb.x; roll = 0f;
+                // gira em torno do quadril (0,95 m), não dos pés: o quadril fica na altura da bicicleta
+                var hipL = Vector3.up * 0.95f;
+                var rot = Quaternion.Euler(pitch, _yaw, 0f);
+                var hipW = rot * hipL;
+                pos += new Vector3(-hipW.x, 0f, -hipW.z);
+                lift = bb.y - hipW.y;
             }
             // trombada: o corpo é jogado para longe do contato e volta (mola amortecida); no ombro a
             // ombro em velocidade, os dois inclinam um contra o outro
@@ -1238,6 +1307,7 @@ namespace Craquez
         /// <summary>Pés sempre no chão: depois da animação, alinha o pé mais baixo ao piso.</summary>
         void GroundFeet()
         {
+            if (_bikeT > 0f) return;   // no ar, de cabeça para baixo: nada de prender os pés no chão
             if (rig == null || rig.model == null) return;
             Transform bl = null, br = null;
             rig.bones.TryGetValue("ball_l", out bl);
@@ -1331,6 +1401,7 @@ namespace Craquez
                 Protest();
                 PointArm();
                 HelpUp();
+                BicycleLimbs();
             }
             GroundFeet();
             Cloth();

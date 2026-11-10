@@ -311,6 +311,7 @@ namespace Craquez.Sim
         {
             p.work = Mathf.Clamp01(0.45f + (p.pace - 0.7f) * 0.6f + (p.Has(Trait.Resistencia) ? 0.15f : 0f) + rng.Gauss() * 0.15f + (p.pos == "MF" ? 0.08f : 0f));
             p.flair = Mathf.Clamp01(0.35f + (p.control - 0.7f) * 1.2f + (p.Has(Trait.Driblador) ? 0.25f : 0f) + rng.Gauss() * 0.15f + (p.pos == "FW" ? 0.1f : p.pos == "DF" ? -0.12f : 0f));
+            p.signature = Signature(p, teams[p.team].data);
             p.discipline = Mathf.Clamp01(0.6f + (p.defense - 0.7f) * 0.8f + (p.Has(Trait.Lider) ? 0.15f : 0f) + rng.Gauss() * 0.12f + (p.pos == "DF" ? 0.12f : 0f));
             p.think = Mathf.Clamp(Mathf.Lerp(0.55f, 0.22f, (p.passing + p.control) * 0.5f) + rng.Range(0f, 0.12f), 0.15f, 0.7f);
             p.thinkT = rng.Range(0f, p.think);
@@ -1018,7 +1019,10 @@ namespace Craquez.Sim
             if (p.windup > 0f) p.windupAim = c.aim;
             var rs = f.rstick;
             if (rs.magnitude > 0.7f && c.prevRs.magnitude < 0.45f && ball.owner == p.id && penaltyTeam < 0 && !(kickoffPass && p.id == kickoffKicker) && !(setPiece && p.id == setPieceTaker) && !(throwIn && p.id == throwInTaker))
-                StartSkill(p, rs.normalized);
+            {
+                if (c.finesseHeld) StartSignature(p, rs.normalized);   // colocado + analógico direito: drible característico
+                else StartSkill(p, rs.normalized);
+            }
             c.prevRs = rs;
             if (penaltyTeam >= 0)
             {
@@ -3673,7 +3677,19 @@ namespace Craquez.Sim
                     // toque: a bola sai um pouco à frente (mais no pique e para quem tem menos controle;
                     // andando/trotando fica colada no pé)
                     float slow = Mathf.Clamp01((spd - 1.3f) / 3f);
-                    float lead = o.sprinting ? Mathf.Lerp(0.8f, 0.45f, o.control) : Mathf.Lerp(0.16f, 1f, slow) * Mathf.Lerp(0.4f, 0.24f, o.control);
+                    float lead = o.sprinting ? Mathf.Lerp(0.78f, 0.4f, o.control) : Mathf.Lerp(0.16f, 1f, slow) * Mathf.Lerp(0.36f, 0.2f, o.control);
+                    // às vezes a bola escapa: toque longo no pique ou num corte em velocidade (mais para quem
+                    // tem menos controle, com marcação em cima e no gramado molhado/neve)
+                    var nearH = NearestOpponent(o);
+                    float press = nearH != null ? Mathf.Clamp01(1f - nearH.position.Dist(o.position) / 3f) : 0f;
+                    float heavyP = (1f - o.control) * 0.045f * (o.sprinting ? 1f : 0.25f) * (cut && spd > 4.5f ? 2.2f : 1f)
+                        * (1f + press * 0.8f) * (1f + water * 0.8f + snow * 0.6f) * (o.Has(Trait.Driblador) ? 0.6f : 1f);
+                    if (rng.Chance(heavyP))
+                    {
+                        lead *= rng.Range(2.2f, 3.4f);
+                        sideErr += rng.Range(-0.25f, 0.25f);
+                        Emit("heavytouch", o.team, o.id);
+                    }
                     // marcador perto: toques mais curtos (bola protegida); campo livre: o habilidoso solta mais
                     var near = NearestOpponent(o);
                     if (near != null && near.position.Dist(o.position) < 2.6f) lead *= Mathf.Lerp(0.75f, 0.5f, o.control);
@@ -3824,6 +3840,12 @@ namespace Craquez.Sim
                     if (ball.z < 1.25f && !keeperZone && ball.Speed < 16f && ball.owner < 0 && !nearOwnGoal)
                     {
                         ChestControl(p);
+                        return;
+                    }
+                    // bicicleta: bola entre a cintura e a cabeça, de costas para o gol, perto da área
+                    if (ball.owner < 0 && !keeperZone && ball.z > 1.15f && ball.z < 2.1f && CanBicycle(p))
+                    {
+                        Bicycle(p);
                         return;
                     }
                     // cabeceio: alcance depende da impulsão (atributo de defesa/velocidade e habilidade)
@@ -4000,6 +4022,85 @@ namespace Craquez.Sim
         }
 
         // ------------------------------------------------------------ dribles
+        static readonly HashSet<string> TopLeagues = new HashSet<string> { "bra", "brb", "eng", "esp", "ita", "fra", "por", "arg", "ned", "fbr", "fes" };
+
+        /// <summary>
+        /// Drible característico: só meias e atacantes habilidosos dos clubes brasileiros, das grandes
+        /// ligas e das seleções do topo do ranking; o drible sai do nome (sempre o mesmo para o atleta).
+        /// Brasileiros puxam mais para elástico, pedalada e chapéu.
+        /// </summary>
+        static Skill Signature(SimPlayer p, TeamData t)
+        {
+            if (p.isKeeper || t == null || (p.pos != "MF" && p.pos != "FW")) return Skill.None;
+            bool top = TopLeagues.Contains(t.leagueId) || (t.IsNational && t.rank <= 25);
+            if (!top) return Skill.None;
+            bool skilled = p.Has(Trait.Driblador) || p.control >= 0.8f || (p.flair >= 0.62f && p.control >= 0.74f);
+            if (!skilled) return Skill.None;
+            uint h = 2166136261u;
+            foreach (char ch in p.name) h = (h ^ ch) * 16777619u;
+            bool br = t.country == "BR" || p.nat == "BR" || t.iso == "br";
+            var pool = br ? new[] { Skill.Elastico, Skill.Pedalada, Skill.Chapeu, Skill.Elastico, Skill.Caneta, Skill.Pedalada, Skill.Corte }
+                          : new[] { Skill.Corte, Skill.Caneta, Skill.Pedalada, Skill.Elastico, Skill.Chapeu, Skill.Corte };
+            return pool[(int)(h % (uint)pool.Length)];
+        }
+
+        /// <summary>Drible característico (colocado + analógico direito), ou o corte para quem não tem um.</summary>
+        void StartSignature(SimPlayer p, Vector2 rs)
+        {
+            if (p.skill != Skill.None || p.skillCd > 0f || p.windup > 0f || p.hold > 0f || p.stun > 0f) return;
+            var kind = p.signature != Skill.None ? p.signature : Skill.Corte;
+            var fwd = p.facing.Norm();
+            var perp = new Vector2(-fwd.y, fwd.x);
+            float side = Vector2.Dot(rs, perp);
+            p.skill = kind;
+            p.skillT = 0f;
+            p.skillDir = fwd;
+            p.skillSide = Mathf.Abs(side) > 0.1f ? Mathf.Sign(side) : (rng.Chance(0.5f) ? 1f : -1f);
+            Emit("skill", p.team, p.id, skill: (int)kind);
+            // o marcador da frente: o drible engana ou não (habilidade x marcação; o característico rende mais)
+            SimPlayer def = null; float bd = 99f;
+            foreach (var o in players)
+            {
+                if (o.team == p.team || o.isKeeper || o.stun > 0f || o.sentOff) continue;
+                var to = o.position - p.position;
+                float d = to.magnitude;
+                if (d < 3.6f && Vector2.Dot(to, fwd) > 0f && d < bd) { bd = d; def = o; }
+            }
+            bool own = p.signature == kind;
+            float chance = 0.32f + 0.45f * p.control - 0.3f * (def != null ? def.defense : 0.5f) + (own ? 0.15f : 0f) + (p.Has(Trait.Driblador) ? 0.1f : 0f);
+            if (kind == Skill.Chapeu)
+            {
+                // chapéu: a bola sobe por cima do marcador e cai atrás dele
+                ball.owner = -1;
+                ball.vel = fwd * (4.6f + p.vel.magnitude * 0.6f);
+                ball.vz = 4.3f;
+                ball.z = Mathf.Max(ball.z, 0.15f);
+                ball.lastTouchTeam = p.team; ball.lastTouchId = p.id;
+                p.kickCd = 0.2f; p.kickAnim = 0.3f; p.burst = 0.8f;
+                if (def != null && rng.Chance(chance)) { def.offBalance = 0.8f; Emit("fooled", def.team, def.id); }
+            }
+            else if (kind == Skill.Caneta)
+            {
+                // caneta: a bola passa por entre as pernas do marcador
+                ball.owner = -1;
+                ball.vel = fwd * (6.2f + p.vel.magnitude * 0.5f);
+                ball.lastTouchTeam = p.team; ball.lastTouchId = p.id;
+                p.kickCd = 0.18f; p.kickAnim = 0.22f; p.burst = 0.7f;
+                if (def != null && bd < 2.8f)
+                {
+                    if (rng.Chance(chance)) { def.stun = Mathf.Max(def.stun, 0.45f); def.offBalance = 0.7f; Emit("fooled", def.team, def.id); }
+                    else { ball.vel = (fwd * 0.3f + perp * (rng.Chance(0.5f) ? 1f : -1f)).Norm() * 3f; }   // bateu na perna
+                }
+            }
+            else if (def != null && rng.Chance(chance))
+            {
+                // elástico, pedalada e corte: o marcador vai para o lado errado
+                def.offBalance = kind == Skill.Pedalada ? 0.75f : 0.65f;
+                def.vel += perp * p.skillSide * (kind == Skill.Elastico ? 2.8f : 2.2f);
+                Emit("fooled", def.team, def.id);
+            }
+        }
+
         void StartSkill(SimPlayer p, Vector2 rs)
         {
             if (p.skill != Skill.None || p.skillCd > 0f || p.windup > 0f || p.hold > 0f || p.stun > 0f) return;
@@ -4071,6 +4172,20 @@ namespace Craquez.Sim
                     v = perp * 2.6f * Mathf.Sin(u * Mathf.PI) + fwd * 0.8f;
                     p.facing = fwd.Rotated(-p.skillSide * Mathf.PI * 2f * u);
                     break;
+                case Skill.Elastico:
+                    // corpo vai para um lado com a bola e volta para o outro num estalo
+                    v = fwd * 1.6f + perp * (u < 0.45f ? 1.4f : -4.2f * Mathf.Sin((u - 0.45f) / 0.55f * Mathf.PI * 0.5f));
+                    break;
+                case Skill.Pedalada:
+                    v = fwd * 1.5f + perp * Mathf.Sin(u * Mathf.PI * 3f) * 1.1f;
+                    break;
+                case Skill.Corte:
+                    v = fwd * Mathf.Lerp(2.4f, 1.2f, u) + perp * Mathf.Lerp(-0.6f, 3.6f, Mathf.SmoothStep(0f, 1f, u));
+                    break;
+                case Skill.Chapeu:
+                case Skill.Caneta:
+                    v = fwd * Mathf.Max(p.vel.magnitude, 3f);   // corre atrás da bola
+                    break;
             }
             p.vel = Vector2.Lerp(p.vel, v, Mathf.Min(1f, 18f * DT));
             p.position += p.vel * DT;
@@ -4084,6 +4199,9 @@ namespace Craquez.Sim
                     exit = (fwd - perp * 0.9f).Norm();
                     p.burst = 0.5f;
                 }
+                else if (p.skill == Skill.Elastico) { exit = (fwd - perp * 0.8f).Norm(); p.burst = 0.7f; }
+                else if (p.skill == Skill.Pedalada) { exit = (fwd - perp * 0.7f).Norm(); p.burst = 0.65f; }
+                else if (p.skill == Skill.Corte) { exit = (fwd * 0.5f + perp).Norm(); p.burst = 0.6f; }
                 p.facing = exit;
                 p.vel = exit * Mathf.Max(p.vel.magnitude, 3.2f);
                 p.skill = Skill.None;
@@ -4104,6 +4222,9 @@ namespace Craquez.Sim
                 case Skill.Roll: target = o.position + fwd * 0.35f + perp * Mathf.Lerp(-0.15f, 0.6f, u); break;
                 case Skill.Stepover: target = o.position + fwd * 0.45f; break;
                 case Skill.Roulette: target = o.position + fwd * 0.3f * Mathf.Cos(u * Mathf.PI) + perp * 0.35f * Mathf.Sin(u * Mathf.PI); break;
+                case Skill.Elastico: target = o.position + fwd * 0.4f + perp * (u < 0.45f ? Mathf.Lerp(0f, 0.35f, u / 0.45f) : Mathf.Lerp(0.35f, -0.45f, (u - 0.45f) / 0.55f)); break;
+                case Skill.Pedalada: target = o.position + fwd * 0.5f; break;
+                case Skill.Corte: target = o.position + fwd * 0.35f + perp * Mathf.Lerp(0f, 0.5f, u); break;
             }
             ball.vel = o.vel + (target - ball.pos) * 14f;
             ball.z = 0f;
@@ -4132,6 +4253,47 @@ namespace Craquez.Sim
             passReceiver = p.id;
             passReceiverT = 0.8f;
             Emit("touch", p.team, p.id, "chest");
+        }
+
+        bool CanBicycle(SimPlayer p)
+        {
+            if (p.isKeeper || p.down > 0f || p.stun > 0f) return false;
+            float dir = TeamDir(p.team);
+            var goal = new Vector2(halfLen * dir, 0f);
+            if (ball.pos.Dist(goal) > 17f) return false;
+            float back = Vector2.Dot(p.facing, (goal - p.position).Norm());
+            if (back > -0.25f) return false;   // precisa estar de costas para o gol
+            var c = ctrl[p.team];
+            bool human = c.player == p.id && !(training && p.team == 1);
+            if (human) return c.shootHeld || c.pending == InputFrame.Shoot;
+            // CPU: só os habilidosos arriscam, e nem sempre
+            return p.flair > 0.6f && rng.Chance(0.35f);
+        }
+
+        /// <summary>Bicicleta: chute de costas, por cima da cabeça, em direção ao gol; o atleta cai de costas.</summary>
+        public void Bicycle(SimPlayer p)
+        {
+            float dir = TeamDir(p.team);
+            float aimY = rng.Range(-goalHalf * 0.75f, goalHalf * 0.75f);
+            var to = new Vector2(halfLen * dir, aimY) - ball.pos;
+            var outV = to.Norm().Rotated(rng.Gauss() * (0.09f + 0.08f * (1f - p.shot)));
+            float spd = Mathf.Lerp(17f, 24f, p.shot) * rng.Range(0.9f, 1.05f);
+            ball.vel = outV * spd;
+            float tF = to.magnitude / spd;
+            float hEnd = rng.Range(0.4f, goalH * 0.85f);
+            ball.vz = Mathf.Clamp((hEnd - ball.z + 0.5f * SimBall.G * tF * tF) / Mathf.Max(0.2f, tF), -4f, 6f);
+            ball.spin = rng.Gauss() * 0.6f;
+            ball.owner = -1;
+            ball.lastTouchTeam = p.team;
+            ball.lastTouchId = p.id;
+            lastShotTick = tick;
+            p.kickCd = 0.6f;
+            p.facing = -outV;   // continua de costas
+            p.vel *= 0.3f;
+            p.down = 1.3f;      // cai de costas
+            p.fallKind = 0;
+            ctrl[p.team].pending = 0;
+            Emit("kick", p.team, p.id, "bicycle", power: 1f);
         }
 
         void Header(SimPlayer p)

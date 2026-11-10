@@ -241,6 +241,52 @@ namespace Craquez
                             yield return new WaitForSecondsRealtime(1.5f);
                         }
                     }
+                    // bicicleta (a silhueta da capa): cruzamento, de costas para o gol, contra os refletores
+                    {
+                        float gxB = sim.halfLen;
+                        SimPlayer att = null, gkB = null;
+                        foreach (var q in sim.players) if (q.isKeeper && Mathf.Sign(-sim.halfLen * sim.TeamDir(q.team)) == 1f) gkB = q;
+                        if (gkB != null) foreach (var q in sim.players) if (q.team != gkB.team && !q.isKeeper) { att = q; break; }
+                        if (att != null)
+                        {
+                            foreach (var q in sim.players) if (q != gkB && q != att) q.position = new Vector2(-sim.halfLen * 0.4f, q.position.y * 0.5f);
+                            gkB.position = new Vector2(gxB - 1.2f, 0f); gkB.vel = Vector2.zero; gkB.saveKind = 0;
+                            att.position = new Vector2(gxB - 9f, 0.5f); att.vel = Vector2.zero; att.facing = new Vector2(-1f, 0f);
+                            att.down = 0f; att.stun = 0f; att.kickCd = 1.6f;   // (não cabeceia nem domina antes: a bicicleta é dele)
+                            // cruzamento da esquerda: chega ao atleta a ~1,6 m de altura
+                            var from = new Vector2(gxB - 14f, -9f);
+                            var tgtB = att.position + new Vector2(0.2f, 0f);
+                            float tB = 0.95f;
+                            sim.ball.owner = -1; sim.ball.pos = from; sim.ball.vel = (tgtB - from) / tB; sim.ball.z = 0.4f;
+                            sim.ball.vz = (1.6f - 0.4f + 0.5f * SimBall.G * tB * tB) / tB;
+                            Time.captureFramerate = 30;
+                            bcK.cinematic = true;
+                            // câmera baixa, de lado, olhando para cima: o atleta recortado contra os refletores
+                            bcK.cam.transform.position = bcK.cinePos = new Vector3(gxB - 9.5f, 0.9f, 0.5f - 8.5f);
+                            bcK.cineLook = new Vector3(gxB - 9f, 2.2f, 0.5f);
+                            bcK.cam.transform.LookAt(bcK.cineLook);
+                            bcK.cam.fieldOfView = bcK.cineFov = 44f;
+                            bool kicked = false;
+                            for (int f = 0; f < 54; f++)
+                            {
+                                if (!kicked && sim.ball.pos.Dist(att.position) < 0.9f && sim.ball.z > 0.9f)
+                                {
+                                    kicked = true;
+                                    att.facing = new Vector2(-1f, 0f);
+                                    sim.Bicycle(att);
+                                }
+                                if (!kicked) { att.vel = Vector2.zero; att.facing = new Vector2(-1f, 0f); }
+                                yield return new WaitForEndOfFrame();
+                                var tex = ScreenCapture.CaptureScreenshotAsTexture();
+                                File.WriteAllBytes(Path.Combine(Dir, $"bicicleta_{f:00}.png"), tex.EncodeToPNG());
+                                Destroy(tex);
+                                yield return null;
+                            }
+                            Time.captureFramerate = 0;
+                            bcK.cinematic = false;
+                            yield return new WaitForSecondsRealtime(1.5f);
+                        }
+                    }
                     // gol forçado: bola entrando no canto (rede balançando) e a comemoração sem corte
                     sim.ball.owner = -1;
                     sim.ball.pos = new Vector2(sim.halfLen - 1.2f, 1.5f);
@@ -260,7 +306,7 @@ namespace Craquez
                 // câmeras próximas do jogador (só nas duas primeiras partidas, para não alongar o roteiro)
                 if (mc != null && mc.view != null && (tag == "campo_noite" || tag == "futsal"))
                 {
-                    foreach (var k in new[] { BroadcastCamera.Kind.PlayerSide, BroadcastCamera.Kind.WideClose, BroadcastCamera.Kind.Behind })
+                    foreach (var k in new[] { BroadcastCamera.Kind.Close, BroadcastCamera.Kind.Low, BroadcastCamera.Kind.PlayerSide, BroadcastCamera.Kind.Behind })
                     {
                         mc.view.bcam.mode = (int)k;
                         yield return Shot(tag + "_cam_" + k, 2.5f);
