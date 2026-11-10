@@ -1348,7 +1348,7 @@ namespace Craquez
         static void ProtectionNets(Venue v, float hl, float hw, float zSide)
         {
             float xe = hl + 2.6f, ze = zSide, endH = 7f, sideH = 5.6f, sideY = 1.05f;
-            var netMat = Gfx.Transparent(new Color(0.12f, 0.13f, 0.15f, 0.8f), Gfx.Net(128, 10f, 1.3f));
+            var netMat = Gfx.Transparent(new Color(0.1f, 0.11f, 0.13f, 0.92f), Gfx.Net(128, 12f, 2.4f));   // (fios mais grossos: de longe a tela fina sumia)
             void Panel(MeshKit k, Vector3 a, Vector3 b, float y0, float y1)
             {
                 float len = (b - a).magnitude;
