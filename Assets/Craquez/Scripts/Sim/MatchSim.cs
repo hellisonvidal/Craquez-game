@@ -2019,7 +2019,7 @@ namespace Craquez.Sim
             // caía "sozinha", fora do lance
             // (corpo ~0,3 m de raio: só há encontro de verdade abaixo de ~0,8 m; no carrinho a perna alcança ~1,2 m)
             float contact = offender.position.Dist(victim.position);
-            if (contact > (holding ? 0.95f : 0.8f) + (offender.slide > 0f ? 0.4f : 0f)) return;
+            if (contact > (holding ? 1.0f : 0.9f) + (offender.slide > 0f ? 0.5f : 0f)) return;
             offender.stun = Mathf.Max(offender.stun, 0.8f);
             offender.slide = Mathf.Min(offender.slide, 0.15f);
             // a vítima vai ao chão: tropeça, cai, rola e levanta (o tempo no chão varia com a pancada)
@@ -2041,7 +2041,7 @@ namespace Craquez.Sim
             if (victim.fallTrip) victim.fallKind = 1;
             // sem contato visível (agarrão, ou o infrator a mais de ~1,1 m): ninguém vai ao chão "sozinho" —
             // a vítima é segurada e para (às vezes tropeça e cai sentada, para trás, por pouco tempo)
-            bool far = contact > 0.8f + (offender.slide > 0f ? 0.4f : 0f);
+            bool far = contact > 0.9f + (offender.slide > 0f ? 0.5f : 0f);
             if (holding)
             {
                 if (rng.Chance(0.6f))

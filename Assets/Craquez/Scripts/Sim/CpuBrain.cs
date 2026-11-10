@@ -360,7 +360,7 @@ namespace Craquez.Sim
                 bool gkHold = gkH != null && gkH.team != team && gkH.isKeeper && gkH.hold > 0f;
                 if (gkHold)
                 {
-                    var outward = new Vector2(-sim.TeamDir(gkH.team), 0f);
+                    var outward = new Vector2(sim.TeamDir(gkH.team), 0f);   // (do gol do goleiro para o meio do campo)
                     target = new Vector2(gkH.position.x + outward.x * (sim.mode.boxDepth + 3f), Mathf.Clamp(p.position.y, -sim.halfW * 0.6f, sim.halfW * 0.6f));
                 }
                 var to = target - p.position;
