@@ -591,6 +591,9 @@ namespace Craquez
                         }
                         if (v > 0.6f && v < 0.7f && Mathf.Abs(u) < 0.12f) c = skin * 0.85f;                                    // pescoço
                         if (new Vector2(u * 1.3f, (v - 0.8f) * 1.0f).magnitude < 0.2f) c = (v > 0.86f ? hair : skin) * (u < 0f ? 1f : 0.9f);   // cabeça
+                        // rosto: olhos e boca (de longe, só pontinhos escuros — mas a cabeça deixa de ser um disco liso)
+                        if (v > 0.795f && v < 0.83f && Mathf.Abs(Mathf.Abs(u) - 0.06f) < 0.025f) c = new Color(0.08f, 0.06f, 0.05f);
+                        if (v > 0.735f && v < 0.755f && Mathf.Abs(u) < 0.05f && Hash(i, 18, seed) > 0.3f) c = new Color(0.25f, 0.1f, 0.08f);
                         if (cap && v > 0.88f && v < 0.99f && Mathf.Abs(u) < 0.17f + (v < 0.9f && u > 0f ? 0.1f : 0f)) c = shirt2 * 0.9f;   // boné
                         if (armsUp && v > 0.45f && v < 1.08f && Mathf.Abs(Mathf.Abs(u) - 0.42f + (v - 0.45f) * 0.25f) < 0.08f) c = v > 0.98f ? skin : shirt * 0.88f;
                         if (scarfUp)

@@ -31,22 +31,6 @@ namespace Craquez
         Image _bg;
         MatchController _match, _attract;
 
-        /// <summary>
-        /// Fotos dos estádios prontas antes de abrir o seletor: monta uma por vez nos menus (nunca durante
-        /// a partida) e salva no aparelho — nas próximas vezes saem do disco na hora.
-        /// </summary>
-        System.Collections.IEnumerator PrewarmVenues()
-        {
-            yield return new WaitForSecondsRealtime(5f);
-            int n = VenueBuilder.StadiumModels.Length;
-            for (int i = 1; i < n; i++)
-            {
-                while (_match != null) yield return new WaitForSecondsRealtime(2f);
-                if (VenueShot.Cached(GameModes.Field, i, 0) != null) continue;
-                yield return VenueShot.Render(GameModes.Field, i, 0, 1, 5, null);
-                yield return new WaitForSecondsRealtime(0.4f);
-            }
-        }
         System.Action _back;
         readonly MatchConfig _cfg = new MatchConfig();
         System.Action _refreshVenue;
@@ -659,6 +643,7 @@ namespace Craquez
         }
 
         string _lastMode;
+        readonly Dictionary<string, Texture2D> _venueArt = new Dictionary<string, Texture2D>();
         readonly Dictionary<string, Button> _modeButtons = new Dictionary<string, Button>();
 
         /// <summary>Depois da modalidade: clubes ou seleções (dois cartões com escudos e bandeiras).</summary>
@@ -854,40 +839,19 @@ namespace Craquez
                 // (o desenho 2D do local não é mais usado)
                 // foto de verdade do local, de fora (montada fora da vista na primeira vez; até lá, o desenho)
                 // só a foto de verdade do local (o desenho antigo não aparece mais); enquanto monta, fundo neutro
-                var shot = VenueShot.Cached(_cfg.mode, vi, _cfg.teamA);
-                venueImg.texture = shot != null ? shot : Texture2D.whiteTexture;
-                venueImg.color = shot != null ? Color.white : new Color(0.08f, 0.11f, 0.2f);
-                if (venueLoading != null) venueLoading.gameObject.SetActive(shot == null);
-                if (shot == null)
-                {
-                    string modeAt = _cfg.mode;
-                    StartCoroutine(VenueShot.Render(_cfg.mode, vi, _cfg.teamA, _cfg.teamB, _cfg.streetPlayers, tex =>
-                    {
-                        if (tex != null && venueImg != null && _cfg.mode == modeAt && VenueIdx() == vi)
-                        {
-                            venueImg.texture = tex;
-                            venueImg.color = Color.white;
-                            if (venueLoading != null) venueLoading.gameObject.SetActive(false);
-                        }
-                    }));
-                }
+                // desenho 2D do local (rápido e mais bonito que a foto 3D, que montava o estádio inteiro e
+                // deixava o jogo pesado); um por local, guardado na memória
+                string vkey = _cfg.mode + "/" + vi + "/" + (home != null ? Teams.Hex(home.c1) : "");
+                if (!_venueArt.TryGetValue(vkey, out var art) || art == null)
+                    _venueArt[vkey] = art = MenuArt.Venue(_cfg.mode, vi, home != null ? home.c1 : Color.white, 960, 540);
+                venueImg.texture = art;
+                venueImg.color = Color.white;
+                if (venueLoading != null) venueLoading.gameObject.SetActive(false);
                 venueName.text = _cfg.mode != GameModes.Field ? VenueNames(_cfg.mode)[_cfg.venue % VenueNames(_cfg.mode).Length]
                     : _cfg.stadium > 0 ? VenueBuilder.StadiumModels[_cfg.stadium].name
                     : (home != null && !string.IsNullOrEmpty(home.stadium.name) ? home.stadium.name : "Estádio do mandante");
             };
             _refreshVenue();
-            {
-                string modeAt = _cfg.mode;
-                StartCoroutine(VenueShot.Prewarm(_cfg.mode, VenueCount(), _cfg.teamA, _cfg.teamB, _cfg.streetPlayers, (i, tex) =>
-                {
-                    if (tex != null && venueImg != null && _cfg.mode == modeAt && VenueIdx() == i && venueImg.texture != tex)
-                    {
-                        venueImg.texture = tex;
-                        venueImg.color = Color.white;
-                        if (venueLoading != null) venueLoading.gameObject.SetActive(false);
-                    }
-                }, () => _match != null));
-            }
             var holder = UiKit.Image(card, Color.white, Theme.Circle, "bola").rectTransform.At(0, 0, 112, 112, 26, 110);
             holder.gameObject.AddComponent<Mask>().showMaskGraphic = false;
             var ballImg = UiKit.Rect(holder, "tex").Place(0, 0, 1, 1).gameObject.AddComponent<RawImage>();

@@ -61,7 +61,7 @@ namespace Craquez
         {
             "Entre Prédios", "Morro", "Praia", "Terraço", "Gaiola", "Telhado", "Sob o Viaduto", "Praça",
             "Beco Grafitado", "Quadra do Conjunto", "Estacionamento", "Campinho de Terra", "Porto", "Vila Colorida",
-            "Linha do Trem",
+            "Linha do Trem", "Quadrão do Conjunto", "Várzea de Terra", "Arena da Vila",
         };
 
         // ------------------------------------------------------------------ campo
@@ -466,7 +466,9 @@ namespace Craquez
                         float t0 = i / (float)seg * Mathf.PI * 2f, t1 = (i + 1) / (float)seg * Mathf.PI * 2f;
                         var d0 = va * (Mathf.Cos(t0) * ra) + vb * (Mathf.Sin(t0) * rb);
                         var d1 = va * (Mathf.Cos(t1) * ra) + vb * (Mathf.Sin(t1) * rb);
-                        kk.Quad(a0 + d0, a0 + d1, a1 + d1, a1 + d0);
+                        // face sempre para fora do tubo (antes, num dos gols, o tubo ficava "do avesso":
+                        // só o contorno escuro aparecia e a trave ficava preta)
+                        kk.QuadOut(a0 + d0, a0 + d1, a1 + d1, a1 + d0, (d0 + d1).normalized, Vector2.zero, Vector2.one);
                     }
                 }
                 var depthAx = new Vector3(s, 0f, 0f);
@@ -541,7 +543,7 @@ namespace Craquez
                 if (futsal) ks.Object("Trave (faixas)", stripeMat, v.root);
                 if (withNets)
                 {
-                    var net = GoalNet.Create(v.root, gx, s, gw, gh, gd, netTex, street ? new Color(0.95f, 0.55f, 0.15f, 1f) : Color.white);
+                    var net = GoalNet.Create(v.root, gx, s, gw, gh, gd, netTex, street ? new Color(0.95f, 0.55f, 0.15f, 1f) : Color.white, stanchions ? gh + r : 0f);
                     v.nets.Add(net);
                 }
             }
@@ -595,7 +597,7 @@ namespace Craquez
             // torcedores em pé: silhuetas recortadas sobre cada fileira (dá volume à arquibancada)
             bool striped = homeKit.pattern == 1 || homeKit.pattern == 5 || homeKit.pattern == 2;
             int pseed = (int)(home.name.GetHashCode() & 0xFFFF) + 1;
-            int pwT = quality >= 2 ? 2048 : 1024, phT = quality >= 1 ? 96 : 64;
+            int pwT = quality >= 1 ? 2048 : 1024, phT = quality >= 1 ? 128 : 80;   // (mais nítido: de longe pareciam quadrados coloridos)
             var people = Gfx.CrowdPeople(pwT, phT, homeKit.c1, homeKit.c2, awayKit.c1, pseed, 0f, striped, share);
             var cheerTex = Gfx.CrowdPeople(pwT, phT, homeKit.c1, homeKit.c2, awayKit.c1, pseed, 1f, striped, share);
             bool stripedA = awayKit.pattern == 1 || awayKit.pattern == 5 || awayKit.pattern == 2;
@@ -671,7 +673,7 @@ namespace Craquez
                 // fileiras da frente: torcedores em 3D (modelados, pulando e erguendo os braços por bloco);
                 // as de trás seguem com as silhuetas (economiza no celular)
                 // todas as fileiras em 3D (no celular mais fraco, até 16; o resto com silhuetas)
-                int front3d = Mathf.Min(rows, quality >= 2 ? rows : quality >= 1 ? 26 : 16);
+                int front3d = Mathf.Min(rows, quality >= 2 ? rows : quality >= 1 ? 26 : 16);   // (32 pesava no carregamento da partida)
                 {
                     var fanGroups = new List<List<FanCrowd.Spot>>();
                     var frng = new System.Random(pseed * 13 + side * 101);
@@ -1791,6 +1793,9 @@ namespace Craquez
         {
             variant = Mathf.Abs(variant) % StreetNames.Length;
             var v = new Venue { root = new GameObject("Rua").transform, name = StreetNames[variant] };
+            // ruas com gol grande e goleiro: o cenário segue uma rua parecida (quadra do conjunto, campinho
+            // de terra, vila colorida), com o gol de futsal e a área pintada
+            if (variant >= 15) variant = new[] { 9, 11, 13 }[Mathf.Clamp(variant - 15, 0, 2)];
             v.root.SetParent(parent, false);
             float hl = sim.halfLen, hw = sim.halfW;
             var rng = new System.Random(variant * 97 + 3);
@@ -1826,6 +1831,18 @@ namespace Craquez
             lines.Strip(new Vector3(hl, 0, -hw), new Vector3(hl, 0, hw), lw);
             lines.Strip(new Vector3(0, 0, -hw), new Vector3(0, 0, hw), lw);
             lines.Arc(Vector3.zero, sim.mode.centerR, lw, 0, Mathf.PI * 2, 40);
+            if (sim.mode.keeper)
+            {
+                // área do goleiro pintada (rua com gol grande)
+                float bd = sim.mode.boxDepth, bh2 = sim.mode.boxHalf;
+                foreach (float sx in new[] { -1f, 1f })
+                {
+                    float ax0 = sx * hl, ax1 = sx * (hl - bd);
+                    lines.Strip(new Vector3(ax0, 0, -bh2), new Vector3(ax1, 0, -bh2), lw);
+                    lines.Strip(new Vector3(ax0, 0, bh2), new Vector3(ax1, 0, bh2), lw);
+                    lines.Strip(new Vector3(ax1, 0, -bh2), new Vector3(ax1, 0, bh2), lw);
+                }
+            }
             lines.Disc(Vector3.zero, 0.14f, 10);
             // áreas em meia-lua e marca do pênalti (como numa quadra de verdade)
             float areaR = Mathf.Min(3f, hw * 0.45f);
@@ -2111,7 +2128,9 @@ namespace Craquez
         float _side;
         float _hitT = 1f;   // (> 0: simula a rede desde o começo)
 
-        public static GoalNet Create(Transform parent, float gx, float side, float gw, float gh, float gd, Texture2D netTex, Color? tint = null)
+        /// <param name="curveH">gols com suportes curvos (campo, society): altura da curva — a rede segue o mesmo
+        /// quarto de elipse dos suportes (antes descia reta e ficava por dentro da armação). 0 = gol em caixa.</param>
+        public static GoalNet Create(Transform parent, float gx, float side, float gw, float gh, float gd, Texture2D netTex, Color? tint = null, float curveH = 0f)
         {
             var go = new GameObject("Rede");
             go.transform.SetParent(parent, false);
@@ -2122,13 +2141,19 @@ namespace Craquez
             // malha mais fina (a bola, de 22 cm, passava entre os nós e a rede não a envolvia)
             int nx = 30, ny = 13;
             float x0 = gx, x1 = gx + side * gd;
+            // profundidade do fundo da rede em cada altura: reta (gol em caixa) ou curva (suportes curvos)
+            float topD = curveH > 0f ? gd * Mathf.Sqrt(Mathf.Max(0f, 1f - (gh / curveH) * (gh / curveH))) : gd * 0.35f;
+            topD = Mathf.Max(topD, gd * 0.12f);
+            float BackX(float y) => curveH > 0f
+                ? x0 + side * Mathf.Max(topD, gd * Mathf.Sqrt(Mathf.Max(0f, 1f - (y / curveH) * (y / curveH))))
+                : Mathf.Lerp(x1, x0 + side * gd * 0.35f, y / gh);
             // fundo (inclinado), teto e laterais em grade
             for (int i = 0; i < nx; i++)
                 for (int j = 0; j < ny; j++)
                 {
                     float z0 = -gw + 2 * gw * i / nx, z1 = -gw + 2 * gw * (i + 1) / nx;
                     float y0 = gh * j / ny, y1 = gh * (j + 1) / ny;
-                    float bx0 = Mathf.Lerp(x1, x0 + side * gd * 0.35f, y0 / gh), bx1 = Mathf.Lerp(x1, x0 + side * gd * 0.35f, y1 / gh);
+                    float bx0 = BackX(y0), bx1 = BackX(y1);
                     // a rede cede um pouco para trás no meio (caimento natural)
                     float sg0 = Mathf.Sin(Mathf.PI * i / nx) * Mathf.Sin(Mathf.PI * y0 / gh) * 0.12f, sg1 = Mathf.Sin(Mathf.PI * (i + 1) / nx) * Mathf.Sin(Mathf.PI * y1 / gh) * 0.12f;
                     float sg01 = Mathf.Sin(Mathf.PI * i / nx) * Mathf.Sin(Mathf.PI * y1 / gh) * 0.12f, sg10 = Mathf.Sin(Mathf.PI * (i + 1) / nx) * Mathf.Sin(Mathf.PI * y0 / gh) * 0.12f;
@@ -2138,14 +2163,14 @@ namespace Craquez
             for (int i = 0; i < nx; i++)
             {
                 float z0 = -gw + 2 * gw * i / nx, z1 = -gw + 2 * gw * (i + 1) / nx;
-                k.Quad(new Vector3(x0, gh, z0), new Vector3(x0 + side * gd * 0.35f, gh, z0), new Vector3(x0 + side * gd * 0.35f, gh, z1), new Vector3(x0, gh, z1),
-                    new Vector2(0, z0) / 0.9f, new Vector2(gd * 0.35f, z1) / 0.9f);
+                k.Quad(new Vector3(x0, gh, z0), new Vector3(x0 + side * topD, gh, z0), new Vector3(x0 + side * topD, gh, z1), new Vector3(x0, gh, z1),
+                    new Vector2(0, z0) / 0.9f, new Vector2(topD, z1) / 0.9f);
             }
             foreach (float zs in new[] { -gw, gw })
                 for (int j = 0; j < ny; j++)
                 {
                     float y0 = gh * j / ny, y1 = gh * (j + 1) / ny;
-                    float bx0 = Mathf.Lerp(x1, x0 + side * gd * 0.35f, y0 / gh), bx1 = Mathf.Lerp(x1, x0 + side * gd * 0.35f, y1 / gh);
+                    float bx0 = BackX(y0), bx1 = BackX(y1);
                     k.Quad(new Vector3(x0, y0, zs), new Vector3(x0, y1, zs), new Vector3(bx1, y1, zs), new Vector3(bx0, y0, zs),
                         new Vector2(0, y0) / 0.9f, new Vector2(gd, y1) / 0.9f);
                 }
@@ -2272,7 +2297,7 @@ namespace Craquez
                 float d2 = (_rest[i] - hit).sqrMagnitude;
                 float w = Mathf.Exp(-d2 * 2.2f) + 0.25f * Mathf.Exp(-d2 * 0.35f);
                 var radial = _rest[i] - hit; radial.x = 0f;
-                _vel[i] += (new Vector3(_side * 5.2f, 0.6f, 0f) + radial * 0.9f) * (w * k);
+                _vel[i] += (new Vector3(_side * 6.5f, 0.8f, 0f) + radial * 1.1f) * (w * k);   // (estufa mais e balança mais)
             }
             _awake = 5f;
         }

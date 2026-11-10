@@ -160,6 +160,52 @@ namespace Craquez
         static void Accessories(AthleteRig rig, Look look, Kit kit, bool keeper, bool captain, int quality)
         {
             Transform B(string n) => rig.bones.TryGetValue(n, out var t) ? t : null;
+            // travas da chuteira de campo (no futsal e na quadra, tênis de sola lisa): 2 no calcanhar e 4 na
+            // frente, presas ao osso do pé e ao da ponta (acompanham a passada)
+            if (!IndoorShoes && quality >= 1)
+            {
+                int di = ((look.boots % BootPainter.Designs.Length) + BootPainter.Designs.Length) % BootPainter.Designs.Length;
+                var studMat = Gfx.Lit(BootPainter.Designs[di].studs, null, 0.5f, 0.3f);
+                foreach (var sfx in new[] { "_l", "_r" })
+                {
+                    var ft = B("foot" + sfx); var ball = B("ball" + sfx);
+                    if (ft == null || ball == null) continue;
+                    var along = ball.position - ft.position; along.y = 0f;
+                    if (along.sqrMagnitude < 1e-4f) continue;
+                    var fwd = along.normalized;
+                    var lat = Vector3.Cross(Vector3.up, fwd);
+                    // altura da sola: o ponto mais baixo da malha da chuteira (pose de ligação)
+                    float sole = ft.position.y - 0.08f;
+                    foreach (var br in rig.GetComponentsInChildren<SkinnedMeshRenderer>(true))
+                        if (br.name == "Boots" && br.sharedMesh != null)
+                        {
+                            var bb = br.sharedMesh.bounds;
+                            float mnY = float.MaxValue;
+                            for (int cx = -1; cx <= 1; cx += 2) for (int cy = -1; cy <= 1; cy += 2) for (int cz = -1; cz <= 1; cz += 2)
+                                mnY = Mathf.Min(mnY, br.transform.TransformPoint(bb.center + Vector3.Scale(bb.extents, new Vector3(cx, cy, cz))).y);
+                            sole = mnY + 0.004f;
+                        }
+                    var heelK = new MeshKit();
+                    var frontK = new MeshKit();
+                    var heelC = ft.position - fwd * 0.045f; heelC.y = sole;
+                    foreach (float sd in new[] { -1f, 1f })
+                    {
+                        var hp = heelC + lat * sd * 0.022f;
+                        heelK.Cylinder(hp, hp - Vector3.up * 0.009f, 0.0065f, 6);
+                    }
+                    var bc = ball.position; bc.y = sole;
+                    foreach (float off in new[] { -0.03f, 0.022f })
+                        foreach (float sd in new[] { -1f, 1f })
+                        {
+                            var fp = bc + fwd * off + lat * sd * (off < 0f ? 0.03f : 0.022f);
+                            frontK.Cylinder(fp, fp - Vector3.up * 0.009f, 0.006f, 6);
+                        }
+                    var hg = heelK.Object("Travas (calcanhar)" + sfx, studMat, null, false);
+                    hg.transform.SetParent(ft, true);
+                    var fg = frontK.Object("Travas (frente)" + sfx, studMat, null, false);
+                    fg.transform.SetParent(ball, true);
+                }
+            }
             foreach (var sfx in new[] { "_l", "_r" })
             {
                 var up = B("upperarm" + sfx); var lo = B("lowerarm" + sfx); var hd = B("hand" + sfx);
@@ -240,6 +286,7 @@ namespace Craquez
                     case "Socks":
                     {
                         var part = n == "Shirt" ? KitPart.Shirt : n == "Shorts" ? KitPart.Shorts : KitPart.Socks;
+                        smr.sharedMesh = SmoothNormals(smr.sharedMesh);
                         // a camisa leva o número pintado (uma textura por atleta; no Ultra em 1024)
                         int size = part == KitPart.Socks ? tex / 2 : part == KitPart.Shirt ? (quality >= 3 ? 1024 : 512) : tex;
                         var kt = KitPainter.Paint(smr.sharedMesh, part, kit, axes, size, part == KitPart.Shirt ? number : -1);
@@ -299,6 +346,33 @@ namespace Craquez
         }
 
         static readonly Dictionary<Mesh, Mesh> _smoothBoots = new Dictionary<Mesh, Mesh>();
+        static readonly Dictionary<Mesh, Mesh> _smoothN = new Dictionary<Mesh, Mesh>();
+
+        /// <summary>
+        /// Peça de roupa com normais contínuas: os vértices repetidos nas costuras de UV ganham a mesma
+        /// normal (média). Antes cada costura virava uma "quina" no sombreado em faixas do cel shading — o
+        /// uniforme parecia feito de blocos encaixados (peito estufado, barriga dobrada).
+        /// </summary>
+        static Mesh SmoothNormals(Mesh src)
+        {
+            if (src == null) return null;
+            if (_smoothN.TryGetValue(src, out var have) && have != null) return have;
+            var m = Object.Instantiate(src);
+            m.name = src.name;
+            var v = m.vertices;
+            var nr = m.normals;
+            if (nr == null || nr.Length != v.Length) { m.RecalculateNormals(); nr = m.normals; }
+            var sum = new Dictionary<Vector3Int, Vector3>();
+            for (int i = 0; i < v.Length; i++)
+            {
+                var k = Vector3Int.RoundToInt(v[i] * 5000f);
+                sum[k] = (sum.TryGetValue(k, out var a) ? a : Vector3.zero) + nr[i];
+            }
+            for (int i = 0; i < v.Length; i++) nr[i] = sum[Vector3Int.RoundToInt(v[i] * 5000f)].normalized;
+            m.normals = nr;
+            _smoothN[src] = m;
+            return m;
+        }
 
         /// <summary>
         /// Chuteira arredondada: suavização de Taubin (alisa as quinas sem encolher a peça) nos vértices
