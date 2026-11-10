@@ -309,7 +309,7 @@ namespace Craquez
         public void OnVictimFoul() { }
 
         // ------------------------------------------------------------ queda (falta)
-        const float FallStumble = 0.16f, FallDrop = 0.42f, FallRise = 0.75f;
+        const float FallStumble = 0.16f, FallDrop = 0.42f, FallRise = 1.1f;   // (levantar: senta, apoia um joelho e fica de pé)
         float _fallW, _fallSide = 1f;
         int _fallPhase;   // 0 em pé, 1 tropeço, 2 caindo, 3 no chão, 4 levantando
 
@@ -427,6 +427,12 @@ namespace Craquez
             Leg(other, otherThigh, otherCalf);
             // tronco curva um pouco no chão (encolhido)
             if (ph == 3 && rig.spine != null) _pose.Rotate(rig.spine, Quaternion.AngleAxis(18f * _fallW, right));
+            // alguém veio dar a mão (companheiro, adversário ou o juiz): no fim do tempo no chão e ao levantar,
+            // a mão do lado dele sobe até a mão de quem ajuda e o corpo é puxado junto
+            var helper = Helper();
+            Transform helperHand = null;
+            if (helper != null && (ph == 4 || (ph == 3 && u > 0.55f)) && helper.rig != null)
+                helper.rig.bones.TryGetValue("hand_r", out helperHand);
             // braços: amortecem a queda (à frente ou atrás) e, no chão, uma mão vai à perna
             Transform knee = null;
             rig.bones.TryGetValue("calf" + hurt, out knee);
@@ -451,11 +457,27 @@ namespace Craquez
                 }
                 else if (fwd > 0f) dir = (transform.forward * 0.9f + transform.up * 0.35f + right * s * 0.35f).normalized;  // mãos à frente
                 else dir = (-transform.forward * 0.7f - transform.up * 0.4f + right * s * 0.6f).normalized;             // mãos atrás
+                if (helperHand != null)
+                {
+                    // o braço do lado de quem ajuda vai na mão dele (o outro apoia no chão)
+                    float hs = Mathf.Sign(Vector3.Dot(helperHand.position - (rig.spine != null ? rig.spine.position : transform.position), right));
+                    if (hs == s) dir = (helperHand.position - up.position).normalized;
+                }
                 var cur = lo.position - up.position;
                 _pose.Rotate(up, Quaternion.Slerp(Quaternion.identity, Quaternion.FromToRotation(cur, dir), _fallW * 0.85f));
                 var cur2 = hd.position - lo.position;
                 _pose.Rotate(lo, Quaternion.Slerp(Quaternion.identity, Quaternion.FromToRotation(cur2, dir), _fallW * 0.6f));
             }
+        }
+
+        /// <summary>Quem está dando a mão para este atleta levantar (perto), se houver.</summary>
+        AthleteView Helper()
+        {
+            var r = view.Referee;
+            if (r != null && r.p != null && r.p.helping == p.id && r.p.position.Dist(p.position) < 1.6f) return r;
+            foreach (var a in view.athletes)
+                if (a != null && a != this && a.p != null && a.p.helping == p.id && a.p.position.Dist(p.position) < 1.6f) return a;
+            return null;
         }
 
         /// <summary>Árbitro: direção para onde aponta (zero = braços normais).</summary>
@@ -513,7 +535,8 @@ namespace Craquez
             if (up == null || lo == null || hd == null) return;
             // a mão vai até a altura da mão de quem está no chão e sobe junto quando ele levanta
             float rise = v.downTotal > 0f ? Mathf.Clamp01(1f - v.down / Mathf.Min(0.9f, v.downTotal * 0.35f)) : 0f;
-            var target = W(v.position) + Vector3.up * Mathf.Lerp(0.45f, 1.0f, rise);
+            // (mira a mão de quem está no chão, que sobe na direção dela)
+            var target = W(v.position) + Vector3.up * Mathf.Lerp(0.5f, 1.05f, rise) + (transform.position - W(v.position)).normalized * 0.25f;
             if (sp1 != null) _pose.Rotate(sp1, Quaternion.AngleAxis(Mathf.Lerp(28f, 8f, rise) * _help, transform.right));
             var dir = (target - up.position).normalized;
             _pose.Rotate(up, Quaternion.Slerp(Quaternion.identity, Quaternion.FromToRotation(lo.position - up.position, dir), _help));
@@ -856,10 +879,17 @@ namespace Craquez
                     lift = -0.03f * k;
                     break;
                 }
-                case 6:   // salto no alto: no ponto mais alto quando a bola chega
-                    lift = Mathf.Sin(Mathf.Clamp01(u / (cu * 2f)) * Mathf.PI) * 0.45f;
-                    pitch = -6f;
+                case 6:   // salto no alto: agacha, sobe e está no ponto mais alto quando a bola chega; desce e amortece
+                {
+                    float top = Mathf.Max(0.1f, cu);
+                    float crouch = u < top * 0.3f ? Mathf.Sin(u / (top * 0.3f) * Mathf.PI) : 0f;
+                    float air = Mathf.Sin(Mathf.Clamp01((u - top * 0.2f) / (top * 1.6f)) * Mathf.PI);
+                    float landK = u > top * 1.6f ? Mathf.Sin(Mathf.Clamp01((u - top * 1.6f) / 0.3f) * Mathf.PI) : 0f;
+                    lift = air * 0.5f - crouch * 0.12f - landK * 0.1f;
+                    pitch = -8f * air + 10f * crouch + 8f * landK;
+                    roll = -_saveSideV * 6f * air;
                     break;
+                }
                 default:  // encaixe de frente: corpo atrás da bola, joelhos flexionados e inclinado para o lado dela
                 {
                     float k = Smooth(u / 0.3f);
@@ -926,7 +956,7 @@ namespace Craquez
                 // ponte: a perna de baixo (a do impulso) estica; a de cima sobe com o joelho no impulso
                 // (como quem empurra o corpo para o lado) e depois acompanha o voo, um pouco dobrada
                 float drive = p.saveKind > 0 && _saveKindV != 2 ? Mathf.Sin(Mathf.Clamp01(_saveU / (cuL * 1.3f)) * Mathf.PI) : 0f;
-                string top = _saveSideV > 0 ? "_l" : "_r";
+                string top = LegOnSide(-_saveSideV);
                 rig.bones.TryGetValue("thigh" + top, out var topThigh);
                 rig.bones.TryGetValue("calf" + top, out var topCalf);
                 _pose.Rotate(topThigh, Quaternion.AngleAxis(-(18f * w + 32f * drive), rgt));
@@ -934,7 +964,7 @@ namespace Craquez
                 if (_saveKindV == 2)
                 {
                     // abafando: as pernas dobram juntas, fechando o espaço por baixo
-                    string bot = _saveSideV > 0 ? "_r" : "_l";
+                    string bot = LegOnSide(_saveSideV);
                     rig.bones.TryGetValue("thigh" + bot, out var bt);
                     rig.bones.TryGetValue("calf" + bot, out var bc);
                     _pose.Rotate(bt, Quaternion.AngleAxis(-25f * w, rgt));
@@ -943,13 +973,23 @@ namespace Craquez
             }
             else if (_saveKindV == 6)
             {
-                // salto: um joelho sobe à frente (protege e dá impulso), a outra perna estica
-                float air = p.saveKind > 0 ? Mathf.Sin(Mathf.Clamp01(_saveU / (cuL * 2f)) * Mathf.PI) : 0f;
-                string kn = _saveSideV > 0 ? "_l" : "_r";
-                rig.bones.TryGetValue("thigh" + kn, out var th);
-                rig.bones.TryGetValue("calf" + kn, out var cf);
-                _pose.Rotate(th, Quaternion.AngleAxis(-55f * air * w, rgt));
-                _pose.Rotate(cf, Quaternion.AngleAxis(70f * air * w, rgt));
+                // salto: agacha (impulso), sobe com um joelho à frente (protege e dá impulso) e a outra perna
+                // estica; na volta ao chão os dois joelhos dobram (amortece)
+                float u6 = _saveU, top6 = Mathf.Max(0.1f, cuL);
+                float crouch = u6 < top6 * 0.3f ? Mathf.Sin(u6 / (top6 * 0.3f) * Mathf.PI) : 0f;
+                float air = p.saveKind > 0 ? Mathf.Sin(Mathf.Clamp01((u6 - top6 * 0.2f) / (top6 * 1.6f)) * Mathf.PI) : 0f;
+                float landK = p.saveKind > 0 && u6 > top6 * 1.6f ? Mathf.Sin(Mathf.Clamp01((u6 - top6 * 1.6f) / 0.3f) * Mathf.PI) : 0f;
+                string kn = LegOnSide(-_saveSideV);
+                foreach (var sfx in LR)
+                {
+                    rig.bones.TryGetValue("thigh" + sfx, out var th);
+                    rig.bones.TryGetValue("calf" + sfx, out var cf);
+                    bool knee = sfx == kn;
+                    float thA = -(28f * crouch + 30f * landK + (knee ? 60f * air : 6f * air));
+                    float cfA = 50f * crouch + 50f * landK + (knee ? 85f * air : 12f * air);
+                    _pose.Rotate(th, Quaternion.AngleAxis(thA * w, rgt));
+                    _pose.Rotate(cf, Quaternion.AngleAxis(cfA * w, rgt));
+                }
             }
             else if (_saveKindV == 1)
             {
@@ -964,6 +1004,17 @@ namespace Craquez
             }
         }
 
+        /// <summary>Sufixo ("_l"/"_r") da perna que está fisicamente do lado dado (+1 direita do corpo).</summary>
+        string LegOnSide(float side)
+        {
+            if (rig.pelvis != null && rig.bones.TryGetValue("thigh_r", out var tr))
+            {
+                float s = Mathf.Sign(Vector3.Dot(tr.position - rig.pelvis.position, transform.right));
+                return (s == Mathf.Sign(side)) ? "_r" : "_l";
+            }
+            return side > 0 ? "_r" : "_l";
+        }
+
         /// <summary>
         /// Bloqueio com o pé: a perna do lado da bola estica para o lado (rente ao chão), a outra dobra para
         /// apoiar, e os braços abrem para equilibrar (e ocupar espaço).
@@ -971,15 +1022,26 @@ namespace Craquez
         void FootBlock(float w)
         {
             var fwd = transform.forward; var right = transform.right;
-            string near = _saveSideV > 0 ? "_r" : "_l", far = _saveSideV > 0 ? "_l" : "_r";
+            // (pernas pelo lado físico, não pelo nome do osso: antes a perna "do lado" podia ser a de lá e
+            // cruzava na frente da outra)
+            string near = LegOnSide(_saveSideV), far = near == "_l" ? "_r" : "_l";
+            // a perna do lado da bola estica para o lado e um pouco à frente (o pé na trajetória), joelho
+            // quase esticado e o corpo baixa sobre a perna de apoio
             rig.bones.TryGetValue("thigh" + near, out var th);
             rig.bones.TryGetValue("calf" + near, out var cf);
             rig.bones.TryGetValue("thigh" + far, out var th2);
             rig.bones.TryGetValue("calf" + far, out var cf2);
-            _pose.Rotate(th, Quaternion.AngleAxis(_saveSideV * 52f * w, fwd));                         // perna esticada para o lado
-            _pose.Rotate(cf, Quaternion.AngleAxis(-4f * w, right));
-            _pose.Rotate(th2, Quaternion.AngleAxis(-28f * w, right));                                   // a outra dobra (apoio)
-            _pose.Rotate(cf2, Quaternion.AngleAxis(48f * w, right));
+            var ft = near == "_l" ? rig.footL : rig.footR;
+            if (th != null && cf != null)
+            {
+                // direção da perna: para o lado do mergulho, rente ao chão, um pouco à frente
+                var legDir = (right * _saveSideV * 0.82f - Vector3.up * 0.5f + fwd * 0.18f).normalized;
+                _pose.Rotate(th, Quaternion.Slerp(Quaternion.identity, Quaternion.FromToRotation(cf.position - th.position, legDir), w));
+                if (ft != null) _pose.Rotate(cf, Quaternion.Slerp(Quaternion.identity, Quaternion.FromToRotation(ft.position - cf.position, legDir), w * 0.9f));
+            }
+            _pose.Rotate(th2, Quaternion.AngleAxis(-30f * w, right));                                   // a outra dobra (apoio)
+            _pose.Rotate(cf2, Quaternion.AngleAxis(55f * w, right));
+            if (rig.spine != null) _pose.Rotate(rig.spine, Quaternion.AngleAxis(-_saveSideV * 10f * w, fwd));   // tronco equilibra para o outro lado
             foreach (var sfx in LR)
             {
                 rig.bones.TryGetValue("upperarm" + sfx, out var ua);
@@ -1407,7 +1469,7 @@ namespace Craquez
                 float u = ps > 0f ? uR : uL;
                 float hip = HipAt(u), knee = KneeAt(u);
                 // + no eixo "right" leva o vetor para trás: flexão (para a frente) é ângulo negativo
-                var lat = right * ps * Mathf.Lerp(0.07f, 0.045f, run) * transform.localScale.x;   // pés um pouco afastados, na proporção do atleta
+                var lat = right * ps * Mathf.Lerp(0.035f, 0.015f, run) * transform.localScale.x;   // pés um pouco afastados, na proporção do atleta
                 // passada: componente para a frente/para trás no plano do corpo e um pouco para o lado
                 // (nada de girar o plano da perna: isso desenhava círculos)
                 var thighDir = (Quaternion.AngleAxis(-hip * _gDir.y, right) * (Quaternion.AngleAxis(hip * _gDir.x * 0.6f, fwd) * -up) + lat).normalized;
@@ -1552,6 +1614,16 @@ namespace Craquez
             // (o "peito aberto" de -3° deixava o peito saltado para a frente: agora o tronco fica neutro, com
             // os ombros levemente à frente, como no corpo relaxado)
             _pose.Rotate(rig.spine, Quaternion.AngleAxis(1.5f * w * (1f - Mathf.Clamp01(spd / 7f)), right));
+            // peito saltado: a parte de cima da coluna (peito -> pescoço) inclinada para trás em relação à de
+            // baixo (quadril -> peito) arqueia as costas e empurra o peito para a frente. Endireita até a
+            // linha de cima ficar ~3° à frente da de baixo (coluna reta, ombros relaxados)
+            var lower = Vector3.ProjectOnPlane(rig.spine.position - rig.pelvis.position, right);
+            var upper = Vector3.ProjectOnPlane(rig.neck.position - rig.spine.position, right);
+            if (lower.sqrMagnitude > 1e-4f && upper.sqrMagnitude > 1e-4f)
+            {
+                float arch = Vector3.SignedAngle(lower, upper, right);   // + = de cima mais à frente
+                if (arch < 3f) _pose.Rotate(rig.spine, Quaternion.AngleAxis(Mathf.Min(3f - arch, 14f) * 0.85f * w, right));
+            }
         }
 
         /// <summary>Correções por cima da animação: tronco na aceleração e perna do toque.</summary>
@@ -1694,6 +1766,63 @@ namespace Craquez
             // (0,88 ainda deixava o ombro para fora da linha do tronco, como uma ombreira)
             if (_uaL != null) _uaL.localPosition = _uaLBase * 0.81f;   // ombros na linha do tronco e da cintura
             if (_uaR != null) _uaR.localPosition = _uaRBase * 0.81f;
+            // quadril um pouco mais estreito: pernas mais juntas (as coxas saíam muito afastadas)
+            if (_thL == null && rig.bones.TryGetValue("thigh_l", out _thL)) _thLBase = _thL.localPosition;
+            if (_thR == null && rig.bones.TryGetValue("thigh_r", out _thR)) _thRBase = _thR.localPosition;
+            if (_thL != null) _thL.localPosition = _thLBase * 0.9f;
+            if (_thR != null) _thR.localPosition = _thRBase * 0.9f;
+        }
+        Transform _thL, _thR;
+        Vector3 _thLBase, _thRBase;
+
+        /// <summary>
+        /// Pernas sem torcer: (1) o joelho nunca dobra para a frente (perna "torta para trás", hiperestendida)
+        /// nem para os lados além de ~8°; (2) a coxa gira no próprio eixo até o pé apontar para a frente
+        /// do corpo (antes o pé era desvirado só no tornozelo e a canela ficava torcida).
+        /// </summary>
+        void KneeGuard()
+        {
+            if (rig.pelvis == null || p.down > 0f || p.slide > 0f || _bikeT > 0f || seat > 0.3f) return;
+            if (p.isKeeper && (p.saveKind > 0 || _saveRec > 0f || p.dive > 0f)) return;
+            float act = anim != null ? anim.ActionWeight : 0f;
+            var right = transform.right; var fwd = transform.forward; var up = Vector3.up;
+            foreach (var sfx in LR)
+            {
+                if (!rig.bones.TryGetValue("thigh" + sfx, out var th) || !rig.bones.TryGetValue("calf" + sfx, out var cf)) continue;
+                var ft = sfx == "_l" ? rig.footL : rig.footR;
+                rig.bones.TryGetValue(sfx == "_l" ? "ball_l" : "ball_r", out var toe);
+                if (ft == null) continue;
+                var a = cf.position - th.position;
+                if (a.sqrMagnitude < 1e-4f) continue;
+                // (2) giro da coxa: ponta do pé para a frente (com a abertura natural de ~8°)
+                if (toe != null)
+                {
+                    var an = a.normalized;
+                    var toeDir = Vector3.ProjectOnPlane(toe.position - ft.position, an);
+                    float sgn = sfx == "_l" ? -1f : 1f;
+                    var want = Vector3.ProjectOnPlane(Quaternion.AngleAxis(sgn * 8f, up) * fwd, an);
+                    if (toeDir.sqrMagnitude > 1e-5f && want.sqrMagnitude > 1e-3f)
+                    {
+                        float tw = Vector3.SignedAngle(toeDir, want, an);
+                        if (Mathf.Abs(tw) > 4f) _pose.Rotate(th, Quaternion.AngleAxis(Mathf.Clamp(tw, -70f, 70f) * 0.85f * (1f - act * 0.6f), an));
+                    }
+                }
+                // (1) dobra do joelho no plano da passada: sempre para trás (+); de lado, no máximo ~8°
+                var a2 = cf.position - th.position;
+                var b = ft.position - cf.position;
+                var aS = Vector3.ProjectOnPlane(a2, right); var bS = Vector3.ProjectOnPlane(b, right);
+                if (aS.sqrMagnitude > 1e-4f && bS.sqrMagnitude > 1e-4f)
+                {
+                    float bend = Vector3.SignedAngle(aS, bS, right);
+                    if (bend < -1f) _pose.Rotate(cf, Quaternion.AngleAxis(-1f - bend, right));
+                }
+                var aF = Vector3.ProjectOnPlane(cf.position - th.position, fwd); var bF = Vector3.ProjectOnPlane(ft.position - cf.position, fwd);
+                if (aF.sqrMagnitude > 1e-4f && bF.sqrMagnitude > 1e-4f)
+                {
+                    float side = Vector3.SignedAngle(aF, bF, fwd);
+                    if (Mathf.Abs(side) > 8f) _pose.Rotate(cf, Quaternion.AngleAxis(-(side - Mathf.Sign(side) * 8f) * (1f - act * 0.5f), fwd));
+                }
+            }
         }
 
         /// <summary>
@@ -1735,8 +1864,8 @@ namespace Craquez
             {
                 if (!rig.bones.TryGetValue("thigh" + sfx, out var th) || !rig.bones.TryGetValue("calf" + sfx, out var cf)) continue;
                 float ps = Mathf.Sign(Vector3.Dot(th.position - rig.pelvis.position, transform.right));
-                _pose.Rotate(th, Quaternion.AngleAxis(ps * 4.5f * slow, fwd));
-                _pose.Rotate(cf, Quaternion.AngleAxis(-ps * 2.5f * slow, fwd));   // canela de volta à vertical (pé plano)
+                _pose.Rotate(th, Quaternion.AngleAxis(ps * 1.8f * slow, fwd));
+                _pose.Rotate(cf, Quaternion.AngleAxis(-ps * 1.2f * slow, fwd));   // canela de volta à vertical (pé plano)
             }
         }
 
@@ -1796,6 +1925,8 @@ namespace Craquez
                 BicycleLimbs();
                 SeatPose();
                 Stance();
+                KneeGuard();
+                FeetFirm();   // (de novo, depois de girar as pernas: sola plana)
             }
             GroundFeet();
             Cloth();

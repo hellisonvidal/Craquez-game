@@ -743,7 +743,18 @@ namespace Craquez.Sim
                     float d = taker.position.Dist(st[i]);
                     if (d < best) { best = d; pick = i; }
                 }
-                if (pick >= 0)
+                gkToss = false;
+                float far = Mathf.Abs(outPos.x) - halfLen;
+                if (pick < 0 && !mouth && rng.Chance(far > 2.5f ? 0.75f : 0.4f))
+                {
+                    // a bola foi longe: o gandula (ou um torcedor) devolve com as mãos, por cima, e o goleiro
+                    // apanha no ar; a bola que saiu é essa mesma (sai de onde ela parou, lá fora)
+                    gkToss = true;
+                    gkTossFrom = new Vector2(gxL + Mathf.Sign(gxL) * Mathf.Clamp(far + 1.5f, 3f, mode.id == GameModes.Field ? 7f : 3.5f),
+                        Mathf.Clamp(outPos.y, -halfW - 2f, halfW + 2f));
+                    gkFetchBall = gkTossFrom;
+                }
+                else if (pick >= 0)
                 {
                     spareFrom = gkFetchBall;
                     gkFetchBall = st[pick];
@@ -794,6 +805,10 @@ namespace Craquez.Sim
         /// <summary>Goleiro buscando a bola do tiro de meta (-1 = não); onde ela está, onde vai ser cobrado.</summary>
         public int gkFetch = -1;
         float gkFetchT;
+        /// <summary>Bola devolvida pelo gandula/torcedor (jogada de longe até o goleiro).</summary>
+        public bool gkToss;
+        Vector2 gkTossFrom;
+        bool _tossThrown;
         Vector2 gkFetchBall, gkFetchSpot, gkFetchFacing;
 
         /// <summary>
@@ -810,6 +825,49 @@ namespace Craquez.Sim
             {
                 p.intent = Vector2.zero;
                 p.facing = V2.RotateToward(p.facing, (ball.pos - p.position).Norm(), 4f * DT);
+                _tossThrown = false;
+            }
+            else if (gkToss && !carrying)
+            {
+                // o goleiro vai em direção à linha de fundo e pede a bola; quem está lá fora joga por cima
+                var edge = new Vector2(Mathf.Sign(gkTossFrom.x) * (halfLen - 0.6f), Mathf.Clamp(gkTossFrom.y, -goalHalf - 6f, goalHalf + 6f));
+                if (!_tossThrown && gkFetchT > 1.6f)
+                {
+                    _tossThrown = true;
+                    // lançamento em arco até onde o goleiro está (bate ~1,6 m de altura na chegada)
+                    var target = p.position + (edge - p.position) * 0.25f;
+                    var d = target - gkTossFrom;
+                    float dist = Mathf.Max(1f, d.magnitude);
+                    float tFly = Mathf.Clamp(dist / 9f, 0.7f, 1.5f);
+                    float g = 9.81f;
+                    ball.pos = gkTossFrom;
+                    ball.z = 1.7f;
+                    ball.vel = d / tFly;
+                    ball.vz = (1.5f - 1.7f + 0.5f * g * tFly * tFly) / tFly;
+                    ball.spin = 0f;
+                    ball.owner = -1;
+                    Emit("balltoss", p.team, p.id);
+                }
+                Vector2 go = _tossThrown ? ball.pos + ball.vel * 0.15f : edge;
+                var to = go - p.position;
+                float dd = to.magnitude;
+                p.intent = dd > 0.1f ? to / dd * Mathf.Clamp(dd * 0.4f, 0.2f, 0.6f) : Vector2.zero;
+                p.facing = V2.RotateToward(p.facing, (ball.pos - p.position).Norm(), 6f * DT);
+                if (_tossThrown)
+                {
+                    ball.Step(DT, mode);
+                    // apanha no ar (ou no quique)
+                    if (ball.pos.Dist(p.position) < 0.85f && ball.z < 2.3f)
+                    {
+                        ball.owner = p.id;
+                        ball.vel = Vector2.zero; ball.vz = 0f;
+                        p.hold = 60f;
+                        p.goalKick = false;
+                        p.vel *= 0.3f;
+                    }
+                    else if (gkFetchT > 6f) { gkToss = false; gkFetchBall = ball.pos; }   // caiu longe: vai buscar no chão
+                }
+                return;   // (MovePlayer de todos vem depois, no passo do reinício)
             }
             else if (!carrying)
             {
@@ -2074,7 +2132,8 @@ namespace Craquez.Sim
             kickoffPass = false;
             foreach (var c in ctrl) { c.charging = 0; c.pending = 0; }
             state = MatchState.Foul;
-            stateTimer = quickRestarts ? 0.9f : Mathf.Max(1.8f, victim.down - 0.2f);
+            // o jogo só recomeça com a vítima de pé (antes voltava ~0,2 s antes, com ela ainda levantando)
+            stateTimer = quickRestarts ? 0.9f : Mathf.Max(1.8f, victim.down + 0.35f);
         }
 
         /// <summary>Lance parado após a falta: a vítima no chão, os outros param ou vão até o lance.</summary>
@@ -4256,6 +4315,7 @@ namespace Craquez.Sim
                     float vn = Vector2.Dot(vin, n);
                     var refl = vin - n * (vn * 2f);
                     float e = rng.Range(0.28f, 0.45f) * (1.1f - p.defense * 0.3f);
+                    if (p.saveKind == 7) e = rng.Range(0.4f, 0.6f);   // a chuteira é dura: a bola volta com mais força
                     var vout = refl * e;
                     // a mão vem com o corpo: no mergulho a palma empurra a bola para o lado do voo (e não de
                     // volta para o meio da área)
@@ -4267,6 +4327,8 @@ namespace Craquez.Sim
                         vout = new Vector2(-outDir.x * rng.Range(1f, 2.5f), vin.y * 0.2f + sideY * rng.Range(0.5f, 2f));
                         ball.vz = rng.Range(3.5f, 5f);
                     }
+                    else if (p.saveKind == 7) ball.vz = rng.Range(0f, 1.2f);   // desvio com o pé: sai rasteira/baixa
+                    else if (p.saveKind == 2) ball.vz = rng.Range(0.2f, 1.2f);  // abafada: a bola espirra rente ao chão
                     else ball.vz = Mathf.Abs(ball.vz) * 0.25f + rng.Range(0.5f, 2.2f);
                     ball.vel = vout;
                     ball.spin = rng.Gauss() * 1.5f;

@@ -126,6 +126,8 @@ namespace Craquez
             // tudo o que é cenário (estrutura, torcida, bandeiras, gente da rua, extras) some quando tapa o jogo
             var roots = new System.Collections.Generic.List<Transform> { venue.root };
             if (_occRoots != null) roots.AddRange(_occRoots);
+            // malhas que dão a volta no campo viram pedaços (só some o que tapa, não o cenário inteiro)
+            VenueSplit.Split(roots, s.halfLen, s.halfW);
             bcam.SetOccluders(roots.ToArray());
             bcam.entrance = venue.entrance;
             bcam.SnapToBall();

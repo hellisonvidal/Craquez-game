@@ -94,7 +94,7 @@ namespace Craquez
                 var want = Quaternion.AngleAxis(sgn * 8f, up) * bodyFwd;
                 float yaw = Vector3.SignedAngle(fwd, want, up);
                 float excess = Mathf.Abs(yaw) > 6f ? yaw - Mathf.Sign(yaw) * 6f : 0f;
-                if (Mathf.Abs(excess) > 0.3f) pose.Rotate(foot, Quaternion.AngleAxis(Mathf.Clamp(excess, -60f, 60f) * w, up));
+                if (Mathf.Abs(excess) > 0.3f) pose.Rotate(foot, Quaternion.AngleAxis(Mathf.Clamp(excess, -120f, 120f) * w, up));
                 // 2) sola plana (giro em torno do comprimento do pé), só apoiado
                 if (stance < 0.2f) continue;
                 if (!_footSideAxis.TryGetValue(rig, out int ax))

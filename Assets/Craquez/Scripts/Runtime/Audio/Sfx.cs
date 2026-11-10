@@ -140,10 +140,12 @@ namespace Craquez
 
         void Update()
         {
-            _crowd.volume = Mathf.MoveTowards(_crowd.volume, _crowdTarget, Time.unscaledDeltaTime * 0.4f);
-            _chant.volume = Mathf.MoveTowards(_chant.volume, _chantTarget, Time.unscaledDeltaTime * 0.2f);
-            _drumSrc.volume = Mathf.MoveTowards(_drumSrc.volume, _drumTarget, Time.unscaledDeltaTime * 0.3f);
-            if (_crowd2 != null) _crowd2.volume = Mathf.MoveTowards(_crowd2.volume, _crowdTarget * 0.55f, Time.unscaledDeltaTime * 0.3f);
+            // (volume da torcida escolhido nas configurações de som: 0 = sem barulho de torcida)
+            float cm = CrowdLevel;
+            _crowd.volume = Mathf.MoveTowards(_crowd.volume, _crowdTarget * cm, Time.unscaledDeltaTime * 0.4f);
+            _chant.volume = Mathf.MoveTowards(_chant.volume, _chantTarget * cm, Time.unscaledDeltaTime * 0.2f);
+            _drumSrc.volume = Mathf.MoveTowards(_drumSrc.volume, _drumTarget * cm, Time.unscaledDeltaTime * 0.3f);
+            if (_crowd2 != null) _crowd2.volume = Mathf.MoveTowards(_crowd2.volume, _crowdTarget * 0.55f * cm, Time.unscaledDeltaTime * 0.3f);
             if (_music != null)
             {
                 _music.volume = Mathf.MoveTowards(_music.volume, _musicTarget, Time.unscaledDeltaTime * 0.5f);
@@ -194,15 +196,27 @@ namespace Craquez
         }
         static bool _noCrowd;
 
-        public static void Cheer() { if (!_noCrowd) Play(_i?._cheer, 1f); }
-        public static void Boo() { if (!_noCrowd) Play(_i?._boo, 0.7f, 0.95f + Random.value * 0.1f); }
+        /// <summary>Volume do barulho da torcida (0..1), das configurações de som. 0 desliga a torcida.</summary>
+        public static float CrowdLevel
+        {
+            get { if (_crowdLevel < 0f) _crowdLevel = Mathf.Clamp01(PlayerPrefs.GetFloat("crowd_volume", 1f)); return _crowdLevel; }
+            set { _crowdLevel = Mathf.Clamp01(value); PlayerPrefs.SetFloat("crowd_volume", _crowdLevel); PlayerPrefs.Save(); }
+        }
+        static float _crowdLevel = -1f;
+        public static readonly string[] CrowdNames = { "Desligado", "25%", "50%", "75%", "100%" };
+        public static int CrowdIndex => Mathf.Clamp(Mathf.RoundToInt(CrowdLevel * 4f), 0, 4);
+        static bool Quiet => _noCrowd || CrowdLevel <= 0.001f;
+        static void CrowdShot(AudioClip c, float v, float pitch = 1f) { if (!Quiet) Play(c, v * CrowdLevel, pitch); }
+
+        public static void Cheer() => CrowdShot(_i?._cheer, 1f);
+        public static void Boo() => CrowdShot(_i?._boo, 0.7f, 0.95f + Random.value * 0.1f);
         /// <summary>Batucada da torcida (0..1).</summary>
         public static void Drums(float v) { if (_i != null) _i._drumTarget = _noCrowd || _inMenus ? 0f : v; }
-        public static void Ooh() { if (!_noCrowd) Play(_i?._ooh, 0.7f, 0.9f + Random.value * 0.2f); }
+        public static void Ooh() => CrowdShot(_i?._ooh, 0.7f, 0.9f + Random.value * 0.2f);
         /// <summary>Aplauso/vibração curta da torcida (desarme, drible, boa defesa).</summary>
-        public static void Applause(float v = 0.4f) { if (!_noCrowd) Play(_i?._applause, Mathf.Clamp01(v * 1.3f), 0.97f + Random.value * 0.08f); }
+        public static void Applause(float v = 0.4f) => CrowdShot(_i?._applause, Mathf.Clamp01(v * 1.3f), 0.97f + Random.value * 0.08f);
         /// <summary>Grito curto da torcida (drible, lance bonito).</summary>
-        public static void Hurray(float v = 0.4f) { if (_noCrowd) return; if (_i?._hurray != null) Play(_i._hurray, v, 0.95f + Random.value * 0.1f); else Applause(v); }
+        public static void Hurray(float v = 0.4f) { if (Quiet) return; if (_i?._hurray != null) CrowdShot(_i._hurray, v, 0.95f + Random.value * 0.1f); else Applause(v); }
 
         /// <summary>Volume da torcida (0 = silêncio, menu) e canto organizado.</summary>
         static bool _inMenus = true;

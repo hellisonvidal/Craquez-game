@@ -43,8 +43,8 @@ namespace Craquez
         {
             Debug.Log("[craquez] início " + Application.version + " em " + SystemInfo.graphicsDeviceName + " / " + SystemInfo.graphicsDeviceType);
             // (no roteiro de screenshots a janela virtual nunca tem foco: sem isso o jogo ficava pausado)
-            Application.runInBackground = ShotTour.Requested();
-            if (!ShotTour.Requested()) GoFullscreen();   // (o servidor gráfico virtual do CI não suporta trocar de modo)
+            Application.runInBackground = ShotTour.Requested() || VenueBake.Requested();
+            if (!ShotTour.Requested() && !VenueBake.Requested()) GoFullscreen();   // (o servidor gráfico virtual do CI não suporta trocar de modo)
             Screen.sleepTimeout = SleepTimeout.NeverSleep;
             Sfx.Init();
             Teams.CustomOptionFile = PlayerPrefs.GetString(OptionKey, "");
@@ -83,6 +83,7 @@ namespace Craquez
             // (depois do "Made with Unity"): aviso de IA -> degradê com a logo -> "toque para iniciar"
             ShowIntro();
             if (ShotTour.Requested()) gameObject.AddComponent<ShotTour>().Run(this);
+            else if (VenueBake.Requested()) gameObject.AddComponent<VenueBake>();
         }
 
         /// <summary>
@@ -861,9 +862,14 @@ namespace Craquez
                 // só a foto de verdade do local (o desenho antigo não aparece mais); enquanto monta, fundo neutro
                 // desenho 2D do local (rápido e mais bonito que a foto 3D, que montava o estádio inteiro e
                 // deixava o jogo pesado); um por local, guardado na memória
+                // imagem pronta do local (foto do 3D feita no CI, em Resources/Locais); sem ela, o desenho 2D
                 string vkey = _cfg.mode + "/" + vi + "/" + (home != null ? Teams.Hex(home.c1) : "");
                 if (!_venueArt.TryGetValue(vkey, out var art) || art == null)
-                    _venueArt[vkey] = art = VenueArt.Exterior(_cfg.mode, vi, home != null ? home.c1 : Color.white, 960, 540);   // visto de fora
+                {
+                    art = Resources.Load<Texture2D>("Locais/" + VenueBake.Name(_cfg.mode, vi, home != null ? home.stadium.tier : 1));
+                    if (art == null) art = VenueArt.Exterior(_cfg.mode, vi, home != null ? home.c1 : Color.white, 960, 540);   // visto de fora
+                    _venueArt[vkey] = art;
+                }
                 venueImg.texture = art;
                 venueImg.color = Color.white;
                 if (venueLoading != null) venueLoading.gameObject.SetActive(false);
@@ -1441,6 +1447,7 @@ namespace Craquez
                     Add(UiKit.Cycler(list, "Volume", vols, Mathf.RoundToInt(Settings.Volume * 10), i => Settings.Volume = i / 10f));
                     string[] mus = { "Desligada", "20%", "40%", "60%", "80%", "100%" };
                     int mi = Settings.Music ? Mathf.Clamp(Mathf.RoundToInt(Settings.MusicVolume * 5f), 1, 5) : 0;
+                    Add(UiKit.Cycler(list, "Barulho da torcida", Sfx.CrowdNames, Sfx.CrowdIndex, i => Sfx.CrowdLevel = i * 0.25f));
                     if (Sfx.MusicEnabled) Add(UiKit.Cycler(list, "Música dos menus", mus, mi, i => { Settings.Music = i > 0; if (i > 0) Settings.MusicVolume = i / 5f; Sfx.MenuMusic(true); }));
                     if (Application.isMobilePlatform)
                         Add(UiKit.Cycler(list, "Vibração", new[] { "Ligada", "Desligada" }, Settings.Vibration ? 0 : 1, i => Settings.Vibration = i == 0));
