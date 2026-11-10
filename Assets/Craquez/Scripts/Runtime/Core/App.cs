@@ -182,7 +182,7 @@ namespace Craquez
             if (es != null && es.currentSelectedGameObject == null && _match == null && (UnityEngine.InputSystem.Gamepad.current != null || UnityEngine.InputSystem.Keyboard.current != null))
             {
                 var s = _root.GetComponentInChildren<Selectable>();
-                if (s != null && (UnityEngine.InputSystem.Keyboard.current?.anyKey.wasPressedThisFrame == true || (UnityEngine.InputSystem.Gamepad.current != null && UnityEngine.InputSystem.Gamepad.current.leftStick.ReadValue().magnitude > 0.5f)))
+                if (s != null && (UnityEngine.InputSystem.Keyboard.current?.anyKey.wasPressedThisFrame == true || (UnityEngine.InputSystem.Gamepad.current != null && (UnityEngine.InputSystem.Gamepad.current.leftStick.ReadValue().magnitude > 0.5f || UnityEngine.InputSystem.Gamepad.current.dpad.ReadValue().magnitude > 0.5f || UnityEngine.InputSystem.Gamepad.current.buttonSouth.wasPressedThisFrame))))
                     UiKit.Select(s);
             }
         }
@@ -578,8 +578,11 @@ namespace Craquez
             void Notice()
             {
                 if (!UpdateCheck.HasUpdate || root == null) return;
-                var nb = UiKit.Button(root, "NOVA VERSÃO " + UpdateCheck.Latest + " DISPONÍVEL  •  BAIXAR", () => Application.OpenURL(UpdateCheck.Url), 26, new Color(0.1f, 0.55f, 0.3f));
-                nb.GetComponent<RectTransform>().At(0, 0, 620, 62, 90, 112);
+                Text nbl = null;
+                var nb = UiKit.Button(root, "NOVA VERSÃO " + UpdateCheck.Latest + "  •  " + (UpdateCheck.CanInstallInGame ? "ATUALIZAR" : "BAIXAR"), () =>
+                    UpdateCheck.Update(this, () => { if (nbl != null) nbl.text = UpdateCheck.InstallMsg.Length > 60 ? UpdateCheck.InstallMsg.Substring(0, 57) + "…" : UpdateCheck.InstallMsg; }), 26, new Color(0.1f, 0.55f, 0.3f));
+                nbl = nb.GetComponentInChildren<Text>();
+                nb.GetComponent<RectTransform>().At(0, 0, 720, 62, 90, 112);
             }
             Notice();
             UpdateCheck.Auto(this, () => { if (root != null && _root.childCount > 0) Notice(); });
@@ -1454,7 +1457,8 @@ namespace Craquez
                         UpdateCheck.Check(this, () => ShowOptions(5, false));
                     }, 28));
                     if (UpdateCheck.HasUpdate)
-                        Add(UiKit.Button(list, "Baixar a versão " + UpdateCheck.Latest, () => Application.OpenURL(UpdateCheck.Url), 28, new Color(0.1f, 0.55f, 0.3f)));
+                        Add(UiKit.Button(list, (UpdateCheck.CanInstallInGame ? "Atualizar agora para a " : "Baixar a versão ") + UpdateCheck.Latest,
+                            () => UpdateCheck.Update(this, () => { if (msg != null) msg.text = UpdateCheck.InstallMsg; }), 28, new Color(0.1f, 0.55f, 0.3f)));
                     break;
                 }
                 default:
@@ -1558,7 +1562,8 @@ namespace Craquez
             StartMatch();
             return _match;
         }
-        public void Tour_EndMatch() { EndMatch(); ShowModes(); }
+        public void Tour_EndMatch() { EndMatch(); EndTraining(); ShowModes(); }
+        public MatchController Tour_Training() { StartTraining(); return _match; }
 
         void EndMatch()
         {

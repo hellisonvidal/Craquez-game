@@ -575,7 +575,7 @@ namespace Craquez
             var matAway = mixed ? mat : Gfx.Lit(Color.white, crowdAway, 0.05f);
             if (!mixed) v.crowdMats.Add(matAway);
             v.crowdMats.Add(mat);
-            var concrete = Gfx.Lit(style.structure.a > 0f ? style.structure : new Color(0.55f, 0.56f, 0.6f), Gfx.Asphalt(256, Color.white, 11, 0.05f), 0.15f);
+            var concrete = Gfx.Lit(style.structure.a > 0f ? style.structure : new Color(0.66f, 0.67f, 0.7f), Gfx.Concrete(256, 11), 0.18f);
             // torcedores em pé: silhuetas recortadas sobre cada fileira (dá volume à arquibancada)
             bool striped = homeKit.pattern == 1 || homeKit.pattern == 5 || homeKit.pattern == 2;
             int pseed = (int)(home.name.GetHashCode() & 0xFFFF) + 1;
@@ -822,7 +822,7 @@ namespace Craquez
                 body.Box(new Vector3(px, top / 2f, -front + 0.3f), new Vector3(0.6f, top, 0.7f));
             }
             var structure = st.structure.a > 0f ? st.structure : new Color(0.55f, 0.56f, 0.6f);
-            body.Object("Tribuna central", Gfx.Lit(Color.Lerp(structure, Color.white, 0.12f), Gfx.Asphalt(256, Color.white, 29, 0.04f), 0.25f), v.root, quality >= 1);
+            body.Object("Tribuna central", Gfx.Lit(Color.Lerp(structure, Color.white, 0.12f), Gfx.Concrete(256, 29), 0.25f), v.root, quality >= 1);
             // camarotes e imprensa: faixas de vidro iluminadas (à noite, acesas)
             var glass = new MeshKit();
             for (float y = 7.35f; y < top - 2.6f; y += 4.2f)
@@ -963,7 +963,7 @@ namespace Craquez
             wall.Box(new Vector3(cw / 2 + side / 2, H / 2, frontZ - D / 2 - 0.02f), new Vector3(side, H, D), 3f);
             wall.Box(new Vector3(0, ch + (H - ch) / 2, frontZ - D / 2 - 0.02f), new Vector3(cw + 0.02f, H - ch, D), 3f);
             wall.Box(new Vector3(0, doorH + 0.25f, frontZ + 0.7f), new Vector3(doorW + 1.6f, 0.22f, 1.6f));
-            wall.Object("Vestiários", Gfx.Lit(new Color(0.62f, 0.63f, 0.66f), Gfx.Asphalt(256, Color.white, 23, 0.04f), 0.2f), grp, true);
+            wall.Object("Vestiários", Gfx.Lit(new Color(0.72f, 0.73f, 0.76f), Gfx.Concrete(256, 23), 0.2f), grp, true);
             Corridor(v, frontZ, cw, ch, cd, accent, night);
             var frame = new MeshKit();
             frame.Box(new Vector3(-doorW / 2 - 0.08f, doorH / 2, frontZ + 0.06f), new Vector3(0.16f, doorH + 0.1f, 0.14f));
@@ -1229,7 +1229,7 @@ namespace Craquez
                 steps.Box(new Vector3(0, y0 + 0.21f, z0 + 0.4f), new Vector3(hl * 1.2f, 0.42f, 0.8f), 2f);
                 ppl.Quad(new Vector3(-hl * 0.6f, y0 + 0.42f, z0 + 0.3f), new Vector3(-hl * 0.6f, y0 + 1.6f, z0 + 0.3f), new Vector3(hl * 0.6f, y0 + 1.6f, z0 + 0.3f), new Vector3(hl * 0.6f, y0 + 0.42f, z0 + 0.3f), new Vector2(0, 0), new Vector2(hl / 5f, 1));
             }
-            steps.Object("Arquibancada", Gfx.Lit(new Color(0.62f, 0.63f, 0.66f), Gfx.Asphalt(256, Color.white, 81, 0.05f), 0.15f), v.root, quality >= 1);
+            steps.Object("Arquibancada", Gfx.Lit(new Color(0.7f, 0.71f, 0.74f), Gfx.Concrete(256, 81), 0.18f), v.root, quality >= 1);
             var crowd = Gfx.CrowdPeople(1024, 64, homeKit.c1, homeKit.c2, awayKit.c1, variant * 23 + 9, 0f, false, home.IsNational || away.IsNational ? 0.3f : 0f);
             var cm = Gfx.Cutout(Color.white, crowd, 0.5f, 0.05f);
             v.crowdMats.Add(cm);
@@ -1448,7 +1448,7 @@ namespace Craquez
                     lamps.Box(b + Vector3.up * 7f, new Vector3(0.8f, 0.16f, 0.8f));
                 }
             var structure = Color.Lerp(homeKit.c1, new Color(0.82f, 0.82f, 0.8f), 0.82f);
-            wall.Object("Ginásio (fora)", Gfx.Lit(structure, Gfx.Asphalt(256, Color.white, 41 + variant, 0.03f), 0.2f), v.root, false);
+            wall.Object("Ginásio (fora)", Gfx.Lit(structure, Gfx.Concrete(256, 41 + variant), 0.2f), v.root, false);
             band.Object("Faixa do ginásio", night ? Gfx.Emissive(homeKit.c1 * 0.7f, homeKit.c1 * 1.2f) : Gfx.Lit(homeKit.c1, null, 0.35f), v.root, false);
             glass.Object("Janelas altas", Gfx.Emissive(new Color(0.1f, 0.14f, 0.2f), night ? new Color(1f, 0.92f, 0.75f) * 0.8f : new Color(0.05f, 0.08f, 0.12f)), v.root, false);
             roof.Object("Telhado", Gfx.Lit(new Color(0.62f, 0.64f, 0.68f), HallPanels(variant), 0.45f, 0.4f), v.root, false);
@@ -1491,7 +1491,7 @@ namespace Craquez
             bd.Object("Placas (esquerda)", led, v.root, false);
             // ginásio
             float W = hl + 18f, D = hw + 17f, H = 17f;
-            var wallLow = Gfx.Lit(Color.Lerp(pp.surround, Color.white, 0.25f), Gfx.Asphalt(256, Color.white, variant + 20, 0f), 0.25f);
+            var wallLow = Gfx.Lit(Color.Lerp(pp.surround, Color.white, 0.25f), Gfx.Concrete(256, variant + 20), 0.25f);
             var wallHigh = Gfx.Lit(new Color(0.82f, 0.83f, 0.86f), HallPanels(variant), 0.2f);
             var low = new MeshKit();
             var high = new MeshKit();
@@ -1538,7 +1538,7 @@ namespace Craquez
             var crowd = Gfx.CrowdTex(1024, 256, homeKit.c1, homeKit.c2, awayKit.c1, variant * 31, 0.85f, null, _mixedCrowd ? 0.3f : 0f);
             var cm = Gfx.Lit(Color.white, crowd, 0.05f);
             v.crowdMats.Add(cm);
-            var concrete = Gfx.Lit(new Color(0.6f, 0.61f, 0.64f), Gfx.Asphalt(256, Color.white, 13, 0.05f), 0.15f);
+            var concrete = Gfx.Lit(new Color(0.7f, 0.71f, 0.74f), Gfx.Concrete(256, 13), 0.18f);
             // torcedores de verdade (silhuetas recortadas em pé, pulando nos lances) sobre os degraus
             bool stripedH = homeKit.pattern == 1 || homeKit.pattern == 5 || homeKit.pattern == 2;
             int hseed = variant * 37 + 3;

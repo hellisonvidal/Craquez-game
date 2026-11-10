@@ -28,7 +28,7 @@ namespace Craquez
 
             var facadeTex = FacadeTex(structure, (int)(seed % 977));
             var wallMat = Gfx.Lit(Color.white, facadeTex, 0.2f);
-            var concreteMat = Gfx.Lit(Color.Lerp(structure, Color.white, 0.2f), Gfx.Asphalt(256, Color.white, 23, 0.04f), 0.15f);
+            var concreteMat = Gfx.Lit(Color.Lerp(structure, Color.white, 0.2f), Gfx.Concrete(256, 23), 0.18f);
             var bandMat = night ? Gfx.Emissive(club * 0.6f, club * 1.4f) : Gfx.Lit(club, null, 0.35f);
             var gateMat = Gfx.Emissive(new Color(0.05f, 0.05f, 0.06f), night ? new Color(1f, 0.82f, 0.55f) * 0.55f : new Color(0.03f, 0.03f, 0.035f));
             var metalMat = Gfx.Lit(new Color(0.62f, 0.64f, 0.68f), null, 0.5f, 0.6f);

@@ -342,8 +342,10 @@ namespace Craquez.UI
             _res = new Vector2Int(Screen.width, Screen.height);
             if (Screen.width <= 0 || Screen.height <= 0) return;
             var rt = (RectTransform)transform;
-            rt.anchorMin = new Vector2(sa.xMin / Screen.width, sa.yMin / Screen.height);
-            rt.anchorMax = new Vector2(sa.xMax / Screen.width, sa.yMax / Screen.height);
+            // TV: margem contra o "overscan" (bordas cortadas em muitas TVs)
+            float mx = Platform.IsTv ? 0.035f : 0f, my = Platform.IsTv ? 0.04f : 0f;
+            rt.anchorMin = new Vector2(Mathf.Max(sa.xMin / Screen.width, mx), Mathf.Max(sa.yMin / Screen.height, my));
+            rt.anchorMax = new Vector2(Mathf.Min(sa.xMax / Screen.width, 1f - mx), Mathf.Min(sa.yMax / Screen.height, 1f - my));
         }
     }
 

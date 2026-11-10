@@ -72,6 +72,12 @@ namespace Craquez.UI
             _weather = UiKit.Label(root, "", 22, Theme.BodyBold, Theme.TextDim);
             _weather.rectTransform.At(0, 1, 600, 30, 44, -104);
             UiKit.Shadow(_weather);
+            if (cfg.training)
+            {
+                // treino: sem placar nem relógio (só o jogador e o goleiro)
+                sb.gameObject.SetActive(false);
+                _weather.gameObject.SetActive(false);
+            }
             // jogadores controlados
             for (int t = 0; t < 2; t++)
             {

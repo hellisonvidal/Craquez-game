@@ -1419,6 +1419,7 @@ namespace Craquez.Sim
             float dist = Mathf.Max(toT.magnitude, 0.5f);
             var dirv = toT / dist;
             float err = rng.Gauss() * 0.03f * (1.25f - p.passing) * (0.6f + power) * (p.sprinting ? 1.6f : 1f) * (p.Has(Trait.Maestro) ? 0.65f : 1f);
+            err *= StrikeFactor(p);
             dirv = dirv.Rotated(err);
             if (lofted)
             {
@@ -1502,6 +1503,19 @@ namespace Craquez.Sim
             Emit("kick", p.team, p.id, "throw", power: power);
         }
 
+        /// <summary>
+        /// Quanto a batida fica menos precisa pelo jeito que a bola chega e pelo cansaço: de voleio ou
+        /// meia-altura (bola no ar, acima do tornozelo) é mais difícil acertar em cheio; cansado, o
+        /// jogador erra mais (só pesa de verdade abaixo de ~60% do fôlego).
+        /// </summary>
+        float StrikeFactor(SimPlayer p)
+        {
+            float f = 1f;
+            if (ball.z > 0.2f) f *= 1f + Mathf.Clamp01((ball.z - 0.2f) / 0.8f) * 0.45f;
+            f *= 1f + Mathf.Clamp01((0.6f - p.stamina) / 0.6f) * 0.35f;
+            return f;
+        }
+
         void Shoot(SimPlayer p, Vector2 aim, float power, bool finesse = false)
         {
             if (throwIn && p.id == throwInTaker && ball.owner == p.id) { Throw(p, aim, power, true, false); return; }
@@ -1539,6 +1553,7 @@ namespace Craquez.Sim
             if (p.Has(Trait.LongaDistancia) && d > 20f) { spd *= 1.1f; err *= 0.85f; }
             float body = Mathf.Abs(p.facing.AngleTo(dirv));
             err *= 1f + Mathf.Max(0f, body - 0.6f) * 0.9f;
+            err *= StrikeFactor(p);
             if (finesse) err *= 0.65f;
             dirv = dirv.Rotated(rng.Gauss() * err);
             float curl = 0f;
