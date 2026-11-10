@@ -97,6 +97,9 @@ namespace Craquez
             if (s.mode.id != GameModes.Street && !c.training) _crowd = CrowdFx.Create(transform, s, venue, kits[0], kits[1], _night, q, c.teamA, c.teamB);
             if (!c.training) life = VenueLife.Create(transform, s, venue, kits[0], kits[1], home, away, _night, q, cam, c.venue);
             var extras = c.training ? null : VenueExtras.Create(transform, s, venue, kits[0], kits[1], _night, q, c.venue);
+            // carros, bicicletas e pedestres em volta (avenida do estádio, estacionamento do ginásio, rua do quarteirão)
+            if (!c.training && venue.roadLoop != Vector2.zero)
+                CityTraffic.Create(venue.root, venue.roadLoop, venue.walkLoop, 5 + 3 * q, 2 + q, 8 + 5 * q, _night, c.venue * 31 + 7);
             _occRoots = new[] { _crowd != null ? _crowd.transform : null, life != null ? life.transform : null, extras != null ? extras.transform : null };
             AthleteFactory.IndoorShoes = c.mode == GameModes.Futsal;
             // capitão: o primeiro "Líder" de cada time (ou o camisa de número mais baixo entre os de linha)
