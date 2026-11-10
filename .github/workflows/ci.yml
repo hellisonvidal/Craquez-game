@@ -78,6 +78,10 @@ jobs:
         include:
           - name: Android
             targetPlatform: Android
+          # versão para TV (Google TV / Android TV 4K, ex.: TCL C6K): pacote próprio, 32 e 64 bits,
+          # padrões de TV; instala por pen drive (docs/TV.md)
+          - name: TV
+            targetPlatform: Android
           - name: Linux
             targetPlatform: StandaloneLinux64
     steps:
@@ -97,12 +101,19 @@ jobs:
       # e a atualização por dentro do jogo funciona); os segredos ANDROID_KEYSTORE_* têm prioridade
       - name: Chave de assinatura
         run: echo "CRAQUEZ_KS=$(base64 -w0 tools/android/craquez.keystore)" >> "$GITHUB_ENV"
+      - name: Versão TV
+        if: matrix.name == 'TV'
+        run: |
+          echo tv > Assets/Craquez/Resources/flavor.txt
+          sed -i 's/^  productName: Craquez$/  productName: Craquez TV/; s/    Android: com.hellisonvidal.craquez$/    Android: com.hellisonvidal.craquez.tv/; s/^  AndroidTargetArchitectures: 2$/  AndroidTargetArchitectures: 3/' ProjectSettings/ProjectSettings.asset
+          grep -n "productName\|craquez.tv\|AndroidTargetArchitectures" ProjectSettings/ProjectSettings.asset
       - uses: game-ci/unity-builder@v4
         env:
           UNITY_LICENSE: ${{ secrets.UNITY_LICENSE }}
           UNITY_EMAIL: ${{ secrets.UNITY_EMAIL }}
           UNITY_PASSWORD: ${{ secrets.UNITY_PASSWORD }}
         with:
+          allowDirtyBuild: ${{ matrix.name == 'TV' }}
           targetPlatform: ${{ matrix.targetPlatform }}
           buildName: Craquez
           versioning: None
@@ -207,6 +218,7 @@ jobs:
           ls -R art | head -50
           mkdir -p out
           find art/Craquez-Android -name "*.apk" -exec cp {} out/Craquez-${GITHUB_REF_NAME}.apk \;
+          find art/Craquez-TV -name "*.apk" -exec cp {} out/Craquez-TV-${GITHUB_REF_NAME}.apk \; 2>/dev/null || true
           ls -la out
       - uses: softprops/action-gh-release@v2
         with:

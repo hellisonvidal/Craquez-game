@@ -111,6 +111,39 @@ namespace Craquez
                 Face(P(-1, 1, 1), P(-1, 1, -1), P(1, 1, -1), P(1, 1, 1), Vector3.up);
             }
 
+            /// <summary>
+            /// Prisma arredondado (seção elíptica de <paramref name="sides"/> lados, tampa em cima): cabeça,
+            /// tronco e pernas sem cara de caixote. <paramref name="taper"/> afina o topo (ombros, cabeça).
+            /// </summary>
+            public void Prism(Vector3 c, Vector3 s, Quaternion r, int col, int sides = 8, float taper = 1f)
+            {
+                var uvc = UV(col);
+                float hy = s.y * 0.5f;
+                int i0 = v.Count;
+                for (int k = 0; k < sides; k++)
+                {
+                    float a0 = (k + 0.5f) / sides * Mathf.PI * 2f, a1 = (k + 1.5f) / sides * Mathf.PI * 2f;
+                    Vector3 Ring(float a, float y, float t) => c + r * new Vector3(Mathf.Cos(a) * s.x * 0.5f * t, y, Mathf.Sin(a) * s.z * 0.5f * t);
+                    var b0 = Ring(a0, -hy, 1f); var b1 = Ring(a1, -hy, 1f); var t1 = Ring(a1, hy, taper); var t0 = Ring(a0, hy, taper);
+                    int i = v.Count;
+                    v.Add(b0); v.Add(t0); v.Add(t1); v.Add(b1);
+                    var nn = r * new Vector3(Mathf.Cos((a0 + a1) * 0.5f), 0f, Mathf.Sin((a0 + a1) * 0.5f));
+                    for (int q = 0; q < 4; q++) { n.Add(nn); uv.Add(uvc); fanA.Add(fan); pivA.Add(pivot); }
+                    // (mesma ordem das faces da caixa: horário visto de fora)
+                    tri.Add(i); tri.Add(i + 2); tri.Add(i + 1); tri.Add(i); tri.Add(i + 3); tri.Add(i + 2);
+                }
+                // tampa de cima (leque)
+                int ci = v.Count;
+                v.Add(c + r * new Vector3(0f, hy, 0f)); n.Add(r * Vector3.up); uv.Add(uvc); fanA.Add(fan); pivA.Add(pivot);
+                for (int k = 0; k < sides; k++)
+                {
+                    float a = (k + 0.5f) / sides * Mathf.PI * 2f;
+                    v.Add(c + r * new Vector3(Mathf.Cos(a) * s.x * 0.5f * taper, hy, Mathf.Sin(a) * s.z * 0.5f * taper));
+                    n.Add(r * Vector3.up); uv.Add(uvc); fanA.Add(fan); pivA.Add(pivot);
+                }
+                for (int k = 0; k < sides; k++) { tri.Add(ci); tri.Add(ci + 1 + k); tri.Add(ci + 1 + (k + 1) % sides); }   // (mesma orientação da tampa da caixa)
+            }
+
             public Mesh Build(string name)
             {
                 var m = new Mesh { name = name };
@@ -161,10 +194,10 @@ namespace Craquez
             if (s.lod)
             {
                 // fileiras do fundo: menos detalhe (sem pernas: a fileira da frente esconde), mas com rosto
-                body.Box(p + q * new Vector3(0f, 1.02f * hgt, 0f), new Vector3(0.46f, 0.82f * hgt, 0.3f), q, top);
-                body.Box(p + q * new Vector3(0f, 1.36f * hgt, 0f), new Vector3(0.54f, 0.14f, 0.3f), q, top);
+                body.Prism(p + q * new Vector3(0f, 1.02f * hgt, 0f), new Vector3(0.46f, 0.82f * hgt, 0.3f), q, top, 6, 1.05f);
+                body.Prism(p + q * new Vector3(0f, 1.36f * hgt, 0f), new Vector3(0.52f, 0.14f, 0.3f), q, top, 6, 0.6f);
                 var hc0 = p + q * new Vector3(0f, 1.6f * hgt, 0f);
-                body.Box(hc0, new Vector3(0.23f, 0.27f, 0.24f), q, skin);
+                body.Prism(hc0, new Vector3(0.24f, 0.27f, 0.27f), q, skin, 6, 0.75f);
                 for (int e = -1; e <= 1; e += 2) body.Box(hc0 + q * new Vector3(e * 0.05f, 0.03f, 0.122f), new Vector3(0.05f, 0.03f, 0.01f), q, 54);
                 body.Box(hc0 + q * new Vector3(0f, -0.08f, 0.122f), new Vector3(0.07f, 0.02f, 0.01f), q, 54);
                 if (coat) body.Box(hc0 + q * new Vector3(0f, 0.08f, -0.02f), new Vector3(0.27f, 0.18f, 0.28f), q, coatC);
@@ -175,13 +208,13 @@ namespace Craquez
             // duas pernas e tênis
             for (int side = -1; side <= 1; side += 2)
             {
-                body.Box(p + q * new Vector3(side * 0.1f, 0.43f * hgt, 0f), new Vector3(0.16f, 0.86f * hgt, 0.19f), q, pants);
+                body.Prism(p + q * new Vector3(side * 0.1f, 0.43f * hgt, 0f), new Vector3(0.17f, 0.86f * hgt, 0.19f), q, pants, 6, 1.1f);
                 body.Box(p + q * new Vector3(side * 0.1f, 0.045f, 0.05f), new Vector3(0.16f, 0.09f, 0.29f), q, r.NextDouble() < 0.5 ? 14 : 15);
             }
             // tronco em V (cintura mais estreita que o peito) com ombros arredondados
-            body.Box(p + q * new Vector3(0f, 0.96f * hgt, 0f), new Vector3(0.42f, 0.26f * hgt, 0.27f), q, top);
-            body.Box(p + q * new Vector3(0f, 1.2f * hgt, 0f), new Vector3(0.5f, 0.36f * hgt, 0.3f), q, top);
-            body.Box(p + q * new Vector3(0f, 1.39f * hgt, 0f), new Vector3(0.56f, 0.1f, 0.29f), q, top);
+            body.Prism(p + q * new Vector3(0f, 0.96f * hgt, 0f), new Vector3(0.42f, 0.26f * hgt, 0.27f), q, top, 8, 1.12f);
+            body.Prism(p + q * new Vector3(0f, 1.2f * hgt, 0f), new Vector3(0.48f, 0.36f * hgt, 0.29f), q, top, 8, 1.06f);
+            body.Prism(p + q * new Vector3(0f, 1.38f * hgt, 0f), new Vector3(0.52f, 0.1f, 0.28f), q, top, 8, 0.6f);   // ombros arredondados
             if (!coat) body.Box(p + q * new Vector3(0f, 0.84f * hgt, 0f), new Vector3(0.43f, 0.06f, 0.28f), q, shirt2);
             else body.Box(p + q * new Vector3(0f, 0.7f * hgt, 0f), new Vector3(0.46f, 0.24f * hgt, 0.3f), q, coatC);   // capa até a coxa
             // detalhe da camisa (gola/faixa na cor 2) ou cachecol do time no pescoço
@@ -192,9 +225,11 @@ namespace Craquez
             }
             else if (!coat) body.Box(p + q * new Vector3(0f, 1.43f * hgt, 0.13f), new Vector3(0.2f, 0.05f, 0.04f), q, shirt2);
             // pescoço e cabeça com rosto: olhos, sobrancelha, nariz, boca, orelhas (às vezes barba)
-            body.Box(p + q * new Vector3(0f, 1.47f * hgt, 0f), new Vector3(0.11f, 0.08f, 0.11f), q, skin);
+            body.Prism(p + q * new Vector3(0f, 1.47f * hgt, 0f), new Vector3(0.11f, 0.08f, 0.11f), q, skin, 6);
             var hc = p + q * new Vector3(0f, 1.6f * hgt, 0f);
-            body.Box(hc, new Vector3(0.22f, 0.27f, 0.24f), q, skin);
+            // (octógono: a face da frente fica a ~0,12 m do centro, onde estão olhos, nariz e boca)
+            body.Prism(hc + q * new Vector3(0f, -0.04f, 0f), new Vector3(0.235f, 0.19f, 0.26f), q, skin, 8, 1.04f);   // queixo e rosto
+            body.Prism(hc + q * new Vector3(0f, 0.095f, 0f), new Vector3(0.245f, 0.08f, 0.27f), q, skin, 8, 0.7f);    // alto da cabeça (arredondado)
             body.Box(hc + q * new Vector3(0f, -0.03f, 0.125f), new Vector3(0.05f, 0.07f, 0.04f), q, skin);              // nariz
             for (int e = -1; e <= 1; e += 2)
             {

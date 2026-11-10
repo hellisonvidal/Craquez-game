@@ -20,6 +20,8 @@ float4 _ClothBand;         // x = altura (y do mundo) onde o tecido começa a so
 float4 _ClothDrag;         // xyz = deslocamento da barra (m, mundo) pelo movimento
 float4 _ClothFlutter;      // x = amplitude (m), y = frequência, z = fase
 
+float4 _ClothTuck;         // camisa por dentro do calção: x = altura da cintura (y do mundo), y = quanto entra (m)
+
 float3 ClothOffset(float3 posWS, float3 nWS)
 {
     float span = max(0.02, _ClothBand.x - _ClothBand.y);
@@ -27,7 +29,10 @@ float3 ClothOffset(float3 posWS, float3 nWS)
     float m2 = mask * mask;
     float wave = sin(_Time.y * _ClothFlutter.y + _ClothFlutter.z + (posWS.x + posWS.z) * 9.0)
                + 0.5 * sin(_Time.y * _ClothFlutter.y * 1.7 + posWS.y * 23.0);
-    return nWS * (_ClothInflate * (0.5 + 0.5 * mask) + wave * _ClothFlutter.x * m2) + _ClothDrag.xyz * m2;
+    float3 off = nWS * (_ClothInflate * (0.5 + 0.5 * mask) + wave * _ClothFlutter.x * m2) + _ClothDrag.xyz * m2;
+    // por dentro: abaixo da cintura a camisa entra no calção (fica escondida sob ele)
+    float tm = _ClothTuck.y > 0.0 ? saturate((_ClothTuck.x - posWS.y) / 0.025) : 0.0;
+    return off * (1.0 - tm) - nWS * (_ClothTuck.y * tm);
 }
 
 struct ToonAttributes

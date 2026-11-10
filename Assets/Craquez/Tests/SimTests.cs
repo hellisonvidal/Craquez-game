@@ -824,6 +824,30 @@ namespace Craquez.Tests
             Assert.AreEqual(0, other, "jogador caiu sem falta, trombada ou bicicleta");
         }
 
+        /// <summary>On-line (lockstep): dois aparelhos, cada um com a sua simulação, trocando só os comandos, terminam iguais.</summary>
+        [Test] public void LockstepStaysInSync()
+        {
+            Craquez.Sim.Net.LoopbackTransport.Pair(out var na, out var nb);
+            var simA = NewMatch(GameModes.Field, 7);
+            var simB = NewMatch(GameModes.Field, 7);
+            var sa = new Craquez.Sim.Net.LockstepSession(na, 0);
+            var sb = new Craquez.Sim.Net.LockstepSession(nb, 1);
+            var cpuA = new CpuBrain(0, 0.7f); var cpuB = new CpuBrain(1, 0.7f);
+            int steps = 0;
+            for (int i = 0; i < 60 * 40; i++)
+            {
+                // cada lado decide o próprio comando com o que vê na própria simulação
+                sa.PushLocal(cpuA.MakeInput(simA));
+                sb.PushLocal(cpuB.MakeInput(simB));
+                bool a = sa.Step(simA), b = sb.Step(simB);
+                if (a && b) steps++;
+            }
+            System.Console.WriteLine($"[on-line] {steps} passos em lockstep; hash {simA.StateHash()} x {simB.StateHash()}");
+            Assert.Greater(steps, 60 * 30);
+            Assert.IsFalse(sa.Desynced || sb.Desynced, "dessincronizou no passo " + Mathf.Max(sa.DesyncTick, sb.DesyncTick));
+            Assert.AreEqual(simA.StateHash(), simB.StateHash(), "as duas partidas terminaram diferentes");
+        }
+
         [Test] public void JsonRoundTrip()
         {
             var o = MiniJson.Parse("{\"a\": [1, 2.5, \"x\\n\"], \"b\": {\"c\": true, \"d\": null}}");

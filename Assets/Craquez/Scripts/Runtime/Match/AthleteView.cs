@@ -1457,7 +1457,9 @@ namespace Craquez
             float sideFix = Mathf.Abs(side) > 4f ? side - Mathf.Sign(side) * 4f : 0f;
             if (Mathf.Abs(sideFix) > 0.1f) _pose.Rotate(rig.spine, Quaternion.AngleAxis(sideFix * 0.8f * w, fwd));
             // peito aberto: o topo da coluna levemente para trás (ombros não caem para a frente)
-            _pose.Rotate(rig.spine, Quaternion.AngleAxis(-3f * w * (1f - Mathf.Clamp01(spd / 7f)), right));
+            // (o "peito aberto" de -3° deixava o peito saltado para a frente: agora o tronco fica neutro, com
+            // os ombros levemente à frente, como no corpo relaxado)
+            _pose.Rotate(rig.spine, Quaternion.AngleAxis(1.5f * w * (1f - Mathf.Clamp01(spd / 7f)), right));
         }
 
         /// <summary>Correções por cima da animação: tronco na aceleração e perna do toque.</summary>
@@ -1685,7 +1687,7 @@ namespace Craquez
         {
             // fora da tela (e sem sombra na tela): pula as correções de pose — economiza processador e
             // bateria (no campo, metade dos atletas, os do aquecimento e o banco ficam fora do quadro)
-            if (rig != null && _bodyR == null) _bodyR = rig.GetComponentInChildren<SkinnedMeshRenderer>();
+            if (rig != null && _bodyR == null) _bodyR = rig.body != null ? (Renderer)rig.body : rig.GetComponentInChildren<SkinnedMeshRenderer>();   // (o corpo, não uma peça qualquer)
             if (_bodyR != null && !_bodyR.isVisible && Time.frameCount > 3) return;
             if (rig != null) NarrowShoulders();
             if (rig != null && p != null) LowerShoulders();
@@ -1763,7 +1765,7 @@ namespace Craquez
 
         // ---------------------------------------------------------------- tecido solto
         static readonly int IdInflate = Shader.PropertyToID("_ClothInflate"), IdBand = Shader.PropertyToID("_ClothBand"),
-            IdDrag = Shader.PropertyToID("_ClothDrag"), IdFlutter = Shader.PropertyToID("_ClothFlutter");
+            IdDrag = Shader.PropertyToID("_ClothDrag"), IdFlutter = Shader.PropertyToID("_ClothFlutter"), IdTuck = Shader.PropertyToID("_ClothTuck");
         MaterialPropertyBlock _mpb;
         Vector3 _clothPos, _clothVel, _clothDrag, _clothDragV;
         float _clothPhase = -1f;
@@ -1815,6 +1817,8 @@ namespace Craquez
                 _mpb.SetVector(IdBand, new Vector4(top, pos.y - 0.14f, 0, 0));
                 _mpb.SetVector(IdDrag, _clothDrag);
                 _mpb.SetVector(IdFlutter, new Vector4(flutAmp, freq, _clothPhase, 0));
+                // camisa por dentro (90%): entra no calção logo acima do quadril; por fora: solta
+                _mpb.SetVector(IdTuck, rig.untucked ? Vector4.zero : new Vector4(pos.y + 0.075f * transform.localScale.y, 0.03f, 0, 0));
                 rig.shirt.SetPropertyBlock(_mpb);
             }
             if (rig.shorts != null)

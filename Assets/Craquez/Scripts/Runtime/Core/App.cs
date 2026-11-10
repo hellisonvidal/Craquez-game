@@ -76,7 +76,7 @@ namespace Craquez
             cam.fieldOfView = 40f;
             cgo.AddComponent<AudioListener>();
             UrpSetup.Camera(cam, Settings.Quality);
-            if (!ShotTour.Requested()) StartCoroutine(PrewarmVenues());
+            // (as fotos dos estádios não são mais montadas na abertura: deixava o jogo abrindo pesado)
             if (FindAnyObjectByType<EventSystem>() == null)
             {
                 var es = new GameObject("EventSystem", typeof(EventSystem), typeof(InputSystemUIInputModule));
@@ -651,6 +651,10 @@ namespace Craquez
             _modeButtons[GameModes.Society] = BigCard(grid, "SOCIETY", "7 x 7", "Grama sintética  •  " + VenueBuilder.SocietyNames.Length + " campos", ModeArt(MenuArt.Kind.Society), 512f / 560f, new Color(0.02f, 0.71f, 0.83f), () => ShowKind(GameModes.Society));
             _modeButtons[GameModes.Street] = BigCard(grid, "RUA", "3 A 5 POR LADO", "Times de rua  •  " + VenueBuilder.StreetNames.Length + " ruas", ModeArt(MenuArt.Kind.Street), 512f / 560f, new Color(0.93f, 0.28f, 0.6f), () => { _lastMode = GameModes.Street; Choose(GameModes.Street, false); });
             _modeButtons["treino"] = BigCard(grid, "TREINO", "ARENA", "Você contra o goleiro  •  chute à vontade", ModeArt(MenuArt.Kind.Field), 512f / 560f, new Color(0.55f, 0.42f, 0.95f), () => { _lastMode = "treino"; ShowTrainingPicker(); });
+            // on-line: a base (lockstep) já existe, mas fica desligado até estar perfeito
+            var online = UiKit.Button(root, Craquez.Sim.Net.Online.Enabled ? "ON-LINE" : "ON-LINE  •  em breve", () => { }, 26, new Color(0.1f, 0.12f, 0.2f, 0.85f));
+            online.GetComponent<RectTransform>().At(0.5f, 0f, 420, 64, 0, 120);
+            online.interactable = Craquez.Sim.Net.Online.Enabled;
             UiKit.Select(_lastMode != null && _modeButtons.TryGetValue(_lastMode, out var lb) && lb != null ? lb : first);
         }
 

@@ -9,6 +9,8 @@ namespace Craquez
     {
         public Transform model;
         public SkinnedMeshRenderer body, shirt, shorts;
+        /// <summary>Camisa por fora do calção (10% dos atletas); os outros com a camisa por dentro.</summary>
+        public bool untucked;
         public Animator animator;
         public readonly Dictionary<string, Transform> bones = new Dictionary<string, Transform>();
         public Transform head, neck, spine, pelvis, footL, footR, handL, handR;

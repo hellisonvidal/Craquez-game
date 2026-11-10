@@ -70,7 +70,12 @@ namespace Craquez
             public float[] face;
             public int boots;
             public int tape;      // fita nos punhos: 0 nenhuma, 1 um, 2 os dois
+            public int hairStyle; // cabelo procedural (HairCap): 0 raspado .. 7 mais longo
+            public bool untucked; // camisa por fora do calção
         }
+
+        /// <summary>Estilo de cabelo (curto 30%, médio 20%, topete 15%, undercut 20%, cacheado 5%, mais longo 10%).</summary>
+        static int PickStyle(float r) => r < 0.3f ? 1 : r < 0.5f ? 2 : r < 0.65f ? 3 : r < 0.85f ? 4 : r < 0.9f ? 5 : 7;
 
         /// <summary>face = [pele 0-5, cor do cabelo, estilo, barba, olhos, porte] (leagues.json).</summary>
         public static Look LookFor(SimPlayer p, int salt = 0)
@@ -100,6 +105,9 @@ namespace Craquez
             {
                 baseName = b, hair = shaved ? -1 : Mathf.Clamp(hair, 0, Hairs.Length - 1), hairColor = HairColors[Mathf.Clamp(hc, 0, HairColors.Length - 1)],
                 tape = R(15) < 0.3f ? (R(16) < 0.5f ? 1 : 2) : 0,
+                hairStyle = shaved ? 0 : b == "afro" ? (R(7) < 0.45f ? 6 : R(7) < 0.75f ? 5 : 1) : PickStyle(R(7)),
+                // camisa por dentro do calção em 90% dos atletas, por fora em 10%
+                untucked = ((h >> 21) & 1023u) % 10u == 0u,
                 // altura: do baixinho (1,68 m) ao grandalhão (1,93 m), mais gente perto da média
                 skinTint = tint, scale = Mathf.Lerp(0.91f, 1.09f, Mathf.Clamp01(F(5, R(6) * 4f) / 4f * 0.5f + (R(8) + R(9)) * 0.25f)), face = f,
                 frame = Mathf.Clamp01(R(10) * 0.7f + F(5, 2f) / 4f * 0.3f),
@@ -140,7 +148,7 @@ namespace Craquez
             // mãos do modelo eram grandes demais para o corpo: um pouco menores
             foreach (var hn in new[] { "hand_l", "hand_r" })
                 if (rig.bones.TryGetValue(hn, out var hb)) hb.localScale = hb.localScale * 0.85f;   // (0,68 sumia com a mão)
-            Dress(rig, look, p.isKeeper ? keeperKit : kit, p.number, quality);
+            Dress(rig, look, p.isKeeper ? keeperKit : kit, p.id < 0 && p.number <= 0 ? -1 : p.number, quality);   // (juiz e técnico: sem número)
             Accessories(rig, look, p.isKeeper ? keeperKit : kit, p.isKeeper, captain, quality);
             return rig;
         }
@@ -243,6 +251,7 @@ namespace Craquez
                     }
                     case "Boots":
                     {
+                        smr.sharedMesh = SmoothBoot(smr.sharedMesh, axes);
                         int d = look.boots;
                         bool indoor = IndoorShoes;
                         smr.sharedMaterial = Shared("boots:" + d + (indoor ? "f" : ""), () => Gfx.Athlete(Color.white, BootPainter.Paint(d, indoor), indoor ? 0.4f : 0.6f, 0f));
@@ -252,7 +261,9 @@ namespace Craquez
                         if (n.StartsWith("Hair_"))
                         {
                             string hn = n.Substring(5);
-                            bool on = look.hair >= 0 && hn == Hairs[look.hair];
+                            // a malha de cabelo do modelo fica por cima do cabelo procedural nos estilos com fios
+                            // (raspado, undercut e cacheado ficam só com o procedural)
+                            bool on = look.hair >= 0 && hn == Hairs[look.hair] && look.hairStyle != 0 && look.hairStyle != 4 && look.hairStyle != 5;
                             smr.gameObject.SetActive(on);
                             if (on)
                                 smr.sharedMaterial = Shared("hair:" + hn + Teams.Hex(look.hairColor), () =>
@@ -281,7 +292,71 @@ namespace Craquez
             SkinnedMeshRenderer eyesR = null, browR = null, lashR = null;
             foreach (var r in smrs) { if (r.name == "Eyes") eyesR = r; else if (r.name == "Eyebrows") browR = r; else if (r.name == "Eyelashes") lashR = r; }
             if (rig.body != null && eyesR != null && bodyMesh != null) FaceRig.Build(rig.body, eyesR, axes, browR, lashR);
+            // cabelo com volume e estilo (antes muitos pareciam carecas)
+            if (rig.body != null && eyesR != null && bodyMesh != null) HairCap.Build(rig.body, eyesR, axes, look.hairStyle, look.hairColor * (look.hairStyle == 0 ? 0.8f : 1.15f), quality);
+            rig.untucked = look.untucked;
             // (o número agora vem pintado na camisa)
+        }
+
+        static readonly Dictionary<Mesh, Mesh> _smoothBoots = new Dictionary<Mesh, Mesh>();
+
+        /// <summary>
+        /// Chuteira arredondada: suavização de Taubin (alisa as quinas sem encolher a peça) nos vértices
+        /// soldados por posição, mantendo a sola plana. O modelo vinha com bico e calcanhar em "caixote".
+        /// </summary>
+        static Mesh SmoothBoot(Mesh src, KitPainter.Axes ax)
+        {
+            if (src == null) return null;
+            if (_smoothBoots.TryGetValue(src, out var have) && have != null) return have;
+            var m = Object.Instantiate(src);
+            m.name = src.name + " (lisa)";
+            var v = m.vertices;
+            int n = v.Length;
+            var id = new int[n];
+            var weld = new Dictionary<Vector3Int, int>();
+            var pos = new List<Vector3>();
+            for (int i = 0; i < n; i++)
+            {
+                var k = Vector3Int.RoundToInt(v[i] * 20000f);
+                if (!weld.TryGetValue(k, out int w)) { w = pos.Count; weld[k] = w; pos.Add(v[i]); }
+                id[i] = w;
+            }
+            var nb = new HashSet<int>[pos.Count];
+            for (int i = 0; i < nb.Length; i++) nb[i] = new HashSet<int>();
+            var tris = m.triangles;
+            for (int t = 0; t + 2 < tris.Length; t += 3)
+                for (int k = 0; k < 3; k++)
+                {
+                    int a = id[tris[t + k]], b = id[tris[t + (k + 1) % 3]];
+                    if (a != b) { nb[a].Add(b); nb[b].Add(a); }
+                }
+            // sola: os vértices mais baixos não se mexem na vertical (o pé continua apoiado)
+            var bounds = m.bounds;
+            int up = ax.up;   // eixo "para cima" do modelo (do corpo)
+            float sole = ax.upSign > 0 ? bounds.min[up] + bounds.size[up] * 0.12f : bounds.max[up] - bounds.size[up] * 0.12f;
+            var p = pos.ToArray();
+            var tmp = new Vector3[p.Length];
+            void Pass(float lambda)
+            {
+                for (int i = 0; i < p.Length; i++)
+                {
+                    if (nb[i].Count == 0) { tmp[i] = p[i]; continue; }
+                    var avg = Vector3.zero;
+                    foreach (int j in nb[i]) avg += p[j];
+                    avg /= nb[i].Count;
+                    var d = (avg - p[i]) * lambda;
+                    if (ax.upSign > 0 ? p[i][up] < sole : p[i][up] > sole) d[up] = 0f;
+                    tmp[i] = p[i] + d;
+                }
+                System.Array.Copy(tmp, p, p.Length);
+            }
+            for (int it = 0; it < 4; it++) { Pass(0.5f); Pass(-0.53f); }
+            for (int i = 0; i < n; i++) v[i] = p[id[i]];
+            m.vertices = v;
+            m.RecalculateNormals();
+            m.RecalculateBounds();
+            _smoothBoots[src] = m;
+            return m;
         }
 
         static readonly string[] FaceKeys =

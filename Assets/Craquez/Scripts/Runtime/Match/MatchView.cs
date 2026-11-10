@@ -60,6 +60,12 @@ namespace Craquez
             var home = Teams.Get(c.teamA);
             var away = Teams.Get(c.teamB);
             kits = Teams.PickKits(home, away, c.kitA, c.kitB);
+            // escudos no peito (uniformes de linha e de goleiro de cada time)
+            KitPainter.Crests.Clear();
+            Texture2D CrestOf(int team) { var sp = team >= 0 ? Craquez.UI.Crest.Team(team) : null; return sp != null ? Craquez.UI.Crest.Readable(sp.texture) : null; }
+            var crestA = CrestOf(c.teamA); var crestB = CrestOf(c.teamB);
+            if (crestA != null) KitPainter.Crests[kits[0]] = crestA;
+            if (crestB != null) KitPainter.Crests[kits[1]] = crestB;
             // society e rua: sem som de torcida (campo pequeno, sem arquibancada cheia)
             Sfx.NoCrowd = s.mode.id == GameModes.Society || s.mode.id == GameModes.Street || c.training;
             _quietOwner = this;
@@ -377,8 +383,36 @@ namespace Craquez
                 if (sc > bestS) { bestS = sc; best = opts[i]; }
             }
             var dark = new Color(0.06f, 0.06f, 0.07f);
-            _refKit = new Kit { c1 = best, c2 = best.grayscale > 0.4f ? dark : new Color(0.85f, 0.75f, 0.1f), shorts = dark, socks = best.grayscale > 0.4f ? dark : best };
+            // uniforme do árbitro com acabamento: gola e punhos em contraste e o distintivo no peito
+            _refKit = new Kit { c1 = best, c2 = best.grayscale > 0.4f ? dark : new Color(0.85f, 0.75f, 0.1f), shorts = dark, socks = best.grayscale > 0.4f ? dark : best,
+                trim = best.grayscale > 0.4f ? dark : Color.white };
+            KitPainter.Crests[_refKit] = RefBadge(best);
             return _refKit;
+        }
+
+        /// <summary>Distintivo da arbitragem: escudo com estrela (sem marcas reais).</summary>
+        static Texture2D RefBadge(Color kitC)
+        {
+            const int N = 64;
+            var t = new Texture2D(N, N, TextureFormat.RGBA32, false) { wrapMode = TextureWrapMode.Clamp };
+            var px = new Color32[N * N];
+            var gold = new Color(0.95f, 0.78f, 0.2f);
+            var bg = kitC.grayscale > 0.5f ? new Color(0.1f, 0.12f, 0.2f) : Color.white;
+            for (int y = 0; y < N; y++)
+                for (int x = 0; x < N; x++)
+                {
+                    float u = (x + 0.5f) / N * 2f - 1f, v = (y + 0.5f) / N * 2f - 1f;
+                    // escudo: retângulo em cima, ponta embaixo
+                    bool inShield = Mathf.Abs(u) < 0.8f && v < 0.85f && v > -0.9f + Mathf.Abs(u) * 0.9f;
+                    bool rim = inShield && !(Mathf.Abs(u) < 0.68f && v < 0.73f && v > -0.75f + Mathf.Abs(u) * 0.9f);
+                    float a = Mathf.Atan2(v - 0.05f, u), r = Mathf.Sqrt(u * u + (v - 0.05f) * (v - 0.05f));
+                    bool star = r < 0.25f + 0.17f * Mathf.Cos(a * 5f + 1.57f);
+                    Color c = !inShield ? new Color(0, 0, 0, 0) : rim || star ? gold : bg;
+                    px[y * N + x] = c;
+                }
+            t.SetPixels32(px);
+            t.Apply(false);
+            return t;
         }
 
         void BuildReferee(Transform parent, int q)

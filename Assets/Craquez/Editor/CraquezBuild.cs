@@ -24,6 +24,13 @@ namespace Craquez.EditorTools
         {
             Common();
             if (report.summary.platform == BuildTarget.Android) AndroidTv();
+            // versão TV (CI grava Resources/flavor.txt = "tv"): também 32 bits — muitas TVs Google TV/Android
+            // TV (inclusive TCL) rodam o sistema em 32 bits, e um APK só ARM64 nem instala
+            if (report.summary.platform == BuildTarget.Android && File.Exists("Assets/Craquez/Resources/flavor.txt") && File.ReadAllText("Assets/Craquez/Resources/flavor.txt").Trim() == "tv")
+            {
+                PlayerSettings.Android.targetArchitectures = AndroidArchitecture.ARMv7 | AndroidArchitecture.ARM64;
+                Debug.Log("[build] versão TV: ARMv7 + ARM64");
+            }
         }
 
         [InitializeOnLoadMethod]

@@ -63,7 +63,10 @@ namespace Craquez
                     foreach (var a in assets)
                     {
                         string n = MiniJson.S(a, "name", "");
-                        if (!n.EndsWith(".apk", System.StringComparison.OrdinalIgnoreCase) || n.ToLowerInvariant().Contains("casa")) continue;
+                        string ln = n.ToLowerInvariant();
+                        if (!n.EndsWith(".apk", System.StringComparison.OrdinalIgnoreCase) || ln.Contains("casa")) continue;
+                        // a versão de TV se atualiza com o APK de TV (32 e 64 bits); o celular, com o do celular
+                        if (Platform.TvBuild != ln.Contains("-tv")) continue;
                         ApkUrl = MiniJson.S(a, "browser_download_url", "");
                         ApkSize = (long)MiniJson.F(a, "size", 0f);
                         break;
