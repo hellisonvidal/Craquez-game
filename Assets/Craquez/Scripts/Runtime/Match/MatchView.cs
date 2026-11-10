@@ -75,7 +75,7 @@ namespace Craquez
             Lighting(c.timeOfDay, s.mode.id, q);
             FanCrowd.HomeKits = home.kits; FanCrowd.AwayKits = away.kits;   // torcedores com os uniformes dos times
             {
-                string wk0 = c.weather == "aleatorio" ? WeatherFx.Kinds[(int)(c.seed % (uint)WeatherFx.Kinds.Length)] : c.weather;
+                string wk0 = c.WeatherKind();
                 // chuva na arquibancada: capas, capuzes e guarda-chuvas; nada de bandeiras
                 FanCrowd.Rain = s.mode.id != GameModes.Futsal && (wk0 == "chuva" || wk0 == "tempestade");
                 Gfx.CrowdRain = FanCrowd.Rain;
@@ -130,11 +130,12 @@ namespace Craquez
             bcam.entrance = venue.entrance;
             bcam.SnapToBall();
             weather = gameObject.AddComponent<WeatherFx>();
-            string wk = c.weather == "aleatorio" ? WeatherFx.Kinds[(int)(c.seed % (uint)WeatherFx.Kinds.Length)] : c.weather;
+            string wk = c.WeatherKind();
+            bool indoorV = MatchConfig.Indoor(c.mode, c.venue);
             if (s.mode.id == GameModes.Futsal) wk = "sol";   // ginásio coberto
-            weather.Setup(wk, c.dynamicWeather && s.mode.id != GameModes.Futsal, c.seed, cam, sun, venue.pitchMat);
+            weather.Setup(wk, c.dynamicWeather && !indoorV, c.seed, cam, sun, venue.pitchMat);
             weather.pitch2 = venue.pitchMat2;
-            if (s.mode.id != GameModes.Futsal) weather.BuildSnowLayer(venue.root, s.halfLen, s.halfW);
+            if (!indoorV) weather.BuildSnowLayer(venue.root, s.halfLen, s.halfW);   // (coberto: sem neve no piso)
             // poças da chuva (as mesmas da simulação); já cheias se a partida começa chovendo
             s.SetPitch(weather.Water, weather.SnowCover);
             PuddleFx.Create(venue.root, s, weather, this);

@@ -17,7 +17,18 @@ namespace Craquez
         public Side sideA = Side.Player1, sideB = Side.Cpu;
         public float difficulty = 0.6f;
         public int minutes = 5;          // duração total (dois tempos)
-        public string weather = "sol";   // sol, nublado, chuva, tempestade, neve, aleatorio
+        public string weather = "aleatorio";   // sol, nublado, chuva, tempestade, neve, aleatorio (padrão: aleatório)
+
+        /// <summary>Local coberto (ginásios de futsal e os society cobertos): sem chuva nem neve.</summary>
+        public static bool Indoor(string mode, int venue) => mode == GameModes.Futsal || (mode == GameModes.Society && (venue == 0 || venue == 1 || venue == 6));
+
+        /// <summary>Clima efetivo da partida: sorteia o aleatório e tira chuva/neve dos locais cobertos.</summary>
+        public string WeatherKind()
+        {
+            string w = weather == "aleatorio" ? WeatherFx.Kinds[(int)(seed % (uint)WeatherFx.Kinds.Length)] : weather;
+            if (Indoor(mode, venue) && (w == "chuva" || w == "tempestade" || w == "neve" || w == "nevasca")) w = "nublado";
+            return w;
+        }
         public string timeOfDay = "noite";  // dia, tarde, noite
         public bool dynamicWeather = true;
         public int streetPlayers = 3;    // rua: 3x3, 4x4 ou 5x5

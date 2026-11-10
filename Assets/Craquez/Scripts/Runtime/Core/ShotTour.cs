@@ -77,6 +77,17 @@ namespace Craquez
 
         IEnumerator Tour()
         {
+            // desenhos 2D dos locais (vistos de fora), salvos direto em arquivo
+            try
+            {
+                int k = 0;
+                foreach (var (mode, v) in new[] { (GameModes.Field, 1), (GameModes.Field, 3), (GameModes.Field, 9), (GameModes.Field, 15), (GameModes.Field, 21), (GameModes.Field, 29), (GameModes.Futsal, 2), (GameModes.Society, 0) })
+                {
+                    var tex = Craquez.UI.VenueArt.Exterior(mode, v, new Color(0.1f, 0.35f, 0.8f), 960, 540);
+                    System.IO.File.WriteAllBytes(System.IO.Path.Combine(Dir, "local_" + (k++).ToString("00") + "_" + mode + v + ".png"), tex.EncodeToPNG());
+                }
+            }
+            catch (System.Exception ex) { Debug.LogWarning("[shots] desenhos dos locais: " + ex.Message); }
             yield return Shot("intro_claude", 1.6f);
             yield return new WaitForSecondsRealtime(3.4f);
             yield return Shot("intro_gratuito", 1.2f);

@@ -40,7 +40,7 @@ namespace Craquez.UI
             var ta = Teams.Get(cfg.teamA);
             var tb = Teams.Get(cfg.teamB);
             // placar
-            var sb = UiKit.Image(root, new Color(0.02f, 0.03f, 0.07f, 0.88f), Theme.RoundSmall, "placar").rectTransform.At(0, 1, 560, 64, 40, -36);
+            var sb = UiKit.Image(root, new Color(0.02f, 0.03f, 0.07f, 0.88f), Theme.RoundSmall, "placar").rectTransform.At(0.5f, 1, 560, 64, 0, -36);   // centralizado no topo
             var accent = UiKit.Image(sb, Theme.Accent, null, "linha").rectTransform;
             accent.Place(0, 0, 1, 0, 0, 0, 0, -4);
             Chip(sb, kits[0], 0f);
@@ -69,8 +69,8 @@ namespace Craquez.UI
             _half.rectTransform.anchorMin = _half.rectTransform.anchorMax = new Vector2(0, 0.5f);
             _half.rectTransform.sizeDelta = new Vector2(60, 60);
             _half.rectTransform.anchoredPosition = new Vector2(510, 0);
-            _weather = UiKit.Label(root, "", 22, Theme.BodyBold, Theme.TextDim);
-            _weather.rectTransform.At(0, 1, 600, 30, 44, -104);
+            _weather = UiKit.Label(root, "", 22, Theme.BodyBold, Theme.TextDim, TextAnchor.MiddleCenter);
+            _weather.rectTransform.At(0.5f, 1, 700, 30, 0, -104);
             UiKit.Shadow(_weather);
             if (cfg.training)
             {
@@ -111,7 +111,7 @@ namespace Craquez.UI
             }
             // (a faixa com a escalação inteira no rodapé saiu: fica só o quadro de quem está com a bola)
             // aviso (falta, escanteio, clima...)
-            _toastBox = UiKit.Image(root, new Color(0.02f, 0.03f, 0.07f, 0.85f), Theme.Round, "aviso").rectTransform.At(0.5f, 1, 640, 60, 0, -40);
+            _toastBox = UiKit.Image(root, new Color(0.02f, 0.03f, 0.07f, 0.85f), Theme.Round, "aviso").rectTransform.At(0.5f, 1, 640, 60, 0, -150);   // (abaixo do placar central)
             _toastCg = _toastBox.gameObject.AddComponent<CanvasGroup>();
             _toast = UiKit.Label(_toastBox, "", 32, Theme.Head, Theme.Text, TextAnchor.MiddleCenter);
             _toast.rectTransform.Place(0, 0, 1, 1);
@@ -180,8 +180,9 @@ namespace Craquez.UI
 
         public static string ClockText(MatchSim sim)
         {
-            float perHalf = sim.mode.id == GameModes.Field ? 45f : sim.mode.id == GameModes.Futsal ? 20f : sim.mode.id == GameModes.Society ? 25f : 10f;
-            float m = Mathf.Min(sim.clock, sim.halfSeconds) / Mathf.Max(1f, sim.halfSeconds) * perHalf + (sim.half - 1) * perHalf;
+            float perHalf = sim.DisplayHalfMinutes;
+            // nos acréscimos o relógio continua (45:31, 90:12...)
+            float m = Mathf.Min(sim.clock, sim.halfSeconds + sim.addedSeconds) / Mathf.Max(1f, sim.halfSeconds) * perHalf + (sim.half - 1) * perHalf;
             int mm = Mathf.FloorToInt(m);
             int ss = Mathf.FloorToInt((m - mm) * 60f);
             return mm.ToString("00") + ":" + ss.ToString("00");
@@ -274,7 +275,9 @@ namespace Craquez.UI
                 _lastSecs = secs;
                 _lastHalf = _sim.half;
                 _clock.text = ClockText(_sim);
-                _half.text = _sim.half == 1 ? "1ºT" : "2ºT";
+                // acréscimos: "+3" ao lado do relógio
+                _half.text = _sim.addedMinutes > 0 ? "+" + _sim.addedMinutes : (_sim.half == 1 ? "1ºT" : "2ºT");
+                _half.color = _sim.addedMinutes > 0 ? Theme.Hot : Theme.TextDim;
             }
             for (int t = 0; t < 2; t++)
             {

@@ -28,6 +28,7 @@ namespace Craquez
             _prev = _cur = W(sp.position);
             _yaw = Yaw(sp.facing);
             transform.position = _cur;
+            MeasureSoles();
             InitFingers();
             SkinnedMeshRenderer brow = null, lash = null;
             foreach (var sr in rig.GetComponentsInChildren<SkinnedMeshRenderer>(true)) { if (sr.name == "Eyebrows") brow = sr; else if (sr.name == "Eyelashes") lash = sr; }
@@ -35,6 +36,30 @@ namespace Craquez
         }
 
         FaceDriver _face;
+        float _footSole = 0.085f, _ballSole = 0.035f;
+
+        /// <summary>
+        /// Distância real (já na escala do atleta) dos ossos do pé e da ponta do pé até a sola da chuteira,
+        /// medida na pose de ligação — e as travas, no campo. Antes eram valores fixos (8,5 e 3,5 cm) que não
+        /// batiam com cada biotipo nem com a altura: o calcanhar afundava até ~1,5 cm no gramado.
+        /// </summary>
+        void MeasureSoles()
+        {
+            if (rig == null || rig.footL == null) return;
+            rig.bones.TryGetValue("ball_l", out var ball);
+            foreach (var r in rig.GetComponentsInChildren<SkinnedMeshRenderer>(true))
+            {
+                if (r.name != "Boots" || r.sharedMesh == null) continue;
+                var bb = r.sharedMesh.bounds;
+                float mn = float.MaxValue;
+                for (int cx = -1; cx <= 1; cx += 2) for (int cy = -1; cy <= 1; cy += 2) for (int cz = -1; cz <= 1; cz += 2)
+                    mn = Mathf.Min(mn, r.transform.TransformPoint(bb.center + Vector3.Scale(bb.extents, new Vector3(cx, cy, cz))).y);
+                float studs = AthleteFactory.IndoorShoes ? 0f : 0.008f * (rig.model != null ? rig.model.lossyScale.y : 1f);
+                _footSole = Mathf.Clamp(rig.footL.position.y - mn + studs, 0.05f, 0.14f);
+                if (ball != null) _ballSole = Mathf.Clamp(ball.position.y - mn + studs, 0.012f, 0.06f);
+                break;
+            }
+        }
         float _effortT;
 
         /// <summary>
@@ -747,6 +772,7 @@ namespace Craquez
         // ------------------------------------------------------------ defesas do goleiro
         int _saveKindV;
         float _saveRec, _saveSideV, _saveU, _saveRecT = 0.45f;
+        bool _crossHand;
         bool _saveHeld;
 
         /// <summary>
@@ -768,6 +794,8 @@ namespace Craquez
                     var sideW = new Vector3(0, 0, p.saveSide);
                     _saveSideV = Vector3.Dot(sideW, transform.right) >= 0f ? 1f : -1f;
                     _saveU = simU;
+                    // espalmada de mão trocada: no mergulho alto, às vezes só a mão de cima cruza e tira a bola
+                    _crossHand = p.saveKind == 5 && ((p.id * 7 + view.sim.tick) % 10) < 4;
                 }
                 // progresso contínuo entre os passos da simulação (sem "quadros")
                 else _saveU = Mathf.Clamp(Mathf.Max(_saveU + dt / Mathf.Max(0.05f, p.saveTotal), simU - 0.02f), 0f, Mathf.Min(1f, simU + 0.04f));
@@ -820,6 +848,14 @@ namespace Craquez
                     lift = 0.06f * k;
                     break;
                 }
+                case 7:   // bloqueio com o pé: o corpo inclina para o lado da perna esticada
+                {
+                    float k = Smooth(u / 0.22f);
+                    roll = -_saveSideV * 12f * k;
+                    pitch = 5f * k;
+                    lift = -0.03f * k;
+                    break;
+                }
                 case 6:   // salto no alto: no ponto mais alto quando a bola chega
                     lift = Mathf.Sin(Mathf.Clamp01(u / (cu * 2f)) * Mathf.PI) * 0.45f;
                     pitch = -6f;
@@ -844,6 +880,7 @@ namespace Craquez
             // braços chegam na bola no instante do contato (antes já estavam esticados logo no início)
             float w = p.saveKind > 0 ? Smooth(_saveU / Mathf.Max(0.08f, Mathf.Clamp(p.saveContact, 0.12f, 0.75f) * 0.85f)) : Smooth(_saveRec / _saveRecT);
             if (!p.isKeeper || _saveKindV == 0 || w <= 0.001f || rig.spine == null) return;
+            if (_saveKindV == 7) { FootBlock(w); return; }
             var sim = view.sim;
             var ballW = W(sim.ball.pos, sim.ball.z + 0.11f);
             Vector3 target;
@@ -871,8 +908,10 @@ namespace Craquez
                 rig.bones.TryGetValue("hand" + sfx, out var hd);
                 if (up == null || lo == null || hd == null) continue;
                 float s = Mathf.Sign(Vector3.Dot(up.position - chest, transform.right));
+                // mão trocada: o braço do lado do mergulho fica junto do corpo e o de cima cruza até a bola
+                if (_crossHand && _saveKindV == 5 && s == _saveSideV) continue;
                 // mãos lado a lado (formando o "W" atrás da bola)
-                var handT = target + transform.right * s * 0.09f;
+                var handT = _crossHand && _saveKindV == 5 ? target : target + transform.right * s * 0.09f;
                 var dirUp = handT - up.position;
                 if (dirUp.sqrMagnitude < 1e-4f) continue;
                 _pose.Rotate(up, Quaternion.Slerp(Quaternion.identity, Quaternion.FromToRotation(lo.position - up.position, dirUp), w));
@@ -922,6 +961,31 @@ namespace Craquez
                     _pose.Rotate(th, Quaternion.AngleAxis(-14f * w, rgt));
                     _pose.Rotate(cf, Quaternion.AngleAxis(22f * w, rgt));
                 }
+            }
+        }
+
+        /// <summary>
+        /// Bloqueio com o pé: a perna do lado da bola estica para o lado (rente ao chão), a outra dobra para
+        /// apoiar, e os braços abrem para equilibrar (e ocupar espaço).
+        /// </summary>
+        void FootBlock(float w)
+        {
+            var fwd = transform.forward; var right = transform.right;
+            string near = _saveSideV > 0 ? "_r" : "_l", far = _saveSideV > 0 ? "_l" : "_r";
+            rig.bones.TryGetValue("thigh" + near, out var th);
+            rig.bones.TryGetValue("calf" + near, out var cf);
+            rig.bones.TryGetValue("thigh" + far, out var th2);
+            rig.bones.TryGetValue("calf" + far, out var cf2);
+            _pose.Rotate(th, Quaternion.AngleAxis(_saveSideV * 52f * w, fwd));                         // perna esticada para o lado
+            _pose.Rotate(cf, Quaternion.AngleAxis(-4f * w, right));
+            _pose.Rotate(th2, Quaternion.AngleAxis(-28f * w, right));                                   // a outra dobra (apoio)
+            _pose.Rotate(cf2, Quaternion.AngleAxis(48f * w, right));
+            foreach (var sfx in LR)
+            {
+                rig.bones.TryGetValue("upperarm" + sfx, out var ua);
+                if (ua == null) continue;
+                float sd = Mathf.Sign(Vector3.Dot(ua.position - rig.spine.position, right));
+                _pose.Rotate(ua, Quaternion.AngleAxis(sd * 50f * w, fwd));                              // braços abertos
             }
         }
 
@@ -1583,10 +1647,10 @@ namespace Craquez
             rig.bones.TryGetValue("ball_r", out br);
             float lowest = float.MaxValue;
             // (sem arrays temporários: roda para cada atleta a cada quadro)
-            if (bl != null) lowest = Mathf.Min(lowest, bl.position.y - 0.035f);
-            if (br != null) lowest = Mathf.Min(lowest, br.position.y - 0.035f);
-            if (rig.footL != null) lowest = Mathf.Min(lowest, rig.footL.position.y - 0.085f);
-            if (rig.footR != null) lowest = Mathf.Min(lowest, rig.footR.position.y - 0.085f);
+            if (bl != null) lowest = Mathf.Min(lowest, bl.position.y - _ballSole);
+            if (br != null) lowest = Mathf.Min(lowest, br.position.y - _ballSole);
+            if (rig.footL != null) lowest = Mathf.Min(lowest, rig.footL.position.y - _footSole);
+            if (rig.footR != null) lowest = Mathf.Min(lowest, rig.footR.position.y - _footSole);
             if (lowest == float.MaxValue) return;
             float lift = transform.position.y;   // pulos/mergulhos intencionais
             float err = lowest - lift;
@@ -1628,8 +1692,8 @@ namespace Craquez
             if (_uaL == null && rig.bones.TryGetValue("upperarm_l", out _uaL)) _uaLBase = _uaL.localPosition;
             if (_uaR == null && rig.bones.TryGetValue("upperarm_r", out _uaR)) _uaRBase = _uaR.localPosition;
             // (0,88 ainda deixava o ombro para fora da linha do tronco, como uma ombreira)
-            if (_uaL != null) _uaL.localPosition = _uaLBase * 0.84f;
-            if (_uaR != null) _uaR.localPosition = _uaRBase * 0.84f;
+            if (_uaL != null) _uaL.localPosition = _uaLBase * 0.81f;   // ombros na linha do tronco e da cintura
+            if (_uaR != null) _uaR.localPosition = _uaRBase * 0.81f;
         }
 
         /// <summary>
@@ -1793,7 +1857,7 @@ namespace Craquez
 
         // ---------------------------------------------------------------- tecido solto
         static readonly int IdInflate = Shader.PropertyToID("_ClothInflate"), IdBand = Shader.PropertyToID("_ClothBand"),
-            IdDrag = Shader.PropertyToID("_ClothDrag"), IdFlutter = Shader.PropertyToID("_ClothFlutter"), IdTuck = Shader.PropertyToID("_ClothTuck");
+            IdDrag = Shader.PropertyToID("_ClothDrag"), IdFlutter = Shader.PropertyToID("_ClothFlutter"), IdTuck = Shader.PropertyToID("_ClothTuck"), IdOutline = Shader.PropertyToID("_OutlineMul");
         MaterialPropertyBlock _mpb;
         Vector3 _clothPos, _clothVel, _clothDrag, _clothDragV;
         float _clothPhase = -1f;
@@ -1846,13 +1910,15 @@ namespace Craquez
                 _mpb.SetVector(IdDrag, _clothDrag);
                 _mpb.SetVector(IdFlutter, new Vector4(flutAmp, freq, _clothPhase, 0));
                 // camisa por dentro (90%): entra no calção logo acima do quadril; por fora: solta
+                _mpb.SetFloat(IdOutline, 0.45f);
                 _mpb.SetVector(IdTuck, rig.untucked ? Vector4.zero : new Vector4(pos.y + 0.075f * transform.localScale.y, 0.03f, 0, 0));
                 rig.shirt.SetPropertyBlock(_mpb);
             }
             if (rig.shorts != null)
             {
                 rig.shorts.GetPropertyBlock(_mpb);
-                _mpb.SetFloat(IdInflate, 0.005f);
+                _mpb.SetFloat(IdInflate, -0.004f);   // (o calção vinha mais largo que a camisa na cintura: degrau)
+                _mpb.SetFloat(IdOutline, 0.45f);
                 _mpb.SetVector(IdBand, new Vector4(pos.y - 0.02f, pos.y - 0.34f, 0, 0));
                 _mpb.SetVector(IdDrag, _clothDrag * 0.55f);
                 _mpb.SetVector(IdFlutter, new Vector4(flutAmp * 0.7f, freq * 1.1f, _clothPhase + 1.7f, 0));

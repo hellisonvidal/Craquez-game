@@ -119,6 +119,8 @@ namespace Craquez.Sim
         public bool setPieceShot;
         float _setPieceT;
         public int kickoffKicker = -1, kickoffMate = -1;
+        /// <summary>Saída para trás (formação com um atacante só).</summary>
+        public bool kickoffBack;
         public Vector2 kickoffMateSpot;
         float kickoffT;
         public float passReceiverT;
@@ -489,7 +491,22 @@ namespace Craquez.Sim
         void Emit(string type, int team = -1, int id = -1, string kind = null, bool ok = false, float power = 0f, int skill = 0)
         {
             events.Add(new SimEvent { type = type, team = team, id = id, kind = kind, ok = ok, power = power, skill = skill });
+            // acréscimos: cada gol, falta, cartão e substituição "para" o jogo um pouco
+            if (type == "goal") _stoppage += 0.6f;
+            else if (type == "foul") _stoppage += 0.18f;
+            else if (type == "card") _stoppage += 0.35f;
+            else if (type == "sub") _stoppage += 0.3f;
+            else if (type == "injury") _stoppage += 0.5f;
         }
+
+        float _stoppage;
+        /// <summary>Acréscimos do tempo atual (minutos exibidos; 0 até o tempo regulamentar acabar).</summary>
+        public int addedMinutes;
+        /// <summary>Acréscimos em segundos reais da simulação.</summary>
+        public float addedSeconds;
+
+        /// <summary>Minutos de um tempo no relógio exibido (campo 45, futsal 20, society 25, rua 10).</summary>
+        public float DisplayHalfMinutes => mode.id == GameModes.Field ? 45f : mode.id == GameModes.Futsal ? 20f : mode.id == GameModes.Society ? 25f : 10f;
 
         // ------------------------------------------------------------ reinícios
         Vector2 FormationWorld(SimPlayer p)
@@ -522,9 +539,19 @@ namespace Craquez.Sim
             SimPlayer kicker = null, mate = null;
             foreach (var p in players)
                 if (p.team == t && !p.isKeeper && !p.sentOff && (kicker == null || p.basePos.x > kicker.basePos.x)) kicker = p;
-            // companheiro da saída: o mais adiantado depois do batedor
+            // companheiro da saída: com dois atacantes, o parceiro de ataque (toque de lado, os dois trabalham a
+            // bola); com um atacante só, o meia mais central, que vem buscar atrás (toque para trás)
+            int strikers = 0;
+            foreach (var p in players) if (p.team == t && !p.isKeeper && !p.sentOff && p.basePos.x > -0.25f) strikers++;
+            bool twoUp = strikers >= 2;
             foreach (var p in players)
-                if (p.team == t && !p.isKeeper && !p.sentOff && p != kicker && (mate == null || p.basePos.x > mate.basePos.x)) mate = p;
+            {
+                if (p.team != t || p.isKeeper || p.sentOff || p == kicker) continue;
+                if (twoUp) { if (mate == null || p.basePos.x > mate.basePos.x) mate = p; }
+                else if (p.basePos.x > -0.62f && (mate == null || Mathf.Abs(p.basePos.y) < Mathf.Abs(mate.basePos.y) - 0.05f
+                         || (Mathf.Abs(Mathf.Abs(p.basePos.y) - Mathf.Abs(mate.basePos.y)) <= 0.05f && p.basePos.x > mate.basePos.x))) mate = p;
+            }
+            kickoffBack = !twoUp;
             kicker.position = new Vector2(-TeamDir(t) * 0.5f, 0);
             kickoffKicker = kicker.id;
             kickoffMate = mate != null ? mate.id : -1;
@@ -534,8 +561,11 @@ namespace Craquez.Sim
             {
                 // ao lado da bola, no próprio campo, de frente para o batedor
                 float side = mate.basePos.y >= 0f ? 1f : -1f;
-                float gap = mode.id == GameModes.Field ? 3.2f : 2.2f;
-                kickoffMateSpot = new Vector2(-TeamDir(t) * 0.9f, side * gap);
+                bool fieldK = mode.id == GameModes.Field;
+                // dois atacantes: lado a lado no círculo; um atacante: o meia uns 9 m atrás (campo)
+                kickoffMateSpot = kickoffBack
+                    ? new Vector2(-TeamDir(t) * (fieldK ? 9f : 4.5f), side * (fieldK ? 1.5f : 0.8f))
+                    : new Vector2(-TeamDir(t) * 0.6f, side * (fieldK ? 2.8f : 2.0f));
                 mate.position = kickoffMateSpot;
                 mate.facing = (ball.pos - mate.position).Norm();
             }
@@ -941,6 +971,7 @@ namespace Craquez.Sim
                     {
                         half = 2;
                         clock = 0f;
+                        addedMinutes = 0; addedSeconds = 0f; _stoppage = 0f;   // acréscimos do 2º tempo contam do zero
                         teamFouls[0] = teamFouls[1] = 0;   // faltas acumuladas zeram no intervalo
                         foreach (var pl in players) pl.stamina = Mathf.Min(1f, pl.stamina + 0.6f);   // descanso no vestiário
                         kickoffTeam = 1 - firstKickoff;
@@ -966,7 +997,15 @@ namespace Craquez.Sim
                     Shoot(tk, new Vector2(TeamDir(tk.team), rng.Chance(0.5f) ? 0.7f : -0.7f), 0.55f);
                 }
             }
-            if (clock >= halfSeconds && !BallInDanger())
+            if (clock >= halfSeconds && addedMinutes == 0 && !training)
+            {
+                // fim do tempo regulamentar: o quarto árbitro mostra os acréscimos (1 a 6 min no campo)
+                int maxAdd = mode.id == GameModes.Field ? 6 : mode.id == GameModes.Street ? 2 : 3;
+                addedMinutes = Mathf.Clamp(Mathf.RoundToInt(1f + _stoppage), 1, maxAdd);
+                addedSeconds = addedMinutes / DisplayHalfMinutes * halfSeconds;
+                Emit("added", -1, -1, addedMinutes.ToString());
+            }
+            if (clock >= halfSeconds + addedSeconds && !BallInDanger())
             {
                 if (half == 1)
                 {
@@ -1473,7 +1512,7 @@ namespace Craquez.Sim
             var to = mate.position - ball.pos;
             float dist = Mathf.Max(0.5f, to.magnitude);
             var dirv = (to / dist).Rotated(rng.Gauss() * 0.02f * (1.2f - p.passing));
-            float vEnd = 2.6f;
+            float vEnd = kickoffBack ? 3.4f : 2.6f;
             float v0 = Mathf.Sqrt(vEnd * vEnd + 2f * mode.rollDecel * dist);
             p.kickKind = InputFrame.Pass;
             p.facing = dirv;
@@ -1490,7 +1529,7 @@ namespace Craquez.Sim
             ReleaseBall(p);
             // o adversário ainda não entra no círculo até a bola chegar ao companheiro
             protectTeam = p.team;
-            protectT = 0.35f;
+            protectT = kickoffBack ? 1.4f : 0.9f;
             Emit("kick", p.team, p.id, "pass", power: 0.2f);
         }
 
@@ -1918,6 +1957,9 @@ namespace Craquez.Sim
         public void Foul(SimPlayer offender, SimPlayer victim, bool holding)
         {
             if (state != MatchState.Playing) return;
+            // sem contato de verdade (o infrator longe da vítima) não é falta: antes o juiz marcava e a vítima
+            // caía "sozinha", fora do lance
+            if (!holding && offender.position.Dist(victim.position) > 1.1f + (offender.slide > 0f ? 0.9f : 0f)) return;
             offender.stun = Mathf.Max(offender.stun, 0.8f);
             offender.slide = Mathf.Min(offender.slide, 0.15f);
             // a vítima vai ao chão: tropeça, cai, rola e levanta (o tempo no chão varia com a pancada)
@@ -1940,7 +1982,7 @@ namespace Craquez.Sim
             // sem contato visível (agarrão, ou o infrator a mais de ~1,1 m): ninguém vai ao chão "sozinho" —
             // a vítima é segurada e para (às vezes tropeça e cai sentada, para trás, por pouco tempo)
             bool far = offender.position.Dist(victim.position) > 1.1f + (offender.slide > 0f ? 0.9f : 0f);
-            if (holding || far)
+            if (holding)
             {
                 if (rng.Chance(0.6f))
                 {
@@ -2876,7 +2918,11 @@ namespace Craquez.Sim
                                 // encaixe: de frente, baixo (cai sobre a bola) ou saltando no alto
                                 // (bola no corpo: arma as mãos em cima da hora; salto só se passar da cabeça)
                                 if (tK < Mathf.Lerp(0.26f, 0.42f, Mathf.Clamp01(side / Mathf.Max(0.1f, armReach * 1.25f))))
-                                    StartSave(p, zK < 0.45f ? 2 : zK > 2.0f ? 6 : 1, Mathf.Sign(lat), zK, side, Mathf.Max(0.35f, tK + 0.25f), tK);
+                                {
+                                    // rasteiro no canto curto, em cima da hora: bloqueio com o pé (a perna estica de lado)
+                                    bool foot = zK < 0.3f && side > armReach * 0.55f && tK < 0.3f && rng.Chance(0.6f);
+                                    StartSave(p, foot ? 7 : zK < 0.45f ? 2 : zK > 2.0f ? 6 : 1, Mathf.Sign(lat), zK, side, Mathf.Max(0.35f, tK + 0.25f), tK);
+                                }
                             }
                             else if (tK < Mathf.Lerp(0.4f, 0.5f, p.defense) * Mathf.Clamp(0.55f + side * 0.2f, 0.7f, 1f))   // mergulho na hora: mais perto do corpo, mais em cima da hora
                             {
@@ -2989,6 +3035,15 @@ namespace Craquez.Sim
                 float hz = p.saveKind == 3 ? 0.22f : p.saveKind == 5 ? Mathf.Clamp(p.saveH, 1.5f, 2.55f) : Mathf.Clamp(p.saveH, 0.6f, 1.5f);
                 radius = 0.3f;
                 return new Vector3(p.position.x + dir * 0.25f, p.position.y + p.saveSide * ext * 0.9f, Mathf.Lerp(1.0f, hz, Mathf.Clamp01(u * 3f)));
+            }
+            if (p.saveKind == 7)
+            {
+                // bloqueio com o pé: a "mão" é a chuteira, esticada para o lado, rente ao chão
+                float gsF = Mathf.Clamp(goalHalf / 3.66f, 0.6f, 1f);
+                float u7 = p.saveTotal > 0f ? 1f - p.saveT / p.saveTotal : 1f;
+                float reachF = (0.95f + 0.1f * p.defense) * gsF * Mathf.Sin(Mathf.Clamp01(u7 * 3f) * Mathf.PI * 0.5f);
+                radius = 0.28f;
+                return new Vector3(p.position.x + dir * 0.15f, p.position.y + p.saveSide * reachF, 0.12f);
             }
             float hzStand = p.saveKind == 2 ? 0.25f : p.saveKind == 6 ? Mathf.Clamp(p.saveH, 1.8f, 2.7f) : p.saveKind == 1 ? Mathf.Clamp(p.saveH, 0.4f, 1.9f) : 1.0f;
             float hy = p.position.y;
@@ -4183,7 +4238,8 @@ namespace Craquez.Sim
                 float catchP = Mathf.Clamp(1.25f - rel / 24f + p.defense * 0.15f + (p.Has(Trait.GoleiroSeguro) ? 0.12f : 0f) - (p.dive > 0f ? 0.15f : 0f)
                     - (p.Diving ? Mathf.Clamp01((stretch - 0.12f) / 0.3f) * 0.18f : 0f) + bodyBonus
                     - (water > 0.25f ? 0.08f : 0f), 0.1f, 0.97f);   // bola molhada escorrega
-                if (rel > 8f && !rng.Chance(catchP))
+                if (p.saveKind == 7) catchP = 0f;   // com o pé não se segura: a bola desvia
+                if ((rel > 8f || p.saveKind == 7) && !rng.Chance(catchP))
                 {
                     // espalmada: a bola volta para o campo e abre para o lado (escanteio ou rebote longe do gol)
                     // espalmada pela mão: a bola reflete na palma (normal = do corpo para a bola, puxada para
