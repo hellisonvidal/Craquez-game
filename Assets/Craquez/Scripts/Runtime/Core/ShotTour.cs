@@ -259,6 +259,7 @@ namespace Craquez
                             float tB = 0.95f;
                             sim.ball.owner = -1; sim.ball.pos = from; sim.ball.vel = (tgtB - from) / tB; sim.ball.z = 0.4f;
                             sim.ball.vz = (1.5f - 0.4f + 0.5f * SimBall.G * tB * tB) / tB;
+                            sim.ball.spin = 0f;
                             Time.captureFramerate = 30;
                             bcK.cinematic = true;
                             // câmera baixa, de lado, olhando para cima: o atleta recortado contra os refletores
@@ -269,7 +270,7 @@ namespace Craquez
                             bool kicked = false;
                             for (int f = 0; f < 54; f++)
                             {
-                                if (!kicked && sim.ball.pos.Dist(att.position) < 1.6f)
+                                if (!kicked && f >= Mathf.RoundToInt(tB * 30f) - 1)
                                 {
                                     kicked = true;
                                     att.facing = new Vector2(-1f, 0f);
@@ -278,7 +279,7 @@ namespace Craquez
                                     sim.ball.z = 1.75f;
                                     sim.Bicycle(att);
                                 }
-                                if (!kicked) { att.vel = Vector2.zero; att.facing = new Vector2(-1f, 0f); }
+                                if (!kicked) { att.position = new Vector2(gxB - 9f, 0.5f); att.vel = Vector2.zero; att.facing = new Vector2(-1f, 0f); }
                                 yield return new WaitForEndOfFrame();
                                 var tex = ScreenCapture.CaptureScreenshotAsTexture();
                                 File.WriteAllBytes(Path.Combine(Dir, $"bicicleta_{f:00}.png"), tex.EncodeToPNG());

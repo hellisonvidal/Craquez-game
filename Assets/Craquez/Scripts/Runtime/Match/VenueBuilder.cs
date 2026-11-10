@@ -1113,8 +1113,9 @@ namespace Craquez
                 foreach (float sz in new[] { -1f, 1f })
                 {
                     var b = new Vector3(hl * sx, 0, hw * sz);
-                    k.Cylinder(b, b + Vector3.up * 1.6f, 0.02f, 6);
-                    f.Quad(b + Vector3.up * 1.6f, b + Vector3.up * 1.2f, b + new Vector3(-sx * 0.4f, 1.2f, 0), b + new Vector3(-sx * 0.4f, 1.6f, 0));
+                    // mastro de 1,5 m (regra) bem fino e bandeirinha pequena (~32 x 26 cm), presa no topo
+                    k.Cylinder(b, b + Vector3.up * 1.5f, 0.013f, 6);
+                    f.Quad(b + Vector3.up * 1.48f, b + Vector3.up * 1.22f, b + new Vector3(-sx * 0.32f, 1.24f, 0), b + new Vector3(-sx * 0.32f, 1.47f, 0));
                 }
             k.Object("Mastros", Gfx.Lit(Color.white, null, 0.3f), v.root, false);
             f.Object("Bandeirinhas", Gfx.Cutout(c, Gfx.Solid(Color.white), 0.1f), v.root, false);

@@ -93,6 +93,10 @@ jobs:
           path: Library
           key: Library-${{ matrix.targetPlatform }}-${{ hashFiles('Packages/manifest.json', 'ProjectSettings/ProjectVersion.txt') }}
           restore-keys: Library-${{ matrix.targetPlatform }}-
+      # chave de assinatura fixa do Android (no repositório: a versão nova instala por cima da antiga,
+      # e a atualização por dentro do jogo funciona); os segredos ANDROID_KEYSTORE_* têm prioridade
+      - name: Chave de assinatura
+        run: echo "CRAQUEZ_KS=$(base64 -w0 tools/android/craquez.keystore)" >> "$GITHUB_ENV"
       - uses: game-ci/unity-builder@v4
         env:
           UNITY_LICENSE: ${{ secrets.UNITY_LICENSE }}
@@ -105,11 +109,11 @@ jobs:
           androidExportType: androidPackage
           # chave de assinatura fixa (segredos do repositório): sem ela cada build sai com uma chave de
           # depuração nova e o Android não aceita instalar a versão nova por cima (atualização pelo jogo)
-          androidKeystoreName: ${{ secrets.ANDROID_KEYSTORE_BASE64 != '' && 'craquez.keystore' || '' }}
-          androidKeystoreBase64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
-          androidKeystorePass: ${{ secrets.ANDROID_KEYSTORE_PASS }}
-          androidKeyaliasName: ${{ secrets.ANDROID_KEYALIAS_NAME }}
-          androidKeyaliasPass: ${{ secrets.ANDROID_KEYALIAS_PASS }}
+          androidKeystoreName: craquez.keystore
+          androidKeystoreBase64: ${{ secrets.ANDROID_KEYSTORE_BASE64 || env.CRAQUEZ_KS }}
+          androidKeystorePass: ${{ secrets.ANDROID_KEYSTORE_PASS || 'craquez2026' }}
+          androidKeyaliasName: ${{ secrets.ANDROID_KEYALIAS_NAME || 'craquez' }}
+          androidKeyaliasPass: ${{ secrets.ANDROID_KEYALIAS_PASS || 'craquez2026' }}
       # option file completo (times, elencos, estádios, bolas, chuteiras) ao lado do executável no PC
       - name: Option file nos pacotes do PC
         if: matrix.targetPlatform == 'StandaloneWindows64' || matrix.targetPlatform == 'StandaloneLinux64'
@@ -242,6 +246,10 @@ jobs:
           path: Library
           key: Library-Android-${{ hashFiles('Packages/manifest.json', 'ProjectSettings/ProjectVersion.txt') }}
           restore-keys: Library-Android-
+      # chave de assinatura fixa do Android (no repositório: a versão nova instala por cima da antiga,
+      # e a atualização por dentro do jogo funciona); os segredos ANDROID_KEYSTORE_* têm prioridade
+      - name: Chave de assinatura
+        run: echo "CRAQUEZ_KS=$(base64 -w0 tools/android/craquez.keystore)" >> "$GITHUB_ENV"
       - uses: game-ci/unity-builder@v4
         env:
           UNITY_LICENSE: ${{ secrets.UNITY_LICENSE }}
@@ -254,11 +262,11 @@ jobs:
           androidExportType: androidPackage
           # chave de assinatura fixa (segredos do repositório): sem ela cada build sai com uma chave de
           # depuração nova e o Android não aceita instalar a versão nova por cima (atualização pelo jogo)
-          androidKeystoreName: ${{ secrets.ANDROID_KEYSTORE_BASE64 != '' && 'craquez.keystore' || '' }}
-          androidKeystoreBase64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
-          androidKeystorePass: ${{ secrets.ANDROID_KEYSTORE_PASS }}
-          androidKeyaliasName: ${{ secrets.ANDROID_KEYALIAS_NAME }}
-          androidKeyaliasPass: ${{ secrets.ANDROID_KEYALIAS_PASS }}
+          androidKeystoreName: craquez.keystore
+          androidKeystoreBase64: ${{ secrets.ANDROID_KEYSTORE_BASE64 || env.CRAQUEZ_KS }}
+          androidKeystorePass: ${{ secrets.ANDROID_KEYSTORE_PASS || 'craquez2026' }}
+          androidKeyaliasName: ${{ secrets.ANDROID_KEYALIAS_NAME || 'craquez' }}
+          androidKeyaliasPass: ${{ secrets.ANDROID_KEYALIAS_PASS || 'craquez2026' }}
           allowDirtyBuild: true
       - name: Rascunho de release (privado)
         env:
