@@ -137,9 +137,9 @@ namespace Craquez
             float tall = Mathf.Lerp(1.68f, 1.93f, u);
             float modelH = rig.head != null ? rig.head.position.y - root.transform.position.y + 0.21f : 1.85f;
             inst.transform.localScale = Vector3.one * Mathf.Clamp(tall / Mathf.Max(1.2f, modelH), 0.82f, 1.08f);
-            // mãos do modelo eram grandes demais para o corpo: ~32% menores
+            // mãos do modelo eram grandes demais para o corpo: um pouco menores
             foreach (var hn in new[] { "hand_l", "hand_r" })
-                if (rig.bones.TryGetValue(hn, out var hb)) hb.localScale = hb.localScale * 0.68f;
+                if (rig.bones.TryGetValue(hn, out var hb)) hb.localScale = hb.localScale * 0.85f;   // (0,68 sumia com a mão)
             Dress(rig, look, p.isKeeper ? keeperKit : kit, p.number, quality);
             Accessories(rig, look, p.isKeeper ? keeperKit : kit, p.isKeeper, captain, quality);
             return rig;
@@ -177,8 +177,9 @@ namespace Craquez
                 else if (look.tape > 0 && (look.tape == 2 || sfx == "_r"))
                 {
                     var tape = new MeshKit();
-                    tape.Cylinder(hd.position - armDir * 0.055f, hd.position - armDir * 0.005f, 0.036f, 10);
-                    var tg = tape.Object("Fita no punho" + sfx, Gfx.Character(look.tape == 1 ? Color.white : Color.Lerp(kit.c1, Color.white, 0.2f), null, 0.2f), null, false);
+                    // fita fina no pulso, acima da mão (antes era larga e cobria a mão: parecia um toco escuro)
+                    tape.Cylinder(hd.position - armDir * 0.075f, hd.position - armDir * 0.035f, 0.029f, 12);
+                    var tg = tape.Object("Fita no punho" + sfx, Gfx.Character(look.tape == 1 ? Color.white : Color.Lerp(kit.c1, Color.white, 0.55f), null, 0.2f), null, false);
                     tg.transform.SetParent(lo, true);
                 }
                 if (captain && sfx == "_l")

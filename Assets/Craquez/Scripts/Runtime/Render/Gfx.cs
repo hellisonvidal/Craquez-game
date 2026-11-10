@@ -780,18 +780,19 @@ namespace Craquez
         };
 
         // traços dos algarismos numa grade 0..2 (x) por 0..4 (y), estilo camisa de futebol
+        // números de camisa no estilo esportivo (cantos arredondados, 2 x 4 unidades por algarismo)
         static readonly Dictionary<char, float[]> Strokes = new Dictionary<char, float[]>
         {
-            ['0'] = new float[] { 0, 0, 2, 0, 2, 0, 2, 4, 2, 4, 0, 4, 0, 4, 0, 0 },
-            ['1'] = new float[] { 1, 0, 1, 4, 1, 4, 0.3f, 3.3f },
-            ['2'] = new float[] { 0, 4, 2, 4, 2, 4, 2, 2, 2, 2, 0, 2, 0, 2, 0, 0, 0, 0, 2, 0 },
-            ['3'] = new float[] { 0, 4, 2, 4, 2, 4, 2, 0, 2, 0, 0, 0, 0.5f, 2, 2, 2 },
-            ['4'] = new float[] { 0, 4, 0, 2, 0, 2, 2, 2, 2, 4, 2, 0 },
-            ['5'] = new float[] { 2, 4, 0, 4, 0, 4, 0, 2, 0, 2, 2, 2, 2, 2, 2, 0, 2, 0, 0, 0 },
-            ['6'] = new float[] { 2, 4, 0, 4, 0, 4, 0, 0, 0, 0, 2, 0, 2, 0, 2, 2, 2, 2, 0, 2 },
-            ['7'] = new float[] { 0, 4, 2, 4, 2, 4, 0.8f, 0 },
-            ['8'] = new float[] { 0, 0, 2, 0, 2, 0, 2, 4, 2, 4, 0, 4, 0, 4, 0, 0, 0, 2, 2, 2 },
-            ['9'] = new float[] { 2, 0, 2, 4, 2, 4, 0, 4, 0, 4, 0, 2, 0, 2, 2, 2, 0, 0, 2, 0 },
+            ['0'] = new float[] { 0.35f, 0, 1.65f, 0, 1.65f, 0, 2, 0.45f, 2, 0.45f, 2, 3.55f, 2, 3.55f, 1.65f, 4, 1.65f, 4, 0.35f, 4, 0.35f, 4, 0, 3.55f, 0, 3.55f, 0, 0.45f, 0, 0.45f, 0.35f, 0 },
+            ['1'] = new float[] { 1.15f, 0, 1.15f, 4, 1.15f, 4, 0.35f, 3.3f, 0.45f, 0, 1.85f, 0 },
+            ['2'] = new float[] { 0, 3.35f, 0.4f, 4, 0.4f, 4, 1.6f, 4, 1.6f, 4, 2, 3.55f, 2, 3.55f, 2, 2.7f, 2, 2.7f, 0, 0.7f, 0, 0.7f, 0, 0, 0, 0, 2, 0 },
+            ['3'] = new float[] { 0, 3.6f, 0.35f, 4, 0.35f, 4, 1.65f, 4, 1.65f, 4, 2, 3.6f, 2, 3.6f, 2, 2.5f, 2, 2.5f, 1.6f, 2.08f, 1.6f, 2.08f, 0.75f, 2.08f, 1.6f, 2.08f, 2, 1.65f, 2, 1.65f, 2, 0.4f, 2, 0.4f, 1.65f, 0, 1.65f, 0, 0.35f, 0, 0.35f, 0, 0, 0.4f },
+            ['4'] = new float[] { 1.55f, 0, 1.55f, 4, 1.55f, 4, 0, 1.3f, 0, 1.3f, 0, 1, 0, 1, 2, 1 },
+            ['5'] = new float[] { 1.95f, 4, 0.15f, 4, 0.15f, 4, 0, 2.25f, 0, 2.25f, 1.6f, 2.35f, 1.6f, 2.35f, 2, 1.95f, 2, 1.95f, 2, 0.4f, 2, 0.4f, 1.65f, 0, 1.65f, 0, 0.35f, 0, 0.35f, 0, 0, 0.4f },
+            ['6'] = new float[] { 1.8f, 4, 0.55f, 4, 0.55f, 4, 0, 3.35f, 0, 3.35f, 0, 0.4f, 0, 0.4f, 0.35f, 0, 0.35f, 0, 1.65f, 0, 1.65f, 0, 2, 0.4f, 2, 0.4f, 2, 1.8f, 2, 1.8f, 1.65f, 2.2f, 1.65f, 2.2f, 0.35f, 2.2f, 0.35f, 2.2f, 0, 1.8f },
+            ['7'] = new float[] { 0, 4, 2, 4, 2, 4, 2, 3.45f, 2, 3.45f, 0.75f, 0 },
+            ['8'] = new float[] { 0.35f, 2.1f, 1.65f, 2.1f, 1.65f, 2.1f, 2, 2.5f, 2, 2.5f, 2, 3.6f, 2, 3.6f, 1.65f, 4, 1.65f, 4, 0.35f, 4, 0.35f, 4, 0, 3.6f, 0, 3.6f, 0, 2.5f, 0, 2.5f, 0.35f, 2.1f, 0.35f, 2.1f, 0, 1.7f, 0, 1.7f, 0, 0.4f, 0, 0.4f, 0.35f, 0, 0.35f, 0, 1.65f, 0, 1.65f, 0, 2, 0.4f, 2, 0.4f, 2, 1.7f, 2, 1.7f, 1.65f, 2.1f },
+            ['9'] = new float[] { 0.2f, 0, 1.45f, 0, 1.45f, 0, 2, 0.65f, 2, 0.65f, 2, 3.6f, 2, 3.6f, 1.65f, 4, 1.65f, 4, 0.35f, 4, 0.35f, 4, 0, 3.6f, 0, 3.6f, 0, 2.2f, 0, 2.2f, 0.35f, 1.8f, 0.35f, 1.8f, 1.65f, 1.8f, 1.65f, 1.8f, 2, 2.2f },
         };
 
         /// <summary>Textura do número da camisa (branco com alfa, cantos levemente arredondados).</summary>
@@ -800,7 +801,7 @@ namespace Craquez
             string s = Mathf.Clamp(n, 0, 99).ToString();
             var t = new Texture2D(size, size, TextureFormat.RGBA32, true) { wrapMode = TextureWrapMode.Clamp };
             var px = new Color32[size * size];
-            float digitW = 2f, gap = 1.1f, thick = 0.62f;
+            float digitW = 2f, gap = 0.9f, thick = 0.8f;
             float totalW = s.Length * digitW + (s.Length - 1) * gap;
             float scale = size * 0.78f / Mathf.Max(4f + thick, totalW + thick);
             float ox = (size - totalW * scale) * 0.5f, oy = (size - 4f * scale) * 0.5f;
@@ -838,7 +839,7 @@ namespace Craquez
         public static float NumberAlpha(int n, float u, float v, float aa, float grow = 0f)
         {
             string s = Mathf.Clamp(n, 0, 99).ToString();
-            float digitW = 2f, gap = 1.1f, thick = 0.62f;
+            float digitW = 2f, gap = 0.9f, thick = 0.8f;
             float totalW = s.Length * digitW + (s.Length - 1) * gap;
             float scale = 0.78f / Mathf.Max(4f + thick, totalW + thick);
             float ox = (1f - totalW * scale) * 0.5f, oy = (1f - 4f * scale) * 0.5f;

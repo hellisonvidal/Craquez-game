@@ -116,6 +116,10 @@ namespace Craquez
                 var fill2 = new bool[size * size];
                 var numCol = NumberColor(kit);
                 var edgeCol = Contrast(numCol, kit.c1);
+                // camisa listrada/xadrez: o número das costas vai numa placa lisa (como nos uniformes de verdade)
+                bool busy = kit.pattern == 1 || kit.pattern == 2 || kit.pattern == 5 || kit.pattern == 8;
+                var panelCol = numCol.grayscale > 0.5f ? Color.Lerp(kit.c1, Color.black, 0.55f) : Color.white;
+                if (busy) { numCol = panelCol.grayscale > 0.5f ? Color.Lerp(kit.c1, Color.black, 0.25f) : Color.white; edgeCol = Contrast(numCol, panelCol); }
                 for (int i = 0; i + 2 < info.tris.Length; i += 3)
                 {
                     var c = (info.v[info.tris[i]] + info.v[info.tris[i + 1]] + info.v[info.tris[i + 2]]) / 3f;
@@ -128,6 +132,13 @@ namespace Craquez
                         NumberUv(p, ax, info.center, topUp, out var uvB, out var uvF);
                         float aB = NumberCover(number, uvB, aa, out float eB);
                         float aF = NumberCover(number, uvF, aa * 2.5f, out float eF);
+                        if (busy && uvB.x > -0.12f && uvB.x < 1.12f && uvB.y > -0.08f && uvB.y < 1.08f)
+                        {
+                            // placa com cantos arredondados e borda suave
+                            float px0 = Mathf.Max(Mathf.Abs(uvB.x - 0.5f) - 0.52f, 0f), py0 = Mathf.Max(Mathf.Abs(uvB.y - 0.5f) - 0.48f, 0f);
+                            float inside = 1f - Mathf.Clamp01((Mathf.Sqrt(px0 * px0 + py0 * py0) - 0.04f) / 0.03f);
+                            col = Color.Lerp(col, panelCol, inside);
+                        }
                         col = Color.Lerp(col, edgeCol, Mathf.Max(eB, eF) * 0.9f);
                         col = Color.Lerp(col, numCol, Mathf.Max(aB, aF));
                         col.a = 1f;

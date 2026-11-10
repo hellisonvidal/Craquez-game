@@ -1408,7 +1408,7 @@ namespace Craquez
             {
                 if (!rig.bones.TryGetValue(cn, out var clv) || clv.childCount == 0) continue;
                 float cs = Mathf.Sign(Vector3.Dot(clv.GetChild(0).position - rig.spine.position, right));
-                _pose.Rotate(clv, Quaternion.AngleAxis(-cs * 11f * k, fwd));   // (24° deixava o ombro caído, abaixo do começo do tronco)
+                _pose.Rotate(clv, Quaternion.AngleAxis(-cs * 18f * k, fwd));   // (24° deixava o ombro caído, abaixo do começo do tronco)
             }
         }
 
