@@ -967,6 +967,10 @@ namespace Craquez
                         }
                     }
                     break;
+                case "balltoss":
+                    // o gandula/torcedor devolve a bola com as mãos (som do lançamento, sem chute)
+                    Sfx.Touch();
+                    break;
                 case "spareball":
                     // o goleiro pega a bola do cone; a que saiu fica lá fora até o gandula recolher
                     if (e.skill >= 0 && e.skill < _stationBalls.Count && _stationBalls[e.skill] != null)
