@@ -276,6 +276,10 @@ namespace Craquez
                         break;
                 }
             }
+            // expressões faciais (formas criadas uma vez por malha, a partir dos marcos do rosto)
+            SkinnedMeshRenderer eyesR = null, browR = null, lashR = null;
+            foreach (var r in smrs) { if (r.name == "Eyes") eyesR = r; else if (r.name == "Eyebrows") browR = r; else if (r.name == "Eyelashes") lashR = r; }
+            if (rig.body != null && eyesR != null && bodyMesh != null) FaceRig.Build(rig.body, eyesR, axes, browR, lashR);
             // (o número agora vem pintado na camisa)
         }
 

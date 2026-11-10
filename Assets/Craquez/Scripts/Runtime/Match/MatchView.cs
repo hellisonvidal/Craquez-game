@@ -360,14 +360,20 @@ namespace Craquez
         Kit RefKit()
         {
             if (_refKit != null) return _refKit;
-            Color[] opts = { new Color(0.08f, 0.08f, 0.1f), new Color(0.95f, 0.88f, 0.12f), new Color(0.5f, 0.88f, 0.18f), new Color(0.8f, 0.12f, 0.15f), new Color(0.15f, 0.3f, 0.8f), new Color(0.95f, 0.45f, 0.65f) };
+            // preto, amarelo, verde-limão, verde, vermelho, azul, rosa, magenta, turquesa, cinza, laranja, roxo, azul-celeste
+            Color[] opts = { new Color(0.08f, 0.08f, 0.1f), new Color(0.97f, 0.88f, 0.1f), new Color(0.62f, 0.95f, 0.15f), new Color(0.1f, 0.6f, 0.3f),
+                new Color(0.8f, 0.12f, 0.15f), new Color(0.15f, 0.3f, 0.8f), new Color(0.97f, 0.5f, 0.7f), new Color(0.85f, 0.1f, 0.65f), new Color(0.1f, 0.78f, 0.75f),
+                new Color(0.55f, 0.56f, 0.6f), new Color(0.98f, 0.55f, 0.1f), new Color(0.45f, 0.2f, 0.65f), new Color(0.45f, 0.75f, 0.95f) };
             float D(Color a, Color b) => Mathf.Abs(a.r - b.r) + Mathf.Abs(a.g - b.g) + Mathf.Abs(a.b - b.b);
             Color best = opts[0]; float bestS = -1f;
             for (int i = 0; i < opts.Length; i++)
             {
                 float sc = float.MaxValue;
-                for (int t = 0; t < 2; t++) sc = Mathf.Min(sc, Mathf.Min(D(opts[i], kits[t].c1), D(opts[i], kits[t].c2) + 0.3f));
-                if (i == 0) sc += 0.25f;   // preto é o clássico: preferido quando contrasta
+                for (int t = 0; t < 2; t++) sc = Mathf.Min(sc, Mathf.Min(D(opts[i], kits[t].c1), Mathf.Min(D(opts[i], kits[t].c2) + 0.35f, D(opts[i], kits[t].shorts) + 0.5f)));
+                // também longe do verde do gramado e dos goleiros
+                sc = Mathf.Min(sc, D(opts[i], new Color(0.2f, 0.5f, 0.2f)) + 0.2f);
+                if (i == 0) sc += 0.2f;   // preto é o clássico: preferido quando contrasta
+                sc += (((uint)(kits[0].c1.r * 977f + kits[1].c1.b * 613f) + (uint)i * 7u) % 5u) * 0.02f;   // um pouco de variedade entre partidas
                 if (sc > bestS) { bestS = sc; best = opts[i]; }
             }
             var dark = new Color(0.06f, 0.06f, 0.07f);
@@ -705,7 +711,8 @@ namespace Craquez
             float urgency = 0f;
             _referee.point = Vector3.zero;
             if (sim.state == MatchState.Goal || sim.state == MatchState.Kickoff || sim.state == MatchState.Halftime)
-                target = new Vector2(-sim.TeamDir(sim.kickoffTeam) * 3f, -sim.mode.centerR - 2f);
+                // saída de bola: bem afastado do círculo (antes ficava a ~11 m, quase em cima do toque inicial)
+                target = new Vector2(-sim.TeamDir(sim.kickoffTeam) * (sim.mode.id == GameModes.Field ? 9f : 4f), -sim.mode.centerR - (sim.mode.id == GameModes.Field ? 6f : 2.5f));
             else if (sim.state == MatchState.Foul && sim.foulVictim >= 0)
             {
                 // corre até o lance e aponta para onde vai a falta
@@ -738,7 +745,7 @@ namespace Craquez
                 target = Vector2.Lerp(onDiag, ball, 0.35f);
                 var toBall = ball - target;
                 float d = toBall.magnitude;
-                float want = 14f + Mathf.Clamp01(sim.ball.Speed / 15f) * 4f;
+                float want = (sim.mode.id == GameModes.Field ? 16f : 8f) + Mathf.Clamp01(sim.ball.Speed / 15f) * 4f;
                 if (d > 0.1f && d < want) target = ball - toBall / d * want;
                 else if (d > want + 6f) target = ball - toBall / d * (want + 6f);
                 urgency = Mathf.Clamp01((p.position.Dist(target) - 10f) / 15f);

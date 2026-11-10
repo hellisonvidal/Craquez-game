@@ -82,7 +82,10 @@ namespace Craquez
             public readonly List<Vector3> v = new List<Vector3>();
             public readonly List<Vector3> n = new List<Vector3>();
             public readonly List<Vector2> uv = new List<Vector2>();
+            public readonly List<Vector4> fanA = new List<Vector4>(), pivA = new List<Vector4>();
             public readonly List<int> tri = new List<int>();
+            /// <summary>Atributos do torcedor atual (fase, parte, giro, lado) e pivô (ombro, altura dos pés).</summary>
+            public Vector4 fan, pivot;
 
             /// <summary>Caixa (sem a face de baixo) já girada e posicionada.</summary>
             public void Box(Vector3 c, Vector3 s, Quaternion r, int col, Vector3 tilt = default)
@@ -96,7 +99,7 @@ namespace Craquez
                     int i = v.Count;
                     v.Add(a); v.Add(b); v.Add(cc); v.Add(d);
                     var nw = r * (tq * nn);
-                    for (int k = 0; k < 4; k++) { n.Add(nw); uv.Add(uvc); }
+                    for (int k = 0; k < 4; k++) { n.Add(nw); uv.Add(uvc); fanA.Add(fan); pivA.Add(pivot); }
                     tri.Add(i); tri.Add(i + 1); tri.Add(i + 2); tri.Add(i); tri.Add(i + 2); tri.Add(i + 3);
                 }
                 Face(P(-1, -1, 1), P(-1, 1, 1), P(1, 1, 1), P(1, -1, 1), Vector3.forward);
@@ -112,22 +115,25 @@ namespace Craquez
             {
                 var m = new Mesh { name = name };
                 if (v.Count > 65000) m.indexFormat = IndexFormat.UInt32;
-                m.SetVertices(v); m.SetNormals(n); m.SetUVs(0, uv); m.SetTriangles(tri, 0);
+                m.SetVertices(v); m.SetNormals(n); m.SetUVs(0, uv); m.SetUVs(1, fanA); m.SetUVs(2, pivA); m.SetTriangles(tri, 0);
                 m.RecalculateBounds();
+                // o pulo e os braços erguidos saem da caixa original (sem isto o bloco "some" nas bordas)
+                var b = m.bounds; b.Expand(new Vector3(1.2f, 2.4f, 1.2f)); m.bounds = b;
                 m.UploadMeshData(true);   // só na placa de vídeo (libera a cópia na memória)
                 return m;
             }
         }
 
-        // braços: 0 baixos, 1 erguidos, 2 batendo palma (mãos juntas à frente), 3 mãos na cabeça (uhh!),
-        // 4 um braço acenando (o outro baixo)
-        const int Poses = 5;
-
-        /// <summary>Corpo de um torcedor (sem braços) e os braços de cada pose em construtores separados.</summary>
-        static void Fan(Builder body, Builder[] arms, Spot s, System.Random r)
+        /// <summary>
+        /// Um torcedor: corpo com pernas, tronco, pescoço, cabeça com rosto (olhos, sobrancelhas, nariz,
+        /// boca, orelhas, às vezes barba), cabelo/boné/capuz, e os dois braços soltos — o shader da torcida
+        /// ergue, abre, bate palmas e acena com eles, cada torcedor no seu tempo.
+        /// </summary>
+        static void Fan(Builder body, Spot s, System.Random r)
         {
             float hgt = 0.9f + (float)r.NextDouble() * 0.2f;
-            var q = Quaternion.Euler(0f, s.yaw + ((float)r.NextDouble() - 0.5f) * 30f, 0f);
+            float yawDeg = s.yaw + ((float)r.NextDouble() - 0.5f) * 30f;
+            var q = Quaternion.Euler(0f, yawDeg, 0f);
             int shirt, shirt2;
             double rr = r.NextDouble();
             if (s.team == 2 || rr > 0.85) { shirt = 16 + r.Next(8); shirt2 = shirt; }
@@ -144,35 +150,28 @@ namespace Craquez
             int hr = r.Next(9), hair = hr < 6 ? 8 + hr % 3 : 59 + (hr - 6);
             int pants = 11 + r.Next(3);
             var p = s.pos;
-            if (s.lod)
-            {
-                if (Rain && r.NextDouble() < 0.7) shirt = 40 + r.Next(6);   // capa de chuva
-                // fileiras do fundo: tronco (com ombros) e cabeça (as pernas ficam escondidas pela fileira da frente)
-                body.Box(p + q * new Vector3(0f, 1.02f * hgt, 0f), new Vector3(0.52f, 0.82f * hgt, 0.32f), q, shirt);
-                body.Box(p + q * new Vector3(0f, 1.36f * hgt, 0f), new Vector3(0.6f, 0.16f, 0.32f), q, shirt);
-                body.Box(p + q * new Vector3(0f, 1.6f * hgt, 0f), new Vector3(0.25f, 0.28f, 0.25f), q, skin);
-                body.Box(p + q * new Vector3(0f, 1.76f * hgt, -0.01f), new Vector3(0.27f, 0.07f, 0.27f), q, hair);
-                // braços: dois de cada vez, na cor da manga, com a mão na ponta (antes cada pose era um bloco
-                // único de 0,6-0,7 m na cor da pele por cima da cabeça: de longe, "quadrados cor de pele")
-                bool scarfL = r.NextDouble() < 0.35;
-                for (int side = -1; side <= 1; side += 2)
-                {
-                    arms[0].Box(p + q * new Vector3(side * 0.31f, 1.08f * hgt, 0.02f), new Vector3(0.13f, 0.5f * hgt, 0.15f), q, shirt);
-                    arms[1].Box(p + q * new Vector3(side * 0.36f, 1.66f * hgt, 0.02f), new Vector3(0.13f, 0.5f * hgt, 0.14f), q, shirt, new Vector3(0f, 0f, -side * 16f));
-                    arms[1].Box(p + q * new Vector3(side * 0.42f, 1.95f * hgt, 0.02f), new Vector3(0.1f, 0.1f, 0.1f), q, skin);
-                    arms[2].Box(p + q * new Vector3(side * 0.15f, 1.28f * hgt, 0.2f), new Vector3(0.12f, 0.12f, 0.34f), q, shirt, new Vector3(-20f, -side * 30f, 0f));
-                    arms[3].Box(p + q * new Vector3(side * 0.27f, 1.66f * hgt, 0.0f), new Vector3(0.12f, 0.4f * hgt, 0.13f), q, shirt, new Vector3(0f, 0f, side * 55f));
-                    if (side > 0) arms[4].Box(p + q * new Vector3(0.38f, 1.72f * hgt, 0.04f), new Vector3(0.13f, 0.6f * hgt, 0.14f), q, shirt, new Vector3(0f, 0f, -24f));
-                    else arms[4].Box(p + q * new Vector3(-0.31f, 1.08f * hgt, 0.02f), new Vector3(0.13f, 0.5f * hgt, 0.15f), q, shirt);
-                }
-                // cachecol do time esticado entre as mãos (braços erguidos)
-                if (scarfL && s.team != 2) arms[1].Box(p + q * new Vector3(0f, 1.98f * hgt, 0.03f), new Vector3(0.8f, 0.13f, 0.04f), q, shirt2);
-                return;
-            }
+            float phase = (float)r.NextDouble();
+            float yawRad = yawDeg * Mathf.Deg2Rad;
+            body.fan = new Vector4(phase, 0f, yawRad, 0f);
+            body.pivot = new Vector4(p.x, p.y, p.z, p.y);
             bool coat = Rain && r.NextDouble() < 0.7;
             bool umbrella = Rain && !coat ? r.NextDouble() < 0.45 : Rain && r.NextDouble() < 0.12;
             int coatC = 40 + r.Next(6);
             int top = coat ? coatC : shirt;
+            if (s.lod)
+            {
+                // fileiras do fundo: menos detalhe (sem pernas: a fileira da frente esconde), mas com rosto
+                body.Box(p + q * new Vector3(0f, 1.02f * hgt, 0f), new Vector3(0.46f, 0.82f * hgt, 0.3f), q, top);
+                body.Box(p + q * new Vector3(0f, 1.36f * hgt, 0f), new Vector3(0.54f, 0.14f, 0.3f), q, top);
+                var hc0 = p + q * new Vector3(0f, 1.6f * hgt, 0f);
+                body.Box(hc0, new Vector3(0.23f, 0.27f, 0.24f), q, skin);
+                for (int e = -1; e <= 1; e += 2) body.Box(hc0 + q * new Vector3(e * 0.05f, 0.03f, 0.122f), new Vector3(0.05f, 0.03f, 0.01f), q, 54);
+                body.Box(hc0 + q * new Vector3(0f, -0.08f, 0.122f), new Vector3(0.07f, 0.02f, 0.01f), q, 54);
+                if (coat) body.Box(hc0 + q * new Vector3(0f, 0.08f, -0.02f), new Vector3(0.27f, 0.18f, 0.28f), q, coatC);
+                else body.Box(hc0 + q * new Vector3(0f, 0.15f, -0.01f), new Vector3(0.25f, 0.07f, 0.26f), q, r.NextDouble() < 0.2 ? shirt : hair);
+                if (!umbrella) Arms(body, p, q, hgt, top, skin, phase, yawRad, 0.29f);
+                return;
+            }
             // duas pernas e tênis
             for (int side = -1; side <= 1; side += 2)
             {
@@ -185,6 +184,13 @@ namespace Craquez
             body.Box(p + q * new Vector3(0f, 1.39f * hgt, 0f), new Vector3(0.56f, 0.1f, 0.29f), q, top);
             if (!coat) body.Box(p + q * new Vector3(0f, 0.84f * hgt, 0f), new Vector3(0.43f, 0.06f, 0.28f), q, shirt2);
             else body.Box(p + q * new Vector3(0f, 0.7f * hgt, 0f), new Vector3(0.46f, 0.24f * hgt, 0.3f), q, coatC);   // capa até a coxa
+            // detalhe da camisa (gola/faixa na cor 2) ou cachecol do time no pescoço
+            if (!coat && s.team != 2 && r.NextDouble() < 0.35)
+            {
+                body.Box(p + q * new Vector3(0f, 1.45f * hgt, 0.02f), new Vector3(0.3f, 0.09f, 0.3f), q, shirt2);
+                body.Box(p + q * new Vector3(0.08f, 1.2f * hgt, 0.155f), new Vector3(0.09f, 0.4f * hgt, 0.03f), q, shirt2);
+            }
+            else if (!coat) body.Box(p + q * new Vector3(0f, 1.43f * hgt, 0.13f), new Vector3(0.2f, 0.05f, 0.04f), q, shirt2);
             // pescoço e cabeça com rosto: olhos, sobrancelha, nariz, boca, orelhas (às vezes barba)
             body.Box(p + q * new Vector3(0f, 1.47f * hgt, 0f), new Vector3(0.11f, 0.08f, 0.11f), q, skin);
             var hc = p + q * new Vector3(0f, 1.6f * hgt, 0f);
@@ -195,8 +201,12 @@ namespace Craquez
                 body.Box(hc + q * new Vector3(e * 0.05f, 0.03f, 0.121f), new Vector3(0.045f, 0.025f, 0.01f), q, 53);        // olho
                 body.Box(hc + q * new Vector3(e * 0.05f, 0.03f, 0.125f), new Vector3(0.02f, 0.022f, 0.01f), q, 54);          // pupila
                 body.Box(hc + q * new Vector3(e * 0.05f, 0.065f, 0.122f), new Vector3(0.06f, 0.015f, 0.012f), q, hair);    // sobrancelha
+                body.Box(hc + q * new Vector3(e * 0.118f, 0.0f, 0.0f), new Vector3(0.03f, 0.07f, 0.05f), q, skin);          // orelha
             }
-            body.Box(hc + q * new Vector3(0f, -0.08f, 0.121f), new Vector3(0.07f, 0.018f, 0.01f), q, 54);                 // boca
+            // boca: fechada, sorrindo ou aberta (gritando/cantando)
+            int mouth = r.Next(3);
+            if (mouth == 2) body.Box(hc + q * new Vector3(0f, -0.085f, 0.121f), new Vector3(0.06f, 0.045f, 0.012f), q, 54);
+            else body.Box(hc + q * new Vector3(0f, -0.08f, 0.121f), new Vector3(mouth == 1 ? 0.08f : 0.065f, 0.018f, 0.01f), q, 54);
             if (r.NextDouble() < 0.18) body.Box(hc + q * new Vector3(0f, -0.09f, 0.06f), new Vector3(0.21f, 0.09f, 0.14f), q, 52);   // barba
             if (coat)
             {
@@ -204,7 +214,11 @@ namespace Craquez
                 body.Box(hc + q * new Vector3(0f, 0.06f, -0.02f), new Vector3(0.27f, 0.2f, 0.28f), q, coatC);
                 body.Box(hc + q * new Vector3(0f, 0.16f, 0.0f), new Vector3(0.25f, 0.06f, 0.26f), q, coatC);
             }
-            else if (r.NextDouble() < 0.25) body.Box(hc + q * new Vector3(0f, 0.15f, 0.03f), new Vector3(0.25f, 0.08f, 0.32f), q, shirt);   // boné
+            else if (r.NextDouble() < 0.25)
+            {
+                body.Box(hc + q * new Vector3(0f, 0.15f, 0.0f), new Vector3(0.25f, 0.08f, 0.26f), q, shirt);   // boné
+                body.Box(hc + q * new Vector3(0f, 0.12f, 0.15f), new Vector3(0.2f, 0.02f, 0.1f), q, shirt);    // aba
+            }
             else if (r.NextDouble() < 0.85)
             {
                 body.Box(hc + q * new Vector3(0f, 0.14f, -0.01f), new Vector3(0.24f, 0.07f, 0.26f), q, hair);
@@ -212,50 +226,44 @@ namespace Craquez
             }
             if (umbrella)
             {
-                // guarda-chuva aberto: cabo e copa (gomos em cruz), na mão direita (braços baixos)
+                // guarda-chuva aberto: cabo e copa (gomos em cruz), na mão direita; braços parados
                 int uc = 46 + r.Next(6);
                 var top0 = p + q * new Vector3(0.2f, 2.05f * hgt, 0.05f);
                 body.Box(p + q * new Vector3(0.2f, 1.62f * hgt, 0.05f), new Vector3(0.025f, 0.85f * hgt, 0.025f), q, 15);
                 body.Box(top0, new Vector3(1.0f, 0.06f, 0.55f), q, uc);
                 body.Box(top0, new Vector3(0.55f, 0.06f, 1.0f), q, uc);
                 body.Box(top0 + Vector3.up * 0.06f, new Vector3(0.72f, 0.06f, 0.72f), q, uc);
-                // só a pose de braços baixos (quem segura o guarda-chuva não pula com os braços para cima)
-                for (int k = 0; k < Poses; k++)
-                    for (int side = -1; side <= 1; side += 2)
-                        arms[k].Box(p + q * new Vector3(side * 0.31f, 1.1f * hgt, 0.02f), new Vector3(0.13f, 0.56f * hgt, 0.14f), q, top, new Vector3(-8f, 0f, side * 6f));
+                for (int side = -1; side <= 1; side += 2)
+                    body.Box(p + q * new Vector3(side * 0.31f, 1.1f * hgt, 0.02f), new Vector3(0.13f, 0.56f * hgt, 0.14f), q, top, new Vector3(-8f, 0f, side * 6f));
                 return;
             }
-            int sleeve = coat ? coatC : shirt;
-            // cachecol do time esticado acima da cabeça quando a torcida levanta os braços (incentivo)
-            if (!coat && s.team != 2 && r.NextDouble() < 0.4)
-            {
-                arms[1].Box(p + q * new Vector3(0f, 2.05f * hgt, 0.03f), new Vector3(0.86f, 0.14f, 0.03f), q, shirt2);
-                arms[1].Box(p + q * new Vector3(-0.2f, 2.05f * hgt, 0.035f), new Vector3(0.12f, 0.14f, 0.03f), q, shirt);
-                arms[1].Box(p + q * new Vector3(0.2f, 2.05f * hgt, 0.035f), new Vector3(0.12f, 0.14f, 0.03f), q, shirt);
-            }
-            for (int side = -1; side <= 1; side += 2)
-            {
-                arms[0].Box(p + q * new Vector3(side * 0.32f, 1.1f * hgt, 0.02f), new Vector3(0.13f, 0.56f * hgt, 0.14f), q, sleeve, new Vector3(-8f, 0f, side * 6f));
-                arms[0].Box(p + q * new Vector3(side * 0.35f, 0.8f * hgt, 0.04f), new Vector3(0.1f, 0.1f, 0.1f), q, skin);   // mão
-                arms[1].Box(p + q * new Vector3(side * 0.34f, 1.62f * hgt, 0.02f), new Vector3(0.13f, 0.34f * hgt, 0.14f), q, sleeve, new Vector3(0f, 0f, -side * 18f));
-                arms[1].Box(p + q * new Vector3(side * 0.42f, 1.92f * hgt, 0.02f), new Vector3(0.11f, 0.26f * hgt, 0.12f), q, skin, new Vector3(0f, 0f, -side * 18f));
-                // palmas: antebraços para a frente, mãos se encontrando diante do peito
-                arms[2].Box(p + q * new Vector3(side * 0.16f, 1.3f * hgt, 0.22f), new Vector3(0.13f, 0.13f, 0.38f), q, coat ? coatC : skin, new Vector3(-20f, -side * 30f, 0f));
-                // mãos na cabeça: cotovelos abertos para os lados e para cima
-                arms[3].Box(p + q * new Vector3(side * 0.27f, 1.64f * hgt, 0.0f), new Vector3(0.13f, 0.42f * hgt, 0.13f), q, coat ? coatC : skin, new Vector3(0f, 0f, side * 55f));
-                // acenando: um braço no alto (o lado sorteado), o outro baixo
-                bool waveSide = side == (r.NextDouble() < 0.5 ? -1 : 1);
-                if (waveSide) arms[4].Box(p + q * new Vector3(side * 0.38f, 1.72f * hgt, 0.04f), new Vector3(0.13f, 0.62f * hgt, 0.14f), q, sleeve, new Vector3(0f, 0f, -side * 24f));
-                else arms[4].Box(p + q * new Vector3(side * 0.32f, 1.1f * hgt, 0.02f), new Vector3(0.13f, 0.56f * hgt, 0.14f), q, sleeve, new Vector3(-8f, 0f, side * 6f));
-            }
+            Arms(body, p, q, hgt, coat ? coatC : shirt, skin, phase, yawRad, 0.32f);
         }
 
-        MeshRenderer[] _arms;
-        int _pose;
+        /// <summary>Os dois braços soltos (manga + antebraço + mão), marcados para o shader animar.</summary>
+        static void Arms(Builder body, Vector3 p, Quaternion q, float hgt, int sleeve, int skin, float phase, float yawRad, float x)
+        {
+            for (int side = -1; side <= 1; side += 2)
+            {
+                var sh = p + q * new Vector3(side * x, 1.38f * hgt, 0.02f);
+                body.fan = new Vector4(phase, 2f, yawRad, side);
+                body.pivot = new Vector4(sh.x, sh.y, sh.z, p.y);
+                body.Box(p + q * new Vector3(side * x, 1.2f * hgt, 0.02f), new Vector3(0.13f, 0.34f * hgt, 0.14f), q, sleeve, new Vector3(-6f, 0f, side * 5f));
+                body.Box(p + q * new Vector3(side * (x + 0.01f), 0.92f * hgt, 0.05f), new Vector3(0.11f, 0.26f * hgt, 0.12f), q, skin, new Vector3(-12f, 0f, side * 5f));
+                body.Box(p + q * new Vector3(side * (x + 0.02f), 0.76f * hgt, 0.07f), new Vector3(0.1f, 0.1f, 0.1f), q, skin);   // mão
+            }
+            body.fan = new Vector4(phase, 0f, yawRad, 0f);
+        }
+
+        Material _mat;
+        MaterialPropertyBlock _mpb;
+        MeshRenderer _mr;
         float _gestT = -1f;
         int _gest;
         float _phase, _freq, _amp;
         int _team;
+        Vector4 _crowd, _crowd2;
+        static readonly int IdCrowd = Shader.PropertyToID("_Crowd"), IdCrowd2 = Shader.PropertyToID("_Crowd2");
 
         /// <summary>Kits dos dois times (os 4 uniformes) para a roupa dos torcedores; defina antes de Build.</summary>
         public static List<Craquez.Sim.Kit> HomeKits, AwayKits;
@@ -265,8 +273,8 @@ namespace Craquez
         public static bool Empty;
 
         /// <summary>
-        /// Cria os blocos de torcedores. <paramref name="groups"/>: uma lista de lugares por bloco (cada bloco
-        /// pula no seu tempo). Cada bloco = o corpo + um conjunto de braços por pose (só um aparece por vez).
+        /// Cria os blocos de torcedores. <paramref name="groups"/>: uma lista de lugares por bloco. Cada bloco
+        /// é uma malha só; cada torcedor se mexe no próprio tempo (no shader), e o bloco só diz o "clima".
         /// </summary>
         public static void Build(Transform parent, Quaternion rot, List<List<Spot>> groups, Color h1, Color h2, Color a1, Color a2, int seed, bool mixed)
         {
@@ -274,17 +282,14 @@ namespace Craquez
             // um pouco de luz própria (a mesma paleta): debaixo da cobertura, na sombra, a torcida ficava
             // quase preta e alguns blocos mal apareciam
             var pal = Palette(h1, h2, a1, a2, HomeKits, AwayKits);
-            var mat = Gfx.Emissive(Color.white, new Color(0.22f, 0.22f, 0.22f), pal);
-            mat.SetFloat("_Smoothness", 0.05f);
+            var mat = Gfx.Crowd(pal, new Color(0.22f, 0.22f, 0.22f));
             int gi = 0;
             foreach (var g in groups)
             {
                 if (g.Count == 0) continue;
                 var body = new Builder();
-                var arms = new Builder[Poses];
-                for (int k = 0; k < Poses; k++) arms[k] = new Builder();
                 var r1 = new System.Random(seed + gi * 977);
-                foreach (var s in g) Fan(body, arms, s, r1);
+                foreach (var s in g) Fan(body, s, r1);
                 var go = new GameObject("Torcedores 3D " + gi);
                 go.transform.SetParent(parent, false);
                 go.transform.localRotation = rot;
@@ -293,18 +298,7 @@ namespace Craquez
                 var mr = go.AddComponent<MeshRenderer>();
                 mr.sharedMaterial = mat;
                 mr.shadowCastingMode = ShadowCastingMode.Off;
-                fc._arms = new MeshRenderer[Poses];
-                for (int k = 0; k < Poses; k++)
-                {
-                    var ag = new GameObject("braços " + k);
-                    ag.transform.SetParent(go.transform, false);
-                    ag.AddComponent<MeshFilter>().sharedMesh = arms[k].Build("braços " + k);
-                    var ar = ag.AddComponent<MeshRenderer>();
-                    ar.sharedMaterial = mat;
-                    ar.shadowCastingMode = ShadowCastingMode.Off;
-                    ar.enabled = k == 0;
-                    fc._arms[k] = ar;
-                }
+                fc._mr = mr;
                 var rr = new System.Random(seed * 31 + gi);
                 fc._phase = (float)rr.NextDouble() * 10f;
                 fc._freq = 2.6f + (float)rr.NextDouble() * 1.4f;
@@ -314,15 +308,7 @@ namespace Craquez
             }
         }
 
-        void SetPose(int k)
-        {
-            if (k == _pose) return;
-            _arms[_pose].enabled = false;
-            _arms[k].enabled = true;
-            _pose = k;
-        }
-
-        Vector3 _base, _center;
+        Vector3 _center;
         bool _init;
         float _angle;   // posição angular do bloco em volta do campo (para a ola)
         float _pulse;   // reação própria do bloco (lance perto dele)
@@ -331,75 +317,70 @@ namespace Craquez
         {
             if (!_init)
             {
-                _base = transform.localPosition; _init = true;
-                _center = GetComponent<MeshRenderer>().bounds.center;
+                _init = true;
+                _center = _mr.bounds.center;
                 _angle = Mathf.Atan2(_center.z, _center.x * 0.7f);
+                _mpb = new MaterialPropertyBlock();
             }
+            if (!_mr.isVisible) return;
             float dt = Time.deltaTime;
             float t = Time.time + _phase;
-            // ola: quando a onda passa pelo bloco, todos levantam com os braços para cima
+            // clima do bloco: empolgação (x), pulo (y), palmas (z), braços erguidos (w); aceno (2.x), silêncio (2.y)
+            var want = new Vector4(0.25f, 0f, 0f, 0f);
+            var want2 = Vector4.zero;
             float olaT = Time.time - OlaStart;
+            bool ola = false;
             if (olaT >= 0f && olaT * OlaSpeed < Mathf.PI * 2f)
             {
                 float front = -Mathf.PI + olaT * OlaSpeed;
                 float d = Mathf.Abs(Mathf.DeltaAngle(_angle * Mathf.Rad2Deg, front * Mathf.Rad2Deg)) * Mathf.Deg2Rad;
-                if (d < 0.22f)
+                if (d < 0.22f) { float k = 1f - d / 0.22f; want = new Vector4(1f, k, 0f, k); ola = true; }
+            }
+            if (!ola)
+            {
+                bool mine = _team == 0 || _team == 2;   // torcida da casa (ou neutra)
+                float hype = Mathf.Clamp01(Hype);
+                float near = 1f - Mathf.Clamp01((new Vector2(_center.x - Ball.x, _center.z - Ball.z).magnitude - 15f) / 35f);
+                _pulse = Mathf.MoveTowards(_pulse, near, dt * 0.8f);
+                hype = Mathf.Clamp01(hype + _pulse * 0.25f * (mine == HomeAttack ? 1f : 0.3f));
+                want.x = hype;
+                if (GoalT > 0f && (GoalTeam == _team || _team == 2)) want = new Vector4(1.4f, 0.9f, 0f, 0.95f);
+                else if (GoalT > 0f) { want = new Vector4(0.05f, 0f, 0f, 0f); want2.y = 1f; }   // torcida rival em silêncio
+                else if (ShotT > 0f)
                 {
-                    float k = 1f - d / 0.22f;
-                    transform.localPosition = _base + new Vector3(0f, 0.3f * k, 0f);
-                    SetPose(1);
-                    return;
+                    // chute que passou perto: braços para cima (quem chutou), alívio e palmas do outro lado
+                    bool attackers = HomeAttack == mine;
+                    want = attackers ? new Vector4(0.9f, 0.15f, 0f, 0.6f) : new Vector4(0.5f, 0f, 0.4f, 0f);
+                }
+                else if (FoulT > 0f)
+                {
+                    bool victims = (FoulOn == 0) == mine;
+                    want = victims ? new Vector4(0.7f, 0f, 0f, 0.45f) : new Vector4(0.3f, 0f, 0f, 0f);
+                }
+                else if (hype > 0.75f) want = new Vector4(hype, 0.35f, 0f, 0.5f);
+                else if (HomeAttack == mine && hype > 0.25f) want = new Vector4(hype, 0f, 0.55f, 0f);   // o time ataca: palmas
+                else
+                {
+                    // fora do lance: de vez em quando uns acenam, uns batem palmas, uns levantam os braços
+                    _gestT -= dt;
+                    if (_gestT <= 0f)
+                    {
+                        _gest = Random.value < 0.6f ? 0 : Random.Range(1, 4);
+                        _gestT = _gest == 0 ? Random.Range(5f, 14f) : Random.Range(1.5f, 3.5f);
+                    }
+                    if (_gest == 1) want2.x = 1f;
+                    else if (_gest == 2) want.z = 0.35f;
+                    else if (_gest == 3) want.w = 0.3f;
                 }
             }
-            bool mine = _team == 0 || _team == 2;   // torcida da casa (ou neutra)
-            float hype = Mathf.Clamp01(Hype);
-            // lance perto deste bloco: a galera dali se agita mais (a bola é o centro das atenções)
-            float near = 1f - Mathf.Clamp01((new Vector2(_center.x - Ball.x, _center.z - Ball.z).magnitude - 15f) / 35f);
-            _pulse = Mathf.MoveTowards(_pulse, near, dt * 0.8f);
-            hype = Mathf.Clamp01(hype + _pulse * 0.25f * (mine == HomeAttack ? 1f : 0.3f));
-            int pose = 0;
-            float jumpK = Mathf.Clamp01((hype - 0.35f) * 1.6f);
-            if (GoalT > 0f && (GoalTeam == _team || _team == 2)) { hype = 1.6f; jumpK = 1f; }
-            else if (GoalT > 0f) { hype = 0.05f; jumpK = 0f; }   // torcida rival em silêncio
-            if (GoalT > 0f && jumpK > 0.5f) pose = Mathf.Sin(t * _freq * Mathf.PI * 0.5f) > -0.5f ? 1 : 0;
-            else if (ShotT > 0f)
-            {
-                // chute que passou perto: mãos na cabeça (do time que chutou) — e alívio do outro lado
-                bool attackers = HomeAttack == mine;
-                pose = attackers ? 3 : (Mathf.Sin(t * 3f) > 0.3f ? 2 : 0);
-                jumpK = attackers ? 0.15f : 0f;
-            }
-            else if (FoulT > 0f)
-            {
-                // falta: quem sofreu protesta (braços para cima), o outro lado reclama menos
-                bool victims = (FoulOn == 0) == mine;
-                pose = victims && Mathf.Sin(t * 5f) > -0.2f ? 1 : 0;
-            }
-            else if (hype > 0.75f) pose = Mathf.Sin(t * _freq * Mathf.PI * 0.5f) > -0.3f ? 1 : 0;
-            else if (HomeAttack == mine && hype > 0.25f)
-            {
-                // o time ataca: palmas no ritmo (cada bloco no seu tempo)
-                pose = Mathf.Repeat(t * 2.1f, 1f) < 0.5f ? 2 : 0;
-            }
-            else if (hype > 0.45f && Mathf.Sin(t * 1.3f) > 0.6f) pose = 1;
-            else
-            {
-                // gestos próprios de cada bloco, fora do lance: aceno, palmas, mãos na cabeça, levantar
-                _gestT -= dt;
-                if (_gestT <= 0f)
-                {
-                    _gest = Random.value < 0.55f ? 0 : Random.Range(1, 5);
-                    _gestT = _gest == 0 ? Random.Range(4f, 12f) : Random.Range(1.2f, 2.8f);
-                }
-                if (_gest == 1) pose = 4;
-                else if (_gest == 2) pose = Mathf.Repeat(t * 2.3f, 1f) < 0.5f ? 2 : 0;
-                else if (_gest == 3) pose = 3;
-                else if (_gest == 4) { pose = 1; jumpK = Mathf.Max(jumpK, 0.25f); }
-            }
-            float jump = Mathf.Max(0f, Mathf.Sin(t * _freq * Mathf.PI)) * 0.22f * jumpK * _amp;
-            float sway = Mathf.Sin(t * 0.9f) * 0.015f + (pose == 2 ? Mathf.Abs(Mathf.Sin(t * 2.1f * Mathf.PI)) * 0.02f : 0f);
-            transform.localPosition = _base + new Vector3(0f, jump + sway, 0f);
-            SetPose(pose);
+            // transições suaves (nada de um bloco inteiro mudando de pose no mesmo quadro)
+            float kk = 1f - Mathf.Exp(-dt * 4f);
+            _crowd = Vector4.Lerp(_crowd, want, kk);
+            _crowd2 = Vector4.Lerp(_crowd2, want2, kk);
+            _mr.GetPropertyBlock(_mpb);
+            _mpb.SetVector(IdCrowd, _crowd);
+            _mpb.SetVector(IdCrowd2, _crowd2);
+            _mr.SetPropertyBlock(_mpb);
         }
     }
 }

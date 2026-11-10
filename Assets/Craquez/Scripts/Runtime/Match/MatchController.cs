@@ -38,6 +38,7 @@ namespace Craquez
         readonly int[] _prevPause = new int[2];
         TouchControls _touch;
         readonly GoalShow _show = new GoalShow();
+        InstantReplay _replay;
         int _showTeam = -1, _showScorer = -1;
         GameObject _pauseMenu, _endMenu, _lineup;
         Camera _cam;
@@ -70,6 +71,7 @@ namespace Craquez
             sim.quickRestarts = c.quickRestarts;
             sim.Setup(c.mode, new TeamSetup { data = ta, tactics = c.tacticsA }, new TeamSetup { data = tb, tactics = c.tacticsB }, c.seed, c.SecondsPerHalf);
             sim.humanSide = new[] { c.sideA != Side.Cpu, c.sideB != Side.Cpu };
+            _replay = gameObject.AddComponent<InstantReplay>();
             view = new GameObject("Partida").AddComponent<MatchView>();
             view.transform.SetParent(transform, false);
             view.sides = new[] { c.sideA, c.sideB };
@@ -438,7 +440,7 @@ namespace Craquez
                     if (_cpu[t] != null) frames[t] = _cpu[t].MakeInput(sim);
                 sim.Step(frames);
                 view.OnTick();
-                if (!attract) _show.Record(sim);
+                if (!attract) { _show.Record(sim); _replay.Record(sim); }
                 HandleEvents();
                 if (_showTeam >= 0)
                 {
@@ -507,6 +509,18 @@ namespace Craquez
         // ------------------------------------------------------------- pausa / fim
         Phase _beforePause = Phase.Playing;
 
+        /// <summary>Replay instantâneo a partir da pausa; ao sair, volta para o menu de pausa.</summary>
+        void OpenReplay()
+        {
+            if (_pauseMenu != null) Destroy(_pauseMenu);
+            _replay.Begin(sim, view, hud, () =>
+            {
+                Time.timeScale = 0f;
+                view.Freeze(true);
+                PausePage(0);
+            });
+        }
+
         void Pause()
         {
             _beforePause = _phase == Phase.Goal ? Phase.Goal : Phase.Playing;
@@ -537,6 +551,8 @@ namespace Craquez
             {
                 first = UiKit.Button(list, "Continuar", Resume);
                 UiKit.Size(first, 76, 76);
+                if (_replay != null && _replay.HasFootage && _beforePause == Phase.Playing)
+                    UiKit.Size(UiKit.Button(list, "Replay  (últimos 30 s)", OpenReplay), 76, 76);
                 UiKit.Size(UiKit.Button(list, "Configurações", () => PausePage(1)), 76, 76);
                 UiKit.Size(UiKit.Button(list, "Equipes e táticas", () => PausePage(2)), 76, 76);
                 UiKit.Size(UiKit.Button(list, "Substituições", () => SubsPage(-1)), 76, 76);

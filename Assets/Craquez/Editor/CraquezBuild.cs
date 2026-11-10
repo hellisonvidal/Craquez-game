@@ -124,6 +124,16 @@ namespace Craquez.EditorTools
                 Save("ToonOutlineCutout", oc);
             }
 
+            var crowd = Shader.Find("Craquez/Crowd");
+            if (crowd != null)
+            {
+                var cm = new Material(crowd);
+                cm.EnableKeyword("_EMISSION");
+                cm.SetColor("_EmissionColor", Color.white);
+                Save("Crowd", cm);
+            }
+            else Debug.LogError("Craquez: shader Craquez/Crowd não encontrado");
+
             var ath = Shader.Find("Craquez/Athlete");
             if (ath != null)
             {
