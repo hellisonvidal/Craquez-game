@@ -13,12 +13,14 @@ namespace Craquez.UI
     public static class VenueShot
     {
         const int Layer = 31;
-        static readonly Dictionary<string, RenderTexture> _cache = new Dictionary<string, RenderTexture>();
+        // foto copiada para uma textura comum: a RenderTexture perde o conteúdo no Android (app em segundo
+        // plano, depois de uma partida) e o quadro ficava preto
+        static readonly Dictionary<string, Texture2D> _cache = new Dictionary<string, Texture2D>();
         static bool _busy;
 
         public static string Key(string mode, int idx, int home) => mode + "/" + idx + "/" + (mode == GameModes.Field && idx == 0 ? home : -1);
 
-        public static Texture Cached(string mode, int idx, int home) => _cache.TryGetValue(Key(mode, idx, home), out var rt) && rt != null ? rt : null;
+        public static Texture Cached(string mode, int idx, int home) => _cache.TryGetValue(Key(mode, idx, home), out var t) && t != null ? t : null;
 
         public static IEnumerator Render(string mode, int idx, int teamA, int teamB, int streetPlayers, System.Action<Texture> done)
         {
@@ -46,7 +48,7 @@ namespace Craquez.UI
                 else VenueBuilder.Stadium(sim, home, away, kits[0], kits[1], false, 0, holder.transform, idx);
                 foreach (var t in holder.GetComponentsInChildren<Transform>(true)) t.gameObject.layer = Layer;
                 foreach (var l in holder.GetComponentsInChildren<Light>(true)) l.enabled = false;   // (luzes do teto do ginásio)
-                rt = new RenderTexture(768, 432, 24) { name = "Local " + key, antiAliasing = 2 };
+                rt = new RenderTexture(768, 432, 24, RenderTextureFormat.ARGB32) { name = "Local " + key, antiAliasing = 1 };
                 camGo = new GameObject("Câmera da foto do local");
                 var cam = camGo.AddComponent<Camera>();
                 cam.cullingMask = 1 << Layer;
@@ -56,6 +58,7 @@ namespace Craquez.UI
                 cam.nearClipPlane = 0.5f;
                 cam.farClipPlane = 2000f;
                 cam.targetTexture = rt;
+                cam.enabled = false;   // desenha só uma vez, na hora da cópia (com a luz da foto)
                 float hl = sim.halfLen, hw = sim.halfW;
                 // de fora e de cima, em diagonal: dá para ver a fachada/entorno e um pedaço do campo
                 Vector3 pos = mode == GameModes.Field ? new Vector3(-hl * 1.5f, 72f, -hw * 3.7f)
@@ -87,14 +90,49 @@ namespace Craquez.UI
             // a câmera desenha no fim deste quadro
             yield return new WaitForEndOfFrame();
             yield return null;
+            Texture2D photo = null;
+            try
+            {
+                // desenha de novo na hora (garante o conteúdo) e copia para uma textura comum; com a luz do
+                // dia própria da foto (no URP só o "sol" da cena ilumina de verdade: à noite, ou com o sol do
+                // menu, a foto saía preta)
+                var cam0 = camGo.GetComponent<Camera>();
+                var oldSun = RenderSettings.sun;
+                var oldAmb = RenderSettings.ambientMode;
+                var oldSky = RenderSettings.ambientSkyColor; var oldEq = RenderSettings.ambientEquatorColor; var oldGr = RenderSettings.ambientGroundColor;
+                var oldAmbL = RenderSettings.ambientLight;
+                bool oldFog = RenderSettings.fog;
+                RenderSettings.sun = lightGo.GetComponent<Light>();
+                RenderSettings.ambientMode = UnityEngine.Rendering.AmbientMode.Trilight;
+                RenderSettings.ambientSkyColor = new Color(0.62f, 0.7f, 0.82f);
+                RenderSettings.ambientEquatorColor = new Color(0.5f, 0.52f, 0.5f);
+                RenderSettings.ambientGroundColor = new Color(0.3f, 0.3f, 0.28f);
+                RenderSettings.fog = false;
+                try { cam0.Render(); }
+                finally
+                {
+                    RenderSettings.sun = oldSun; RenderSettings.ambientMode = oldAmb;
+                    RenderSettings.ambientSkyColor = oldSky; RenderSettings.ambientEquatorColor = oldEq; RenderSettings.ambientGroundColor = oldGr;
+                    RenderSettings.ambientLight = oldAmbL; RenderSettings.fog = oldFog;
+                }
+                var prev = RenderTexture.active;
+                RenderTexture.active = rt;
+                photo = new Texture2D(rt.width, rt.height, TextureFormat.RGB24, false) { name = "Local " + key, wrapMode = TextureWrapMode.Clamp };
+                photo.ReadPixels(new Rect(0, 0, rt.width, rt.height), 0, 0);
+                photo.Apply(false, true);   // sem cópia na memória do processador
+                RenderTexture.active = prev;
+            }
+            catch (System.Exception ex) { Debug.LogWarning("[local] cópia da foto falhou: " + ex.Message); photo = null; }
             Object.Destroy(camGo);
             Object.Destroy(lightGo);
             Object.Destroy(holder);
-            _cache[key] = rt;
+            rt.Release();
+            Object.Destroy(rt);
+            if (photo != null) _cache[key] = photo;
             _busy = false;
             yield return null;
             Resources.UnloadUnusedAssets();   // texturas e malhas do local montado só para a foto
-            done?.Invoke(rt);
+            done?.Invoke(photo);
         }
     }
 }

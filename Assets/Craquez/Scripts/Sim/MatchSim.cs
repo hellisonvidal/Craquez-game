@@ -145,6 +145,8 @@ namespace Craquez.Sim
         public bool smallGoals;
         /// <summary>Tick do último chute (tempo de reação do goleiro).</summary>
         public int lastShotTick = -1000;
+        /// <summary>Falta em que o juiz vai ajudar a vítima a levantar (id da vítima, -1 = não).</summary>
+        public int refHelp = -1;
 
         public readonly List<SimEvent> events = new List<SimEvent>();
 
@@ -1776,6 +1778,7 @@ namespace Craquez.Sim
             victim.vel = victim.vel * 0.5f + hit * (1.5f + 2.5f * force);
             victim.windup = 0f;
             victim.skill = Skill.None;
+            victim.fallRoll = force > 0.3f && rng.Chance(0.35f);   // às vezes rola no chão
             if (ball.owner == victim.id || ball.owner == offender.id)
             {
                 ball.owner = -1;
@@ -1800,10 +1803,19 @@ namespace Craquez.Sim
             // às vezes alguém vem dar a mão para levantar: um companheiro perto ou, em fair play, quem
             // fez a falta. A vítima fica um pouco mais no chão (sente a pancada) até ele chegar.
             foreach (var q in players) q.helping = -1;
-            if (!quickRestarts && mode.id != GameModes.Street && rng.Chance(0.45f))
+            refHelp = -1;
+            if (!quickRestarts && mode.id == GameModes.Field && rng.Chance(0.14f))
+            {
+                // o próprio juiz vai até ele e dá a mão
+                refHelp = victim.id;
+                victim.down = Mathf.Min(Mathf.Max(victim.down, 3.8f) + rng.Range(0f, 0.6f), 4.6f);
+                victim.downTotal = victim.down;
+                victim.stun = victim.down + 0.15f;
+            }
+            else if (!quickRestarts && mode.id != GameModes.Street && rng.Chance(0.55f))
             {
                 bool rival = rng.Chance(0.3f) && !offender.sentOff;
-                SimPlayer h = null; float hd = 12f;
+                SimPlayer h = null; float hd = 8f;
                 foreach (var q in players)
                 {
                     if (q == victim || q.isKeeper || q.sentOff || q.down > 0f) continue;
@@ -1814,7 +1826,7 @@ namespace Craquez.Sim
                 if (h != null)
                 {
                     h.helping = victim.id;
-                    victim.down = Mathf.Max(victim.down, 1.6f + hd / 2.2f + 1.0f) + rng.Range(0f, 0.6f);
+                    victim.down = Mathf.Min(Mathf.Max(victim.down, 1.6f + hd / 2.2f + 1.0f) + rng.Range(0f, 0.6f), 4.6f);
                     victim.downTotal = victim.down;
                     victim.stun = victim.down + 0.15f;
                 }
@@ -1891,6 +1903,7 @@ namespace Craquez.Sim
             int t = foulTeam;
             var victim = foulVictim >= 0 ? players[foulVictim] : null;
             foulTeam = foulVictim = foulOffender = -1;
+            refHelp = -1;
             foreach (var q in players) q.helping = -1;
             state = MatchState.Playing;
             if (_foulPenalty)
@@ -3544,6 +3557,17 @@ namespace Craquez.Sim
                                 weak.offBalance = Mathf.Max(weak.offBalance, 0.3f);
                                 var strong = weak == a ? b : a;
                                 Emit("bump", weak.team, weak.id, null, false, closing, strong.id);
+                                // trombada forte de verdade (sem falta): de vez em quando quem perde cai e levanta
+                                if (closing > 4.5f && weak.down <= 0f && !weak.isKeeper && state == MatchState.Playing && rng.Chance(0.22f))
+                                {
+                                    weak.fallDir = (weak.position - strong.position).Norm();
+                                    weak.fallKind = Vector2.Dot(weak.fallDir, weak.facing) > 0.3f ? 1 : Vector2.Dot(weak.fallDir, weak.facing) < -0.3f ? 0 : 2;
+                                    weak.down = rng.Range(1.1f, 1.9f);
+                                    weak.downTotal = weak.down;
+                                    weak.stun = weak.down + 0.1f;
+                                    weak.fallRoll = rng.Chance(0.3f);
+                                    if (ball.owner == weak.id) { ball.owner = -1; ball.vel = ball.vel * 0.5f + weak.fallDir * 1.2f; }
+                                }
                                 // quem conduz pode perder a bola no choque
                                 if (ball.owner == weak.id && closing > 4f && rng.Chance(0.45f * (1.2f - weak.control)) && !weak.isKeeper)
                                 {

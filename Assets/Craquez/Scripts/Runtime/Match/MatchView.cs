@@ -524,6 +524,13 @@ namespace Craquez
                 var v = sim.players[sim.foulVictim].position;
                 target = v + new Vector2(0f, v.y > 0 ? -4f : 4f);
                 urgency = 1f;
+                if (sim.refHelp == sim.foulVictim && _cardT <= 0f && sim.players[sim.foulVictim].down > 0f)
+                {
+                    // o juiz vai até quem está no chão e dá a mão para levantar
+                    target = v + new Vector2(0.75f, v.y > 0 ? -0.55f : 0.55f);
+                    p.helping = sim.foulVictim;
+                }
+                else p.helping = -1;
                 if (p.position.Dist(v) < 9f) _referee.point = AthleteView.W(new Vector2(sim.TeamDir(sim.foulTeam), 0f));
                 if (_cardT > 0f) _referee.point = Vector3.up * 3f + AthleteView.W(new Vector2(sim.TeamDir(sim.foulTeam), 0f)) * 0.3f;   // cartão erguido
             }
@@ -640,10 +647,10 @@ namespace Craquez
                     break;
                 case "skill":
                     _crowd?.React("skill");
-                    if (e.team == 0) { Sfx.Hurray(0.3f); _crowdHype = Mathf.Max(_crowdHype, 0.45f); }
+                    if (e.team == 0) _crowdHype = Mathf.Max(_crowdHype, 0.45f);   // (sem grito: parecia voz de jogador)
                     break;
                 case "fooled":
-                    if (e.team == 1) Sfx.Applause(0.3f);    // drible do time da casa deixou o visitante no chão
+                    // (sem som: o marcador desequilibrado não "faz barulho")
                     break;
                 case "tackle":
                 case "steal":
@@ -710,7 +717,7 @@ namespace Craquez
                     FanCrowd.FoulT = 2.2f; FanCrowd.FoulOn = 1 - e.team;
                     Sfx.Whistle();
                     if (e.team == 1) Sfx.Boo();   // torcida da casa vaia falta do visitante
-                    else Sfx.Ooh();
+                    // (sem o "uuuh" na falta: soava como os jogadores gemendo ao serem empurrados)
                     _crowd?.React("foul");
                     bcam.Shake(0.12f);
                     break;

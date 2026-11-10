@@ -835,7 +835,7 @@ namespace Craquez
                     string modeAt = _cfg.mode;
                     StartCoroutine(VenueShot.Render(_cfg.mode, vi, _cfg.teamA, _cfg.teamB, _cfg.streetPlayers, tex =>
                     {
-                        if (venueImg != null && _cfg.mode == modeAt && VenueIdx() == vi) venueImg.texture = tex;
+                        if (tex != null && venueImg != null && _cfg.mode == modeAt && VenueIdx() == vi) venueImg.texture = tex;
                     }));
                 }
                 // de noite, o desenho escurece e azula

@@ -101,7 +101,7 @@ namespace Craquez
             {
                 (GameModes.Field, false, "noite", "sol", "campo_noite"),
                 (GameModes.Field, true, "dia", "sol", "selecoes_dia"),
-                (GameModes.Field, false, "tarde", "chuva", "campo_chuva"),
+                (GameModes.Field, false, "tarde", "tempestade", "campo_chuva"),
                 (GameModes.Futsal, false, "noite", "sol", "futsal"),
                 (GameModes.Street, false, "tarde", "sol", "rua"),
             })
@@ -110,7 +110,7 @@ namespace Craquez
                 yield return new WaitForSecondsRealtime(1f);
                 yield return Shot(tag + "_inicio", 2.5f);
                 yield return Shot(tag + "_jogo", 6f);
-                if (weather == "chuva" && mc != null && mc.sim.puddles.Count > 0)
+                if ((weather == "chuva" || weather == "tempestade") && mc != null && mc.sim.puddles.Count > 0)
                 {
                     // poça de perto: anéis da chuva e o reflexo
                     var bc = mc.view.bcam;

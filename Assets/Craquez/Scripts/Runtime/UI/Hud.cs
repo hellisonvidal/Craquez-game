@@ -281,7 +281,7 @@ namespace Craquez.UI
                 // quadro só de quem está com a bola (do lado do time dele); some quando a bola muda de time
                 int own = _sim.ball.owner >= 0 && _sim.players[_sim.ball.owner].team == t ? _sim.ball.owner : -1;
                 bool cine = view != null && view.bcam != null && view.bcam.cinematic;
-                _pboxCg[t].alpha = Mathf.MoveTowards(_pboxCg[t].alpha, own >= 0 && !cine && Settings.PossessionHud ? 1f : 0f, Time.unscaledDeltaTime * (own >= 0 ? 8f : 3f));
+                _pboxCg[t].alpha = Mathf.MoveTowards(_pboxCg[t].alpha, own >= 0 && !cine && Settings.PossessionHud && !_sim.training ? 1f : 0f, Time.unscaledDeltaTime * (own >= 0 ? 8f : 3f));
                 if (own >= 0)
                 {
                     var p = _sim.players[own];

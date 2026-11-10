@@ -220,6 +220,8 @@ namespace Craquez
                     float writhe = Mathf.Sin(Time.time * 5.5f + p.id) * 6f * (1f - u * 0.6f);
                     pitch = lying;
                     roll += _fallSide * Mathf.Lerp(sideRoll * _fallSide, 62f, turn) + writhe;
+                    // às vezes rola no chão (uma volta inteira) antes de ficar sentindo
+                    if (p.fallRoll) roll += _fallSide * 360f * Smooth(Mathf.Clamp01(u / 0.3f));
                     lift = 0.16f + turn * 0.06f;
                     break;
                 }
