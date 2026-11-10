@@ -55,6 +55,7 @@ namespace Craquez
             sim.rollScale = RollFor(c.mode, w);
             sim.startSwapped = c.swapSides;
             sim.training = c.training;
+            sim.trainingRoster = c.trainingRoster;
             if (c.toss && !c.training)
             {
                 // sorteio: quem ganha escolhe o lado; quem perde dá a saída
@@ -67,6 +68,7 @@ namespace Craquez
             sim.smallGoals = c.mode == GameModes.Street && System.Array.IndexOf(GameModes.SmallGoalStreets, c.venue) >= 0;
             sim.quickRestarts = c.quickRestarts;
             sim.Setup(c.mode, new TeamSetup { data = ta, tactics = c.tacticsA }, new TeamSetup { data = tb, tactics = c.tacticsB }, c.seed, c.SecondsPerHalf);
+            sim.humanSide = new[] { c.sideA != Side.Cpu, c.sideB != Side.Cpu };
             view = new GameObject("Partida").AddComponent<MatchView>();
             view.transform.SetParent(transform, false);
             view.sides = new[] { c.sideA, c.sideB };

@@ -632,7 +632,7 @@ namespace Craquez
             _modeButtons[GameModes.Futsal] = BigCard(grid, "FUTSAL", "5 x 5", "Quadra  •  " + VenueBuilder.FutsalNames.Length + " ginásios", ModeArt(MenuArt.Kind.Futsal), 512f / 560f, new Color(0.96f, 0.62f, 0.04f), () => ShowKind(GameModes.Futsal));
             _modeButtons[GameModes.Society] = BigCard(grid, "SOCIETY", "7 x 7", "Grama sintética  •  " + VenueBuilder.SocietyNames.Length + " campos", ModeArt(MenuArt.Kind.Society), 512f / 560f, new Color(0.02f, 0.71f, 0.83f), () => ShowKind(GameModes.Society));
             _modeButtons[GameModes.Street] = BigCard(grid, "RUA", "3 A 5 POR LADO", "Times de rua  •  " + VenueBuilder.StreetNames.Length + " ruas", ModeArt(MenuArt.Kind.Street), 512f / 560f, new Color(0.93f, 0.28f, 0.6f), () => { _lastMode = GameModes.Street; Choose(GameModes.Street, false); });
-            _modeButtons["treino"] = BigCard(grid, "TREINO", "ARENA", "Você contra o goleiro  •  chute à vontade", ModeArt(MenuArt.Kind.Field), 512f / 560f, new Color(0.55f, 0.42f, 0.95f), () => { _lastMode = "treino"; StartTraining(); });
+            _modeButtons["treino"] = BigCard(grid, "TREINO", "ARENA", "Você contra o goleiro  •  chute à vontade", ModeArt(MenuArt.Kind.Field), 512f / 560f, new Color(0.55f, 0.42f, 0.95f), () => { _lastMode = "treino"; ShowTrainingPicker(); });
             UiKit.Select(_lastMode != null && _modeButtons.TryGetValue(_lastMode, out var lb) && lb != null ? lb : first);
         }
 
@@ -1529,7 +1529,37 @@ namespace Craquez
         /// Arena de treino: você conduz um atacante contra o goleiro, no campo do seu time; a cada chute
         /// (gol, defesa ou bola fora) uma bola nova aparece no seu pé em outro ponto. Sem relógio.
         /// </summary>
-        void StartTraining()
+        /// <summary>Arena de treino: escolha do atleta (jogadores de linha do seu time).</summary>
+        void ShowTrainingPicker()
+        {
+            var root = Page("JOGAR › TREINO");
+            Title(root, "TREINO", "Escolha quem vai treinar finalizações");
+            var team = Teams.Get(_cfg.teamA);
+            if (team == null || team.IsNational) team = Teams.Get(0);
+            var list = Scroll(UiKit.Rect(root, "atletas").Place(0.12f, 0, 0.88f, 1, 0, 120, 0, 250), 8f);
+            Selectable first = null;
+            var roster = team.roster;
+            // atacantes primeiro, depois meias e defensores
+            var order = new List<int>();
+            foreach (var want in new[] { "FW", "MF", "DF" })
+                for (int i = 0; i < roster.Count; i++) if (roster[i].pos == want) order.Add(i);
+            foreach (int i in order)
+            {
+                var e = roster[i];
+                int ri = i;
+                string pos = e.pos == "FW" ? "ATA" : e.pos == "MF" ? "MEI" : "ZAG";
+                var b = UiKit.Button(list, e.num + "   " + e.n.ToUpperInvariant() + "   •   " + pos + (e.ovr > 0 ? "   •   " + e.ovr : ""), () => StartTraining(ri), 28);
+                UiKit.Size(b, 64, 64);
+                var lbl = b.GetComponentInChildren<Text>();
+                lbl.alignment = TextAnchor.MiddleLeft;
+                lbl.rectTransform.Place(0, 0, 1, 1, 28, 0, 12, 0);
+                if (first == null) first = b;
+            }
+            _back = ShowPlay;
+            if (first != null) UiKit.Select(first);
+        }
+
+        void StartTraining(int rosterIdx = -1)
         {
             var c = _cfg;
             _trainBak = (c.mode, c.national, c.teamB, c.tacticsA, c.tacticsB, c.timeOfDay, c.weather, c.ceremony, c.minutes, c.sideA, c.sideB, c.stadium, c.toss);
@@ -1540,6 +1570,7 @@ namespace Craquez
             c.timeOfDay = "dia"; c.weather = "sol"; c.ceremony = false; c.minutes = 45;
             c.sideA = Side.Player1; c.sideB = Side.Cpu; c.stadium = 0; c.toss = false;
             c.training = true;
+            c.trainingRoster = rosterIdx;
             StartMatch();
         }
 

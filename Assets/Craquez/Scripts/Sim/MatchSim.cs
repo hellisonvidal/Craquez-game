@@ -40,7 +40,7 @@ namespace Craquez.Sim
         {
             public int player, prev, charging, pending;
             public float charge, pendingPower, pendingT, switchCd, autoT, helpT;
-            public Vector2 aim, prevRs;
+            public Vector2 aim, prevRs, prevMove;
             public bool shootHeld, finesseHeld;
         }
 
@@ -64,6 +64,8 @@ namespace Craquez.Sim
         public int firstKickoff;
         /// <summary>Arena de treino: um atacante (time 0) contra o goleiro; a bola volta ao pé dele depois de cada lance.</summary>
         public bool training;
+        /// <summary>Treino: atleta escolhido pelo jogador (índice no elenco; -1 = o melhor finalizador).</summary>
+        public int trainingRoster = -1;
         float _trainReset;
         public int protectTeam = -1;
         public float protectT;
@@ -147,6 +149,8 @@ namespace Craquez.Sim
         public int lastShotTick = -1000;
         /// <summary>Falta em que o juiz vai ajudar a vítima a levantar (id da vítima, -1 = não).</summary>
         public int refHelp = -1;
+        /// <summary>Lados controlados por gente (a CPU não usa os atalhos do analógico esquerdo).</summary>
+        public bool[] humanSide = new bool[2];
 
         public readonly List<SimEvent> events = new List<SimEvent>();
 
@@ -987,6 +991,7 @@ namespace Craquez.Sim
             ResolveCollisions();
             ClampKeepers();
             Slides();
+            Pulls();
             Dribble();
             Possession();
             if (ball.owner >= 0) possTeam = players[ball.owner].team;
@@ -1013,6 +1018,16 @@ namespace Craquez.Sim
             p.intent = f.move.Limit(1f);
             p.wantSprint = f.Has(InputFrame.Sprint);
             p.shielding = f.Has(InputFrame.Shield);
+            // proteger + colocado colado atrás/do lado de quem está com a bola = puxão de camisa
+            // (só proteger é "conter", a marcação de frente)
+            if (p.shielding && f.Has(InputFrame.Finesse) && ball.owner >= 0 && players[ball.owner].team != p.team && !p.isKeeper)
+            {
+                var car = players[ball.owner];
+                var rel = p.position - car.position;
+                if (rel.magnitude < 1.1f && Vector2.Dot(car.facing, rel.Norm()) < 0.3f && car.hold <= 0f) p.pulling = car.id;
+                else if (p.pulling >= 0 && rel.magnitude > 1.4f) p.pulling = -1;
+            }
+            else p.pulling = -1;
             p.faceBall = false;
             foreach (var q in players) if (q.team == t && q.id != p.id) q.shielding = false;
             c.finesseHeld = f.Has(InputFrame.Finesse);
@@ -1026,6 +1041,19 @@ namespace Craquez.Sim
                 else StartSkill(p, rs.normalized);
             }
             c.prevRs = rs;
+            // analógico esquerdo com a bola, parado/andando: empurrão firme para a frente = adianta a bola;
+            // de lado = rola a bola com a sola para o lado (sem precisar do analógico direito)
+            {
+                var mv = f.move;
+                if (humanSide[t] && ball.owner == p.id && p.skill == Skill.None && p.skillCd <= 0f && p.vel.magnitude < 2.2f && mv.magnitude > 0.9f && c.prevMove.magnitude < 0.35f
+                    && !setPiece && !throwIn && penaltyTeam < 0 && !(kickoffPass && p.id == kickoffKicker) && p.windup <= 0f && !p.shielding)
+                {
+                    float fa = Vector2.Dot(mv.normalized, p.facing.Norm());
+                    if (fa > 0.75f) StartSkill(p, mv.normalized);                                   // adianta (toque à frente)
+                    else if (Mathf.Abs(fa) < 0.5f) StartSkill(p, mv.normalized);                   // sola para o lado
+                }
+                c.prevMove = mv;
+            }
             if (penaltyTeam >= 0)
             {
                 p.intent = Vector2.zero;
@@ -1644,7 +1672,15 @@ namespace Craquez.Sim
             var o = players[ball.owner];
             if (o.team == p.team || (protectT > 0f && protectTeam == o.team) || o.hold > 0f) return;
             float d = p.position.Dist(ball.pos);
-            if (d > 1.5f) { p.stun = 0.25f; return; }
+            bool bote = d > 1.5f && d < 2.4f && Vector2.Dot(p.facing, (ball.pos - p.position).Norm()) > 0.6f;
+            if (bote)
+            {
+                // bote: estica a perna dando o passo longo na bola (mais arriscado se errar)
+                p.vel = (ball.pos - p.position).Norm() * Mathf.Max(p.vel.magnitude, 5.5f);
+                p.tackleAnim = 0.45f;
+                Emit("bote", p.team, p.id);
+            }
+            if (d > (bote ? 2.4f : 1.5f)) { p.stun = 0.25f; return; }
             bool fromBehind = Vector2.Dot(o.facing, (p.position - o.position).Norm()) < -0.45f;
             // por trás é arriscado, mas nem toda chegada vira falta (marcador bom chega na bola)
             if (fromBehind && rng.Chance(Mathf.Lerp(0.22f, 0.06f, p.defense) * (o.sprinting ? 1.3f : 1f) * (p.yellows > 0 ? 0.45f : 1f))) { Foul(p, o); return; }
@@ -1666,8 +1702,47 @@ namespace Craquez.Sim
             }
             else
             {
-                p.stun = 0.45f;
+                p.stun = bote ? 0.7f : 0.45f;   // bote errado: fica para trás
                 Emit("tackle", p.team, p.id, ok: false);
+            }
+        }
+
+        /// <summary>
+        /// Puxões de camisa e agarrões: quem puxa vai junto, quem é puxado perde velocidade; quanto mais
+        /// tempo segurando, maior a chance de o juiz marcar (agarrão longo quase sempre é falta).
+        /// A CPU puxa quando é batida (o atacante passou e ela está atrás), mais quem tem pouca disciplina.
+        /// </summary>
+        void Pulls()
+        {
+            if (state != MatchState.Playing) { foreach (var q in players) q.pulling = -1; return; }
+            foreach (var p in players)
+            {
+                if (p.sentOff || p.isKeeper || p.down > 0f) { p.pulling = -1; continue; }
+                bool human = ctrl[p.team].player == p.id && !(training && p.team == 1);
+                if (!human && p.pulling < 0 && ball.owner >= 0)
+                {
+                    var car = players[ball.owner];
+                    if (car.team != p.team && car.hold <= 0f)
+                    {
+                        var rel = p.position - car.position;
+                        float toGoalCar = Mathf.Abs(halfLen * TeamDir(car.team) - car.position.x), toGoalP = Mathf.Abs(halfLen * TeamDir(car.team) - p.position.x);
+                        bool beaten = toGoalCar < toGoalP + 0.3f && rel.magnitude < 1.45f && car.vel.magnitude > 2.2f;
+                        if (beaten && rng.Chance(DT * (0.25f + 0.5f * (1f - p.discipline)))) { p.pulling = car.id; p.pullT = 0f; }
+                    }
+                }
+                if (p.pulling < 0) { p.pullT = 0f; continue; }
+                var o = players[p.pulling];
+                var d = o.position - p.position;
+                if (ball.owner != o.id || d.magnitude > 1.5f || o.down > 0f || (!human && p.pullT > 0.35f + 0.5f * (1f - p.discipline))) { p.pulling = -1; p.pullT = 0f; continue; }
+                p.pullT += DT;
+                o.pulledT = 0.12f;
+                o.offBalance = Mathf.Max(o.offBalance, 0.15f);
+                // vai junto, colado atrás
+                if (d.magnitude > 0.75f) p.vel = Vector2.Lerp(p.vel, d.Norm() * o.vel.magnitude, 0.25f);
+                if (p.pullT < 0.05f + DT) Emit("pull", p.team, p.id, null, false, 0f, o.id);
+                // o juiz vê: segurar muito vira falta (agarrão)
+                float foulRate = 0.12f + p.pullT * 0.5f + (p.pullT > 1.0f ? 1.2f : 0f);
+                if (rng.Chance(DT * foulRate)) { p.pulling = -1; Foul(p, o); return; }
             }
         }
 
@@ -3327,6 +3402,7 @@ namespace Craquez.Sim
                 maxS *= 1f - 0.4f * back - 0.15f * side;
             }
             if (p.burst > 0f) maxS *= 1.07f;
+            if (p.pulledT > 0f) { p.pulledT -= DT; maxS *= 0.72f; }   // sendo puxado pela camisa
             if (water > 0.25f || snow > 0.05f) maxS *= (1f - 0.12f * PuddleAt(p.position)) * (1f - 0.1f * snow);   // poça e neve pesam
             if (p.offBalance > 0f) maxS *= 0.3f;
             if (p.isKeeper && p.Diving && p.saveT > 0f)
@@ -4470,6 +4546,14 @@ namespace Craquez.Sim
         {
             SimPlayer striker = null;
             foreach (var p in players) if (p.team == 0 && !p.isKeeper && (striker == null || p.shot > striker.shot)) striker = p;
+            if (trainingRoster >= 0)
+            {
+                // o escolhido: se já está em campo, é ele; senão entra no lugar do atacante
+                SimPlayer chosen = null;
+                foreach (var p in players) if (p.team == 0 && p.rosterIndex == trainingRoster) chosen = p;
+                if (chosen != null && !chosen.isKeeper) striker = chosen;
+                else if (striker != null && Substitute(striker.id, trainingRoster)) striker.signature = Signature(striker, teams[0].data);
+            }
             foreach (var p in players)
             {
                 if (p == striker || (p.team == 1 && p.isKeeper)) continue;

@@ -387,15 +387,16 @@ namespace Craquez
             if (q < 1) return;
             // coletes: laranja para o mandante, verde-limão para o visitante
             var bibs = new[] { new Color(1f, 0.45f, 0.05f), new Color(0.65f, 0.95f, 0.1f) };
+            int nWarm = q >= 2 ? 5 : 4;
             for (int t = 0; t < 2; t++)
-                for (int i = 0; i < 3; i++)
+                for (int i = 0; i < nWarm; i++)
                 {
                     var wp = new SimPlayer { id = -1, name = "Reserva", number = 12 + i, face = new float[] { (i + t) % 4, i % 3, (t * 2 + i) % 4, 1, i % 2, 2 } };
                     var bib = new Kit { c1 = bibs[t], c2 = bibs[t], shorts = Color.Lerp(kits[t].shorts, Color.black, 0.2f), socks = kits[t].socks };
                     var rig = AthleteFactory.Create(wp, bib, bib, parent, q);
                     var av = rig.gameObject.AddComponent<AthleteView>();
                     float gx = (t == 0 ? -1f : 1f) * (sim.halfLen + 4f);
-                    wp.position = new Vector2(gx, sim.halfW * (0.35f + i * 0.17f));
+                    wp.position = new Vector2(gx, sim.halfW * (0.2f + i * 0.15f));
                     wp.facing = new Vector2(0f, 1f);
                     av.Setup(wp, rig, this);
                     _warm.Add((av, t, i * 1.7f + t * 0.9f));
@@ -475,26 +476,73 @@ namespace Craquez
                     }
                 }
                 if (_coachPointT[t] > 0f) { _coachPointT[t] -= dt; if (_coachPointT[t] <= 0f) av.point = Vector3.zero; }
+                // lance de perigo do time dele: aplaude / vibra na beira do campo
+                if (sim.tick - sim.lastShotTick < 4 && sim.ball.lastTouchTeam == t && !av.Celebrating) av.Celebrate(1.4f);
                 av.OnTick();
             }
-            // aquecimento atrás dos gols: trote de ida e volta e paradas para alongar
+            // aquecimento atrás dos gols: cada reserva no seu ciclo — trote de ida e volta, deslocamento de
+            // lado, polichinelos, alongamento (braços para cima), tiro curto e caminhada de volta
             int wk = 1;
             foreach (var w in _warm)
             {
                 if (BenchJoin(w.av, w.team, wk++, dt)) continue;
                 var p = w.av.p;
                 float gx = (w.team == 0 ? -1f : 1f) * (hl + 4f);
-                float cyc = (float)(sim.tick * dt * 0.09f + w.phase);
+                float toField = w.team == 0 ? 1f : -1f;
+                float cyc = (float)(sim.tick * dt / 26f + w.phase * 0.37f);
                 float u = Mathf.Repeat(cyc, 1f);
-                // 0..0,4 vai, 0,4..0,5 parado, 0,5..0,9 volta, 0,9..1 parado
-                float z0 = hw * 0.3f, z1 = hw * 0.9f;
-                float s = u < 0.4f ? u / 0.4f : u < 0.5f ? 1f : u < 0.9f ? 1f - (u - 0.5f) / 0.4f : 0f;
-                var target = new Vector2(gx + Mathf.Sin(w.phase * 3f) * 0.8f, Mathf.Lerp(z0, z1, Mathf.SmoothStep(0f, 1f, s)));
+                int lane = (int)(w.phase * 10f) % 4;
+                float z0 = hw * 0.15f, z1 = hw * 0.85f;
+                float laneZ = Mathf.Lerp(z0, z1, (lane + 0.5f) / 4f);
+                Vector2 target = p.position;
+                float maxV = 3.2f;
+                w.av.point = Vector3.zero;
+                if (u < 0.3f)
+                {
+                    // trote de ida e volta
+                    float s = Mathf.PingPong(u / 0.3f * 2f, 1f);
+                    target = new Vector2(gx + Mathf.Sin(w.phase * 3f) * 0.8f, Mathf.Lerp(z0, z1, Mathf.SmoothStep(0f, 1f, s)));
+                }
+                else if (u < 0.45f)
+                {
+                    // deslocamento lateral (de frente para o campo)
+                    float s = Mathf.PingPong((u - 0.3f) / 0.15f * 3f, 1f);
+                    target = new Vector2(gx, laneZ + (s - 0.5f) * 4f);
+                    maxV = 2.4f;
+                }
+                else if (u < 0.55f)
+                {
+                    // polichinelos / saltitos no lugar
+                    target = new Vector2(gx, laneZ);
+                    if (p.position.Dist(target) < 0.6f && !w.av.Celebrating) w.av.Celebrate(1.2f);
+                }
+                else if (u < 0.7f)
+                {
+                    // alongamento: parado, braço esticado para cima ou para o lado
+                    target = new Vector2(gx, laneZ);
+                    if (p.position.Dist(target) < 0.6f)
+                        w.av.point = (Mathf.Repeat(u * 12f, 1f) < 0.5f ? Vector3.up : new Vector3(0f, 0.4f, Mathf.Sign(Mathf.Sin(u * 40f)))) * 1f;
+                }
+                else if (u < 0.8f)
+                {
+                    // tiro curto
+                    float s = (u - 0.7f) / 0.1f;
+                    target = new Vector2(gx + toField * 0.5f, s < 0.5f ? z1 : z0);
+                    maxV = 6.5f;
+                }
+                else
+                {
+                    // caminha de volta conversando, olhando o jogo
+                    target = new Vector2(gx - toField * 0.6f, laneZ);
+                    maxV = 1.3f;
+                }
                 var to = target - p.position;
-                p.vel = Vector2.MoveTowards(p.vel, to / dt * 0.15f, 6f * dt);
-                if (p.vel.magnitude > 3.2f) p.vel = p.vel.normalized * 3.2f;
+                var want = to.magnitude > 0.25f ? to / Mathf.Max(to.magnitude, 0.01f) * Mathf.Min(maxV, to.magnitude * 2f) : Vector2.zero;
+                p.vel = Vector2.MoveTowards(p.vel, want, 6f * dt);
                 p.position += p.vel * dt;
-                if (p.vel.magnitude > 0.3f) p.facing = V2.RotateToward(p.facing, p.vel.normalized, 5f * dt).Norm();
+                bool lateral = u >= 0.3f && u < 0.45f;
+                if (lateral) p.facing = V2.RotateToward(p.facing, new Vector2(toField, 0f), 5f * dt).Norm();
+                else if (p.vel.magnitude > 0.3f) p.facing = V2.RotateToward(p.facing, p.vel.normalized, 5f * dt).Norm();
                 else p.facing = V2.RotateToward(p.facing, (sim.ball.pos - p.position).Norm(), 2f * dt).Norm();
                 w.av.OnTick();
             }

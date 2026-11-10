@@ -258,7 +258,7 @@ namespace Craquez
                             var tgtB = att.position + new Vector2(0.2f, 0f);
                             float tB = 0.95f;
                             sim.ball.owner = -1; sim.ball.pos = from; sim.ball.vel = (tgtB - from) / tB; sim.ball.z = 0.4f;
-                            sim.ball.vz = (1.6f - 0.4f + 0.5f * SimBall.G * tB * tB) / tB;
+                            sim.ball.vz = (1.5f - 0.4f + 0.5f * SimBall.G * tB * tB) / tB;
                             Time.captureFramerate = 30;
                             bcK.cinematic = true;
                             // câmera baixa, de lado, olhando para cima: o atleta recortado contra os refletores
@@ -269,10 +269,13 @@ namespace Craquez
                             bool kicked = false;
                             for (int f = 0; f < 54; f++)
                             {
-                                if (!kicked && sim.ball.pos.Dist(att.position) < 0.9f && sim.ball.z > 0.9f)
+                                if (!kicked && sim.ball.pos.Dist(att.position) < 1.6f)
                                 {
                                     kicked = true;
                                     att.facing = new Vector2(-1f, 0f);
+                                    // contato no pé lá no alto (o corpo já está deitado no ar)
+                                    sim.ball.pos = att.position + new Vector2(-0.25f, 0f);
+                                    sim.ball.z = 1.75f;
                                     sim.Bicycle(att);
                                 }
                                 if (!kicked) { att.vel = Vector2.zero; att.facing = new Vector2(-1f, 0f); }

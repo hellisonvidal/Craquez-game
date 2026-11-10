@@ -99,6 +99,9 @@ namespace Craquez.Sim
         public int fallKind;
         /// <summary>Na queda, rola no chão antes de ficar sentindo.</summary>
         public bool fallRoll;
+        /// <summary>Puxando a camisa / agarrando o adversário (id) e há quanto tempo; quem é puxado fica mais lento.</summary>
+        public int pulling = -1;
+        public float pullT, pulledT;
         /// <summary>Personalidade (0..1): disposição, ousadia, disciplina tática; leitura de jogo (s entre decisões).</summary>
         public float work = 0.5f, flair = 0.5f, discipline = 0.6f, think = 0.35f, thinkT;
         /// <summary>IA: decisão atual (aiGoal), alvo suavizado (aiTarget) e deslocamento pessoal na formação.</summary>

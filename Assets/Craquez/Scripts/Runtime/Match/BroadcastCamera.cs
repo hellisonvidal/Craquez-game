@@ -127,7 +127,8 @@ namespace Craquez
                 // inteiro do lado da câmera (além da lateral de baixo): nas câmeras de lado fica escondido
                 // a partida toda (antes sumia e voltava a cada movimento da câmera: arquibancada e
                 // torcedores "piscando", trocando de camada)
-                _occNear.Add(sim != null && b.max.z < -(sim.halfW + 0.6f));
+                // (pelo centro: cantos, coberturas e refletores que passam um pouco da lateral também contam)
+                _occNear.Add(sim != null && (b.max.z < -(sim.halfW + 0.6f) || (b.center.z < -(sim.halfW + 1.5f) && b.min.z < -(sim.halfW + 2f))));
                 _occClear.Add(0f);
             }
         }

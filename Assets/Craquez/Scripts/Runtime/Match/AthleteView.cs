@@ -100,6 +100,13 @@ namespace Craquez
                         anim.Play(c, ct - 0.06f, 0.6f, 1.35f, 0.04f);
                     }
                     break;
+                case "bote":
+                {
+                    // bote: passo longo esticando a perna na bola
+                    float cb = AthleteAnimator.KickContact("Pass");
+                    anim.Play("Pass", cb - 0.1f, 0.55f, 1.25f, 0.04f);
+                    break;
+                }
                 case "skill":
                     switch ((Skill)e.skill)
                     {
@@ -439,6 +446,21 @@ namespace Craquez
             }
         }
 
+        bool _pullSet;
+        /// <summary>Puxão de camisa: o braço vai até as costas de quem está sendo puxado.</summary>
+        void PullArm()
+        {
+            var sim = view.sim;
+            if (p.pulling >= 0 && p.pulling < sim.players.Count)
+            {
+                var o = sim.players[p.pulling];
+                var dir = W(o.position - p.position);
+                point = (dir.sqrMagnitude > 0.01f ? dir.normalized : transform.forward) * 0.8f + Vector3.up * 0.15f;
+                _pullSet = true;
+            }
+            else if (_pullSet) { point = Vector3.zero; _pullSet = false; }
+        }
+
         public void Celebrate(float seconds) => _celebrate = Mathf.Max(_celebrate, seconds);
         public bool Celebrating => _celebrate > 0f;
 
@@ -590,7 +612,7 @@ namespace Craquez
             if (_celebrate > 0f) _celebrate -= dt;
             // a comemoração acaba quando o jogo volta (saída de bola/jogo rolando): ninguém fica de braços erguidos
             var stt = view.sim.state;
-            if (stt == Craquez.Sim.MatchState.Kickoff || stt == Craquez.Sim.MatchState.Playing || stt == Craquez.Sim.MatchState.Restart || stt == Craquez.Sim.MatchState.Foul)
+            if (p.id >= 0 && (stt == Craquez.Sim.MatchState.Kickoff || stt == Craquez.Sim.MatchState.Playing || stt == Craquez.Sim.MatchState.Restart || stt == Craquez.Sim.MatchState.Foul))   // (banco e aquecimento: livres)
             {
                 _celebrate = 0f;
                 _armsUp = Mathf.MoveTowards(_armsUp, 0f, dt * 4f);
@@ -1401,6 +1423,7 @@ namespace Craquez
                 BodyLayer();
                 FallLimbs();
                 Protest();
+                PullArm();
                 PointArm();
                 HelpUp();
                 BicycleLimbs();

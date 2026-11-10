@@ -34,7 +34,8 @@ namespace Craquez
         {
             // três formatos de poça (antes uma só, girada) e a mancha de grama molhada em volta
             var texs = new[] { Blob(128, 0), Blob(128, 1), Blob(128, 2) };
-            var halo = Gfx.Transparent(new Color(0.05f, 0.09f, 0.04f, 0.38f), Halo(64));
+            // (material de partícula: respeita o alfa da textura; o transparente comum virava um quadrado)
+            var halo = Gfx.Particles(new Color(0.03f, 0.07f, 0.03f, 0.42f), Halo(64));
             // água: escura, levemente azulada e lisa (reflete o céu/refletores no brilho especular);
             // recorte pelo contorno irregular (o material transparente ignorava o alfa da textura e a
             // poça aparecia como um ladrilho quadrado)
