@@ -6,6 +6,7 @@ set -euo pipefail
 E=${1:-/opt/unity/Editor/Data}
 ROOT=$(cd "$(dirname "$0")/../.." && pwd)
 W=$(mktemp -d)
+trap "rm -rf $W" EXIT
 DOTNET=$E/NetCoreRuntime/dotnet
 CSC="$DOTNET $E/DotNetSdkRoslyn/csc.dll -nologo -noconfig -nostdlib -target:library -langversion:9 -nowarn:1701,1702,0649,0414,0618 -define:UNITY_2023_1_OR_NEWER -define:UNITY_6000_0_OR_NEWER"
 NS=$E/NetStandard/ref/2.1.0/netstandard.dll

@@ -60,6 +60,7 @@ namespace Craquez
             new ExtLook(3, new Color(0.05f, 0.25f, 0.2f), false, true, false, new Color(0.5f, 0.6f, 0.45f)),   // 27 Jardim Botânico
             new ExtLook(9, new Color(0.9f, 0.45f, 0.1f), true, false, false, new Color(0.85f, 0.7f, 0.5f)),    // 28 Arena do Sertão
             new ExtLook(6, new Color(0.2f, 0.2f, 0.22f), true, true, true, new Color(0.4f, 0.4f, 0.42f)),      // 29 Estádio da Usina
+            new ExtLook(5, new Color(0.55f, 0.3f, 0.8f), false, true, true, new Color(0.7f, 0.72f, 0.66f)),     // 30 Arena da Colina
         };
 
         public static ExtLook LookOf(int model, uint seed)

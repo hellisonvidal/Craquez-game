@@ -196,7 +196,7 @@ namespace Craquez
                     away.y = 0f;
                     if (away.sqrMagnitude < 1e-4f) break;
                     float k = Mathf.Clamp01(e.power / 7f);
-                    _bumpVel += away.normalized * (e.id == p.id ? 70f + 90f * k : 25f);
+                    _bumpVel += away.normalized * (e.id == p.id ? 35f + 40f * k : 14f);   // (antes ~17° de tranco: parecia que ia cair de costas)
                     break;
                 }
                 case "fooled":
@@ -1257,7 +1257,9 @@ namespace Craquez
             float drop = (G(uR, 0.25f, 0.12f) - G(uL, 0.25f, 0.12f)) * Mathf.Lerp(3f, 1.5f, run);
             _pose.Rotate(rig.pelvis, Quaternion.AngleAxis(drop * W, fwd));
             rig.bones.TryGetValue("spine_01", out var sp1);
-            _pose.Rotate(sp1, Quaternion.AngleAxis((Mathf.Lerp(1.5f, 4.5f, run) * (1f - back) + 3.5f * sprint) * W, right));   // tronco mais ereto
+            // tronco: trote quase ereto (~2°), corrida rápida ~6°, pique intenso ~12° (o corpo "cai" para a frente)
+            float fastRun = Mathf.Clamp01((spd - 4.2f) / 1.8f) * (1f - back) * (1f - lateral);
+            _pose.Rotate(sp1, Quaternion.AngleAxis((Mathf.Lerp(1.5f, 3f, run) * (1f - back) + 3f * fastRun + 6.5f * sprint) * W, right));
             for (int side = -1; side <= 1; side += 2)
             {
                 string sfx = side < 0 ? "_l" : "_r";
@@ -1270,7 +1272,7 @@ namespace Craquez
                 float u = ps > 0f ? uR : uL;
                 float hip = HipAt(u), knee = KneeAt(u);
                 // + no eixo "right" leva o vetor para trás: flexão (para a frente) é ângulo negativo
-                var lat = right * ps * 0.035f;
+                var lat = right * ps * Mathf.Lerp(0.07f, 0.045f, run);   // pés um pouco afastados (antes 0,035: pernas coladas)
                 // passada: componente para a frente/para trás no plano do corpo e um pouco para o lado
                 // (nada de girar o plano da perna: isso desenhava círculos)
                 var thighDir = (Quaternion.AngleAxis(-hip * _gDir.y, right) * (Quaternion.AngleAxis(hip * _gDir.x * 0.6f, fwd) * -up) + lat).normalized;
@@ -1308,7 +1310,7 @@ namespace Craquez
                 float ph = uOpp + 0.15f * runArm;
                 float c = Mathf.Cos(2f * Mathf.PI * ph);
                 float vel = -Mathf.Sin(2f * Mathf.PI * ph);   // > 0: braço indo para a frente
-                float amp = (Mathf.Lerp(15f, 34f, runArm) + 16f * sprint) * Mathf.Min(_armAmp, 1.1f) * (ps < 0 ? 1f : _armAsym) * (hasBall ? 0.85f : 1f)
+                float amp = (Mathf.Lerp(15f, 28f, runArm) + 9f * fastRun + 20f * sprint) * Mathf.Min(_armAmp, 1.1f) * (ps < 0 ? 1f : _armAsym) * (hasBall ? 0.85f : 1f)
                             * Mathf.Lerp(1f, 0.6f, Mathf.Max(back, lateral));
                 // à frente e atrás: andando o braço vai mais para trás; correndo, quase simétrico
                 float fwdK = Mathf.Lerp(0.6f, 0.95f, runArm), backK = Mathf.Lerp(1.2f, 1f, runArm);
@@ -1316,11 +1318,11 @@ namespace Craquez
                 // cotovelo: fecha na ida e abre na volta, com um pequeno atraso (antebraço solto)
                 float cl = Mathf.Cos(2f * Mathf.PI * (ph - 0.06f));
                 float elbowWalk = 16f + 10f * Mathf.Max(0f, cl);
-                float elbowRun = 76f + 16f * cl;
+                float elbowRun = Mathf.Lerp(70f, 80f, fastRun) + Mathf.Lerp(12f, 18f, sprint) * cl;   // trote: antebraço mais baixo e solto
                 float elbow = Mathf.Lerp(elbowWalk, elbowRun, runArm) + 10f * sprint + _elbowStyle * 0.3f * runArm;
                 elbow = Mathf.Clamp(elbow, 8f, 115f - Mathf.Max(0f, swing) * 0.5f);
                 if (clv != null) _pose.Rotate(clv, Quaternion.AngleAxis(-ps * swing * 0.1f * Mathf.Max(0.4f, run) * W, up));   // ombro acompanha
-                float abd = _armCarry * 0.25f + 7f + (hasBall ? 3.5f : 0f) + lateral * 5f;
+                float abd = _armCarry * 0.25f + 11f + (hasBall ? 3.5f : 0f) + lateral * 5f;   // (7° ainda parecia braço colado)
                 var swingAxis = Quaternion.AngleAxis(ps * cross, up) * right;
                 var upDir = Quaternion.AngleAxis(-swing, swingAxis) * -up;
                 upDir = (Quaternion.AngleAxis(ps * abd, fwd) * upDir).normalized;
@@ -1350,7 +1352,7 @@ namespace Craquez
         void RestPose()
         {
             bool tired = p.stamina < 0.45f;
-            bool want = _idleT > 2.2f && (_restKind != 1 || tired);
+            bool want = _idleT > 2.2f && (_restKind != 1 || tired) && seat < 0.5f;
             _restPose = Mathf.MoveTowards(_restPose, want ? 1f : 0f, Time.deltaTime * (want ? 2f : 5f));
             if (_restPose <= 0.001f || rig.pelvis == null) return;
             bool knees = tired && _restKind == 2;
@@ -1548,10 +1550,67 @@ namespace Craquez
 
         Transform _neckT;
         Vector3 _neckPos0;
+
+        /// <summary>
+        /// Base de pé: as pernas um pouco afastadas (antes ficavam coladas, joelho com joelho). Só
+        /// parado ou andando devagar; correndo, a passada desenhada já cuida da largura.
+        /// </summary>
+        void Stance()
+        {
+            if (rig.pelvis == null || p.down > 0f || p.slide > 0f || (p.isKeeper && (p.saveKind > 0 || _saveRec > 0f)) || seat > 0.5f || _bikeT > 0f) return;
+            float slow = 1f - Mathf.Clamp01((_animSpd - 0.6f) / 1.6f);
+            if (slow <= 0.01f) return;
+            var fwd = transform.forward;
+            foreach (var sfx in LR)
+            {
+                if (!rig.bones.TryGetValue("thigh" + sfx, out var th) || !rig.bones.TryGetValue("calf" + sfx, out var cf)) continue;
+                float ps = Mathf.Sign(Vector3.Dot(th.position - rig.pelvis.position, transform.right));
+                _pose.Rotate(th, Quaternion.AngleAxis(ps * 4.5f * slow, fwd));
+                _pose.Rotate(cf, Quaternion.AngleAxis(-ps * 2.5f * slow, fwd));   // canela de volta à vertical (pé plano)
+            }
+        }
+
+        static readonly string[] LR = { "_l", "_r" };
+
+        /// <summary>Sentado no banco: coxas na horizontal, canelas na vertical, mãos sobre as coxas.</summary>
+        void SeatPose()
+        {
+            if (seat <= 0.001f || rig.pelvis == null) return;
+            var right = transform.right;
+            foreach (var sfx in LR)
+            {
+                rig.bones.TryGetValue("thigh" + sfx, out var th);
+                rig.bones.TryGetValue("calf" + sfx, out var cf);
+                rig.bones.TryGetValue("upperarm" + sfx, out var ua);
+                rig.bones.TryGetValue("lowerarm" + sfx, out var la);
+                if (th != null && cf != null)
+                {
+                    var thighDir = Vector3.Slerp(-transform.up, (transform.forward - transform.up * 0.08f).normalized, seat);
+                    _pose.Rotate(th, Quaternion.FromToRotation(cf.position - th.position, thighDir));
+                    var ft = sfx == "_l" ? rig.footL : rig.footR;
+                    if (ft != null) _pose.Rotate(cf, Quaternion.FromToRotation(ft.position - cf.position, Vector3.Slerp(ft.position - cf.position, -transform.up, seat)));
+                }
+                if (ua != null && la != null)
+                {
+                    _pose.Rotate(ua, Quaternion.AngleAxis(-22f * seat, right));
+                    _pose.Rotate(la, Quaternion.AngleAxis(-48f * seat, right));
+                }
+            }
+            rig.bones.TryGetValue("spine_01", out var sp1);
+            _pose.Rotate(sp1, Quaternion.AngleAxis(8f * seat, right));   // tronco um pouco à frente, apoiado
+        }
         static readonly string[] Clavicles = { "clavicle_l", "clavicle_r" };
+
+        Renderer _bodyR;
+        /// <summary>Sentado (reservas no banco): 0 de pé .. 1 sentado.</summary>
+        public float seat;
 
         void LateUpdate()
         {
+            // fora da tela (e sem sombra na tela): pula as correções de pose — economiza processador e
+            // bateria (no campo, metade dos atletas, os do aquecimento e o banco ficam fora do quadro)
+            if (rig != null && _bodyR == null) _bodyR = rig.GetComponentInChildren<SkinnedMeshRenderer>();
+            if (_bodyR != null && !_bodyR.isVisible && Time.frameCount > 3) return;
             if (rig != null) NarrowShoulders();
             if (rig != null && p != null) LowerShoulders();
             if (p != null && rig != null)
@@ -1565,6 +1624,8 @@ namespace Craquez
                 PointArm();
                 HelpUp();
                 BicycleLimbs();
+                SeatPose();
+                Stance();
             }
             GroundFeet();
             Cloth();

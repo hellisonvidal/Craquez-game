@@ -20,12 +20,69 @@ namespace Craquez.UI
 
         public static string Key(string mode, int idx, int home) => mode + "/" + idx + "/" + (mode == GameModes.Field && idx == 0 ? home : -1);
 
-        public static Texture Cached(string mode, int idx, int home) => _cache.TryGetValue(Key(mode, idx, home), out var t) && t != null ? t : null;
+        /// <summary>Foto já pronta: da memória ou, se não, do disco (fotos salvas em execuções anteriores).</summary>
+        public static Texture Cached(string mode, int idx, int home)
+        {
+            string key = Key(mode, idx, home);
+            if (_cache.TryGetValue(key, out var t) && t != null) return t;
+            var d = LoadDisk(key);
+            if (d != null) { _cache[key] = d; return d; }
+            return null;
+        }
+
+        // fotos salvas no aparelho: a segunda vez que o seletor abre (e nas próximas execuções) é instantâneo.
+        // O carimbo muda com a versão do jogo e o número de estádios (refaz as fotos depois de atualizar)
+        static string Dir => System.IO.Path.Combine(Application.persistentDataPath, "locais");
+        static string FileFor(string key) => System.IO.Path.Combine(Dir, key.Replace('/', '_') + "_" + Application.version + "_" + VenueBuilder.StadiumModels.Length + ".jpg");
+
+        static Texture2D LoadDisk(string key)
+        {
+            try
+            {
+                string f = FileFor(key);
+                if (!System.IO.File.Exists(f)) return null;
+                var t = new Texture2D(2, 2, TextureFormat.RGB24, false) { name = "Local " + key, wrapMode = TextureWrapMode.Clamp };
+                if (!t.LoadImage(System.IO.File.ReadAllBytes(f), true)) { Object.Destroy(t); return null; }
+                return t;
+            }
+            catch (System.Exception ex) { Debug.LogWarning("[local] foto do disco falhou: " + ex.Message); return null; }
+        }
+
+        static void SaveDisk(string key, Texture2D t)
+        {
+            try
+            {
+                System.IO.Directory.CreateDirectory(Dir);
+                System.IO.File.WriteAllBytes(FileFor(key), t.EncodeToJPG(86));
+            }
+            catch (System.Exception ex) { Debug.LogWarning("[local] salvar a foto falhou: " + ex.Message); }
+        }
+
+        /// <summary>
+        /// Monta antes as fotos de todos os locais da modalidade (uma por vez, com folga entre elas), para o
+        /// seletor já abrir com as miniaturas prontas. <paramref name="each"/> é chamado a cada foto pronta.
+        /// </summary>
+        public static IEnumerator Prewarm(string mode, int count, int teamA, int teamB, int streetPlayers, System.Action<int, Texture> each = null, System.Func<bool> hold = null)
+        {
+            for (int i = 0; i < count; i++)
+            {
+                while (hold != null && hold()) yield return new WaitForSecondsRealtime(1f);   // (nunca durante a partida)
+                var have = Cached(mode, i, teamA);
+                if (have != null) { each?.Invoke(i, have); continue; }
+                Texture got = null;
+                yield return Render(mode, i, teamA, teamB, streetPlayers, t => got = t);
+                if (got != null) each?.Invoke(i, got);
+                yield return null;
+                yield return null;
+            }
+        }
 
         public static IEnumerator Render(string mode, int idx, int teamA, int teamB, int streetPlayers, System.Action<Texture> done)
         {
             string key = Key(mode, idx, teamA);
             if (_cache.TryGetValue(key, out var have) && have != null) { done?.Invoke(have); yield break; }
+            var disk = LoadDisk(key);
+            if (disk != null) { _cache[key] = disk; done?.Invoke(disk); yield break; }
             while (_busy) yield return null;
             if (_cache.TryGetValue(key, out have) && have != null) { done?.Invoke(have); yield break; }
             _busy = true;
@@ -120,6 +177,8 @@ namespace Craquez.UI
                 RenderTexture.active = rt;
                 photo = new Texture2D(rt.width, rt.height, TextureFormat.RGB24, false) { name = "Local " + key, wrapMode = TextureWrapMode.Clamp };
                 photo.ReadPixels(new Rect(0, 0, rt.width, rt.height), 0, 0);
+                photo.Apply(false, false);
+                SaveDisk(key, photo);
                 photo.Apply(false, true);   // sem cópia na memória do processador
                 RenderTexture.active = prev;
             }

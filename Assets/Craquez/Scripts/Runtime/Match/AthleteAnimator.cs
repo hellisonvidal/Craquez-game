@@ -141,10 +141,10 @@ namespace Craquez
                 if (up == null || lo == null) continue;
                 float s = Mathf.Sign(Vector3.Dot(up.position - (rig.spine != null ? rig.spine.position : root.position), right));
                 float abd = Abduction(rig, root, side, out _);
-                if (abd > 16f) pose.Rotate(up, Quaternion.AngleAxis(-(abd - 16f) * w * s, root.forward));   // (+ em torno da frente ergueria o braço direito)
+                if (abd > 20f) pose.Rotate(up, Quaternion.AngleAxis(-(abd - 20f) * w * s, root.forward));   // (+ em torno da frente ergueria o braço direito)
                 // e um mínimo de abertura: braço colado no tronco (a captura às vezes fecha demais) parece
                 // preso ao corpo; o braço solto de verdade fica ~8° afastado
-                else if (abd < 8f) pose.Rotate(up, Quaternion.AngleAxis((8f - abd) * w * s, root.forward));
+                else if (abd < 12f) pose.Rotate(up, Quaternion.AngleAxis((12f - abd) * w * s, root.forward));
                 var arm = (lo.position - up.position).normalized;
                 float elev = Vector3.Angle(arm, down);
                 // correndo forte o braço sobe mais (balanço natural da corrida); parado/andando, menos

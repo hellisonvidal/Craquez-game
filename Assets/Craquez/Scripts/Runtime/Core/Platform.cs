@@ -37,7 +37,7 @@ namespace Craquez
         {
             bool mobile = Application.isMobilePlatform;
             if (!mobile) return quality >= 3 ? 4320 : quality == 2 ? 2160 : 1440;
-            return quality >= 3 ? 1620 : quality == 2 ? 1440 : 1080;
+            return quality >= 3 ? 1440 : quality == 2 ? 1080 : quality == 1 ? 900 : 720;   // (celular: menos pixels = menos calor; o FSR amplia)
         }
     }
 }

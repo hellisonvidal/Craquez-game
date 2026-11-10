@@ -319,6 +319,7 @@ namespace Craquez
         float _w, _h, _top, _t, _phase, _sweepAmp, _sweepFreq, _restCycle, _prevAng, _angVel, _ph, _hypeS, _ph2;
         bool _waved;
         Quaternion _base;
+        MeshRenderer _mr;
         public float hype;
 
         public static FlagWave Create(Transform parent, Vector3 basePos, Quaternion facing, float w, float h, float poleH, Material cloth, bool waved, int seed)
@@ -383,6 +384,9 @@ namespace Craquez
                 float lean = Mathf.Sin(_ph * 2f + _phase) * amp * 0.12f;
                 transform.rotation = _base * Quaternion.AngleAxis(ang, Vector3.forward) * Quaternion.AngleAxis(lean, Vector3.right);
             }
+            // pano fora da tela: não recalcula a malha (economia de processador)
+            if (_mr == null) _mr = GetComponent<MeshRenderer>();
+            if (_mr != null && !_mr.isVisible) { _prevAng = ang; return; }
             _angVel = Mathf.Lerp(_angVel, (ang - _prevAng) / dt, 1f - Mathf.Exp(-dt * 10f));
             _prevAng = ang;
             // pano: arrasta atrás do movimento (curva no plano), ondula (fora do plano) e cai um pouco
