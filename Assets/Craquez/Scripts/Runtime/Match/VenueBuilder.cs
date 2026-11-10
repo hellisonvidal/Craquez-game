@@ -475,19 +475,31 @@ namespace Craquez
                     for (int i = 0; i < n; i++)
                         Ell((i & 1) == 0 ? k : ks, Vector3.Lerp(a0, a1, i / (float)n), Vector3.Lerp(a0, a1, (i + 1) / (float)n), rad, rad * 1.15f, depthAx);
                 }
-                Bar(new Vector3(gx, 0, -gw - r), new Vector3(gx, gh + r * 2f, -gw - r), r, futsal);
-                Bar(new Vector3(gx, 0, gw + r), new Vector3(gx, gh + r * 2f, gw + r), r, futsal);
-                Bar(new Vector3(gx, gh + r, -gw - 2 * r), new Vector3(gx, gh + r, gw + 2 * r), r, futsal);
+                // traves e travessão se encontram no centro dos tubos (antes o travessão passava das traves e
+                // os tubos tinham as pontas abertas: o gol parecia "desencaixado")
+                Bar(new Vector3(gx, 0, -gw - r), new Vector3(gx, gh + r, -gw - r), r, futsal);
+                Bar(new Vector3(gx, 0, gw + r), new Vector3(gx, gh + r, gw + r), r, futsal);
+                Bar(new Vector3(gx, gh + r, -gw - r), new Vector3(gx, gh + r, gw + r), r, futsal);
+                // cantos arredondados: tampa os encontros com um "nó" do mesmo tubo
+                foreach (float zc0 in new[] { -gw - r, gw + r })
+                {
+                    var cn = new Vector3(gx, gh + r, zc0);
+                    for (int a = 0; a < 3; a++)
+                    {
+                        var ax = a == 0 ? Vector3.right : a == 1 ? Vector3.up : Vector3.forward;
+                        Ell(k, cn - ax * r * 0.98f, cn + ax * r * 0.98f, r * 0.99f, r * 1.13f, depthAx, 14);
+                    }
+                }
                 float br = r * (street ? 0.5f : 0.55f);
-                // base no chão (atrás) e as laterais da base
-                k.Cylinder(new Vector3(gx + s * gd, br, -gw), new Vector3(gx + s * gd, br, gw), br, 10);
-                k.Cylinder(new Vector3(gx + s * r, br, -gw - r), new Vector3(gx + s * gd, br, -gw), br, 10);
-                k.Cylinder(new Vector3(gx + s * r, br, gw + r), new Vector3(gx + s * gd, br, gw), br, 10);
+                // base no chão (atrás) e as laterais da base, retas e alinhadas com as traves
+                k.Cylinder(new Vector3(gx + s * gd, br, -gw - r), new Vector3(gx + s * gd, br, gw + r), br, 10);
+                k.Cylinder(new Vector3(gx, br, -gw - r), new Vector3(gx + s * gd, br, -gw - r), br, 10);
+                k.Cylinder(new Vector3(gx, br, gw + r), new Vector3(gx + s * gd, br, gw + r), br, 10);
                 bool stanchions = m.id == GameModes.Field || m.id == GameModes.Society;
                 if (stanchions)
                 {
                     // suportes curvos por fora da rede (como nos estádios): do alto da trave até a base de trás
-                    foreach (float zc in new[] { -gw - r * 0.4f, gw + r * 0.4f })
+                    foreach (float zc in new[] { -gw - r, gw + r })   // (alinhados com as traves)
                     {
                         int segs = 12;
                         Vector3 prev = new Vector3(gx + s * r, gh + r, zc);
@@ -510,11 +522,11 @@ namespace Craquez
                 else
                 {
                     // gols pequenos (futsal, rua): armação de tubo em caixa
-                    k.Cylinder(new Vector3(gx + s * gd, 0, -gw), new Vector3(gx + s * gd * 0.35f, gh, -gw), br, 10);
-                    k.Cylinder(new Vector3(gx + s * gd, 0, gw), new Vector3(gx + s * gd * 0.35f, gh, gw), br, 10);
-                    k.Cylinder(new Vector3(gx, gh, -gw), new Vector3(gx + s * gd * 0.35f, gh, -gw), br, 10);
-                    k.Cylinder(new Vector3(gx, gh, gw), new Vector3(gx + s * gd * 0.35f, gh, gw), br, 10);
-                    k.Cylinder(new Vector3(gx + s * gd * 0.35f, gh, -gw), new Vector3(gx + s * gd * 0.35f, gh, gw), br, 10);
+                    k.Cylinder(new Vector3(gx + s * gd, 0, -gw - r), new Vector3(gx + s * gd * 0.35f, gh + r, -gw - r), br, 10);
+                    k.Cylinder(new Vector3(gx + s * gd, 0, gw + r), new Vector3(gx + s * gd * 0.35f, gh + r, gw + r), br, 10);
+                    k.Cylinder(new Vector3(gx, gh + r, -gw - r), new Vector3(gx + s * gd * 0.35f, gh + r, -gw - r), br, 10);
+                    k.Cylinder(new Vector3(gx, gh + r, gw + r), new Vector3(gx + s * gd * 0.35f, gh + r, gw + r), br, 10);
+                    k.Cylinder(new Vector3(gx + s * gd * 0.35f, gh + r, -gw - r), new Vector3(gx + s * gd * 0.35f, gh + r, gw + r), br, 10);
                     foreach (float zc in new[] { -gw, gw })
                     {
                         k.Cylinder(new Vector3(gx + s * gd * 0.35f, gh - br, zc), new Vector3(gx + s * gd * 0.35f, gh + br, zc), br * 1.3f, 10);
@@ -659,13 +671,18 @@ namespace Craquez
                 {
                     var fanGroups = new List<List<FanCrowd.Spot>>();
                     var frng = new System.Random(pseed * 13 + side * 101);
-                    int nA3 = Mathf.Max(2, Mathf.RoundToInt(len / 13f));
-                    for (int a = 0; a < nA3; a++)
-                    for (int band = 0; band * 10 < front3d; band++)
+                    // blocos menores (cada um com o seu tempo: parece gente, não uma massa só)
+                    int bandRows = quality >= 2 ? 5 : 8;
+                    int nA3 = Mathf.Max(2, Mathf.RoundToInt(len / 13f));   // vãos das escadas (como antes)
+                    int subs = quality >= 2 ? 2 : 1;                       // cada setor dividido sem vão
+                    for (int a = 0; a < nA3 * subs; a++)
+                    for (int band = 0; band * bandRows < front3d; band++)
                     {
                         var grp = new List<FanCrowd.Spot>();
-                        float xa = -len / 2 + a * len / nA3 + 0.9f, xb = -len / 2 + (a + 1) * len / nA3 - 0.9f;
-                        for (int r = band * 10; r < Mathf.Min(front3d, band * 10 + 10); r++)
+                        int sec = a / subs, sub = a % subs;
+                        float sa0 = -len / 2 + sec * len / nA3 + 0.9f, sb0 = -len / 2 + (sec + 1) * len / nA3 - 0.9f;
+                        float xa = Mathf.Lerp(sa0, sb0, sub / (float)subs), xb = Mathf.Lerp(sa0, sb0, (sub + 1) / (float)subs);
+                        for (int r = band * bandRows; r < Mathf.Min(front3d, band * bandRows + bandRows); r++)
                         {
                             float y1 = 1.1f + (r + 1) * rise, d = dist + r * step + step * 0.5f;
                             for (float x = xa + (float)frng.NextDouble() * 0.3f; x < xb; x += 0.74f + (float)frng.NextDouble() * 0.12f)

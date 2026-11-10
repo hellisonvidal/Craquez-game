@@ -99,8 +99,12 @@ namespace Craquez.Sim
         public int fallKind;
         /// <summary>Na queda, rola no chão antes de ficar sentindo.</summary>
         public bool fallRoll;
+        /// <summary>Queda leve (trombada sem falta): cai e levanta, sem ficar sentindo; tropeço de carrinho (voa por cima da perna).</summary>
+        public bool fallLight, fallTrip;
         /// <summary>Puxando a camisa / agarrando o adversário (id) e há quanto tempo; quem é puxado fica mais lento.</summary>
         public int pulling = -1;
+        /// <summary>Intervalo até o próximo choque de corpo valer de novo (sem vários trancos no mesmo contato).</summary>
+        public float bumpCd;
         public float pullT, pulledT;
         /// <summary>Personalidade (0..1): disposição, ousadia, disciplina tática; leitura de jogo (s entre decisões).</summary>
         public float work = 0.5f, flair = 0.5f, discipline = 0.6f, think = 0.35f, thinkT;

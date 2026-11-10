@@ -213,18 +213,20 @@ namespace Craquez
                     break;
                 case 2:
                 {
-                    // queda acelerada (gravidade) com pequeno quique no impacto
+                    // queda acelerada (gravidade) com pequeno quique no impacto; no carrinho, voa por cima
+                    // da perna (o corpo sobe um pouco antes de cair de frente)
                     float k = u * u;
                     pitch = Mathf.Lerp(24f * fwd, lying, k);
                     roll += sideRoll * (0.5f + 0.5f * k);
                     lift = Mathf.Lerp(0f, 0.16f, k) + (u > 0.85f ? Mathf.Sin((u - 0.85f) / 0.15f * Mathf.PI) * 0.05f : 0f);
+                    if (p.fallTrip) lift += Mathf.Sin(Mathf.Clamp01(u * 1.3f) * Mathf.PI) * 0.35f;
                     break;
                 }
                 case 3:
                 {
                     // no chão: vira de lado segurando a perna e se contorce
-                    float turn = Smooth(u * 3f);
-                    float writhe = Mathf.Sin(Time.time * 5.5f + p.id) * 6f * (1f - u * 0.6f);
+                    float turn = p.fallLight ? 0f : Smooth(u * 3f);   // queda leve: sem virar de lado se contorcendo
+                    float writhe = p.fallLight ? 0f : Mathf.Sin(Time.time * 5.5f + p.id) * 6f * (1f - u * 0.6f);
                     pitch = lying;
                     roll += _fallSide * Mathf.Lerp(sideRoll * _fallSide, 62f, turn) + writhe;
                     // às vezes rola no chão (uma volta inteira) antes de ficar sentindo
@@ -302,7 +304,7 @@ namespace Craquez
                 Vector3 dir;
                 var down = (-transform.up + right * s * 0.12f).normalized;   // braço solto ao lado do corpo
                 if (ph == 0) dir = down;   // já de pé: os braços descem (antes ficavam erguidos enquanto a pose se desfazia)
-                else if (ph == 3 && knee != null && sfx == hurt) dir = (knee.position - up.position).normalized;   // segura a perna
+                else if (ph == 3 && knee != null && sfx == hurt && !p.fallLight) dir = (knee.position - up.position).normalized;   // segura a perna
                 else if (ph == 3) dir = (transform.up * 0.3f + right * s * 0.8f - transform.forward * 0.4f * fwd).normalized;   // braço apoiado no chão
                 else if (ph == 4)
                 {
@@ -1174,13 +1176,15 @@ namespace Craquez
                 // fase do braço: na corrida o pico à frente vem junto com o joelho oposto no alto
                 float ph = Mathf.Lerp(uOpp, uOpp - 0.85f, run);
                 float c = Mathf.Cos(2f * Mathf.PI * ph);
-                float amp = (Mathf.Lerp(16f, 30f, run) + 10f * sprint) * Mathf.Min(_armAmp, 1.1f) * (ps < 0 ? 1f : _armAsym) * (hasBall ? 0.75f : 1f)
+                // (balanço maior: andando ~25°, trotando ~38°, correndo ~45° + pique; antes 16-30° parecia braço parado)
+                float runArm = Mathf.Clamp01((spd - 1.3f) / 1.8f);   // o cotovelo dobra já no trote
+                float amp = (Mathf.Lerp(25f, 45f, runArm) + 14f * sprint) * Mathf.Min(_armAmp, 1.1f) * (ps < 0 ? 1f : _armAsym) * (hasBall ? 0.8f : 1f)
                             * Mathf.Lerp(1f, 0.65f, Mathf.Max(back, lateral));
                 // correndo, o braço vai mais para trás do que para a frente (o cotovelo passa do tronco
                 // atrás; na frente a mão para na altura do peito); andando, balanço simétrico e solto
                 float fwdK = Mathf.Lerp(0.9f, 0.55f, run), backK = Mathf.Lerp(0.9f, 1.05f, run);
                 float swing = (c > 0f ? c * amp * fwdK : c * amp * backK) + Mathf.Lerp(0f, -4f, run) + _armFwd * 0.3f;
-                float elbow = Mathf.Lerp(14f + 8f * Mathf.Max(0f, c), 80f + 8f * c, run) + 6f * sprint + _elbowStyle * 0.3f;
+                float elbow = Mathf.Lerp(20f + 12f * Mathf.Max(0f, c), 88f + 10f * c, runArm) + 6f * sprint + _elbowStyle * 0.3f;
                 // a mão nunca passa da altura do peito (antebraço no máximo ~20° acima da horizontal)
                 elbow = Mathf.Clamp(elbow, 8f, 110f - swing);
                 if (clv != null) _pose.Rotate(clv, Quaternion.AngleAxis(-ps * swing * 0.08f * run * W, up));   // ombro acompanha

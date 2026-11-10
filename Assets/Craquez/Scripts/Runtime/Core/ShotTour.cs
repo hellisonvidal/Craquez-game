@@ -278,6 +278,8 @@ namespace Craquez
                                     sim.ball.pos = att.position + new Vector2(-0.25f, 0f);
                                     sim.ball.z = 1.75f;
                                     sim.Bicycle(att);
+                                    // (fora do passo da simulação o evento se perde: aciona o desenho direto)
+                                    if (att.id < mc.view.athletes.Count) mc.view.athletes[att.id].Bicycle(1.2f);
                                 }
                                 if (!kicked) { att.position = new Vector2(gxB - 9f, 0.5f); att.vel = Vector2.zero; att.facing = new Vector2(-1f, 0f); }
                                 yield return new WaitForEndOfFrame();

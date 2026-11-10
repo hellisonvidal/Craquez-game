@@ -72,7 +72,9 @@ namespace Craquez
                 FanCrowd.Rain = s.mode.id != GameModes.Futsal && (wk0 == "chuva" || wk0 == "tempestade");
                 Gfx.CrowdRain = FanCrowd.Rain;
             }
-            if (c.training) venue = VenueBuilder.TrainingGround(s, home, kits[0], _night, q, transform);   // só o campo: sem torcida, placar, juiz
+            // treino: arquibancadas vazias (futsal, society, rua); no campo, o CT
+            FanCrowd.Empty = c.training; Gfx.CrowdEmpty = c.training;
+            if (c.training && s.mode.id == GameModes.Field) venue = VenueBuilder.TrainingGround(s, home, kits[0], _night, q, transform);   // só o campo: sem torcida, placar, juiz
             else if (s.mode.id == GameModes.Futsal) venue = VenueBuilder.Futsal(s, home, away, kits[0], kits[1], c.venue, _night, q, transform);
             else if (s.mode.id == GameModes.Street) venue = VenueBuilder.Street(s, home, away, kits[0], kits[1], c.venue, _night, q, transform);
             else if (s.mode.id == GameModes.Society) venue = VenueBuilder.Society(s, home, away, kits[0], kits[1], c.venue, _night, q, transform);
@@ -102,7 +104,7 @@ namespace Craquez
                 av.Setup(p, rig, this);
                 athletes.Add(av);
             }
-            if (s.mode.id == GameModes.Field && !c.training) BuildReferee(parent, q);
+            if (s.mode.id == GameModes.Field && !c.training) { BuildReferee(parent, q); BuildAssistants(parent, q); }
             if (s.mode.id == GameModes.Field && !c.training) BuildBench(parent, q);
             BuildBall(q);
             if (!c.training) BuildStations();
@@ -123,6 +125,7 @@ namespace Craquez
             if (s.mode.id == GameModes.Futsal) wk = "sol";   // ginásio coberto
             weather.Setup(wk, c.dynamicWeather && s.mode.id != GameModes.Futsal, c.seed, cam, sun, venue.pitchMat);
             weather.pitch2 = venue.pitchMat2;
+            if (s.mode.id != GameModes.Futsal) weather.BuildSnowLayer(venue.root, s.halfLen, s.halfW);
             // poças da chuva (as mesmas da simulação); já cheias se a partida começa chovendo
             s.SetPitch(weather.Water, weather.SnowCover);
             PuddleFx.Create(venue.root, s, weather, this);
@@ -362,6 +365,69 @@ namespace Craquez
         Vector2 _refTarget;
         int _refThink;
 
+        // ------------------------------------------------------------ assistentes (bandeirinhas)
+        readonly AthleteView[] _assist = new AthleteView[2];
+        readonly float[] _flagT = new float[2];
+        public AthleteView[] Assistants => _assist[0] != null ? _assist : null;
+
+        /// <summary>Dois assistentes: um em cada lateral, cada um cuidando de uma metade do campo.</summary>
+        void BuildAssistants(Transform parent, int q)
+        {
+            var black = new Kit { c1 = new Color(0.08f, 0.08f, 0.1f), c2 = new Color(0.85f, 0.75f, 0.1f), shorts = new Color(0.05f, 0.05f, 0.06f), socks = new Color(0.08f, 0.08f, 0.1f) };
+            for (int k = 0; k < 2; k++)
+            {
+                var ap = new SimPlayer { id = -1, name = "Assistente", number = 0, face = new float[] { 1 + k, 1, k, 0, 1, 1 } };
+                var rig = AthleteFactory.Create(ap, black, black, parent, q);
+                var av = rig.gameObject.AddComponent<AthleteView>();
+                ap.position = AssistantSpot(k, 0f);
+                ap.facing = new Vector2(0f, k == 0 ? 1f : -1f);
+                av.Setup(ap, rig, this);
+                _assist[k] = av;
+            }
+        }
+
+        // assistente 0: lateral de baixo (lado da câmera), metade direita; 1: lateral de cima, metade esquerda
+        Vector2 AssistantSpot(int k, float x) => new Vector2(x, k == 0 ? -(sim.halfW + 1.4f) : sim.halfW + 1.4f);
+
+        /// <summary>Acompanha a linha do impedimento (penúltimo defensor ou a bola, o que estiver mais à frente) e levanta a bandeira.</summary>
+        void AssistantStep()
+        {
+            if (_assist[0] == null) return;
+            float hl = sim.halfLen, dt = MatchSim.DT;
+            for (int k = 0; k < 2; k++)
+            {
+                var av = _assist[k];
+                var p = av.p;
+                float half = k == 0 ? 1f : -1f;
+                // time que defende esta metade (o gol dele fica deste lado)
+                int def = Mathf.Sign(-hl * sim.TeamDir(0)) == half ? 0 : 1;
+                float first = 0f, second = 0f;
+                foreach (var q in sim.players)
+                {
+                    if (q.team != def || q.sentOff) continue;
+                    float v = q.position.x * half;
+                    if (v > first) { second = first; first = v; } else if (v > second) second = v;
+                }
+                float line = Mathf.Max(second, sim.ball.pos.x * half);
+                line = Mathf.Clamp(line, 0f, hl - 0.5f) * half;
+                var target = AssistantSpot(k, line);
+                var to = target - p.position;
+                float d = to.magnitude;
+                var want = d > 0.3f ? to / d * Mathf.Min(7f, d * 2.5f) : Vector2.zero;
+                p.vel = Vector2.MoveTowards(p.vel, want, 9f * dt);
+                p.position += p.vel * dt;
+                // corre de lado, de frente para o campo
+                p.facing = V2.RotateToward(p.facing, new Vector2(0f, -Mathf.Sign(p.position.y)), 6f * dt).Norm();
+                if (_flagT[k] > 0f)
+                {
+                    _flagT[k] -= dt;
+                    av.point = Vector3.up * 1.2f;   // bandeira erguida
+                }
+                else av.point = Vector3.zero;
+                av.OnTick();
+            }
+        }
+
         // ------------------------------------------------------------ banco: técnicos e aquecimento
         readonly List<AthleteView> _coaches = new List<AthleteView>();
         readonly List<(AthleteView av, int team, float phase)> _warm = new List<(AthleteView, int, float)>();
@@ -527,7 +593,7 @@ namespace Craquez
                 {
                     // tiro curto
                     float s = (u - 0.7f) / 0.1f;
-                    target = new Vector2(gx + toField * 0.5f, s < 0.5f ? z1 : z0);
+                    target = new Vector2(gx, s < 0.5f ? z1 : z0);
                     maxV = 6.5f;
                 }
                 else
@@ -540,6 +606,10 @@ namespace Craquez
                 var want = to.magnitude > 0.25f ? to / Mathf.Max(to.magnitude, 0.01f) * Mathf.Min(maxV, to.magnitude * 2f) : Vector2.zero;
                 p.vel = Vector2.MoveTowards(p.vel, want, 6f * dt);
                 p.position += p.vel * dt;
+                // nunca dentro do campo: sempre atrás da linha de fundo (antes o tiro e o embalo levavam para dentro)
+                float side0 = w.team == 0 ? -1f : 1f;
+                if (p.position.x * side0 < hl + 2.5f) { p.position.x = side0 * (hl + 2.5f); if (p.vel.x * side0 < 0f) p.vel.x = 0f; }
+                p.position.y = Mathf.Clamp(p.position.y, -hw + 1f, hw - 0.5f);
                 bool lateral = u >= 0.3f && u < 0.45f;
                 if (lateral) p.facing = V2.RotateToward(p.facing, new Vector2(toField, 0f), 5f * dt).Norm();
                 else if (p.vel.magnitude > 0.3f) p.facing = V2.RotateToward(p.facing, p.vel.normalized, 5f * dt).Norm();
@@ -654,6 +724,7 @@ namespace Craquez
                 if (show) a.OnTick();
             }
             RefereeStep();
+            AssistantStep();
             BenchStep();
             _ballPrev = _ballCur;
             _ballCur = new Vector3(sim.ball.pos.x, sim.ball.z + sim.ball.radius, sim.ball.pos.y);
@@ -758,6 +829,13 @@ namespace Craquez
                         _decoy.rotation = _ball.rotation;
                     }
                     break;
+                case "offside":
+                {
+                    // o assistente da metade onde aconteceu levanta a bandeira
+                    int k = sim.players[e.id].position.x >= 0f ? 0 : 1;
+                    _flagT[k] = 2.5f;
+                    break;
+                }
                 case "card":
                     ShowCard(e.kind == "yellow" ? new Color(1f, 0.85f, 0.1f) : new Color(0.85f, 0.08f, 0.1f));
                     break;

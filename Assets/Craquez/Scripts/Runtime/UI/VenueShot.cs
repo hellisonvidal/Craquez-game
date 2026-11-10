@@ -34,6 +34,7 @@ namespace Craquez.UI
             RenderTexture rt = null;
             try
             {
+                FanCrowd.Empty = false; FanCrowd.Rain = false; Gfx.CrowdEmpty = false; Gfx.CrowdRain = false;   // foto: torcida normal
                 var home = Teams.Get(teamA);
                 var away = Teams.Get(teamB);
                 var sim = new MatchSim();

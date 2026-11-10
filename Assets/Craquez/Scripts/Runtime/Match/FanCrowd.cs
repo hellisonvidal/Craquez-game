@@ -116,8 +116,9 @@ namespace Craquez
             }
         }
 
-        // braços: 0 baixos, 1 erguidos, 2 batendo palma (mãos juntas à frente), 3 mãos na cabeça (uhh!)
-        const int Poses = 4;
+        // braços: 0 baixos, 1 erguidos, 2 batendo palma (mãos juntas à frente), 3 mãos na cabeça (uhh!),
+        // 4 um braço acenando (o outro baixo)
+        const int Poses = 5;
 
         /// <summary>Corpo de um torcedor (sem braços) e os braços de cada pose em construtores separados.</summary>
         static void Fan(Builder body, Builder[] arms, Spot s, System.Random r)
@@ -150,6 +151,7 @@ namespace Craquez
                 arms[1].Box(p + q * new Vector3(0f, 1.8f * hgt, 0.02f), new Vector3(0.72f, 0.52f * hgt, 0.14f), q, skin);
                 arms[2].Box(p + q * new Vector3(0f, 1.28f * hgt, 0.2f), new Vector3(0.34f, 0.15f, 0.16f), q, skin);
                 arms[3].Box(p + q * new Vector3(0f, 1.7f * hgt, 0.0f), new Vector3(0.58f, 0.15f, 0.15f), q, skin);
+                arms[4].Box(p + q * new Vector3(0.3f, 1.8f * hgt, 0.02f), new Vector3(0.16f, 0.52f * hgt, 0.14f), q, skin);
                 return;
             }
             bool coat = Rain && r.NextDouble() < 0.7;
@@ -219,11 +221,17 @@ namespace Craquez
                 arms[2].Box(p + q * new Vector3(side * 0.16f, 1.3f * hgt, 0.22f), new Vector3(0.13f, 0.13f, 0.38f), q, coat ? coatC : skin, new Vector3(-20f, -side * 30f, 0f));
                 // mãos na cabeça: cotovelos abertos para os lados e para cima
                 arms[3].Box(p + q * new Vector3(side * 0.27f, 1.64f * hgt, 0.0f), new Vector3(0.13f, 0.42f * hgt, 0.13f), q, coat ? coatC : skin, new Vector3(0f, 0f, side * 55f));
+                // acenando: um braço no alto (o lado sorteado), o outro baixo
+                bool waveSide = side == (r.NextDouble() < 0.5 ? -1 : 1);
+                if (waveSide) arms[4].Box(p + q * new Vector3(side * 0.38f, 1.72f * hgt, 0.04f), new Vector3(0.13f, 0.62f * hgt, 0.14f), q, sleeve, new Vector3(0f, 0f, -side * 24f));
+                else arms[4].Box(p + q * new Vector3(side * 0.32f, 1.1f * hgt, 0.02f), new Vector3(0.13f, 0.56f * hgt, 0.14f), q, sleeve, new Vector3(-8f, 0f, side * 6f));
             }
         }
 
         MeshRenderer[] _arms;
         int _pose;
+        float _gestT = -1f;
+        int _gest;
         float _phase, _freq, _amp;
         int _team;
 
@@ -231,6 +239,8 @@ namespace Craquez
         public static List<Craquez.Sim.Kit> HomeKits, AwayKits;
         /// <summary>Partida com chuva: capas, capuzes e guarda-chuvas (defina antes de Build).</summary>
         public static bool Rain;
+        /// <summary>Arquibancada vazia (arena de treino).</summary>
+        public static bool Empty;
 
         /// <summary>
         /// Cria os blocos de torcedores. <paramref name="groups"/>: uma lista de lugares por bloco (cada bloco
@@ -238,7 +248,7 @@ namespace Craquez
         /// </summary>
         public static void Build(Transform parent, Quaternion rot, List<List<Spot>> groups, Color h1, Color h2, Color a1, Color a2, int seed, bool mixed)
         {
-            if (groups == null || groups.Count == 0) return;
+            if (groups == null || groups.Count == 0 || Empty) return;
             // um pouco de luz própria (a mesma paleta): debaixo da cobertura, na sombra, a torcida ficava
             // quase preta e alguns blocos mal apareciam
             var pal = Palette(h1, h2, a1, a2, HomeKits, AwayKits);
@@ -350,6 +360,20 @@ namespace Craquez
                 pose = Mathf.Repeat(t * 2.1f, 1f) < 0.5f ? 2 : 0;
             }
             else if (hype > 0.45f && Mathf.Sin(t * 1.3f) > 0.6f) pose = 1;
+            else
+            {
+                // gestos próprios de cada bloco, fora do lance: aceno, palmas, mãos na cabeça, levantar
+                _gestT -= dt;
+                if (_gestT <= 0f)
+                {
+                    _gest = Random.value < 0.55f ? 0 : Random.Range(1, 5);
+                    _gestT = _gest == 0 ? Random.Range(4f, 12f) : Random.Range(1.2f, 2.8f);
+                }
+                if (_gest == 1) pose = 4;
+                else if (_gest == 2) pose = Mathf.Repeat(t * 2.3f, 1f) < 0.5f ? 2 : 0;
+                else if (_gest == 3) pose = 3;
+                else if (_gest == 4) { pose = 1; jumpK = Mathf.Max(jumpK, 0.25f); }
+            }
             float jump = Mathf.Max(0f, Mathf.Sin(t * _freq * Mathf.PI)) * 0.22f * jumpK * _amp;
             float sway = Mathf.Sin(t * 0.9f) * 0.015f + (pose == 2 ? Mathf.Abs(Mathf.Sin(t * 2.1f * Mathf.PI)) * 0.02f : 0f);
             transform.localPosition = _base + new Vector3(0f, jump + sway, 0f);

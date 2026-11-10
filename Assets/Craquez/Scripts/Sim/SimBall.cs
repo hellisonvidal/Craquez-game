@@ -87,7 +87,7 @@ namespace Craquez.Sim
                     float dec = m.rollDecel + m.groundDrag * s * s;
                     // água empoçada e neve acumulada freiam a bola rolando (a água "segura" muito mais
                     // quanto mais rápida a bola: ela empurra a água à frente)
-                    dec += puddle * (3.5f + 0.45f * s * s) + snowCover * (0.9f + 0.035f * s * s);
+                    dec += puddle * (3.5f + 0.45f * s * s) + snowCover * (0.6f + 0.022f * s * s);   // neve segura, mas a bola ainda rola
                     if (slideT > 0f)
                     {
                         // fase de deslize (atrito de escorregamento) até a bola "pegar" e rolar

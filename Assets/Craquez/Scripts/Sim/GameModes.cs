@@ -135,7 +135,7 @@ namespace Craquez.Sim
                 {
                     id = Street, length = players >= 7 ? 46 : players == 6 ? 42 : players >= 5 ? 38 : players == 4 ? 34 : 30,
                     width = players >= 7 ? 26 : players == 6 ? 24 : players >= 5 ? 22 : players == 4 ? 20 : 18,
-                    goalWidth = players >= 6 ? 3.4f : players >= 5 ? 3f : 2.6f, goalHeight = players >= 6 ? 1.8f : players >= 5 ? 1.6f : 1.4f, goalDepth = 0.8f,
+                    goalWidth = players >= 6 ? 2.6f : players >= 5 ? 2.3f : 2.0f, goalHeight = players >= 6 ? 1.4f : players >= 5 ? 1.25f : 1.1f, goalDepth = 0.7f,   // traves de rua menores
                     keeper = false, walls = true, wallBounce = 0.72f, boxDepth = 0, boxHalf = 0, penaltyDist = 0,
                     offside = false, centerR = 2.5f, restartDist = 3,
                     rollDecel = 0.95f, groundDrag = 0.006f, airDrag = 0.014f, bounce = 0.78f,
