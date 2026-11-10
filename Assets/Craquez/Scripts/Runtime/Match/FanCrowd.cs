@@ -194,8 +194,8 @@ namespace Craquez
             if (s.lod)
             {
                 // fileiras do fundo: menos detalhe (sem pernas: a fileira da frente esconde), mas com rosto
-                body.Prism(p + q * new Vector3(0f, 1.02f * hgt, 0f), new Vector3(0.46f, 0.82f * hgt, 0.3f), q, top, 6, 1.05f);
-                body.Prism(p + q * new Vector3(0f, 1.36f * hgt, 0f), new Vector3(0.52f, 0.14f, 0.3f), q, top, 6, 0.6f);
+                body.Box(p + q * new Vector3(0f, 1.02f * hgt, 0f), new Vector3(0.46f, 0.82f * hgt, 0.3f), q, top);
+                body.Box(p + q * new Vector3(0f, 1.36f * hgt, 0f), new Vector3(0.52f, 0.14f, 0.3f), q, top);
                 var hc0 = p + q * new Vector3(0f, 1.6f * hgt, 0f);
                 body.Prism(hc0, new Vector3(0.24f, 0.27f, 0.27f), q, skin, 6, 0.75f);
                 for (int e = -1; e <= 1; e += 2) body.Box(hc0 + q * new Vector3(e * 0.05f, 0.03f, 0.122f), new Vector3(0.05f, 0.03f, 0.01f), q, 54);

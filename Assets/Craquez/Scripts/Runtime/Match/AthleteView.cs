@@ -1317,7 +1317,7 @@ namespace Craquez
             float flightU = Mathf.Clamp01((cyc - stanceEnd) / Mathf.Max(0.05f, 1f - stanceEnd));
             float runB = Mathf.Sin(flightU * Mathf.PI) * Mathf.Lerp(0.055f, 0.045f, wS) - (cyc < stanceEnd ? Mathf.Sin(cyc / stanceEnd * Mathf.PI) * 0.02f : 0f);
             float walkB = Mathf.Sin(Mathf.Clamp01(cyc / 0.6f) * Mathf.PI) * 0.018f;
-            _bounce = Mathf.Lerp(walkB, runB, wJ) * W * (1f - Mathf.Max(back, lateral) * 0.6f) * (hasBall ? 0.7f : 1f);
+            _bounce = Mathf.Lerp(walkB, runB, wJ) * W * (1f - Mathf.Max(back, lateral) * 0.6f) * (hasBall ? 0.7f : 1f) * transform.localScale.y;
             float uR = _gPhase, uL = Mathf.Repeat(_gPhase + 0.5f, 1f);
             // pelve: gira para o lado da perna que vai à frente; ombros no sentido contrário
             // (andando o quadril quase não gira nem cai de lado: com mais, o atleta parecia "rebolar")
@@ -1343,7 +1343,7 @@ namespace Craquez
                 float u = ps > 0f ? uR : uL;
                 float hip = HipAt(u), knee = KneeAt(u);
                 // + no eixo "right" leva o vetor para trás: flexão (para a frente) é ângulo negativo
-                var lat = right * ps * Mathf.Lerp(0.07f, 0.045f, run);   // pés um pouco afastados (antes 0,035: pernas coladas)
+                var lat = right * ps * Mathf.Lerp(0.07f, 0.045f, run) * transform.localScale.x;   // pés um pouco afastados, na proporção do atleta
                 // passada: componente para a frente/para trás no plano do corpo e um pouco para o lado
                 // (nada de girar o plano da perna: isso desenhava círculos)
                 var thighDir = (Quaternion.AngleAxis(-hip * _gDir.y, right) * (Quaternion.AngleAxis(hip * _gDir.x * 0.6f, fwd) * -up) + lat).normalized;

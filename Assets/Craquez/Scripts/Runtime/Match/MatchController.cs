@@ -385,6 +385,7 @@ namespace Craquez
                 sim.players[k].vel = Vector2.zero;
             }
             view.SnapAll();
+            view.SnapOfficials();   // juiz e bandeirinhas já no lugar quando o jogo começa
             view.bcam.cinematic = false;
             if (_touch) _touch.gameObject.SetActive(true);
             _phase = Phase.Playing;

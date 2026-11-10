@@ -673,7 +673,7 @@ namespace Craquez
                 // fileiras da frente: torcedores em 3D (modelados, pulando e erguendo os braços por bloco);
                 // as de trás seguem com as silhuetas (economiza no celular)
                 // todas as fileiras em 3D (no celular mais fraco, até 16; o resto com silhuetas)
-                int front3d = Mathf.Min(rows, quality >= 2 ? rows : quality >= 1 ? 32 : 18);   // (torcedores 3D em mais fileiras)
+                int front3d = Mathf.Min(rows, quality >= 2 ? rows : quality >= 1 ? 26 : 16);   // (32 pesava no carregamento da partida)
                 {
                     var fanGroups = new List<List<FanCrowd.Spot>>();
                     var frng = new System.Random(pseed * 13 + side * 101);

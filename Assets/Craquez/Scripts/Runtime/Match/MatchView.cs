@@ -456,6 +456,43 @@ namespace Craquez
         // assistente 0: lateral de baixo (lado da câmera), metade direita; 1: lateral de cima, metade esquerda
         Vector2 AssistantSpot(int k, float x) => new Vector2(x, k == 0 ? -(sim.halfW + 1.4f) : sim.halfW + 1.4f);
 
+        /// <summary>
+        /// Coloca a arbitragem na posição do pontapé inicial (fim da entrada em campo): o juiz afastado do
+        /// círculo central e cada bandeirinha na sua lateral, na linha do penúltimo defensor. Antes eles
+        /// saíam do meio do campo e iam correndo até o lugar com o jogo já valendo.
+        /// </summary>
+        public void SnapOfficials()
+        {
+            if (_referee != null)
+            {
+                var rp = _referee.p;
+                rp.position = new Vector2(-sim.TeamDir(sim.kickoffTeam) * 9f, -sim.mode.centerR - 6f);
+                rp.vel = Vector2.zero;
+                rp.facing = new Vector2(0f, 1f);
+                _referee.Snap();
+                _refTarget = rp.position;
+            }
+            if (_assist[0] == null) return;
+            float hl = sim.halfLen;
+            for (int k = 0; k < 2; k++)
+            {
+                var p = _assist[k].p;
+                float half = k == 0 ? 1f : -1f;
+                int def = Mathf.Sign(-hl * sim.TeamDir(0)) == half ? 0 : 1;
+                float first = 0f, second = 0f;
+                foreach (var q in sim.players)
+                {
+                    if (q.team != def || q.sentOff) continue;
+                    float v = q.position.x * half;
+                    if (v > first) { second = first; first = v; } else if (v > second) second = v;
+                }
+                p.position = AssistantSpot(k, Mathf.Clamp(second, 0f, hl - 0.5f) * half);
+                p.vel = Vector2.zero;
+                p.facing = new Vector2(0f, -Mathf.Sign(p.position.y));
+                _assist[k].Snap();
+            }
+        }
+
         /// <summary>Acompanha a linha do impedimento (penúltimo defensor ou a bola, o que estiver mais à frente) e levanta a bandeira.</summary>
         void AssistantStep()
         {
