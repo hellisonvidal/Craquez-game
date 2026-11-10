@@ -632,7 +632,7 @@ namespace Craquez
             _modeButtons[GameModes.Futsal] = BigCard(grid, "FUTSAL", "5 x 5", "Quadra  •  " + VenueBuilder.FutsalNames.Length + " ginásios", ModeArt(MenuArt.Kind.Futsal), 512f / 560f, new Color(0.96f, 0.62f, 0.04f), () => ShowKind(GameModes.Futsal));
             _modeButtons[GameModes.Society] = BigCard(grid, "SOCIETY", "7 x 7", "Grama sintética  •  " + VenueBuilder.SocietyNames.Length + " campos", ModeArt(MenuArt.Kind.Society), 512f / 560f, new Color(0.02f, 0.71f, 0.83f), () => ShowKind(GameModes.Society));
             _modeButtons[GameModes.Street] = BigCard(grid, "RUA", "3 A 5 POR LADO", "Times de rua  •  " + VenueBuilder.StreetNames.Length + " ruas", ModeArt(MenuArt.Kind.Street), 512f / 560f, new Color(0.93f, 0.28f, 0.6f), () => { _lastMode = GameModes.Street; Choose(GameModes.Street, false); });
-            _modeButtons["treino"] = BigCard(grid, "TREINO", "ARENA", "Você contra o goleiro  •  chute à vontade", ModeArt(MenuArt.Kind.Field), 512f / 560f, new Color(0.55f, 0.42f, 0.95f), () => { _lastMode = "treino"; StartTraining(); });
+            _modeButtons["treino"] = BigCard(grid, "TREINO", "ARENA", "Você contra o goleiro  •  chute à vontade", ModeArt(MenuArt.Kind.Field), 512f / 560f, new Color(0.55f, 0.42f, 0.95f), () => { _lastMode = "treino"; ShowTrainingPicker(); });
             UiKit.Select(_lastMode != null && _modeButtons.TryGetValue(_lastMode, out var lb) && lb != null ? lb : first);
         }
 
@@ -770,7 +770,7 @@ namespace Craquez
             foreach (var m in MinuteOpts) mins.Add(m + " minutos");
             UiKit.Size(UiKit.Cycler(list, "Duração", mins, Mathf.Max(0, System.Array.IndexOf(MinuteOpts, _cfg.minutes)), i => _cfg.minutes = MinuteOpts[i]), 50, 50);
             if (_cfg.mode == GameModes.Street)
-                UiKit.Size(UiKit.Cycler(list, "Formato", new[] { "3 x 3", "4 x 4", "5 x 5" }, Mathf.Clamp(_cfg.streetPlayers - 3, 0, 2), i =>
+                UiKit.Size(UiKit.Cycler(list, "Formato", new[] { "3 x 3", "4 x 4", "5 x 5", "6 x 6", "7 x 7" }, Mathf.Clamp(_cfg.streetPlayers - 3, 0, 4), i =>
                 {
                     _cfg.streetPlayers = 3 + i;
                     _cfg.tacticsA = new Tactics();
@@ -835,7 +835,7 @@ namespace Craquez
                     string modeAt = _cfg.mode;
                     StartCoroutine(VenueShot.Render(_cfg.mode, vi, _cfg.teamA, _cfg.teamB, _cfg.streetPlayers, tex =>
                     {
-                        if (venueImg != null && _cfg.mode == modeAt && VenueIdx() == vi) venueImg.texture = tex;
+                        if (tex != null && venueImg != null && _cfg.mode == modeAt && VenueIdx() == vi) venueImg.texture = tex;
                     }));
                 }
                 // de noite, o desenho escurece e azula
@@ -1337,15 +1337,16 @@ namespace Craquez
         System.Collections.Generic.Dictionary<string, object> _optSnap;
 
         /// <summary>Abas das configurações (submenus): som, câmera, partida e vídeo.</summary>
-        static readonly string[] OptionTabs = { "SOM", "CÂMERA", "PARTIDA", "VÍDEO", "OPTION FILE", "ATUALIZAÇÕES" };
+        static readonly string[] OptionTabs = { "SOM", "CÂMERA", "PARTIDA", "VÍDEO", "OPTION FILE", "ATUALIZAÇÕES", "CONTROLES" };
         static readonly string[] OptionTabInfo =
         {
-            "Volume, música dos menus e vibração",
+            "Volume e vibração",
             "Câmera da partida e zoom",
             "Nomes dos atletas e cobranças de falta",
             "Qualidade, tela, resolução e efeitos",
             "Times, elencos, uniformes e escudos",
             "Procurar uma versão nova do jogo",
+            "Layout dos botões do controle (quem chuta com bola, quadrado...) e personalização",
         };
         int _optTab;
 
@@ -1413,7 +1414,7 @@ namespace Craquez
                     Add(UiKit.Cycler(list, "Volume", vols, Mathf.RoundToInt(Settings.Volume * 10), i => Settings.Volume = i / 10f));
                     string[] mus = { "Desligada", "20%", "40%", "60%", "80%", "100%" };
                     int mi = Settings.Music ? Mathf.Clamp(Mathf.RoundToInt(Settings.MusicVolume * 5f), 1, 5) : 0;
-                    Add(UiKit.Cycler(list, "Música dos menus", mus, mi, i => { Settings.Music = i > 0; if (i > 0) Settings.MusicVolume = i / 5f; Sfx.MenuMusic(true); }));
+                    if (Sfx.MusicEnabled) Add(UiKit.Cycler(list, "Música dos menus", mus, mi, i => { Settings.Music = i > 0; if (i > 0) Settings.MusicVolume = i / 5f; Sfx.MenuMusic(true); }));
                     if (Application.isMobilePlatform)
                         Add(UiKit.Cycler(list, "Vibração", new[] { "Ligada", "Desligada" }, Settings.Vibration ? 0 : 1, i => Settings.Vibration = i == 0));
                     break;
@@ -1444,6 +1445,44 @@ namespace Craquez
                         ReloadOptionFile();
                         ShowOptions(4, false);
                     }, 28, new Color(0.4f, 0.12f, 0.15f)));
+                    break;
+                }
+                case 6:
+                {
+                    var map = Settings.PadMap;
+                    string cur = string.Concat(map[0], map[1], map[2], map[3]);
+                    int preset = 3;
+                    for (int k = 0; k < Settings.PadPresets.Length; k++) if (Settings.PadPresets[k][0] == cur) preset = k;
+                    bool ps = UnityEngine.InputSystem.Gamepad.current != null && InputRouter.IsPlayStation(UnityEngine.InputSystem.Gamepad.current);
+                    Add(UiKit.Cycler(list, "Layout", Settings.PadPresetNames, preset, i =>
+                    {
+                        if (i >= Settings.PadPresets.Length) return;
+                        var ps2 = Settings.PadPresets[i][0];
+                        Settings.PadMap = new[] { ps2[0] - '0', ps2[1] - '0', ps2[2] - '0', ps2[3] - '0' };
+                        InputRouter.InvalidateMap();
+                        ShowOptions(6, false);
+                    }));
+                    var faces = new string[4];
+                    for (int k = 0; k < 4; k++) faces[k] = InputRouter.FaceName(k, ps);
+                    for (int a = 0; a < 4; a++)
+                    {
+                        int aa = a;
+                        Add(UiKit.Cycler(list, InputRouter.ActionNames[a], faces, map[a], i =>
+                        {
+                            // troca com a ação que usava esse botão (cada botão faz uma coisa só)
+                            var m = Settings.PadMap;
+                            int other = System.Array.IndexOf(m, i);
+                            if (other >= 0 && other != aa) m[other] = m[aa];
+                            m[aa] = i;
+                            Settings.PadMap = m;
+                            InputRouter.InvalidateMap();
+                            ShowOptions(6, false);
+                        }));
+                    }
+                    Add(UiKit.Cycler(list, "Correr / colocado", new[] { ps ? "Correr no R2, colocado no R1" : "Correr no RT, colocado no RB", ps ? "Correr no R1, colocado no R2" : "Correr no RB, colocado no RT" },
+                        Settings.SprintOnShoulder ? 1 : 0, i => Settings.SprintOnShoulder = i == 1));
+                    var hint = UiKit.Label(list, InputRouter.Help(UnityEngine.InputSystem.Gamepad.all.Count > 0 ? DeviceKind.Gamepad1 : DeviceKind.Gamepad1), 22, Theme.Body, Theme.TextDim);
+                    hint.gameObject.AddComponent<LayoutElement>().minHeight = 70;
                     break;
                 }
                 case 5:
@@ -1490,7 +1529,37 @@ namespace Craquez
         /// Arena de treino: você conduz um atacante contra o goleiro, no campo do seu time; a cada chute
         /// (gol, defesa ou bola fora) uma bola nova aparece no seu pé em outro ponto. Sem relógio.
         /// </summary>
-        void StartTraining()
+        /// <summary>Arena de treino: escolha do atleta (jogadores de linha do seu time).</summary>
+        void ShowTrainingPicker()
+        {
+            var root = Page("JOGAR › TREINO");
+            Title(root, "TREINO", "Escolha quem vai treinar finalizações");
+            var team = Teams.Get(_cfg.teamA);
+            if (team == null || team.IsNational) team = Teams.Get(0);
+            var list = Scroll(UiKit.Rect(root, "atletas").Place(0.12f, 0, 0.88f, 1, 0, 120, 0, 250), 8f);
+            Selectable first = null;
+            var roster = team.roster;
+            // atacantes primeiro, depois meias e defensores
+            var order = new List<int>();
+            foreach (var want in new[] { "FW", "MF", "DF" })
+                for (int i = 0; i < roster.Count; i++) if (roster[i].pos == want) order.Add(i);
+            foreach (int i in order)
+            {
+                var e = roster[i];
+                int ri = i;
+                string pos = e.pos == "FW" ? "ATA" : e.pos == "MF" ? "MEI" : "ZAG";
+                var b = UiKit.Button(list, e.num + "   " + e.n.ToUpperInvariant() + "   •   " + pos + (e.ovr > 0 ? "   •   " + e.ovr : ""), () => StartTraining(ri), 28);
+                UiKit.Size(b, 64, 64);
+                var lbl = b.GetComponentInChildren<Text>();
+                lbl.alignment = TextAnchor.MiddleLeft;
+                lbl.rectTransform.Place(0, 0, 1, 1, 28, 0, 12, 0);
+                if (first == null) first = b;
+            }
+            _back = ShowPlay;
+            if (first != null) UiKit.Select(first);
+        }
+
+        void StartTraining(int rosterIdx = -1)
         {
             var c = _cfg;
             _trainBak = (c.mode, c.national, c.teamB, c.tacticsA, c.tacticsB, c.timeOfDay, c.weather, c.ceremony, c.minutes, c.sideA, c.sideB, c.stadium, c.toss);
@@ -1501,6 +1570,7 @@ namespace Craquez
             c.timeOfDay = "dia"; c.weather = "sol"; c.ceremony = false; c.minutes = 45;
             c.sideA = Side.Player1; c.sideB = Side.Cpu; c.stadium = 0; c.toss = false;
             c.training = true;
+            c.trainingRoster = rosterIdx;
             StartMatch();
         }
 

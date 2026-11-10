@@ -3,7 +3,7 @@ using UnityEngine;
 
 namespace Craquez.Sim
 {
-    public enum Skill { None, Knock, Drag, Roll, Stepover, Roulette }
+    public enum Skill { None, Knock, Drag, Roll, Stepover, Roulette, Elastico, Pedalada, Chapeu, Caneta, Corte }
 
     [System.Flags]
     public enum Trait
@@ -16,7 +16,11 @@ namespace Craquez.Sim
     public class SimPlayer
     {
         public const float Radius = 0.38f;
-        public static readonly float[] SkillTime = { 0f, 0.25f, 0.5f, 0.42f, 0.55f, 0.62f };
+        public static readonly float[] SkillTime = { 0f, 0.25f, 0.5f, 0.42f, 0.55f, 0.62f, 0.46f, 0.8f, 0.3f, 0.28f, 0.34f };
+        public static readonly string[] SkillNames = { "", "Toque à frente", "Puxada", "Arrastada", "Pedalada simples", "Roleta", "Elástico", "Pedalada", "Chapéu", "Caneta", "Corte" };
+
+        /// <summary>Jogada característica (drible próprio) — só alguns atletas de meio para a frente.</summary>
+        public Skill signature = Skill.None;
 
         public static readonly Dictionary<string, Trait> TraitNames = new Dictionary<string, Trait>
         {
@@ -93,6 +97,11 @@ namespace Craquez.Sim
         public float down, downTotal;
         public Vector2 fallDir;
         public int fallKind;
+        /// <summary>Na queda, rola no chão antes de ficar sentindo.</summary>
+        public bool fallRoll;
+        /// <summary>Puxando a camisa / agarrando o adversário (id) e há quanto tempo; quem é puxado fica mais lento.</summary>
+        public int pulling = -1;
+        public float pullT, pulledT;
         /// <summary>Personalidade (0..1): disposição, ousadia, disciplina tática; leitura de jogo (s entre decisões).</summary>
         public float work = 0.5f, flair = 0.5f, discipline = 0.6f, think = 0.35f, thinkT;
         /// <summary>IA: decisão atual (aiGoal), alvo suavizado (aiTarget) e deslocamento pessoal na formação.</summary>

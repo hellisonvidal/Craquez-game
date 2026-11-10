@@ -11,20 +11,20 @@ namespace Craquez
     /// </summary>
     public class BroadcastCamera : MonoBehaviour
     {
-        public enum Kind { Tv, TvClose, Wide, Tactical, PlayerSide, Behind, Shoulder, Pitchside, Dynamic, BehindGoal, Drone, WideClose }
+        public enum Kind { Tv, TvClose, Wide, Tactical, PlayerSide, Behind, Shoulder, Pitchside, Dynamic, BehindGoal, Drone, WideClose, Close, Low }
         public static readonly string[] Modes =
         {
             "TV", "TV Próxima", "Transmissão Aberta", "Alta (tática)",
             "Perto do Jogador", "Atrás do Jogador", "Ombro (bem perto)", "Rente ao Gramado",
-            "Dinâmica", "Atrás do Gol", "Drone", "Aberta Aproximada",
+            "Dinâmica", "Atrás do Gol", "Drone", "Aberta Aproximada", "TV Bem Perto", "Rente ao Lance",
         };
         /// <summary>Índices antigos (versão 2.0) -> novos, para manter a escolha salva.</summary>
         public static int FromOld(int old) => old switch { 0 => 0, 1 => 1, 2 => 3, 3 => 5, 4 => 8, 5 => 7, 6 => 9, 7 => 10, 9 => 2, _ => 0 };
         /// <summary>Câmeras oferecidas nos menus (drone, atrás do gol e ombro foram retiradas).</summary>
         public static readonly Kind[] Offered =
         {
-            Kind.Tv, Kind.TvClose, Kind.WideClose, Kind.Wide, Kind.Tactical,
-            Kind.PlayerSide, Kind.Behind, Kind.Pitchside, Kind.Dynamic,
+            Kind.Tv, Kind.TvClose, Kind.Close, Kind.WideClose, Kind.Wide, Kind.Tactical,
+            Kind.PlayerSide, Kind.Low, Kind.Shoulder, Kind.Behind, Kind.Pitchside, Kind.Dynamic,
         };
         public static string[] OfferedNames
         {
@@ -98,6 +98,8 @@ namespace Craquez
         readonly System.Collections.Generic.List<Renderer> _occ = new System.Collections.Generic.List<Renderer>();
         readonly System.Collections.Generic.List<UnityEngine.Rendering.ShadowCastingMode> _occMode = new System.Collections.Generic.List<UnityEngine.Rendering.ShadowCastingMode>();
         readonly System.Collections.Generic.List<bool> _occHidden = new System.Collections.Generic.List<bool>();
+        readonly System.Collections.Generic.List<bool> _occNear = new System.Collections.Generic.List<bool>();
+        readonly System.Collections.Generic.List<float> _occClear = new System.Collections.Generic.List<float>();
 
         /// <summary>
         /// Estruturas grandes do estádio/ginásio (paredes, arquibancadas, cobertura) que podem
@@ -105,7 +107,7 @@ namespace Craquez
         /// </summary>
         public void SetOccluders(params Transform[] roots)
         {
-            _occ.Clear(); _occMode.Clear(); _occHidden.Clear();
+            _occ.Clear(); _occMode.Clear(); _occHidden.Clear(); _occNear.Clear(); _occClear.Clear();
             if (roots == null) return;
             foreach (var venueRoot in roots)
             if (venueRoot != null)
@@ -122,6 +124,12 @@ namespace Craquez
                 _occ.Add(r);
                 _occMode.Add(r.shadowCastingMode);
                 _occHidden.Add(false);
+                // inteiro do lado da câmera (além da lateral de baixo): nas câmeras de lado fica escondido
+                // a partida toda (antes sumia e voltava a cada movimento da câmera: arquibancada e
+                // torcedores "piscando", trocando de camada)
+                // (pelo centro: cantos, coberturas e refletores que passam um pouco da lateral também contam)
+                _occNear.Add(sim != null && (b.max.z < -(sim.halfW + 0.6f) || (b.center.z < -(sim.halfW + 1.5f) && b.min.z < -(sim.halfW + 2f))));
+                _occClear.Add(0f);
             }
         }
 
@@ -134,6 +142,8 @@ namespace Craquez
         void UpdateOccluders(Vector3 focus)
         {
             if (_occ.Count == 0) return;
+            var kNow = (Kind)Mathf.Clamp(mode, 0, Modes.Length - 1);
+            bool sideView = !cinematic && kNow != Kind.Behind && kNow != Kind.Shoulder && kNow != Kind.Dynamic && kNow != Kind.BehindGoal;
             var c = cam.transform.position;
             float hw = sim.halfW;
             // alvos: o foco, um pouco antes/depois dele e a linha lateral mais próxima
@@ -184,6 +194,15 @@ namespace Craquez
                 }
                 // colado na câmera (poste, mureta, alambrado) também some
                 if (!block && !showAll && b.SqrDistance(c) < 25f) block = true;
+                // câmeras de lado: o lado da câmera fica sempre escondido (sem piscar)
+                if (!showAll && sideView && _occNear[i]) block = true;
+                // some na hora; só volta depois de ~1,5 s sem tapar (nada de piscar a cada passe)
+                if (block) _occClear[i] = 0f;
+                else if (_occHidden[i])
+                {
+                    _occClear[i] += Time.deltaTime;
+                    if (_occClear[i] < 1.5f && !showAll && !cinematic) block = true;
+                }
                 if (block == _occHidden[i]) continue;
                 _occHidden[i] = block;
                 // escondido: quem já fazia sombra continua fazendo (só a sombra); quem não fazia some de vez
@@ -268,10 +287,11 @@ namespace Craquez
             _lead = Vector3.Lerp(_lead, Vector3.ClampMagnitude(vel * 0.35f, field ? 8f : 4f), 1f - Mathf.Exp(-dt * 2f));
             var target = ball + _lead;
             target.x = Mathf.Clamp(target.x, -hl * 0.88f, hl * 0.88f);
-            target.z = Mathf.Clamp(target.z * 0.55f, -hw * 0.5f, hw * 0.5f);
             var kind = (Kind)Mathf.Clamp(mode, 0, Modes.Length - 1);
+            if (kind == Kind.Close || kind == Kind.Low) target.z = Mathf.Clamp(target.z, -hw, hw);
+            else target.z = Mathf.Clamp(target.z * 0.55f, -hw * 0.5f, hw * 0.5f);
             bool onPlayer = kind == Kind.PlayerSide || kind == Kind.Behind || kind == Kind.Shoulder || kind == Kind.Dynamic;
-            if (!onPlayer) _focus = Vector3.SmoothDamp(_focus, target, ref _vel, 0.35f, 60f, dt);
+            if (!onPlayer) _focus = Vector3.SmoothDamp(_focus, target, ref _vel, kind == Kind.Close || kind == Kind.Low ? 0.28f : 0.35f, 60f, dt);
             // perto do gol: aproxima um pouco
             float nearGoal = Mathf.Clamp01((Mathf.Abs(_focus.x) - hl * 0.55f) / (hl * 0.35f));
             float zk = 1f - zoom * 0.14f;   // zoom afasta/aproxima mantendo o ângulo
@@ -294,6 +314,10 @@ namespace Craquez
                 // aberta aproximada: alta como a aberta (vê a jogada e o posicionamento), mas fechada
                 // na bola — atletas grandes o bastante para ver os detalhes
                 case Kind.WideClose: height = field ? 21f : 11f; back = field ? 40f : 18f; fov = field ? 24f : 30f; break;
+                // TV bem perto: a mesma vista de lado da TV, baixa e fechada na bola (atletas grandes)
+                case Kind.Close: height = field ? 6.5f : 5f; back = field ? 13f : 9f; fov = field ? 30f : 34f; break;
+                // rente ao lance: quase na altura dos atletas, à beira do campo, acompanhando a bola de perto
+                case Kind.Low: height = field ? 3.4f : 2.6f; back = field ? 8.5f : 5.5f; fov = field ? 38f : 42f; break;
                 // TV (padrão): no campo, mais perto do jogo e de frente (antes 18 m de altura a 38 m da
                 // lateral: os atletas ficavam pequenos)
                 default: height = field ? 13f : 10f; back = field ? 26f : 16f; fov = field ? 30f : 38f; break;
@@ -302,7 +326,17 @@ namespace Craquez
             back *= zk;
             fov -= nearGoal * 4f;
             _dist = Mathf.Lerp(_dist <= 0 ? back : _dist, back * (1f - nearGoal * 0.1f), 1f - Mathf.Exp(-dt * 1.5f));
-            var pos = new Vector3(_focus.x * (kind == Kind.Pitchside ? 0.95f : field && (kind == Kind.Tv || kind == Kind.TvClose) ? 0.9f : 0.82f), height, -(hw + _dist) + _focus.z * 0.25f);
+            bool tight = kind == Kind.Close || kind == Kind.Low;
+            // câmeras fechadas: acompanham a bola de verdade (x igual e chegando perto na profundidade)
+            if (kind == Kind.Low)
+            {
+                // fica na beira do campo (fora das quatro linhas) e fecha a lente conforme a bola se afasta
+                float dz = _focus.z + hw + 2f;
+                fov = Mathf.Lerp(field ? 40f : 44f, field ? 16f : 24f, Mathf.Clamp01((dz - 6f) / (hw * 2f)));
+            }
+            var pos = kind == Kind.Low ? new Vector3(_focus.x - 3f, height, -(hw + 2f))
+                : tight ? new Vector3(_focus.x, height, _focus.z - _dist - hw * 0.15f)
+                : new Vector3(_focus.x * (kind == Kind.Pitchside ? 0.95f : field && (kind == Kind.Tv || kind == Kind.TvClose) ? 0.9f : 0.82f), height, -(hw + _dist) + _focus.z * 0.25f);
             pos += ShakeOffset(dt, 0.25f);
             cam.transform.position = pos;
             var look = _focus + Vector3.up * (kind == Kind.Pitchside ? 1.1f : 0.6f);

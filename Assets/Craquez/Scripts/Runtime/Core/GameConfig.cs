@@ -22,7 +22,8 @@ namespace Craquez
         public bool dynamicWeather = true;
         public int streetPlayers = 3;    // rua: 3x3, 4x4 ou 5x5
         public int stadium;              // campo: 0 = estádio do mandante; 1.. = modelos
-        public bool training;            // arena de treino: atacante x goleiro, sem relógio
+        public bool training;
+        public int trainingRoster = -1;  // treino: atleta escolhido (índice no elenco; -1 = o melhor finalizador)            // arena de treino: atacante x goleiro, sem relógio
         public bool toss = true;         // sorteio do juiz: lados e saída aleatórios
         public bool swapSides;           // trocar os campos: o mandante começa atacando para a esquerda
         public int venue;                // futsal/rua: qual quadra/rua
@@ -71,6 +72,29 @@ namespace Craquez
         {
             get => PlayerPrefs.GetInt("player_markers", 1) == 1;
             set { PlayerPrefs.SetInt("player_markers", value ? 1 : 0); PlayerPrefs.Save(); }
+        }
+
+        /// <summary>Layout do controle: para cada ação (passe, chute, alto, enfiada) qual botão da face
+        /// (0 = baixo A/✕, 1 = direita B/○, 2 = esquerda X/□, 3 = cima Y/△).</summary>
+        public static int[] PadMap
+        {
+            get
+            {
+                var s = PlayerPrefs.GetString("pad_map", "0123");
+                var m = new int[4];
+                for (int i = 0; i < 4; i++) m[i] = i < s.Length ? Mathf.Clamp(s[i] - '0', 0, 3) : i;
+                return m;
+            }
+            set { PlayerPrefs.SetString("pad_map", string.Concat(value[0], value[1], value[2], value[3])); PlayerPrefs.Save(); }
+        }
+        public static readonly string[][] PadPresets = { new[] { "0123" }, new[] { "0213" }, new[] { "0312" } };
+        public static readonly string[] PadPresetNames = { "Padrão (B / ○ chuta)", "X / □ chuta", "Y / △ chuta", "Personalizado" };
+
+        /// <summary>Correr no gatilho (RT/R2, padrão) ou no botão de ombro (RB/R1); o colocado fica no outro.</summary>
+        public static bool SprintOnShoulder
+        {
+            get => PlayerPrefs.GetInt("sprint_rb", 0) == 1;
+            set { PlayerPrefs.SetInt("sprint_rb", value ? 1 : 0); PlayerPrefs.Save(); }
         }
 
         public static bool Vibration

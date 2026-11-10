@@ -66,6 +66,12 @@ namespace Craquez
             _night = c.timeOfDay == "noite";
             Lighting(c.timeOfDay, s.mode.id, q);
             FanCrowd.HomeKits = home.kits; FanCrowd.AwayKits = away.kits;   // torcedores com os uniformes dos times
+            {
+                string wk0 = c.weather == "aleatorio" ? WeatherFx.Kinds[(int)(c.seed % (uint)WeatherFx.Kinds.Length)] : c.weather;
+                // chuva na arquibancada: capas, capuzes e guarda-chuvas; nada de bandeiras
+                FanCrowd.Rain = s.mode.id != GameModes.Futsal && (wk0 == "chuva" || wk0 == "tempestade");
+                Gfx.CrowdRain = FanCrowd.Rain;
+            }
             if (c.training) venue = VenueBuilder.TrainingGround(s, home, kits[0], _night, q, transform);   // só o campo: sem torcida, placar, juiz
             else if (s.mode.id == GameModes.Futsal) venue = VenueBuilder.Futsal(s, home, away, kits[0], kits[1], c.venue, _night, q, transform);
             else if (s.mode.id == GameModes.Street) venue = VenueBuilder.Street(s, home, away, kits[0], kits[1], c.venue, _night, q, transform);
@@ -381,29 +387,65 @@ namespace Craquez
             if (q < 1) return;
             // coletes: laranja para o mandante, verde-limão para o visitante
             var bibs = new[] { new Color(1f, 0.45f, 0.05f), new Color(0.65f, 0.95f, 0.1f) };
+            int nWarm = q >= 2 ? 5 : 4;
             for (int t = 0; t < 2; t++)
-                for (int i = 0; i < 3; i++)
+                for (int i = 0; i < nWarm; i++)
                 {
                     var wp = new SimPlayer { id = -1, name = "Reserva", number = 12 + i, face = new float[] { (i + t) % 4, i % 3, (t * 2 + i) % 4, 1, i % 2, 2 } };
                     var bib = new Kit { c1 = bibs[t], c2 = bibs[t], shorts = Color.Lerp(kits[t].shorts, Color.black, 0.2f), socks = kits[t].socks };
                     var rig = AthleteFactory.Create(wp, bib, bib, parent, q);
                     var av = rig.gameObject.AddComponent<AthleteView>();
                     float gx = (t == 0 ? -1f : 1f) * (sim.halfLen + 4f);
-                    wp.position = new Vector2(gx, sim.halfW * (0.35f + i * 0.17f));
+                    wp.position = new Vector2(gx, sim.halfW * (0.2f + i * 0.15f));
                     wp.facing = new Vector2(0f, 1f);
                     av.Setup(wp, rig, this);
                     _warm.Add((av, t, i * 1.7f + t * 0.9f));
                 }
         }
 
+        public bool HasBench => _coaches.Count > 0;
+        public float BenchX(int team) => (team == 0 ? -1f : 1f) * 9f;
+
+        int _celTeam = -1;
+        Vector2 _celSpot;
+        float _celT;
+        bool _celStarted;
+
+        /// <summary>Gol comemorado no banco: técnico e reservas daquele time correm até o autor.</summary>
+        public void BenchCelebrate(int team, Vector2 spot, float seconds)
+        {
+            _celTeam = team; _celSpot = spot; _celT = seconds; _celStarted = false;
+        }
+
+        /// <summary>Durante a comemoração no banco: leva o técnico e os reservas até o autor do gol.</summary>
+        bool BenchJoin(AthleteView av, int team, int k, float dt)
+        {
+            if (_celT <= 0f || team != _celTeam) return false;
+            var p = av.p;
+            float ang = k * 1.9f + 0.6f;
+            var target = _celSpot + new Vector2(Mathf.Cos(ang), Mathf.Abs(Mathf.Sin(ang)) + 0.3f) * (0.9f + (k % 2) * 0.4f);
+            var to = target - p.position;
+            float d = to.magnitude;
+            var want = d > 0.3f ? to / d * Mathf.Min(6f, d * 2f) : Vector2.zero;
+            p.vel = Vector2.MoveTowards(p.vel, want, 8f * dt);
+            p.position += p.vel * dt;
+            if (d > 0.6f) p.facing = V2.RotateToward(p.facing, to / Mathf.Max(d, 0.01f), 6f * dt).Norm();
+            else p.facing = V2.RotateToward(p.facing, (_celSpot - p.position).Norm(), 4f * dt).Norm();
+            if (d < 1.4f && !av.Celebrating) av.Celebrate(_celT);
+            av.OnTick();
+            return true;
+        }
+
         void BenchStep()
         {
             if (_coaches.Count == 0) return;
+            if (_celT > 0f) { _celT -= MatchSim.DT; if (_celT <= 0f) _celTeam = -1; }
             float dt = MatchSim.DT, hw = sim.halfW, hl = sim.halfLen;
             bool live = sim.state == MatchState.Playing;
             for (int t = 0; t < _coaches.Count; t++)
             {
                 var av = _coaches[t];
+                if (BenchJoin(av, t, 0, dt)) continue;
                 var p = av.p;
                 float cx = (t == 0 ? -1f : 1f) * 9f;
                 // acompanha o lance de lado dentro da área técnica (até a beira), de frente para o jogo
@@ -434,24 +476,73 @@ namespace Craquez
                     }
                 }
                 if (_coachPointT[t] > 0f) { _coachPointT[t] -= dt; if (_coachPointT[t] <= 0f) av.point = Vector3.zero; }
+                // lance de perigo do time dele: aplaude / vibra na beira do campo
+                if (sim.tick - sim.lastShotTick < 4 && sim.ball.lastTouchTeam == t && !av.Celebrating) av.Celebrate(1.4f);
                 av.OnTick();
             }
-            // aquecimento atrás dos gols: trote de ida e volta e paradas para alongar
+            // aquecimento atrás dos gols: cada reserva no seu ciclo — trote de ida e volta, deslocamento de
+            // lado, polichinelos, alongamento (braços para cima), tiro curto e caminhada de volta
+            int wk = 1;
             foreach (var w in _warm)
             {
+                if (BenchJoin(w.av, w.team, wk++, dt)) continue;
                 var p = w.av.p;
                 float gx = (w.team == 0 ? -1f : 1f) * (hl + 4f);
-                float cyc = (float)(sim.tick * dt * 0.09f + w.phase);
+                float toField = w.team == 0 ? 1f : -1f;
+                float cyc = (float)(sim.tick * dt / 26f + w.phase * 0.37f);
                 float u = Mathf.Repeat(cyc, 1f);
-                // 0..0,4 vai, 0,4..0,5 parado, 0,5..0,9 volta, 0,9..1 parado
-                float z0 = hw * 0.3f, z1 = hw * 0.9f;
-                float s = u < 0.4f ? u / 0.4f : u < 0.5f ? 1f : u < 0.9f ? 1f - (u - 0.5f) / 0.4f : 0f;
-                var target = new Vector2(gx + Mathf.Sin(w.phase * 3f) * 0.8f, Mathf.Lerp(z0, z1, Mathf.SmoothStep(0f, 1f, s)));
+                int lane = (int)(w.phase * 10f) % 4;
+                float z0 = hw * 0.15f, z1 = hw * 0.85f;
+                float laneZ = Mathf.Lerp(z0, z1, (lane + 0.5f) / 4f);
+                Vector2 target = p.position;
+                float maxV = 3.2f;
+                w.av.point = Vector3.zero;
+                if (u < 0.3f)
+                {
+                    // trote de ida e volta
+                    float s = Mathf.PingPong(u / 0.3f * 2f, 1f);
+                    target = new Vector2(gx + Mathf.Sin(w.phase * 3f) * 0.8f, Mathf.Lerp(z0, z1, Mathf.SmoothStep(0f, 1f, s)));
+                }
+                else if (u < 0.45f)
+                {
+                    // deslocamento lateral (de frente para o campo)
+                    float s = Mathf.PingPong((u - 0.3f) / 0.15f * 3f, 1f);
+                    target = new Vector2(gx, laneZ + (s - 0.5f) * 4f);
+                    maxV = 2.4f;
+                }
+                else if (u < 0.55f)
+                {
+                    // polichinelos / saltitos no lugar
+                    target = new Vector2(gx, laneZ);
+                    if (p.position.Dist(target) < 0.6f && !w.av.Celebrating) w.av.Celebrate(1.2f);
+                }
+                else if (u < 0.7f)
+                {
+                    // alongamento: parado, braço esticado para cima ou para o lado
+                    target = new Vector2(gx, laneZ);
+                    if (p.position.Dist(target) < 0.6f)
+                        w.av.point = (Mathf.Repeat(u * 12f, 1f) < 0.5f ? Vector3.up : new Vector3(0f, 0.4f, Mathf.Sign(Mathf.Sin(u * 40f)))) * 1f;
+                }
+                else if (u < 0.8f)
+                {
+                    // tiro curto
+                    float s = (u - 0.7f) / 0.1f;
+                    target = new Vector2(gx + toField * 0.5f, s < 0.5f ? z1 : z0);
+                    maxV = 6.5f;
+                }
+                else
+                {
+                    // caminha de volta conversando, olhando o jogo
+                    target = new Vector2(gx - toField * 0.6f, laneZ);
+                    maxV = 1.3f;
+                }
                 var to = target - p.position;
-                p.vel = Vector2.MoveTowards(p.vel, to / dt * 0.15f, 6f * dt);
-                if (p.vel.magnitude > 3.2f) p.vel = p.vel.normalized * 3.2f;
+                var want = to.magnitude > 0.25f ? to / Mathf.Max(to.magnitude, 0.01f) * Mathf.Min(maxV, to.magnitude * 2f) : Vector2.zero;
+                p.vel = Vector2.MoveTowards(p.vel, want, 6f * dt);
                 p.position += p.vel * dt;
-                if (p.vel.magnitude > 0.3f) p.facing = V2.RotateToward(p.facing, p.vel.normalized, 5f * dt).Norm();
+                bool lateral = u >= 0.3f && u < 0.45f;
+                if (lateral) p.facing = V2.RotateToward(p.facing, new Vector2(toField, 0f), 5f * dt).Norm();
+                else if (p.vel.magnitude > 0.3f) p.facing = V2.RotateToward(p.facing, p.vel.normalized, 5f * dt).Norm();
                 else p.facing = V2.RotateToward(p.facing, (sim.ball.pos - p.position).Norm(), 2f * dt).Norm();
                 w.av.OnTick();
             }
@@ -481,6 +572,13 @@ namespace Craquez
                 var v = sim.players[sim.foulVictim].position;
                 target = v + new Vector2(0f, v.y > 0 ? -4f : 4f);
                 urgency = 1f;
+                if (sim.refHelp == sim.foulVictim && _cardT <= 0f && sim.players[sim.foulVictim].down > 0f)
+                {
+                    // o juiz vai até quem está no chão e dá a mão para levantar
+                    target = v + new Vector2(0.75f, v.y > 0 ? -0.55f : 0.55f);
+                    p.helping = sim.foulVictim;
+                }
+                else p.helping = -1;
                 if (p.position.Dist(v) < 9f) _referee.point = AthleteView.W(new Vector2(sim.TeamDir(sim.foulTeam), 0f));
                 if (_cardT > 0f) _referee.point = Vector3.up * 3f + AthleteView.W(new Vector2(sim.TeamDir(sim.foulTeam), 0f)) * 0.3f;   // cartão erguido
             }
@@ -597,10 +695,10 @@ namespace Craquez
                     break;
                 case "skill":
                     _crowd?.React("skill");
-                    if (e.team == 0) { Sfx.Hurray(0.3f); _crowdHype = Mathf.Max(_crowdHype, 0.45f); }
+                    if (e.team == 0) _crowdHype = Mathf.Max(_crowdHype, 0.45f);   // (sem grito: parecia voz de jogador)
                     break;
                 case "fooled":
-                    if (e.team == 1) Sfx.Applause(0.3f);    // drible do time da casa deixou o visitante no chão
+                    // (sem som: o marcador desequilibrado não "faz barulho")
                     break;
                 case "tackle":
                 case "steal":
@@ -667,7 +765,7 @@ namespace Craquez
                     FanCrowd.FoulT = 2.2f; FanCrowd.FoulOn = 1 - e.team;
                     Sfx.Whistle();
                     if (e.team == 1) Sfx.Boo();   // torcida da casa vaia falta do visitante
-                    else Sfx.Ooh();
+                    // (sem o "uuuh" na falta: soava como os jogadores gemendo ao serem empurrados)
                     _crowd?.React("foul");
                     bcam.Shake(0.12f);
                     break;
@@ -678,13 +776,15 @@ namespace Craquez
                     // gol do mandante: o estádio explode; do visitante: só o setor visitante comemora
                     bool homeGoal = e.team == 0;
                     if (homeGoal) Sfx.Cheer(); else Sfx.Applause(0.45f);
-                    GoalParty(e.team);
+                    // (sem papel picado nem sinalizadores em nenhuma comemoração)
                     _crowd?.React(homeGoal ? "goal" : "silence");
                     _crowdHype = homeGoal ? 1.6f : 0f;
                     _silence = homeGoal ? 0f : 6f;
                     bcam.Shake(0.6f);
                     foreach (var n in venue.nets)
-                        n.Hit(new Vector3(sim.ball.pos.x, sim.ball.z + 0.3f, sim.ball.pos.y), sim.ball.Speed * 0.15f);   // (o bolsão vem da própria bola: Press)
+                        // força real do chute (antes ia multiplicada por 0,15: a rede mal mexia); a rede do outro
+                        // gol fica longe do ponto e quase não recebe nada
+                        n.Hit(new Vector3(sim.ball.pos.x, sim.ball.z + 0.3f, sim.ball.pos.y), Mathf.Max(sim.ball.Speed, 12f));
                     break;
             }
         }

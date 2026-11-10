@@ -1,4 +1,41 @@
-## Craquez 2.6.0
+## Craquez 2.7.0
+
+Jogo de futebol feito 100% com inteligência artificial, **gratuito**. Por enquanto, só Android.
+
+### Download
+- **Android**: `Craquez-v2.7.0.apk` (instale permitindo "fontes desconhecidas")
+- **Importante**: a partir desta versão o APK tem assinatura fixa. Para instalar a 2.7.0 por cima de
+  uma versão antiga, desinstale a antiga uma vez (o progresso salvo no aparelho é apagado). Daí em
+  diante o botão **ATUALIZAR** do jogo baixa e instala as versões novas sozinho.
+
+### Novidades
+- **Câmeras**: TV Bem Perto, Rente ao Lance e Ombro (bem perto); as partes do estádio do lado da
+  câmera ficam escondidas de forma estável (sem piscar) e as outras só voltam depois de um tempo.
+- **Dribles característicos** (elástico, pedalada, chapéu, caneta, corte) para meias e atacantes
+  habilidosos dos clubes brasileiros, das grandes ligas e das seleções do topo: Colocado + analógico
+  direito. Analógico esquerdo com a bola: empurrão firme adianta a bola; de lado, rola com a sola.
+- **Bicicleta** (de costas para o gol, bola entre a cintura e a cabeça, perto da área).
+- **Defesa**: bote, carrinho e puxão de camisa/agarrão (Proteger + Colocado); segurar muito vira falta.
+- **Quedas**: o jogador cai, às vezes rola no chão, sente a pancada e um companheiro, um adversário
+  ou o próprio juiz vem ajudar a levantar. Sem gemidos nas trombadas.
+- **Comemorações** novas: com a torcida atrás do gol e no banco (técnico e reservas vêm abraçar);
+  sem papel picado nem sinalizadores. A rede agora estufa e balança no gol.
+- **Torcida** com rosto e corpo melhores; na chuva, capas, capuzes e guarda-chuvas (sem bandeiras).
+- **Poças** azuladas, em três formatos, com a grama encharcada em volta e os pingos batendo na água.
+- **Layouts de controle**: quem chuta com o B/Bola, com o X/Quadrado ou com o Y/Triângulo, ou
+  personalizado (Configurações → Controles); correr no gatilho ou no botão de ombro.
+- **Lateral da CPU** com calma e para o companheiro livre.
+- **Controle de bola** mais colado, mas às vezes a bola escapa (pique, corte em velocidade,
+  marcação, gramado molhado).
+- **Rua**: golzinho em algumas ruas, formatos 6 x 6 e 7 x 7 e menos gols de longe.
+- **Arena de treino**: escolha o atleta, o goleiro devolve a bola, só o CT (sem torcida, juiz,
+  placar ou quadro do jogador).
+- **Banco**: aquecimento variado (trote, lateral, polichinelos, alongamento, tiros) e técnico vibrando.
+- Parado com a bola, o jogador não fica mais dando passinhos no lugar.
+- Foto dos locais no seletor não fica mais preta. Bandeiras de escanteio no tamanho certo.
+- Sem música por enquanto.
+
+## Versão 2.6.0
 
 Jogo de futebol feito 100% com inteligência artificial, **gratuito**. Por enquanto, só Android.
 

@@ -58,6 +58,8 @@ namespace Craquez
         MatchView _view;
         Hud _hud;
         int _team, _scorer;
+        int _kind;      // 0 bandeirinha, 1 torcida (atrás do gol), 2 banco de reservas
+        float _dir;
         float _t, _acc, _replayPos;
         Vector2 _spot;
         PState[] _live;
@@ -83,9 +85,19 @@ namespace Craquez
             _done = false;
             _replaying = false;
             _hugged.Clear();
-            // comemoração na bandeirinha do lado atacado, do lado da câmera
+            // tipo de comemoração (sorteado): bandeirinha do lado da câmera, junto da torcida atrás do gol
+            // ou correndo para o banco (técnico e reservas vêm abraçar)
             float dir = Mathf.Sign(sim.ball.pos.x == 0 ? 1f : sim.ball.pos.x);
-            _spot = new Vector2(dir * (sim.halfLen - 3f), -(sim.halfW - 2.5f));
+            uint hsh = (uint)(sim.tick * 2654435761u) ^ (uint)(scorer * 977 + team * 31);
+            float roll = (hsh >> 8) % 1000 / 1000f;
+            bool bench = view.HasBench && roll < 0.3f;
+            bool fans = !bench && roll < 0.6f && sim.mode.id != GameModes.Street;
+            _kind = bench ? 2 : fans ? 1 : 0;
+            if (_kind == 2) _spot = new Vector2(view.BenchX(team), sim.halfW - 1.2f);
+            else if (_kind == 1) _spot = new Vector2(dir * (sim.halfLen - 1.2f), Mathf.Clamp(sim.ball.pos.y * 0.5f, -6f, 6f));
+            else _spot = new Vector2(dir * (sim.halfLen - 3f), -(sim.halfW - 2.5f));
+            _dir = dir;
+            if (_kind == 2) view.BenchCelebrate(team, _spot, LiveEnd + 1f);
             // sem corte: a câmera sai de onde estava, acompanha a bola morrendo na rede e só então
             // desliza até o autor do gol (a câmera cinematográfica interpola posição e mira)
             var bc = view.bcam;
@@ -199,7 +211,12 @@ namespace Craquez
                 p.position += p.vel * dt;
                 if (p.vel.sqrMagnitude > 0.2f) p.facing = Vector2.Lerp(p.facing, p.vel.normalized, 0.15f).normalized;
                 else if (p.team == _team && p.id != _scorer) { var f = sPos - p.position; if (f.sqrMagnitude > 0.01f) p.facing = Vector2.Lerp(p.facing, f.normalized, 0.1f).normalized; }
-                else if (p.id == _scorer) p.facing = Vector2.Lerp(p.facing, new Vector2(0, -1), 0.05f).normalized;   // de frente para a câmera/torcida
+                else if (p.id == _scorer)
+                {
+                    // de frente para a câmera (bandeirinha), para a torcida (atrás do gol) ou para o banco
+                    var fw = _kind == 1 ? new Vector2(_dir, 0f) : _kind == 2 ? new Vector2(0f, 1f) : new Vector2(0, -1);
+                    p.facing = Vector2.Lerp(p.facing, fw, 0.05f).normalized;
+                }
                 p.slide = 0f;
                 p.dive = 0f;
                 p.stun = 0f;

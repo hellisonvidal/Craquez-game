@@ -32,12 +32,16 @@ namespace Craquez
 
         void Build()
         {
-            var tex = Blob(128);
+            // três formatos de poça (antes uma só, girada) e a mancha de grama molhada em volta
+            var texs = new[] { Blob(128, 0), Blob(128, 1), Blob(128, 2) };
+            // (material de partícula: respeita o alfa da textura; o transparente comum virava um quadrado)
+            var halo = Gfx.Particles(new Color(0.03f, 0.07f, 0.03f, 0.42f), Halo(64));
             // água: escura, levemente azulada e lisa (reflete o céu/refletores no brilho especular);
             // recorte pelo contorno irregular (o material transparente ignorava o alfa da textura e a
             // poça aparecia como um ladrilho quadrado)
             // azul claro de água refletindo o céu (escura demais parecia piche)
-            var mat = Gfx.Cutout(new Color(0.56f, 0.74f, 0.92f), tex, 0.5f, 0.92f);
+            var mats = new Material[3];
+            for (int k = 0; k < 3; k++) mats[k] = Gfx.Cutout(new Color(0.56f, 0.74f, 0.92f), texs[k], 0.5f, 0.92f);
             _quads = new Transform[_sim.puddles.Count];
             for (int i = 0; i < _quads.Length; i++)
             {
@@ -50,7 +54,18 @@ namespace Craquez
                 // formato irregular: alongada e girada ao acaso (sempre a mesma para a poça)
                 q.transform.localRotation = Quaternion.Euler(90f, (i * 67) % 180, 0f);
                 var r = q.GetComponent<MeshRenderer>();
-                r.sharedMaterial = mat;
+                r.sharedMaterial = mats[i % 3];
+                // mancha escura de grama encharcada em volta (mais larga que a água)
+                var h = GameObject.CreatePrimitive(PrimitiveType.Quad);
+                Destroy(h.GetComponent<Collider>());
+                h.name = "Grama molhada " + i;
+                h.transform.SetParent(q.transform, false);
+                h.transform.localPosition = new Vector3(0f, 0f, 0.004f);
+                h.transform.localScale = Vector3.one * 1.45f;
+                var hr = h.GetComponent<MeshRenderer>();
+                hr.sharedMaterial = halo;
+                hr.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
+                hr.receiveShadows = false;
                 r.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
                 r.receiveShadows = false;
                 _quads[i] = q.transform;
@@ -76,17 +91,30 @@ namespace Craquez
             }
             // pingos batendo nas poças: anéis que abrem e somem
             float rain = _weather != null ? _weather.Rain : 0f;
-            _ringAcc += dt * rain * 260f;
-            while (_ringAcc >= 1f && _rings != null)
+            // por área de água: poça grande recebe mais pingos
+            float area = 0f;
+            for (int i = 0; i < _quads.Length; i++) { float r0 = _sim.PuddleRadius(i); if (r0 > 0.25f) area += r0 * r0; }
+            _ringAcc += dt * rain * Mathf.Min(900f, 70f * area);
+            int guard = 0;
+            while (_ringAcc >= 1f && _rings != null && guard++ < 80)
             {
                 _ringAcc -= 1f;
                 int i = _rng.Next(_quads.Length);
                 float r = _sim.PuddleRadius(i);
-                if (r < 0.3f || !_quads[i].gameObject.activeSelf) continue;
+                if (r < 0.25f || !_quads[i].gameObject.activeSelf) { _ringAcc += 0.6f; continue; }
                 var pd = _sim.puddles[i];
                 float a = (float)_rng.NextDouble() * Mathf.PI * 2f, d = Mathf.Sqrt((float)_rng.NextDouble()) * r * 0.8f;
-                var ep = new ParticleSystem.EmitParams { position = new Vector3(pd.x + Mathf.Cos(a) * d, 0.03f, pd.y + Mathf.Sin(a) * d), applyShapeToPosition = false };
+                var at = new Vector3(pd.x + Mathf.Cos(a) * d, 0.03f, pd.y + Mathf.Sin(a) * d);
+                var ep = new ParticleSystem.EmitParams { position = at, applyShapeToPosition = false, startSize = 0.18f + (float)_rng.NextDouble() * 0.14f };
                 _rings.Emit(ep, 1);
+                // a gota quica: coroinha de respingos subindo um palmo
+                if (_spray != null && _rng.NextDouble() < 0.55)
+                    for (int k = 0; k < 3; k++)
+                    {
+                        float aa = (float)_rng.NextDouble() * Mathf.PI * 2f;
+                        var v = new Vector3(Mathf.Cos(aa) * 0.5f, 1.1f + (float)_rng.NextDouble() * 0.7f, Mathf.Sin(aa) * 0.5f);
+                        _spray.Emit(new ParticleSystem.EmitParams { position = at, velocity = v, applyShapeToPosition = false, startSize = 0.025f }, 1);
+                    }
             }
             // bola e atletas atravessando poças: espirra água
             if (_spray == null) return;
@@ -122,10 +150,10 @@ namespace Craquez
             ps.Stop(true, ParticleSystemStopBehavior.StopEmittingAndClear);
             var m = ps.main;
             m.loop = false; m.playOnAwake = false;
-            m.startLifetime = 0.6f; m.startSpeed = 0f; m.startSize = 0.16f;
-            m.maxParticles = 900;
+            m.startLifetime = 0.7f; m.startSpeed = 0f; m.startSize = 0.2f;
+            m.maxParticles = 1600;
             m.simulationSpace = ParticleSystemSimulationSpace.World;
-            m.startColor = new Color(0.85f, 0.9f, 1f, 0.55f);
+            m.startColor = new Color(0.9f, 0.95f, 1f, 0.75f);
             var em = ps.emission; em.enabled = false;
             var sz = ps.sizeOverLifetime; sz.enabled = true;
             sz.size = new ParticleSystem.MinMaxCurve(1f, AnimationCurve.Linear(0f, 0.3f, 1f, 3.2f));
@@ -151,7 +179,7 @@ namespace Craquez
             m.loop = false; m.playOnAwake = false;
             m.startLifetime = 0.45f; m.startSpeed = 0f; m.startSize = 0.045f;
             m.gravityModifier = 1f;
-            m.maxParticles = 600;
+            m.maxParticles = 1200;
             m.simulationSpace = ParticleSystemSimulationSpace.World;
             m.startColor = new Color(0.82f, 0.88f, 0.95f, 0.75f);
             var em = ps.emission; em.enabled = false;
@@ -162,7 +190,25 @@ namespace Craquez
         }
 
         /// <summary>Mancha de água de borda irregular (o mesmo desenho para todas, girado e esticado).</summary>
-        static Texture2D Blob(int size)
+        /// <summary>Mancha de grama molhada em volta da poça (borda suave).</summary>
+        static Texture2D Halo(int size)
+        {
+            var t = new Texture2D(size, size, TextureFormat.RGBA32, true) { wrapMode = TextureWrapMode.Clamp };
+            var px = new Color32[size * size];
+            for (int y = 0; y < size; y++)
+                for (int x = 0; x < size; x++)
+                {
+                    float u = (x + 0.5f) / size * 2f - 1f, v = (y + 0.5f) / size * 2f - 1f;
+                    float d = Mathf.Sqrt(u * u + v * v);
+                    float a = Mathf.Clamp01((1f - d) / 0.45f);
+                    px[y * size + x] = new Color32(255, 255, 255, (byte)(a * a * 255));
+                }
+            t.SetPixels32(px);
+            t.Apply(true, true);
+            return t;
+        }
+
+        static Texture2D Blob(int size, int variant)
         {
             var t = new Texture2D(size, size, TextureFormat.RGBA32, true) { wrapMode = TextureWrapMode.Clamp };
             var px = new Color32[size * size];
@@ -171,7 +217,8 @@ namespace Craquez
                 {
                     float u = (x + 0.5f) / size * 2f - 1f, v = (y + 0.5f) / size * 2f - 1f;
                     float ang = Mathf.Atan2(v, u);
-                    float edge = 0.78f + 0.1f * Mathf.Sin(ang * 3f + 0.7f) + 0.06f * Mathf.Sin(ang * 7f + 2.1f) + 0.04f * Mathf.Sin(ang * 13f);
+                    float ph = variant * 1.7f;
+                    float edge = 0.76f + 0.1f * Mathf.Sin(ang * (3f + variant) + 0.7f + ph) + 0.07f * Mathf.Sin(ang * (7f - variant) + 2.1f + ph * 2f) + 0.04f * Mathf.Sin(ang * 13f + ph);
                     float d = Mathf.Sqrt(u * u + v * v) / edge;
                     float a = Mathf.Clamp01((1f - d) / 0.18f);
                     // borda um pouco mais escura (terra molhada) e reflexos claros do céu no meio

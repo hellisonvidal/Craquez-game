@@ -212,6 +212,8 @@ namespace Craquez
         static float[] _contact;   // fase (0..1) do apoio do pé esquerdo em cada clipe de locomoção
         static float[] _groundSpeed; // velocidade real dos pés no chão em cada clipe (m/s), medida na pose
         float _idleRate = 1f;
+        /// <summary>Quadro (0..1) da captura parada que fica segurado: os dois pés apoiados.</summary>
+        public static float IdleHold = 0f;
         readonly float[] _sp4 = new float[4], _sp5 = new float[5];
         static readonly int[] Ix4 = { IIdle, IWalk, IJog, IRun }, Ix5 = { IIdle, IWalk, IJog, IRun, ISprint };
 
@@ -233,6 +235,21 @@ namespace Craquez
             }
             if (fl == null || fr == null) return;
             FindKickContacts(go, fl, fr, pel);
+            // quadro da captura parada com os dois pés mais baixos e mais juntos (fica segurado)
+            if (Clips.TryGetValue("Idle", out var idleC))
+            {
+                float bestI = float.MaxValue, bti = 0f, lenI = idleC.clip.length;
+                for (int k = 0; k < 34; k++)
+                {
+                    float t = lenI * k / 34f;
+                    idleC.clip.SampleAnimation(go, t);
+                    float lo = Mathf.Min(fl.position.y, fr.position.y);
+                    var dxz = fl.position - fr.position; dxz.y = 0f;
+                    float sc = (Mathf.Max(fl.position.y, fr.position.y) - lo) * 4f + Mathf.Abs(dxz.magnitude - 0.24f);
+                    if (sc < bestI) { bestI = sc; bti = k / 34f; }
+                }
+                IdleHold = bti;
+            }
             for (int i = 0; i < Loco.Length; i++)
             {
                 if (!Clips.TryGetValue(Loco[i], out var ci) || !ci.loop || i == IIdle) continue;
@@ -468,6 +485,9 @@ namespace Craquez
                 if (!_locoP[i].IsValid()) continue;
                 float len = (float)_locoP[i].GetAnimationClip().length;
                 float off = (_contact != null && i != IIdle) ? _contact[i] : 0f;
+                // parado: a captura "Idle" dá passos no lugar (0,8 m/s de pé mexendo) — ninguém fica assim
+                // em jogo; segura um quadro com os dois pés no chão (o corpo respira por cima, na pose)
+                if (i == IIdle) { _locoP[i].SetTime(IdleHold * len); _loco.SetInputWeight(i, _locoW[i]); continue; }
                 _locoP[i].SetTime(Mathf.Repeat(_phase + off, 1f) * len);
                 _loco.SetInputWeight(i, _locoW[i]);
             }

@@ -29,11 +29,14 @@ namespace Craquez.Sim
 
         public static string DisplayName(string id) => id == Futsal ? "Futsal" : id == Street ? "Rua" : id == Society ? "Society" : "Campo";
 
-        /// <summary>Jogadores por time nas ruas (3x3, 4x4, 5x5).</summary>
-        public static readonly int[] StreetSizes = { 3, 4, 5 };
+        /// <summary>Jogadores por time nas ruas (3x3 a 7x7).</summary>
+        public static readonly int[] StreetSizes = { 3, 4, 5, 6, 7 };
+
+        /// <summary>Ruas com golzinho (trave improvisada, menor): gaiola, morro, beco, campinho de terra, linha do trem.</summary>
+        public static readonly int[] SmallGoalStreets = { 1, 4, 8, 11, 14 };
 
         /// <summary>Formação padrão da rua para o número de jogadores.</summary>
-        public static string StreetDefault(int players) => players >= 5 ? "2-1-2" : players == 4 ? "2-2" : "1-2";
+        public static string StreetDefault(int players) => players >= 7 ? "2-3-2" : players == 6 ? "2-2-2" : players >= 5 ? "2-1-2" : players == 4 ? "2-2" : "1-2";
 
         /// <summary>Formações: x de -1 (próprio gol) a 0 (meio); o primeiro é o goleiro (campo/futsal).</summary>
         public static Dictionary<string, Vector2[]> Formations(string id)
@@ -61,6 +64,14 @@ namespace Craquez.Sim
                     ["2-1-2"] = new[] { V(-0.7f, -0.45f), V(-0.7f, 0.45f), V(-0.45f, 0), V(-0.2f, -0.45f), V(-0.2f, 0.45f) },
                     ["2-2-1"] = new[] { V(-0.7f, -0.45f), V(-0.7f, 0.45f), V(-0.42f, -0.45f), V(-0.42f, 0.45f), V(-0.15f, 0) },
                     ["1-3-1"] = new[] { V(-0.74f, 0), V(-0.45f, -0.6f), V(-0.48f, 0), V(-0.45f, 0.6f), V(-0.15f, 0) },
+                    // 6x6
+                    ["2-2-2"] = new[] { V(-0.72f, -0.45f), V(-0.72f, 0.45f), V(-0.45f, -0.5f), V(-0.45f, 0.5f), V(-0.18f, -0.35f), V(-0.18f, 0.35f) },
+                    ["3-2-1"] = new[] { V(-0.7f, -0.6f), V(-0.74f, 0), V(-0.7f, 0.6f), V(-0.42f, -0.4f), V(-0.42f, 0.4f), V(-0.15f, 0) },
+                    ["2-3-1"] = new[] { V(-0.72f, -0.45f), V(-0.72f, 0.45f), V(-0.45f, -0.65f), V(-0.48f, 0), V(-0.45f, 0.65f), V(-0.15f, 0) },
+                    // 7x7
+                    ["2-3-2"] = new[] { V(-0.74f, -0.45f), V(-0.74f, 0.45f), V(-0.48f, -0.65f), V(-0.5f, 0), V(-0.48f, 0.65f), V(-0.18f, -0.35f), V(-0.18f, 0.35f) },
+                    ["3-3-1"] = new[] { V(-0.72f, -0.6f), V(-0.76f, 0), V(-0.72f, 0.6f), V(-0.46f, -0.6f), V(-0.48f, 0), V(-0.46f, 0.6f), V(-0.15f, 0) },
+                    ["3-2-2"] = new[] { V(-0.72f, -0.6f), V(-0.76f, 0), V(-0.72f, 0.6f), V(-0.45f, -0.4f), V(-0.45f, 0.4f), V(-0.18f, -0.35f), V(-0.18f, 0.35f) },
                 };
             if (id == Society)
                 return new Dictionary<string, Vector2[]>
@@ -122,8 +133,9 @@ namespace Craquez.Sim
             if (id == Street)
                 return new ModeDef
                 {
-                    id = Street, length = players >= 5 ? 38 : players == 4 ? 34 : 30, width = players >= 5 ? 22 : players == 4 ? 20 : 18,
-                    goalWidth = players >= 5 ? 3f : 2.6f, goalHeight = players >= 5 ? 1.6f : 1.4f, goalDepth = 0.8f,
+                    id = Street, length = players >= 7 ? 46 : players == 6 ? 42 : players >= 5 ? 38 : players == 4 ? 34 : 30,
+                    width = players >= 7 ? 26 : players == 6 ? 24 : players >= 5 ? 22 : players == 4 ? 20 : 18,
+                    goalWidth = players >= 6 ? 3.4f : players >= 5 ? 3f : 2.6f, goalHeight = players >= 6 ? 1.8f : players >= 5 ? 1.6f : 1.4f, goalDepth = 0.8f,
                     keeper = false, walls = true, wallBounce = 0.72f, boxDepth = 0, boxHalf = 0, penaltyDist = 0,
                     offside = false, centerR = 2.5f, restartDist = 3,
                     rollDecel = 0.95f, groundDrag = 0.006f, airDrag = 0.014f, bounce = 0.78f,

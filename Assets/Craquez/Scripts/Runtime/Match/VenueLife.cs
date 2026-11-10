@@ -247,7 +247,7 @@ namespace Craquez
                 var leg = rng.NextDouble() < 0.35 ? skin : pants[rng.Next(pants.Length)];
                 bool shortsOn = leg == skin;
                 int hairKind = rng.Next(5);   // 0 curto, 1 careca, 2 boné, 3 comprido, 4 black
-                bool flag = c < 10 && c % 3 == 0;
+                bool flag = c < 10 && c % 3 == 0 && !FanCrowd.Rain;
                 bool camera = c == 15;
                 for (int row = 0; row < 2; row++)
                 {
