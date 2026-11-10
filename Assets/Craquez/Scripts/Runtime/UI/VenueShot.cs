@@ -127,7 +127,7 @@ namespace Craquez.UI
                 Vector3 pos = mode == GameModes.Field ? new Vector3(-hl * 1.5f, 72f, -hw * 3.7f)
                     : mode == GameModes.Futsal ? new Vector3(-hl * 2.6f, 34f, -hw * 4.4f)
                     : mode == GameModes.Society ? new Vector3(-hl * 1.7f, 30f, -hw * 3.2f)
-                    : new Vector3(-hl * 2.2f, 20f, -hw * 3.4f);
+                    : new Vector3(-hl * 0.9f, 58f, -hw * 2.0f);   // rua: do alto, dentro do anel de prédios (de fora, os prédios tapavam a quadra)
                 var origin = holder.transform.position;
                 cam.transform.position = origin + pos;
                 cam.transform.LookAt(origin + new Vector3(0f, mode == GameModes.Futsal ? 6f : 0f, 0f));
