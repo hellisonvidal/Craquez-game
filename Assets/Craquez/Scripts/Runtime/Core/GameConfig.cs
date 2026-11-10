@@ -59,11 +59,18 @@ namespace Craquez
         }
         public static readonly string[] PlayerTagNames = { "Controlados e bola", "Todos", "Desligado" };
 
-        /// <summary>Faixa no rodapé com a escalação dos dois times (número e nome; destaca quem está com a bola).</summary>
-        public static bool LineupBar
+        /// <summary>Quadro do jogador com a bola (nome, número, fôlego), do lado do time dele.</summary>
+        public static bool PossessionHud
         {
-            get => PlayerPrefs.GetInt("lineup_bar", 1) == 1;
-            set { PlayerPrefs.SetInt("lineup_bar", value ? 1 : 0); PlayerPrefs.Save(); }
+            get => PlayerPrefs.GetInt("possession_hud", 1) == 1;
+            set { PlayerPrefs.SetInt("possession_hud", value ? 1 : 0); PlayerPrefs.Save(); }
+        }
+
+        /// <summary>"1"/"2" sobre a cabeça de quem cada controle comanda.</summary>
+        public static bool PlayerMarkers
+        {
+            get => PlayerPrefs.GetInt("player_markers", 1) == 1;
+            set { PlayerPrefs.SetInt("player_markers", value ? 1 : 0); PlayerPrefs.Save(); }
         }
 
         public static bool Vibration

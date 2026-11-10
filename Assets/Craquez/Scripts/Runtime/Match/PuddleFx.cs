@@ -36,7 +36,8 @@ namespace Craquez
             // água: escura, levemente azulada e lisa (reflete o céu/refletores no brilho especular);
             // recorte pelo contorno irregular (o material transparente ignorava o alfa da textura e a
             // poça aparecia como um ladrilho quadrado)
-            var mat = Gfx.Cutout(new Color(0.1f, 0.12f, 0.14f), tex, 0.5f, 0.95f);
+            // azul claro de água refletindo o céu (escura demais parecia piche)
+            var mat = Gfx.Cutout(new Color(0.56f, 0.74f, 0.92f), tex, 0.5f, 0.92f);
             _quads = new Transform[_sim.puddles.Count];
             for (int i = 0; i < _quads.Length; i++)
             {
@@ -173,7 +174,11 @@ namespace Craquez
                     float edge = 0.78f + 0.1f * Mathf.Sin(ang * 3f + 0.7f) + 0.06f * Mathf.Sin(ang * 7f + 2.1f) + 0.04f * Mathf.Sin(ang * 13f);
                     float d = Mathf.Sqrt(u * u + v * v) / edge;
                     float a = Mathf.Clamp01((1f - d) / 0.18f);
-                    px[y * size + x] = new Color32(255, 255, 255, (byte)(a * 255));
+                    // borda um pouco mais escura (terra molhada) e reflexos claros do céu no meio
+                    float lum = Mathf.Lerp(0.78f, 1f, Mathf.Clamp01((1f - d) / 0.35f));
+                    float sky = Mathf.Clamp01(Mathf.Sin(u * 2.2f + v * 3.1f) * 0.5f + 0.5f) * 0.08f;
+                    byte r = (byte)(Mathf.Clamp01(lum * 0.94f + sky) * 255), g = (byte)(Mathf.Clamp01(lum * 0.97f + sky) * 255), b = (byte)(Mathf.Clamp01(lum + sky) * 255);
+                    px[y * size + x] = new Color32(r, g, b, (byte)(a * 255));
                 }
             t.SetPixels32(px);
             t.Apply(true, true);

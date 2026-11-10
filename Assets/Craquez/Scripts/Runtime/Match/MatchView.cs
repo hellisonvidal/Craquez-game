@@ -21,6 +21,7 @@ namespace Craquez
         public Kit[] kits;
         public float Alpha;   // interpolação entre passos da simulação (0..1)
         Transform _ball, _ballShadow, _marker0, _marker1;
+        readonly Transform[] _badge = new Transform[2];
         Vector3 _ballPrev, _ballCur;
         Quaternion _ballRot = Quaternion.identity;
         float _crowdT, _crowdHype, _silence;
@@ -282,6 +283,48 @@ namespace Craquez
             sh.GetComponent<MeshRenderer>().sharedMaterial = _ballShadowMat;
             sh.GetComponent<MeshRenderer>().shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
             _ballShadow = sh.transform;
+        }
+
+        /// <summary>Plaquinha "1"/"2" sobre a cabeça de quem cada controle comanda (na cor do marcador do chão).</summary>
+        Transform Badge(int n, Color c)
+        {
+            const int W = 128, H = 160;
+            var t = new Texture2D(W, H, TextureFormat.RGBA32, true) { wrapMode = TextureWrapMode.Clamp };
+            var px = new Color32[W * H];
+            var cen = new Vector2(64f, 100f);
+            for (int y = 0; y < H; y++)
+                for (int x = 0; x < W; x++)
+                {
+                    var q = new Vector2(x + 0.5f, y + 0.5f);
+                    float d = Vector2.Distance(q, cen);
+                    // seta para baixo, apontando para a cabeça
+                    float ty = (54f - q.y) / 30f;
+                    bool tri = q.y < 56f && q.y > 22f && Mathf.Abs(q.x - 64f) < (1f - Mathf.Clamp01(ty)) * 26f;
+                    float a = Mathf.Clamp01(56f - d + 0.5f);
+                    if (tri) a = 1f;
+                    var col = Color.Lerp(Color.white, c, Mathf.Clamp01(52f - d));   // borda branca
+                    if (tri) col = c;
+                    float u = (q.x - (cen.x - 34f)) / 68f, v = (q.y - (cen.y - 34f)) / 68f;
+                    if (u >= 0f && u <= 1f && v >= 0f && v <= 1f)
+                    {
+                        float na = Glyphs.NumberAlpha(n, u, v, 1f / 68f);
+                        col = Color.Lerp(col, Color.white, na);
+                    }
+                    col.a = a;
+                    px[y * W + x] = col;
+                }
+            t.SetPixels32(px);
+            t.Apply(true);
+            var go = GameObject.CreatePrimitive(PrimitiveType.Quad);
+            Destroy(go.GetComponent<Collider>());
+            go.name = "Indicador do controle " + n;
+            go.transform.SetParent(transform, false);
+            go.transform.localScale = new Vector3(0.62f, 0.775f, 1f);
+            var mr = go.GetComponent<MeshRenderer>();
+            mr.sharedMaterial = Gfx.UnlitTransparent(Color.white, t);
+            mr.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
+            mr.receiveShadows = false;
+            return go.transform;
         }
 
         Transform Marker(Color c)
@@ -821,11 +864,26 @@ namespace Craquez
             if (m == null) return;
             bool human = sides != null && team < sides.Length && sides[team] != Side.Cpu;
             m.gameObject.SetActive(human && sim.state != MatchState.Goal);
-            if (!human) return;
+            if (!human) { if (_badge[team] != null) _badge[team].gameObject.SetActive(false); return; }
             var p = sim.Controlled(team);
             var av = athletes[p.id];
             m.position = new Vector3(av.transform.position.x, 0, av.transform.position.z);
             m.rotation = Quaternion.Euler(0, Mathf.Atan2(p.facing.x, p.facing.y) * Mathf.Rad2Deg, 0);
+            // indicador do controle sobre a cabeça (1 ou 2), sempre de frente para a câmera
+            if (_badge[team] == null) _badge[team] = Badge(sides[team] == Side.Player2 ? 2 : 1, team == 0 ? new Color(0.1f, 0.6f, 0.95f) : new Color(0.95f, 0.45f, 0.08f));
+            var b = _badge[team];
+            bool showB = Settings.PlayerMarkers && !(bcam != null && bcam.cinematic);
+            b.gameObject.SetActive(showB);
+            if (showB && cam != null)
+            {
+                Vector3 top = av.rig != null && av.rig.head != null ? av.rig.head.position : av.transform.position + Vector3.up * 1.75f;
+                b.position = new Vector3(av.transform.position.x, top.y + 0.75f, av.transform.position.z);
+                b.rotation = Quaternion.LookRotation(b.position - cam.transform.position, Vector3.up);
+                // do mesmo tamanho na tela de perto e de longe (até um limite)
+                float dist = Vector3.Distance(cam.transform.position, b.position);
+                float k = Mathf.Clamp(dist / 22f, 0.7f, 2.4f);
+                b.localScale = new Vector3(0.62f, 0.775f, 1f) * k;
+            }
         }
 
         static MatchView _quietOwner;

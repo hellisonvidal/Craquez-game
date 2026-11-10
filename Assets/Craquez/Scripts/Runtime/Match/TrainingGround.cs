@@ -93,18 +93,26 @@ namespace Craquez
                     }
                 }
             poles.Object("Postes de luz", Gfx.Lit(new Color(0.55f, 0.56f, 0.58f), null, 0.4f, 0.6f), v.root, false);
-            // árvores em volta
-            var k = new PropKit((int)(seed % 9973));
+            // árvores em volta, em grupos separados por lado (uma malha só, em anel, "envolvia" o campo e
+            // o sistema que esconde o que tapa a câmera sumia com todas)
+            var groups = new PropKit[6];
+            for (int g = 0; g < groups.Length; g++) groups[g] = new PropKit((int)(seed % 9973) + g * 17);
+            var rnd = groups[0];
             for (int i = 0; i < 44; i++)
             {
-                float a = i / 44f * Mathf.PI * 2f + k.R() * 0.08f;
+                float a = i / 44f * Mathf.PI * 2f + rnd.R() * 0.08f;
                 if (Mathf.Sin(a) < -0.55f) continue;   // não tapa a câmera
-                float rr = hw + 34f + k.R() * 18f;
+                float rr = hw + 34f + rnd.R() * 18f;
                 var p = new Vector3(Mathf.Cos(a) * rr * 1.7f, 0f, Mathf.Sin(a) * rr);
                 if (Mathf.Abs(p.x) < 30f && p.z > 0f && p.z < bz + 14f) continue;   // não dentro do prédio
-                k.Tree(p, 8f + k.R() * 6f);
+                groups[Mathf.Clamp((int)(Mathf.Repeat(a, Mathf.PI * 2f) / (Mathf.PI * 2f) * groups.Length), 0, groups.Length - 1)].Tree(p, 8f + rnd.R() * 6f);
             }
-            k.Emit(v.root, quality, new Color(0.2f, 0.42f, 0.18f), new Color(0.45f, 0.32f, 0.2f), Color.white, Color.white);
+            for (int g = 0; g < groups.Length; g++)
+            {
+                var gr = new GameObject("Árvores " + g).transform;
+                gr.SetParent(v.root, false);
+                groups[g].Emit(gr, quality, new Color(0.2f, 0.42f, 0.18f), new Color(0.45f, 0.32f, 0.2f), Color.white, Color.white);
+            }
             v.tunnel = new Vector3(0, 0, -(hw + 6f));
             v.outerR = hw + 30f;
             return v;
