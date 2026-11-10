@@ -512,8 +512,9 @@ namespace Craquez
             }
             else if (page == 13)
             {
-                first = UiKit.Cycler(list, "Escalações no rodapé", new[] { "Ligado", "Desligado" }, Settings.LineupBar ? 0 : 1, i => Settings.LineupBar = i == 0);
+                first = UiKit.Cycler(list, "Jogador com a bola (HUD)", new[] { "Mostrar", "Ocultar" }, Settings.PossessionHud ? 0 : 1, i => Settings.PossessionHud = i == 0);
                 UiKit.Size(first, 72, 72);
+                UiKit.Size(UiKit.Cycler(list, "Indicador 1/2 na cabeça", new[] { "Mostrar", "Ocultar" }, Settings.PlayerMarkers ? 0 : 1, i => Settings.PlayerMarkers = i == 0), 72, 72);
                 UiKit.Size(UiKit.Cycler(list, "Gráficos", Settings.QualityNames, Settings.Quality, i => { Settings.Quality = i; UrpSetup.Quality(i); UrpSetup.Camera(_cam, i); }), 72, 72);
                 if (cfg.mode != GameModes.Futsal)
                     UiKit.Size(UiKit.Cycler(list, "Clima dinâmico", new[] { "Ligado", "Desligado" }, view.weather.dynamic ? 0 : 1, i => view.weather.dynamic = i == 0), 72, 72);

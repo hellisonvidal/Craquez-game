@@ -1300,7 +1300,7 @@ namespace Craquez
         {
             if (rig.spine == null) return;
             if (_neckT == null && rig.bones.TryGetValue("neck_01", out _neckT)) _neckPos0 = _neckT.localPosition;
-            if (_neckT != null) _neckT.localPosition = _neckPos0 * 1.12f;
+            if (_neckT != null) _neckT.localPosition = _neckPos0 * 1.03f;
             var fwd = transform.forward;
             var right = transform.right;
             // nos braços para cima (comemoração, salto do goleiro) desce menos, para o braço não "quebrar"
@@ -1309,7 +1309,7 @@ namespace Craquez
             {
                 if (!rig.bones.TryGetValue(cn, out var clv) || clv.childCount == 0) continue;
                 float cs = Mathf.Sign(Vector3.Dot(clv.GetChild(0).position - rig.spine.position, right));
-                _pose.Rotate(clv, Quaternion.AngleAxis(-cs * 24f * k, fwd));
+                _pose.Rotate(clv, Quaternion.AngleAxis(-cs * 11f * k, fwd));   // (24° deixava o ombro caído, abaixo do começo do tronco)
             }
         }
 

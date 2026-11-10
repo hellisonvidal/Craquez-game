@@ -109,7 +109,7 @@ namespace Craquez.UI
                 _power[t].sprite = _stamina[t].sprite;
                 pbg.gameObject.SetActive(false);
             }
-            Lineup(root, ta, tb);
+            // (a faixa com a escalação inteira no rodapé saiu: fica só o quadro de quem está com a bola)
             // aviso (falta, escanteio, clima...)
             _toastBox = UiKit.Image(root, new Color(0.02f, 0.03f, 0.07f, 0.85f), Theme.Round, "aviso").rectTransform.At(0.5f, 1, 640, 60, 0, -40);
             _toastCg = _toastBox.gameObject.AddComponent<CanvasGroup>();
@@ -281,7 +281,7 @@ namespace Craquez.UI
                 // quadro só de quem está com a bola (do lado do time dele); some quando a bola muda de time
                 int own = _sim.ball.owner >= 0 && _sim.players[_sim.ball.owner].team == t ? _sim.ball.owner : -1;
                 bool cine = view != null && view.bcam != null && view.bcam.cinematic;
-                _pboxCg[t].alpha = Mathf.MoveTowards(_pboxCg[t].alpha, own >= 0 && !cine ? 1f : 0f, Time.unscaledDeltaTime * (own >= 0 ? 8f : 3f));
+                _pboxCg[t].alpha = Mathf.MoveTowards(_pboxCg[t].alpha, own >= 0 && !cine && Settings.PossessionHud ? 1f : 0f, Time.unscaledDeltaTime * (own >= 0 ? 8f : 3f));
                 if (own >= 0)
                 {
                     var p = _sim.players[own];
@@ -404,7 +404,7 @@ namespace Craquez.UI
         {
             if (_lineup == null) return;
             bool cine = view != null && view.bcam != null && view.bcam.cinematic;
-            bool on = Settings.LineupBar && !cine && !_sim.training;
+            bool on = false;   // (faixa de escalações desativada)
             _lineupCg.alpha = Mathf.MoveTowards(_lineupCg.alpha, on ? 1f : 0f, Time.unscaledDeltaTime * 4f);
             if (_lineupCg.alpha <= 0f) return;
             // entre os quadros dos jogadores controlados (que só aparecem para quem é humano)

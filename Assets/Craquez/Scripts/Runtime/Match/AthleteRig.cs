@@ -125,8 +125,8 @@ namespace Craquez
                 var sc = Vector3.one * k;
                 // comprimento: clavícula mais longa = ombros mais largos (o modelo tinha ombros caídos e
                 // estreitos para um atleta); pescoço um pouco mais curto
-                sc[len] = name.StartsWith("clavicle") ? Mathf.Lerp(1.06f, 1.16f, Mathf.Clamp01(frame * 0.6f + build * 0.4f))
-                    : name == "neck_01" ? 0.88f : 1f;
+                sc[len] = name.StartsWith("clavicle") ? Mathf.Lerp(1.0f, 1.05f, Mathf.Clamp01(frame * 0.6f + build * 0.4f))
+                    : name == "neck_01" ? 0.94f : 1f;
                 b.localScale = Vector3.Scale(b.localScale, sc);
                 // filhos: desfaz a escala do pai no referencial de cada filho
                 foreach (Transform c in b)

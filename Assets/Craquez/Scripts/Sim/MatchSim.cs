@@ -507,7 +507,7 @@ namespace Craquez.Sim
         {
             if (training)
             {
-                // treino: bola fora = nova bola no pé do atacante (depois de um instante)
+                // treino: bola fora = o goleiro pega outra bola (do cone atrás do gol) e devolve ao atacante
                 ball.owner = -1;
                 state = MatchState.Restart;
                 stateTimer = 0.9f;
@@ -855,7 +855,7 @@ namespace Craquez.Sim
                     if (gkFetch >= 0) StepGkFetch();
                     foreach (var p in players) MovePlayer(p);
                     Dribble();
-                    if (stateTimer <= 0f && _trainReset > 0f) { _trainReset = 0f; TrainingReset(); break; }
+                    if (stateTimer <= 0f && _trainReset > 0f) { _trainReset = 0f; TrainingKeeperBall(); break; }
                     if (stateTimer <= 0f && walkUpTaker < 0)
                     {
                         state = MatchState.Playing;
@@ -868,10 +868,18 @@ namespace Craquez.Sim
                 case MatchState.Goal:
                     stateTimer -= DT;
                     AiAll(false);
-                    foreach (var p in players) { p.intent *= 0.5f; MovePlayer(p); }
-                    ClampKeepers();
+                    var tgk = training ? TrainingKeeper() : null;
+                    if (tgk != null && stateTimer < 1.0f)
+                    {
+                        // treino: o goleiro vai buscar a bola no fundo da rede e devolve
+                        SteerTo(tgk, ball.pos, false);
+                        tgk.wantSprint = false;
+                    }
+                    foreach (var p in players) { if (p != tgk) p.intent *= 0.5f; MovePlayer(p); }
+                    if (tgk == null) ClampKeepers();
                     StepBallInNet();
-                    if (stateTimer <= 0f) { if (training) TrainingReset(); else ResetForKickoff(kickoffTeam); }
+                    if (tgk != null && stateTimer < 1.0f && tgk.position.Dist(ball.pos) < 0.9f) { TrainingKeeperBall(false); break; }
+                    if (stateTimer <= 0f) { if (training) TrainingKeeperBall(false); else ResetForKickoff(kickoffTeam); }
                     break;
                 case MatchState.Foul:
                     StepFoul();
@@ -2489,10 +2497,20 @@ namespace Craquez.Sim
             if (ball.owner != p.id) p.heldT = 0f;
             if (training && ball.owner == p.id && !frozen)
             {
-                // treino: o goleiro segura (ou fica com a bola) um instante e a jogada recomeça
+                // treino: o goleiro segura um instante, vira para o atacante e devolve a bola (rolando)
                 p.intent = Vector2.zero;
                 p.heldT += DT;
-                if (p.heldT > 1.1f) { p.heldT = 0f; TrainingReset(); }
+                SimPlayer st = null;
+                foreach (var q in players) if (!q.sentOff && q.team == 0) st = q;
+                if (st != null) p.facing = V2.RotateToward(p.facing, (st.position - p.position).Norm(), 0.12f);
+                if (p.heldT > 1.0f && st != null)
+                {
+                    p.heldT = 0f;
+                    if (p.InHands) KeeperThrow(p, st, 0);
+                    else Pass(p, (st.position - p.position).Norm(), Mathf.Clamp01(st.position.Dist(p.position) / 30f), false, false);
+                    passReceiver = st.id;
+                    passReceiverT = 3f;
+                }
                 return;
             }
             if (ball.owner == p.id)
@@ -3384,7 +3402,13 @@ namespace Craquez.Sim
                 if (gk.hold > 0f && gk.team != p.team)
                 {
                     var d = p.position - gk.position;
-                    if (d.magnitude < 3f) p.position = gk.position + (d.magnitude > 0.1f ? d.normalized : new Vector2(TeamDir(gk.team), 0)) * 3f;
+                    if (d.magnitude < 3f)
+                    {
+                        // afasta andando (antes pulava os até 3 m num quadro só: o atacante "teleportava")
+                        var n = d.magnitude > 0.1f ? d.normalized : new Vector2(TeamDir(gk.team), 0);
+                        float rr = Mathf.Max(d.magnitude + 4.5f * DT, 0.9f);
+                        p.position = gk.position + n * Mathf.Min(rr, 3f);
+                    }
                 }
             }
             if (setPiece && p.team != setPieceTeam && !wallIds.Contains(p.id))
@@ -3880,7 +3904,8 @@ namespace Craquez.Sim
                 {
                     if (o.team == p.team) continue;
                     var d = o.position - p.position;
-                    if (d.magnitude < 4f) o.position = p.position + (d.magnitude > 0.1f ? d.normalized : new Vector2(TeamDir(p.team), 0)) * 4f;
+                    // só desgruda de quem está colado; o resto se afasta andando (ClampPlayer), sem teleporte
+                    if (d.magnitude < 0.9f) o.position = p.position + (d.magnitude > 0.1f ? d.normalized : new Vector2(TeamDir(p.team), 0)) * 0.9f;
                 }
                 ball.lastTouchTeam = p.team;
                 ball.lastTouchId = p.id;
@@ -4231,6 +4256,44 @@ namespace Craquez.Sim
             TrainingReset();
         }
 
+        SimPlayer TrainingKeeper()
+        {
+            foreach (var p in players) if (!p.sentOff && p.team == 1 && p.isKeeper) return p;
+            return null;
+        }
+
+        /// <summary>Treino: a bola vai para as mãos do goleiro (a da rede ou uma nova do cone, quando saiu),
+        /// que a devolve ao atacante. O atacante fica onde está: sem recomeçar a cena.</summary>
+        void TrainingKeeperBall(bool spare = true)
+        {
+            var gk = TrainingKeeper();
+            if (gk == null) { TrainingReset(); return; }
+            float dir = TeamDir(0), gx = halfLen * dir;
+            if (spare)
+            {
+                // nova bola: o goleiro já está na pequena área com ela
+                gk.position = new Vector2(gx - dir * 2.5f, Mathf.Clamp(gk.position.y, -3f, 3f));
+                Emit("spareball", 1, gk.id);
+            }
+            gk.vel = Vector2.zero;
+            gk.saveKind = 0; gk.saveT = 0f; gk.dive = 0f; gk.down = 0f; gk.stun = 0f; gk.goalKick = false;
+            gk.hold = 60f; gk.heldT = 0f;
+            gk.facing = new Vector2(-dir, 0f);
+            ball.owner = gk.id;
+            ball.pos = gk.position + gk.facing * 0.3f;
+            ball.vel = Vector2.zero; ball.z = 1f; ball.vz = 0f; ball.spin = 0f; ball.slideT = 0f;
+            ball.lastTouchTeam = 1; ball.lastTouchId = gk.id;
+            foreach (var c in ctrl) { c.charging = 0; c.pending = 0; }
+            passReceiver = -1;
+            protectT = 0f;
+            kickoffPass = false;
+            setPiece = false; throwIn = false; cornerKick = false; kickIn = false;
+            penaltyTeam = -1;
+            walkUpTaker = -1; gkFetch = -1;
+            _trainReset = 0f;
+            state = MatchState.Playing;
+        }
+
         /// <summary>Treino: nova bola no pé do atacante, num ponto ao acaso de 14 a 28 m do gol; goleiro na meta.</summary>
         void TrainingReset()
         {
@@ -4281,7 +4344,7 @@ namespace Craquez.Sim
             bool ownGoal = ball.lastTouchTeam != t;
             ball.owner = -1;
             state = MatchState.Goal;
-            stateTimer = training ? 1.6f : 3f;
+            stateTimer = training ? 4.5f : 3f;   // (treino: o goleiro busca a bola na rede)
             kickoffTeam = 1 - t;
             passReceiver = -1;
             foreach (var c in ctrl) { c.charging = 0; c.pending = 0; }

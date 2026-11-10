@@ -1423,7 +1423,6 @@ namespace Craquez
                     Add(UiKit.Cycler(list, "Zoom da câmera", BroadcastCamera.Zooms, Settings.CameraZoom + 2, i => Settings.CameraZoom = i - 2));
                     break;
                 case 2:
-                    Add(UiKit.Cycler(list, "Escalações no rodapé", new[] { "Ligado", "Desligado" }, Settings.LineupBar ? 0 : 1, i => Settings.LineupBar = i == 0));
                     Add(UiKit.Cycler(list, "Faltas", new[] { "Cena antes da cobrança", "Cobrança rápida" }, Settings.QuickRestarts ? 1 : 0, i => { Settings.QuickRestarts = i == 1; _cfg.quickRestarts = i == 1; }));
                     break;
                 case 4:
@@ -1464,6 +1463,8 @@ namespace Craquez
                 default:
                     // no PC, tudo ajustável; no celular, o essencial
                     Add(UiKit.Cycler(list, "Predefinição", Settings.QualityNames, Mathf.Min(Settings.Quality, Settings.QualityNames.Length - 1), i => { Settings.Quality = i; Apply(); }));
+                    Add(UiKit.Cycler(list, "Jogador com a bola (HUD)", new[] { "Mostrar", "Ocultar" }, Settings.PossessionHud ? 0 : 1, i => Settings.PossessionHud = i == 0));
+                    Add(UiKit.Cycler(list, "Indicador 1/2 na cabeça", new[] { "Mostrar", "Ocultar" }, Settings.PlayerMarkers ? 0 : 1, i => Settings.PlayerMarkers = i == 0));
                     if (!Application.isMobilePlatform)
                     {
                         Add(UiKit.Cycler(list, "Modo de tela", Settings.DisplayNames, Settings.Display, i => { Settings.Display = i; GoFullscreen(); }));
