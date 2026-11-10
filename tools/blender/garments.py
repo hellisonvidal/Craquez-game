@@ -172,7 +172,7 @@ def make_shirt(body, rig, slot):
     torso = [v for v in interior if not on_arm(v.co) and abs(v.co.x) < 0.13]
     ys = [v.co.y for v in torso] or [0.0]
     cy = (max(ys) + min(ys)) / 2
-    _drape(torso, lambda co: Vector((0.0, cy, co.z)))
+    _drape(torso, lambda co: Vector((0.0, cy, co.z)), ang_win=0.2, keep=0.97)   # (menos "barril": segue o tronco)
     _taubin(bm, interior, 24)
     # uma subdivisão: dobras com mais definição
     bmesh.ops.subdivide_edges(bm, edges=bm.edges[:], cuts=1, use_grid_fill=True, smooth=0.0)
@@ -189,12 +189,12 @@ def make_shirt(body, rig, slot):
         on_arm = t_arm > 0.08 and _dist_axis(rig, arm_b, p).length < 0.11
         if on_arm:
             # manga: mais larga perto da boca
-            d = 0.007 + 0.008 * min(1.0, max(0.0, (t_arm - 0.1) / 0.4))
+            d = 0.005 + 0.006 * min(1.0, max(0.0, (t_arm - 0.1) / 0.4))
             # dobras transversais na manga
             d += 0.0012 * math.sin(t_arm * 60.0 + noise.noise(p * 9.0) * 3.0)
         else:
             h = (p.z - pelvis_z) / torso_h            # 0 cintura .. 1 pescoço
-            loose = 0.008 + 0.01 * max(0.0, 1.0 - h * 1.3)    # corte justo (camisa moderna)
+            loose = 0.005 + 0.007 * max(0.0, 1.0 - h * 1.3)    # corte justo (camisa moderna, colada no peito)
             if h > 0.85:
                 loose = 0.006                          # gola rente ao pescoço
             # dobras horizontais na cintura e nas laterais

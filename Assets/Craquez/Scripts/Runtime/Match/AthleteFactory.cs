@@ -288,7 +288,7 @@ namespace Craquez
                         var part = n == "Shirt" ? KitPart.Shirt : n == "Shorts" ? KitPart.Shorts : KitPart.Socks;
                         smr.sharedMesh = SmoothNormals(smr.sharedMesh);
                         // a camisa leva o número pintado (uma textura por atleta; no Ultra em 1024)
-                        int size = part == KitPart.Socks ? tex / 2 : part == KitPart.Shirt ? (quality >= 3 ? 1024 : 512) : tex;
+                        int size = part == KitPart.Socks ? tex / 2 : part == KitPart.Shirt ? (quality >= 2 ? 1024 : 512) : tex;   // (listras, número e escudo nítidos de perto)
                         var kt = KitPainter.Paint(smr.sharedMesh, part, kit, axes, size, part == KitPart.Shirt ? number : -1);
                         // tecido dos dois lados (vê-se o avesso pela gola e pelas mangas)
                         if (part == KitPart.Shirt) rig.shirt = smr;

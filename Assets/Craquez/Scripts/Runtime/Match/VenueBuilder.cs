@@ -27,6 +27,8 @@ namespace Craquez
         public float standDist = 12f;
         /// <summary>Até onde vai o entorno do estádio (esplanada, avenida, estacionamento): a cidade e a paisagem começam depois.</summary>
         public float outerR;
+        /// <summary>Eixo da rua em volta do local (meia-largura x, meia-profundidade z) para o trânsito; zero = sem trânsito.</summary>
+        public Vector2 roadLoop, walkLoop;
         /// <summary>Meio da esplanada do lado da tribuna (z negativo), para as tomadas de fora.</summary>
         public float plazaZ;
         /// <summary>Arquibancadas para as bandeiras da torcida: fileiras do lado de lá, atrás dos gols (0 = não há) e meia largura do lado de lá.</summary>
@@ -1508,6 +1510,8 @@ namespace Craquez
             Ring(ground, X, Z, X + 14f, Z + 14f, -0.005f, 4f);
             var lot = new MeshKit();
             Ring(lot, X + 14f, Z + 14f, X + 40f, Z + 34f, -0.008f, 8f);
+            v.roadLoop = new Vector2(X + 27f, Z + 24f);   // carros circulando no estacionamento
+            v.walkLoop = new Vector2(X + 7f, Z + 7f);     // gente na calçada do ginásio
             var poles = new MeshKit();
             var lamps = new MeshKit();
             for (float x = -X; x <= X; x += 14f)
@@ -1858,7 +1862,8 @@ namespace Craquez
             var ground = Gfx.LitN(gc, groundTex, sand || grassy ? Gfx.GrassNormal : Gfx.AsphaltNormal, sand ? 0.05f : 0.2f, 1f);
             v.pitchMat = ground;
             var k = new MeshKit();
-            float mx = hl + 25f, mz = hw + 25f;
+            bool cityBlock = variant == 0 || variant == 4 || variant == 6 || variant == 9 || variant == 10;
+            float mx = hl + (cityBlock ? 70f : 25f), mz = hw + (cityBlock ? 70f : 25f);
             k.Quad(new Vector3(-mx, 0, -mz), new Vector3(-mx, 0, mz), new Vector3(mx, 0, mz), new Vector3(mx, 0, -mz), new Vector2(0, 0), new Vector2(mx / 3f, mz / 3f));
             k.Object("Chão", ground, v.root, false);
             // quadra pintada no chão (piso de quadra poliesportiva gasto), com áreas e marcas
@@ -1966,14 +1971,18 @@ namespace Craquez
             // prédios / casas ao redor
             var bmat = new[]
             {
-                Gfx.Lit(new Color(0.85f, 0.55f, 0.4f), Windows(rng, night), 0.2f), Gfx.Lit(new Color(0.65f, 0.75f, 0.85f), Windows(rng, night), 0.2f),
-                Gfx.Lit(new Color(0.9f, 0.85f, 0.6f), Windows(rng, night), 0.2f), Gfx.Lit(new Color(0.55f, 0.85f, 0.6f), Windows(rng, night), 0.2f),
+                // (cores de cidade de verdade: tijolo, concreto, bege, gelo — antes tons de brinquedo)
+                Gfx.Lit(FacadeColors[2], FacadeTex(variant * 13 + 1, night), 0.2f), Gfx.Lit(FacadeColors[1], FacadeTex(variant * 13 + 2, night), 0.2f),
+                Gfx.Lit(FacadeColors[0], FacadeTex(variant * 13 + 3, night), 0.2f), Gfx.Lit(FacadeColors[3], FacadeTex(variant * 13 + 4, night), 0.2f),
             };
-            if (variant != 2 && variant != 7 && variant != 11 && variant != 12 && variant != 14)
+            // quarteirão de cidade de verdade (rua, calçadas e prédios enfileirados) nas ruas urbanas
+            if (cityBlock) CityBlock(v, hl, hw, variant, rng, night, quality);
+            else if (variant != 2 && variant != 7 && variant != 11 && variant != 12 && variant != 14)
             {
                 // beco: prédios colados; conjunto: blocos iguais em fileira; vila: casinhas baixas coloridas
                 int n = variant == 1 ? 40 : variant == 13 ? 30 : variant == 9 ? 12 : 18;
                 var bk = new MeshKit[4];
+                var roofK = new MeshKit();
                 for (int i = 0; i < 4; i++) bk[i] = new MeshKit();
                 for (int i = 0; i < n; i++)
                 {
@@ -1986,14 +1995,15 @@ namespace Craquez
                         : variant == 8 ? 14f + (float)rng.NextDouble() * 14f
                         : 8f + (float)rng.NextDouble() * 22f;
                     float by = variant == 1 ? Mathf.Max(0, -c.z - 10f) * 0.5f : 0f;
-                    bk[i % 4].Box(c + Vector3.up * (by + bh / 2), new Vector3(6f + (float)rng.NextDouble() * 6f, bh, 6f + (float)rng.NextDouble() * 4f), 3f);
+                    Building(bk[i % 4], roofK, c + Vector3.up * by, new Vector3(6f + (float)rng.NextDouble() * 6f, bh, 6f + (float)rng.NextDouble() * 4f), (float)rng.Next(4) * 0.25f);
                 }
                 for (int i = 0; i < 4; i++) bk[i].Object("Prédios " + i, bmat[i], v.root, quality >= 1);
+                roofK.Object("Lajes", Gfx.Lit(new Color(0.45f, 0.44f, 0.43f), null, 0.1f), v.root, false);
             }
             if (variant == 13)
             {
                 // vila colorida: fachadas em cores fortes por cima dos prédios baixos
-                for (int i = 0; i < 4; i++) bmat[i].SetColor("_BaseColor", new[] { new Color(0.95f, 0.35f, 0.4f), new Color(0.2f, 0.65f, 0.9f), new Color(1f, 0.8f, 0.2f), new Color(0.4f, 0.8f, 0.45f) }[i]);
+                for (int i = 0; i < 4; i++) bmat[i].SetColor("_BaseColor", new[] { new Color(0.86f, 0.55f, 0.52f), new Color(0.55f, 0.7f, 0.82f), new Color(0.92f, 0.78f, 0.45f), new Color(0.6f, 0.75f, 0.58f) }[i]);
             }
             if (variant == 12)
             {
@@ -2028,13 +2038,6 @@ namespace Craquez
                 var sea = new MeshKit();
                 sea.Quad(new Vector3(-200, -0.05f, 40), new Vector3(-200, -0.05f, 400), new Vector3(200, -0.05f, 400), new Vector3(200, -0.05f, 40));
                 sea.Object("Mar", Gfx.Lit(new Color(0.1f, 0.4f, 0.55f), null, 0.92f), v.root, false);
-            }
-            if (variant == 6)
-            {
-                var via = new MeshKit();
-                via.Box(new Vector3(0, 9f, 0), new Vector3(120f, 1.4f, 14f), 4f);
-                for (int i = -2; i <= 2; i++) via.Box(new Vector3(i * 25f, 4.2f, 9f), new Vector3(2.2f, 8.4f, 2.2f), 4f);
-                via.Object("Viaduto", Gfx.Lit(new Color(0.6f, 0.6f, 0.62f), Gfx.Asphalt(256, Color.white, 77, 0.6f), 0.1f), v.root, true);
             }
             // (a galera de fora é feita um por um em VenueLife: acompanha o lance e comemora)
             // postes de luz

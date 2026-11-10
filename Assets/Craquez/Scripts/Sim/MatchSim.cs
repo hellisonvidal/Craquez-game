@@ -1899,14 +1899,14 @@ namespace Craquez.Sim
                     {
                         var rel = p.position - car.position;
                         float toGoalCar = Mathf.Abs(halfLen * TeamDir(car.team) - car.position.x), toGoalP = Mathf.Abs(halfLen * TeamDir(car.team) - p.position.x);
-                        bool beaten = toGoalCar < toGoalP + 0.3f && rel.magnitude < 1.45f && car.vel.magnitude > 2.2f;
+                        bool beaten = toGoalCar < toGoalP + 0.3f && rel.magnitude < 0.95f && car.vel.magnitude > 2.2f;
                         if (beaten && rng.Chance(DT * (0.25f + 0.5f * (1f - p.discipline)))) { p.pulling = car.id; p.pullT = 0f; }
                     }
                 }
                 if (p.pulling < 0) { p.pullT = 0f; continue; }
                 var o = players[p.pulling];
                 var d = o.position - p.position;
-                if (ball.owner != o.id || d.magnitude > 1.5f || o.down > 0f || (!human && p.pullT > 0.35f + 0.5f * (1f - p.discipline))) { p.pulling = -1; p.pullT = 0f; continue; }
+                if (ball.owner != o.id || d.magnitude > 1.05f || o.down > 0f || (!human && p.pullT > 0.35f + 0.5f * (1f - p.discipline))) { p.pulling = -1; p.pullT = 0f; continue; }
                 p.pullT += DT;
                 o.pulledT = 0.12f;
                 o.offBalance = Mathf.Max(o.offBalance, 0.15f);
@@ -2017,7 +2017,9 @@ namespace Craquez.Sim
             if (state != MatchState.Playing) return;
             // sem contato de verdade (o infrator longe da vítima) não é falta: antes o juiz marcava e a vítima
             // caía "sozinha", fora do lance
-            if (!holding && offender.position.Dist(victim.position) > 1.1f + (offender.slide > 0f ? 0.9f : 0f)) return;
+            // (corpo ~0,3 m de raio: só há encontro de verdade abaixo de ~0,8 m; no carrinho a perna alcança ~1,2 m)
+            float contact = offender.position.Dist(victim.position);
+            if (contact > (holding ? 1.0f : 0.9f) + (offender.slide > 0f ? 0.5f : 0f)) return;
             offender.stun = Mathf.Max(offender.stun, 0.8f);
             offender.slide = Mathf.Min(offender.slide, 0.15f);
             // a vítima vai ao chão: tropeça, cai, rola e levanta (o tempo no chão varia com a pancada)
@@ -2039,7 +2041,7 @@ namespace Craquez.Sim
             if (victim.fallTrip) victim.fallKind = 1;
             // sem contato visível (agarrão, ou o infrator a mais de ~1,1 m): ninguém vai ao chão "sozinho" —
             // a vítima é segurada e para (às vezes tropeça e cai sentada, para trás, por pouco tempo)
-            bool far = offender.position.Dist(victim.position) > 1.1f + (offender.slide > 0f ? 0.9f : 0f);
+            bool far = contact > 0.9f + (offender.slide > 0f ? 0.5f : 0f);
             if (holding)
             {
                 if (rng.Chance(0.6f))
@@ -2502,8 +2504,9 @@ namespace Craquez.Sim
                         urgent = true;
                     }
                 }
-                else if (!attacking && ball.owner >= 0)
+                else if (!attacking && ball.owner >= 0 && !(gkOwn != null && gkOwn.isKeeper && gkOwn.hold > 0f))
                 {
+                    // (goleiro adversário com a bola nas mãos: ninguém pressiona)
                     // só UM companheiro ajuda na pressão (o mais perto além do controlado); o resto guarda a zona
                     var helper = NearestToBall(t, ctrl[t].player);
                     if (helper == p)

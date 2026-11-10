@@ -91,7 +91,11 @@ def make_human(v):
     # físico de atleta: pernas e glúteos fortes, cintura fina
     for name, w in [("legs/l-upperleg-muscle-incr", 0.35), ("legs/r-upperleg-muscle-incr", 0.35),
                     ("legs/l-lowerleg-muscle-incr", 0.4), ("legs/r-lowerleg-muscle-incr", 0.4),
-                    ("stomach/stomach-pregnant-decr", 0.45), ("torso/torso-vshape-incr", 0.12),
+                    ("stomach/stomach-pregnant-decr", 0.45), ("torso/torso-vshape-incr", 0.06),
+                    # tronco de jogador de futebol: ombros na largura natural, peitoral discreto, tórax menos fundo
+                    # (antes os ombros eram apertados no jogo, empurrando a malha e estufando o peito)
+                    ("torso/measure-shoulder-dist-decr", 0.5), ("torso/torso-muscle-pectoral-decr", 0.55),
+                    ("torso/torso-scale-depth-decr", 0.3), ("torso/measure-bust-circ-decr", 0.3),
                     ("neck/neck-scale-horiz-incr", 0.1)]:
         p = TargetService.target_full_path(name.split("/")[-1])
         if p:

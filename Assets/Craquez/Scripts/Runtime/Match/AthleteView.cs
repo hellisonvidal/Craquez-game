@@ -1764,8 +1764,10 @@ namespace Craquez
             if (_uaL == null && rig.bones.TryGetValue("upperarm_l", out _uaL)) _uaLBase = _uaL.localPosition;
             if (_uaR == null && rig.bones.TryGetValue("upperarm_r", out _uaR)) _uaRBase = _uaR.localPosition;
             // (0,88 ainda deixava o ombro para fora da linha do tronco, como uma ombreira)
-            if (_uaL != null) _uaL.localPosition = _uaLBase * 0.81f;   // ombros na linha do tronco e da cintura
-            if (_uaR != null) _uaR.localPosition = _uaRBase * 0.81f;
+            // (o corpo já vem com os ombros na largura certa do Blender: aqui só um ajuste leve — apertar
+            // demais empurrava a malha do ombro para o peito e o peito parecia estufado)
+            if (_uaL != null) _uaL.localPosition = _uaLBase * 0.93f;
+            if (_uaR != null) _uaR.localPosition = _uaRBase * 0.93f;
             // quadril um pouco mais estreito: pernas mais juntas (as coxas saíam muito afastadas)
             if (_thL == null && rig.bones.TryGetValue("thigh_l", out _thL)) _thLBase = _thL.localPosition;
             if (_thR == null && rig.bones.TryGetValue("thigh_r", out _thR)) _thRBase = _thR.localPosition;

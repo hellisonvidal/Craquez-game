@@ -165,6 +165,8 @@ namespace Craquez
             // faixas: tracejado no meio da avenida e as vagas
             var paint = new MeshKit();
             float mx = Xp + road * 0.5f, mz = Zp + road * 0.5f;
+            v.roadLoop = new Vector2(mx, mz);            // trânsito na avenida
+            v.walkLoop = new Vector2(Xp - 2.5f, Zp - 2.5f);   // gente andando na beira da esplanada
             for (float x = -mx; x < mx; x += 6f) { paint.Strip(new Vector3(x, 0, mz), new Vector3(x + 3f, 0, mz), 0.15f, 0.02f); paint.Strip(new Vector3(x, 0, -mz), new Vector3(x + 3f, 0, -mz), 0.15f, 0.02f); }
             for (float z = -mz; z < mz; z += 6f) { paint.Strip(new Vector3(mx, 0, z), new Vector3(mx, 0, z + 3f), 0.15f, 0.02f); paint.Strip(new Vector3(-mx, 0, z), new Vector3(-mx, 0, z + 3f), 0.15f, 0.02f); }
             for (float x = -Xr + 2f; x < Xr - 2f && lotFar; x += 2.6f)

@@ -145,7 +145,7 @@ namespace Craquez
                         float aa = 1.2f / size * 3f;
                         NumberUv(p, ax, info.center, topUp, out var uvB, out var uvF);
                         float aB = 0f, aF = 0f, eB = 0f, eF = 0f;
-                        if (number >= 0) { aB = NumberCover(number, uvB, aa, out eB); aF = NumberCover(number, uvF, aa * 2.5f, out eF); }
+                        if (number >= 0) { aB = NumberCover(number, uvB, aa, out eB); aF = NumberCover(number, uvF, aa * 1.4f, out eF); }
                         // escudo bordado no lado esquerdo do peito (com um contorno fino, como um patch)
                         if (crest != null)
                         {

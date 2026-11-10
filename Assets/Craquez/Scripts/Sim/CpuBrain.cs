@@ -354,10 +354,20 @@ namespace Craquez.Sim
                     var ownGoal = new Vector2(-sim.halfLen * dir, 0f);
                     target = sim.ball.pos + (ownGoal - sim.ball.pos).Norm() * 0.7f;
                 }
+                // goleiro adversário com a bola nas mãos: ninguém vai em cima dele (não pode disputar) — recua
+                // para fora da área, de frente para a jogada (antes o atacante corria em volta do goleiro)
+                var gkH = sim.Owner;
+                bool gkHold = gkH != null && gkH.team != team && gkH.isKeeper && gkH.hold > 0f;
+                if (gkHold)
+                {
+                    var outward = new Vector2(sim.TeamDir(gkH.team), 0f);   // (do gol do goleiro para o meio do campo)
+                    target = new Vector2(gkH.position.x + outward.x * (sim.mode.boxDepth + 3f), Mathf.Clamp(p.position.y, -sim.halfW * 0.6f, sim.halfW * 0.6f));
+                }
                 var to = target - p.position;
                 float d = to.magnitude;
-                f.move = d > 0.05f ? (to / d) * Mathf.Clamp(d / 1.5f, 0.3f, 1f) : Vector2.zero;
-                if (d > 3f) f.buttons |= InputFrame.Sprint;
+                f.move = d > 0.05f ? (to / d) * Mathf.Clamp(d / 1.5f, 0.3f, gkHold ? 0.45f : 1f) : Vector2.zero;
+                if (d > 3f && !gkHold) f.buttons |= InputFrame.Sprint;
+                if (gkHold) return f;
                 var owner = sim.Owner;
                 if (owner != null && owner.team != team && p.position.Dist(owner.position) < 3.5f)
                 {

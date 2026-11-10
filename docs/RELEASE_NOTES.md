@@ -1,3 +1,27 @@
+## Craquez 2.8.0
+
+Jogo de futebol feito 100% com inteligência artificial, **gratuito**.
+
+### Download
+- **Celular Android**: `Craquez-v2.8.0.apk`
+- **TV (Google TV / Android TV, ex.: TCL C6K)**: `Craquez-TV-v2.8.0.apk` — use este na TV (32 e 64 bits).
+  O APK de celular é só 64 bits e não instala em TVs com sistema 32 bits ("erro ao analisar o pacote").
+  Passo a passo do pen drive em `docs/TV.md`.
+
+### Novidades
+- **Cenários de rua de verdade**: quarteirão com calçadas, rua de mão dupla, faixas de pedestre, meio-fio
+  e prédios enfileirados com cores de cidade (concreto, tijolo, bege) e janelas em escala; viaduto ao lado
+  da quadra, com os pilares fora dela.
+- **Movimento em volta dos locais**: carros (faróis à noite), bicicletas e pedestres circulando na rua,
+  na avenida do estádio e no estacionamento do ginásio.
+- **Corpo dos atletas refeito**: ombros na largura natural, peitoral e tórax menos salientes e camisa
+  mais justa (o peito não fica mais "estufado").
+- **Uniformes mais nítidos** de perto (listras, número e escudo).
+- **Faltas só com contato de verdade**; ninguém corre em volta do goleiro com a bola nas mãos.
+- Replay com controles, telas de proteção nos ginásios, defesas com salto e com o pé, gandula devolvendo
+  a bola, levantar com a mão de quem ajuda, saída para o menu no intervalo e volume da torcida.
+- Seletor de locais com fotos tiradas dos cenários 3D.
+
 ## Craquez 2.7.0
 
 Jogo de futebol feito 100% com inteligência artificial, **gratuito**. Por enquanto, só Android.
