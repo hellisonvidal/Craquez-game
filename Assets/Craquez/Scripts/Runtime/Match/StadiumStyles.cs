@@ -95,6 +95,8 @@ namespace Craquez
             new StadiumStyle(30, true, false, 1, new Color(0.88f, 0.45f, 0.15f), new Color(0.72f, 0.42f, 0.28f), new Color(0.62f, 0.36f, 0.24f), 0, 4, None, false, false, 0.85f),
             // 29 Usina: bacia escura industrial, cadeiras amarelas, rio, alambrado
             new StadiumStyle(44, true, true, 2, new Color(0.9f, 0.75f, 0.1f), new Color(0.26f, 0.26f, 0.28f), new Color(0.15f, 0.15f, 0.16f), 1, 5, new Color(1f, 0.8f, 0.1f), false, true, 0.95f),
+            // 30 Colina: encosta nas montanhas, cadeiras lilás e brancas, cobertura com arco, LED lilás
+            new StadiumStyle(32, true, false, 3, new Color(0.55f, 0.35f, 0.75f), new Color(0.86f, 0.84f, 0.88f), new Color(0.92f, 0.9f, 0.95f), 0, 3, new Color(0.7f, 0.45f, 0.95f), true, false, 0.88f),
         };
 
         public static StadiumStyle StyleOf(int model, int homeTier)

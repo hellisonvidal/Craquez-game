@@ -19,7 +19,7 @@ namespace Craquez
             data.renderPostProcessing = true;
             data.stopNaN = true;   // pixel inválido (NaN/infinito) vira preto em vez de explodir no bloom
             int aa = Settings.Antialias;
-            if (aa == 0) aa = quality >= 2 ? 4 : quality == 1 ? 3 : 2;   // automático: SMAA alto / SMAA / FXAA
+            if (aa == 0) aa = Application.isMobilePlatform ? (quality >= 2 ? 3 : 2) : quality >= 2 ? 4 : quality == 1 ? 3 : 2;   // automático: SMAA alto / SMAA / FXAA (celular: mais leve)
             data.antialiasing = aa == 2 ? AntialiasingMode.FastApproximateAntialiasing
                 : aa == 3 || aa == 4 ? AntialiasingMode.SubpixelMorphologicalAntiAliasing : AntialiasingMode.None;
             data.antialiasingQuality = aa == 4 ? AntialiasingQuality.High : AntialiasingQuality.Medium;
@@ -34,8 +34,8 @@ namespace Craquez
             if (sh == 0) sh = q >= 3 ? 5 : q == 2 ? 4 : q == 1 ? 3 : 2;
             if (GraphicsSettings.currentRenderPipeline is UniversalRenderPipelineAsset urp)
             {
-                urp.shadowDistance = sh >= 5 ? 160f : sh == 4 ? 120f : sh == 3 ? 80f : sh == 2 ? 50f : 0f;
-                urp.shadowCascadeCount = mobile ? (sh >= 4 ? 2 : 1) : (sh >= 4 ? 4 : sh == 3 ? 2 : 1);
+                urp.shadowDistance = (sh >= 5 ? 160f : sh == 4 ? 120f : sh == 3 ? 80f : sh == 2 ? 50f : 0f) * (mobile ? 0.6f : 1f);
+                urp.shadowCascadeCount = mobile ? 1 : (sh >= 4 ? 4 : sh == 3 ? 2 : 1);
                 // escala de render: automática (nativa; só o "Leve" do celular reduz) ou a escolhida
                 float rs = Settings.RenderScaleValues[Mathf.Clamp(Settings.RenderScale, 0, Settings.RenderScaleValues.Length - 1)];
                 float auto = mobile ? (q >= 1 ? 1f : 0.8f) : 1f;
@@ -48,7 +48,7 @@ namespace Craquez
                 urp.fsrSharpness = 0.85f;
                 int aa = Settings.Antialias;
                 urp.msaaSampleCount = aa == 5 ? 2 : aa == 6 ? 4 : aa == 7 ? 8 : 1;
-                urp.supportsHDR = q >= 1;
+                urp.supportsHDR = mobile ? q >= 2 : q >= 1;   // HDR no celular só no "Alto" (esquenta)
                 // celular: poucas luzes extras por objeto (refletores à noite pesam)
                 urp.maxAdditionalLightsCount = mobile ? (q >= 2 ? 4 : q == 1 ? 2 : 1) : (q >= 3 ? 8 : q == 2 ? 6 : 4);
             }

@@ -351,10 +351,34 @@ namespace Craquez
             return go.transform;
         }
 
+        Kit _refKit;
+
+        /// <summary>
+        /// Uniforme da arbitragem que mais contrasta com os dois times (como na vida real): preto, amarelo
+        /// ou verde fluorescente, vermelho, azul ou rosa. O trio usa o mesmo uniforme.
+        /// </summary>
+        Kit RefKit()
+        {
+            if (_refKit != null) return _refKit;
+            Color[] opts = { new Color(0.08f, 0.08f, 0.1f), new Color(0.95f, 0.88f, 0.12f), new Color(0.5f, 0.88f, 0.18f), new Color(0.8f, 0.12f, 0.15f), new Color(0.15f, 0.3f, 0.8f), new Color(0.95f, 0.45f, 0.65f) };
+            float D(Color a, Color b) => Mathf.Abs(a.r - b.r) + Mathf.Abs(a.g - b.g) + Mathf.Abs(a.b - b.b);
+            Color best = opts[0]; float bestS = -1f;
+            for (int i = 0; i < opts.Length; i++)
+            {
+                float sc = float.MaxValue;
+                for (int t = 0; t < 2; t++) sc = Mathf.Min(sc, Mathf.Min(D(opts[i], kits[t].c1), D(opts[i], kits[t].c2) + 0.3f));
+                if (i == 0) sc += 0.25f;   // preto é o clássico: preferido quando contrasta
+                if (sc > bestS) { bestS = sc; best = opts[i]; }
+            }
+            var dark = new Color(0.06f, 0.06f, 0.07f);
+            _refKit = new Kit { c1 = best, c2 = best.grayscale > 0.4f ? dark : new Color(0.85f, 0.75f, 0.1f), shorts = dark, socks = best.grayscale > 0.4f ? dark : best };
+            return _refKit;
+        }
+
         void BuildReferee(Transform parent, int q)
         {
             var refP = new SimPlayer { id = -1, name = "Árbitro", number = 0, face = new float[] { 2, 0, 3, 0, 1, 2 } };
-            var black = new Kit { c1 = new Color(0.08f, 0.08f, 0.1f), c2 = new Color(0.85f, 0.75f, 0.1f), shorts = new Color(0.05f, 0.05f, 0.06f), socks = new Color(0.08f, 0.08f, 0.1f) };
+            var black = RefKit();
             var rig = AthleteFactory.Create(refP, black, black, parent, q);
             var av = rig.gameObject.AddComponent<AthleteView>();
             refP.position = new Vector2(-6, 6);
@@ -373,7 +397,7 @@ namespace Craquez
         /// <summary>Dois assistentes: um em cada lateral, cada um cuidando de uma metade do campo.</summary>
         void BuildAssistants(Transform parent, int q)
         {
-            var black = new Kit { c1 = new Color(0.08f, 0.08f, 0.1f), c2 = new Color(0.85f, 0.75f, 0.1f), shorts = new Color(0.05f, 0.05f, 0.06f), socks = new Color(0.08f, 0.08f, 0.1f) };
+            var black = RefKit();
             for (int k = 0; k < 2; k++)
             {
                 var ap = new SimPlayer { id = -1, name = "Assistente", number = 0, face = new float[] { 1 + k, 1, k, 0, 1, 1 } };
@@ -442,7 +466,10 @@ namespace Craquez
             for (int t = 0; t < 2; t++)
             {
                 var cp = new SimPlayer { id = -1, name = "Técnico", number = 0, face = new float[] { 1 + t, 1, 2, 1, 0, 1 } };
-                var suit = new Kit { c1 = new Color(0.1f, 0.11f, 0.14f), c2 = Color.Lerp(kits[t].c1, Color.black, 0.3f), shorts = new Color(0.08f, 0.08f, 0.1f), socks = new Color(0.05f, 0.05f, 0.06f) };
+                // agasalho do clube (antes terno quase preto: de longe parecia um bandeirinha)
+                var club = kits[t].c1;
+                var suit = new Kit { c1 = Color.Lerp(club, Color.black, 0.25f), c2 = Mathf.Abs(kits[t].c2.grayscale - club.grayscale) > 0.2f ? kits[t].c2 : Color.white,
+                    shorts = Color.Lerp(club, Color.black, 0.6f), socks = new Color(0.08f, 0.08f, 0.1f), pattern = 0 };
                 var rig = AthleteFactory.Create(cp, suit, suit, parent, q);
                 var av = rig.gameObject.AddComponent<AthleteView>();
                 cp.position = new Vector2((t == 0 ? -1f : 1f) * 9f, sim.halfW + 1.6f);
@@ -451,6 +478,10 @@ namespace Craquez
                 _coaches.Add(av);
             }
             if (q < 1) return;
+            // os bonecos fixos do banco (blocos) saem: no lugar, os reservas de verdade, sentados
+            if (venue != null && venue.root != null)
+                foreach (Transform ch in venue.root)
+                    if (ch.name.StartsWith("Reservas")) ch.gameObject.SetActive(false);
             // coletes: laranja para o mandante, verde-limão para o visitante
             var bibs = new[] { new Color(1f, 0.45f, 0.05f), new Color(0.65f, 0.95f, 0.1f) };
             int nWarm = q >= 2 ? 5 : 4;
@@ -461,13 +492,23 @@ namespace Craquez
                     var bib = new Kit { c1 = bibs[t], c2 = bibs[t], shorts = Color.Lerp(kits[t].shorts, Color.black, 0.2f), socks = kits[t].socks };
                     var rig = AthleteFactory.Create(wp, bib, bib, parent, q);
                     var av = rig.gameObject.AddComponent<AthleteView>();
-                    float gx = (t == 0 ? -1f : 1f) * (sim.halfLen + 4f);
-                    wp.position = new Vector2(gx, sim.halfW * (0.2f + i * 0.15f));
-                    wp.facing = new Vector2(0f, 1f);
+                    // começam sentados no banco (de frente para o campo) e saem para aquecer ao longo do jogo
+                    wp.position = SeatSpot(t, i);
+                    wp.facing = new Vector2(0f, -1f);
                     av.Setup(wp, rig, this);
+                    av.seat = 1f;
                     _warm.Add((av, t, i * 1.7f + t * 0.9f));
+                    _warmState.Add(0);
+                    _warmLeave.Add(18f + i * 22f + t * 9f);
                 }
         }
+
+        readonly List<int> _warmState = new List<int>();     // 0 sentado no banco, 1 indo aquecer, 2 aquecendo
+        readonly List<float> _warmLeave = new List<float>(); // segundos de bola rolando até levantar
+        float _benchClock;
+
+        /// <summary>Lugar no banco de reservas (o assento fica 4,2 m além da lateral, do lado de lá).</summary>
+        Vector2 SeatSpot(int team, int i) => new Vector2((team == 0 ? -1f : 1f) * 9f - 2.6f + (i + 1) * 1.05f, sim.halfW + 4.15f);
 
         public bool HasBench => _coaches.Count > 0;
         public float BenchX(int team) => (team == 0 ? -1f : 1f) * 9f;
@@ -549,10 +590,39 @@ namespace Craquez
             // aquecimento atrás dos gols: cada reserva no seu ciclo — trote de ida e volta, deslocamento de
             // lado, polichinelos, alongamento (braços para cima), tiro curto e caminhada de volta
             int wk = 1;
-            foreach (var w in _warm)
+            if (live) _benchClock += dt;
+            for (int wi = 0; wi < _warm.Count; wi++)
             {
-                if (BenchJoin(w.av, w.team, wk++, dt)) continue;
+                var w = _warm[wi];
+                if (BenchJoin(w.av, w.team, wk++, dt)) { w.av.seat = 0f; if (_warmState[wi] == 0) _warmState[wi] = 1; continue; }
                 var p = w.av.p;
+                if (_warmState[wi] == 0)
+                {
+                    // sentado: olha o jogo; na hora dele, levanta
+                    p.vel = Vector2.zero;
+                    p.facing = V2.RotateToward(p.facing, (sim.ball.pos - p.position).Norm(), 1.5f * dt).Norm();
+                    if (_benchClock > _warmLeave[wi]) _warmState[wi] = 1;
+                    w.av.OnTick();
+                    continue;
+                }
+                w.av.seat = Mathf.MoveTowards(w.av.seat, 0f, dt / 0.7f);
+                if (_warmState[wi] == 1)
+                {
+                    // levanta, sai do banco e vai por fora do campo (beirando a lateral) até atrás do gol
+                    float gxw = (w.team == 0 ? -1f : 1f) * (hl + 4f);
+                    var way = new Vector2(gxw, hw + 2.6f);
+                    var to1 = way - p.position;
+                    if (w.av.seat > 0.05f) { p.vel = Vector2.zero; w.av.OnTick(); continue; }
+                    if (to1.magnitude < 1.2f) _warmState[wi] = 2;
+                    else
+                    {
+                        p.vel = Vector2.MoveTowards(p.vel, to1.normalized * Mathf.Min(3f, to1.magnitude * 2f), 5f * dt);
+                        p.position += p.vel * dt;
+                        p.facing = V2.RotateToward(p.facing, p.vel.sqrMagnitude > 0.05f ? p.vel.normalized : p.facing, 5f * dt).Norm();
+                        w.av.OnTick();
+                        continue;
+                    }
+                }
                 float gx = (w.team == 0 ? -1f : 1f) * (hl + 4f);
                 float toField = w.team == 0 ? 1f : -1f;
                 float cyc = (float)(sim.tick * dt / 26f + w.phase * 0.37f);

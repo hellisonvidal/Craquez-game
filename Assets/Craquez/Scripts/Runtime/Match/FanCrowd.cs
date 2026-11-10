@@ -59,6 +59,9 @@ namespace Craquez
             c[52] = new Color(0.12f, 0.09f, 0.07f);   // barba
             c[53] = new Color(0.97f, 0.97f, 0.97f);   // olhos (branco)
             c[54] = new Color(0.04f, 0.04f, 0.05f);   // pupila / boca
+            // mais tons de pele (do bem claro ao bem escuro) e de cabelo (grisalho, ruivo, loiro)
+            c[55] = new Color(0.9f, 0.72f, 0.58f); c[56] = new Color(0.7f, 0.5f, 0.36f); c[57] = new Color(0.46f, 0.3f, 0.2f); c[58] = new Color(0.25f, 0.16f, 0.11f);
+            c[59] = new Color(0.62f, 0.62f, 0.6f); c[60] = new Color(0.55f, 0.22f, 0.1f); c[61] = new Color(0.86f, 0.74f, 0.45f);
             // camisas dos 4 uniformes de cada time: 24-31 mandante (c1,c2 por uniforme), 32-39 visitante
             for (int k = 0; k < 4; k++)
             {
@@ -137,7 +140,9 @@ namespace Craquez
                 shirt = baseC;
                 shirt2 = baseC + 1;
             }
-            int skin = 4 + r.Next(4), hair = 8 + r.Next(3), pants = 11 + r.Next(3);
+            int sk = r.Next(8), skin = sk < 4 ? 4 + sk : 55 + (sk - 4);
+            int hr = r.Next(9), hair = hr < 6 ? 8 + hr % 3 : 59 + (hr - 6);
+            int pants = 11 + r.Next(3);
             var p = s.pos;
             if (s.lod)
             {
@@ -147,11 +152,21 @@ namespace Craquez
                 body.Box(p + q * new Vector3(0f, 1.36f * hgt, 0f), new Vector3(0.6f, 0.16f, 0.32f), q, shirt);
                 body.Box(p + q * new Vector3(0f, 1.6f * hgt, 0f), new Vector3(0.25f, 0.28f, 0.25f), q, skin);
                 body.Box(p + q * new Vector3(0f, 1.76f * hgt, -0.01f), new Vector3(0.27f, 0.07f, 0.27f), q, hair);
-                arms[0].Box(p + q * new Vector3(0f, 1.08f * hgt, 0.02f), new Vector3(0.66f, 0.5f * hgt, 0.16f), q, shirt);
-                arms[1].Box(p + q * new Vector3(0f, 1.8f * hgt, 0.02f), new Vector3(0.72f, 0.52f * hgt, 0.14f), q, skin);
-                arms[2].Box(p + q * new Vector3(0f, 1.28f * hgt, 0.2f), new Vector3(0.34f, 0.15f, 0.16f), q, skin);
-                arms[3].Box(p + q * new Vector3(0f, 1.7f * hgt, 0.0f), new Vector3(0.58f, 0.15f, 0.15f), q, skin);
-                arms[4].Box(p + q * new Vector3(0.3f, 1.8f * hgt, 0.02f), new Vector3(0.16f, 0.52f * hgt, 0.14f), q, skin);
+                // braços: dois de cada vez, na cor da manga, com a mão na ponta (antes cada pose era um bloco
+                // único de 0,6-0,7 m na cor da pele por cima da cabeça: de longe, "quadrados cor de pele")
+                bool scarfL = r.NextDouble() < 0.35;
+                for (int side = -1; side <= 1; side += 2)
+                {
+                    arms[0].Box(p + q * new Vector3(side * 0.31f, 1.08f * hgt, 0.02f), new Vector3(0.13f, 0.5f * hgt, 0.15f), q, shirt);
+                    arms[1].Box(p + q * new Vector3(side * 0.36f, 1.66f * hgt, 0.02f), new Vector3(0.13f, 0.5f * hgt, 0.14f), q, shirt, new Vector3(0f, 0f, -side * 16f));
+                    arms[1].Box(p + q * new Vector3(side * 0.42f, 1.95f * hgt, 0.02f), new Vector3(0.1f, 0.1f, 0.1f), q, skin);
+                    arms[2].Box(p + q * new Vector3(side * 0.15f, 1.28f * hgt, 0.2f), new Vector3(0.12f, 0.12f, 0.34f), q, shirt, new Vector3(-20f, -side * 30f, 0f));
+                    arms[3].Box(p + q * new Vector3(side * 0.27f, 1.66f * hgt, 0.0f), new Vector3(0.12f, 0.4f * hgt, 0.13f), q, shirt, new Vector3(0f, 0f, side * 55f));
+                    if (side > 0) arms[4].Box(p + q * new Vector3(0.38f, 1.72f * hgt, 0.04f), new Vector3(0.13f, 0.6f * hgt, 0.14f), q, shirt, new Vector3(0f, 0f, -24f));
+                    else arms[4].Box(p + q * new Vector3(-0.31f, 1.08f * hgt, 0.02f), new Vector3(0.13f, 0.5f * hgt, 0.15f), q, shirt);
+                }
+                // cachecol do time esticado entre as mãos (braços erguidos)
+                if (scarfL && s.team != 2) arms[1].Box(p + q * new Vector3(0f, 1.98f * hgt, 0.03f), new Vector3(0.8f, 0.13f, 0.04f), q, shirt2);
                 return;
             }
             bool coat = Rain && r.NextDouble() < 0.7;
@@ -211,6 +226,13 @@ namespace Craquez
                 return;
             }
             int sleeve = coat ? coatC : shirt;
+            // cachecol do time esticado acima da cabeça quando a torcida levanta os braços (incentivo)
+            if (!coat && s.team != 2 && r.NextDouble() < 0.4)
+            {
+                arms[1].Box(p + q * new Vector3(0f, 2.05f * hgt, 0.03f), new Vector3(0.86f, 0.14f, 0.03f), q, shirt2);
+                arms[1].Box(p + q * new Vector3(-0.2f, 2.05f * hgt, 0.035f), new Vector3(0.12f, 0.14f, 0.03f), q, shirt);
+                arms[1].Box(p + q * new Vector3(0.2f, 2.05f * hgt, 0.035f), new Vector3(0.12f, 0.14f, 0.03f), q, shirt);
+            }
             for (int side = -1; side <= 1; side += 2)
             {
                 arms[0].Box(p + q * new Vector3(side * 0.32f, 1.1f * hgt, 0.02f), new Vector3(0.13f, 0.56f * hgt, 0.14f), q, sleeve, new Vector3(-8f, 0f, side * 6f));

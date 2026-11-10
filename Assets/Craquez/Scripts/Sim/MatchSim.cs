@@ -2226,6 +2226,29 @@ namespace Craquez.Sim
             return new Vector2(tx * dir, ty);
         }
 
+        /// <summary>Onde cada um se oferece para a reposição do goleiro com as mãos.</summary>
+        Vector2 KeeperOutlet(SimPlayer p, Vector2 fallback)
+        {
+            float dir = TeamDir(p.team), gx = -halfLen * dir;
+            bool field = mode.id == GameModes.Field;
+            float bx = p.basePos.x, by = p.basePos.y;
+            float sy = Mathf.Abs(by) > 0.05f ? Mathf.Sign(by) : (p.id % 2 == 0 ? 1f : -1f);
+            float box = mode.boxDepth, bh = mode.boxHalf;
+            if (bx <= -0.62f)
+            {
+                // lateral: aberto, colado na linha, um pouco à frente da área; zagueiro: na quina da área
+                if (Mathf.Abs(by) > 0.45f) return new Vector2(gx + dir * (box + (field ? 9f : 3f)), sy * halfW * 0.88f);
+                return new Vector2(gx + dir * (box * 0.7f + (field ? 1.5f : 0.5f)), sy * Mathf.Min(halfW * 0.82f, bh + (field ? 2f : 0.8f)));
+            }
+            if (bx <= -0.3f)
+            {
+                // meia central vem buscar entre as linhas; os de lado abrem
+                if (Mathf.Abs(by) < 0.25f) return new Vector2(gx + dir * (box + (field ? 11f : 3.5f)), sy * (field ? 4.5f : 1.6f));
+                return new Vector2(gx + dir * (box + (field ? 20f : 6f)), sy * halfW * 0.72f);
+            }
+            return fallback;   // atacantes seguram a linha lá na frente
+        }
+
         void AiOutfield(SimPlayer p, bool frozen)
         {
             int t = p.team;
@@ -2255,7 +2278,12 @@ namespace Craquez.Sim
             bool live = !frozen && state == MatchState.Playing;
             var target = FormationTarget(p, attacking);
             bool urgent = false, pressing = false;
-            if (live) target = attacking ? SupportRun(p, target, attacking) : Mark(p, target);
+            // goleiro do time com a bola nas mãos: o time abre para receber (laterais na linha, zagueiros
+            // nas quinas da área, um meia vem buscar pelo meio) — antes ficavam no lugar, marcados
+            var gkOwn = ball.owner >= 0 ? players[ball.owner] : null;
+            bool outlet = live && gkOwn != null && gkOwn.team == t && gkOwn.isKeeper && gkOwn.InHands && !gkOwn.goalKick && mode.id != GameModes.Street;
+            if (outlet) target = KeeperOutlet(p, target);
+            else if (live) target = attacking ? SupportRun(p, target, attacking) : Mark(p, target);
             if (live)
             {
                 if (passReceiver == p.id && ball.owner < 0)
@@ -2946,7 +2974,8 @@ namespace Craquez.Sim
                 if (ahead < 2f) continue;   // nunca para trás nem para o lado colado no gol
                 if (d < throwMax && free > needFree && lane > needLane)
                 {
-                    float sc = Mathf.Min(free, 10f) + Mathf.Min(lane, 6f) * 0.5f - d * 0.06f + ahead * 0.04f + rng.Range(0f, 1.2f);
+                    float sc = Mathf.Min(free, 10f) + Mathf.Min(lane, 6f) * 0.5f - d * 0.06f + ahead * 0.04f + rng.Range(0f, 1.2f)
+                        + (Mathf.Abs(m.position.y) > halfW * 0.5f ? 1.5f : 0f);   // pelos lados é mais seguro (longe do meio da área)
                     if (sc > bestS) { bestS = sc; best = m; }
                 }
                 // chutão: quem está sozinho mais à frente (adversários perto dele disputam a bola no alto)
@@ -3653,7 +3682,9 @@ namespace Craquez.Sim
                                 var strong = weak == a ? b : a;
                                 Emit("bump", weak.team, weak.id, null, false, closing, strong.id);
                                 // trombada forte de verdade (sem falta): de vez em quando quem perde cai e levanta
-                                if (closing > 5.5f && weak.down <= 0f && !weak.isKeeper && state == MatchState.Playing && rng.Chance(0.1f))
+                                // (antes: 10% a partir de 5,5 m/s — mais quedas por trombada do que por falta, jogador "caindo
+                                // sem motivo". Agora só no choque de frente em velocidade alta e bem desigual)
+                                if (closing > 7.5f && Mathf.Abs(sa - sb) > 0.35f && weak.down <= 0f && !weak.isKeeper && state == MatchState.Playing && rng.Chance(0.05f))
                                 {
                                     weak.fallDir = (weak.position - strong.position).Norm();
                                     weak.fallKind = Vector2.Dot(weak.fallDir, weak.facing) > 0.3f ? 1 : Vector2.Dot(weak.fallDir, weak.facing) < -0.3f ? 0 : 2;

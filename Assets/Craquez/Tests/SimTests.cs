@@ -796,6 +796,34 @@ namespace Craquez.Tests
             Assert.Greater(attackThird / (float)Mathf.Max(1, owned), 0.07f, "a bola não chega ao ataque");
         }
 
+        /// <summary>Quedas: toda queda tem causa (falta, trombada, bicicleta) e não são frequentes demais.</summary>
+        [Test] public void FallsHaveCause()
+        {
+            int falls = 0, fouls = 0, bumpFalls = 0, other = 0;
+            float minutes = 0f;
+            for (uint seed = 1; seed <= 3; seed++)
+            {
+                var sim = NewMatch(GameModes.Field, seed);
+                var a = new CpuBrain(0, 0.7f); var b = new CpuBrain(1, 0.7f);
+                var was = new bool[sim.players.Count];
+                for (int i = 0; i < 60 * 300 && sim.state != MatchState.Fulltime; i++)
+                {
+                    sim.Step(new[] { a.MakeInput(sim), b.MakeInput(sim) });
+                    bool foul = false, bump = false, bike = false;
+                    foreach (var e in sim.events) { if (e.type == "foul") { foul = true; fouls++; } if (e.type == "bump") bump = true; if (e.type == "kick" && e.kind == "bicycle") bike = true; }
+                    for (int k = 0; k < sim.players.Count; k++)
+                    {
+                        bool d = sim.players[k].down > 0f;
+                        if (d && !was[k]) { falls++; if (foul || bike) { } else if (bump) bumpFalls++; else other++; }
+                        was[k] = d;
+                    }
+                }
+                minutes += 300f / 60f;
+            }
+            System.Console.WriteLine($"[quedas] {falls} quedas em {minutes:F0} min de jogo simulado: {fouls} faltas, {bumpFalls} por trombada, {other} sem causa");
+            Assert.AreEqual(0, other, "jogador caiu sem falta, trombada ou bicicleta");
+        }
+
         [Test] public void JsonRoundTrip()
         {
             var o = MiniJson.Parse("{\"a\": [1, 2.5, \"x\\n\"], \"b\": {\"c\": true, \"d\": null}}");

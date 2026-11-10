@@ -30,6 +30,23 @@ namespace Craquez
         RectTransform _root;
         Image _bg;
         MatchController _match, _attract;
+
+        /// <summary>
+        /// Fotos dos estádios prontas antes de abrir o seletor: monta uma por vez nos menus (nunca durante
+        /// a partida) e salva no aparelho — nas próximas vezes saem do disco na hora.
+        /// </summary>
+        System.Collections.IEnumerator PrewarmVenues()
+        {
+            yield return new WaitForSecondsRealtime(5f);
+            int n = VenueBuilder.StadiumModels.Length;
+            for (int i = 1; i < n; i++)
+            {
+                while (_match != null) yield return new WaitForSecondsRealtime(2f);
+                if (VenueShot.Cached(GameModes.Field, i, 0) != null) continue;
+                yield return VenueShot.Render(GameModes.Field, i, 0, 1, 5, null);
+                yield return new WaitForSecondsRealtime(0.4f);
+            }
+        }
         System.Action _back;
         readonly MatchConfig _cfg = new MatchConfig();
         System.Action _refreshVenue;
@@ -59,6 +76,7 @@ namespace Craquez
             cam.fieldOfView = 40f;
             cgo.AddComponent<AudioListener>();
             UrpSetup.Camera(cam, Settings.Quality);
+            if (!ShotTour.Requested()) StartCoroutine(PrewarmVenues());
             if (FindAnyObjectByType<EventSystem>() == null)
             {
                 var es = new GameObject("EventSystem", typeof(EventSystem), typeof(InputSystemUIInputModule));
@@ -854,6 +872,18 @@ namespace Craquez
                     : (home != null && !string.IsNullOrEmpty(home.stadium.name) ? home.stadium.name : "Estádio do mandante");
             };
             _refreshVenue();
+            {
+                string modeAt = _cfg.mode;
+                StartCoroutine(VenueShot.Prewarm(_cfg.mode, VenueCount(), _cfg.teamA, _cfg.teamB, _cfg.streetPlayers, (i, tex) =>
+                {
+                    if (tex != null && venueImg != null && _cfg.mode == modeAt && VenueIdx() == i && venueImg.texture != tex)
+                    {
+                        venueImg.texture = tex;
+                        venueImg.color = Color.white;
+                        if (venueLoading != null) venueLoading.gameObject.SetActive(false);
+                    }
+                }, () => _match != null));
+            }
             var holder = UiKit.Image(card, Color.white, Theme.Circle, "bola").rectTransform.At(0, 0, 112, 112, 26, 110);
             holder.gameObject.AddComponent<Mask>().showMaskGraphic = false;
             var ballImg = UiKit.Rect(holder, "tex").Place(0, 0, 1, 1).gameObject.AddComponent<RawImage>();
