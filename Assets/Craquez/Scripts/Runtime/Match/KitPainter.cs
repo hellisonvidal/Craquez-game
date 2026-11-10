@@ -69,16 +69,23 @@ namespace Craquez
             var boundary = new HashSet<int>();
             foreach (var kv in edgeCount)
                 if (kv.Value == 1) { boundary.Add((int)(kv.Key >> 32)); boundary.Add((int)(kv.Key & 0xFFFFFFFF)); }
-            // borda + um anel de vizinhos = faixa de acabamento
-            var ring = new HashSet<int>(boundary);
-            for (int t = 0; t + 2 < info.tris.Length; t += 3)
-            {
-                bool touch = false;
-                for (int k = 0; k < 3; k++) if (boundary.Contains(id[info.tris[t + k]])) touch = true;
-                if (touch) for (int k = 0; k < 3; k++) ring.Add(id[info.tris[t + k]]);
-            }
+            // distância (m) de cada vértice até a borda aberta mais próxima (gola, punho, barra). Antes o
+            // acabamento era "borda + um anel de vizinhos", que seguia os triângulos da malha e saía em
+            // zigue-zague (punhos e barras serrilhados, listras pretas na cintura)
+            var bpos = new List<Vector3>();
+            var seenB = new HashSet<int>();
+            for (int i = 0; i < info.v.Length; i++) if (boundary.Contains(id[i]) && seenB.Add(id[i])) bpos.Add(info.v[i]);
             info.trim = new float[info.v.Length];
-            for (int i = 0; i < info.v.Length; i++) info.trim[i] = boundary.Contains(id[i]) ? 1f : ring.Contains(id[i]) ? 0.6f : 0f;
+            var cacheD = new Dictionary<int, float>();
+            for (int i = 0; i < info.v.Length; i++)
+            {
+                if (cacheD.TryGetValue(id[i], out float dd)) { info.trim[i] = dd; continue; }
+                float best = 1f;
+                if (boundary.Contains(id[i])) best = 0f;
+                else foreach (var q in bpos) { float d = (q - info.v[i]).sqrMagnitude; if (d < best * best) best = Mathf.Sqrt(d); }
+                cacheD[id[i]] = best;
+                info.trim[i] = best;
+            }
             _info[m] = info;
             return info;
         }
@@ -97,14 +104,16 @@ namespace Craquez
             if (_cache.TryGetValue(key, out var cached) && cached != null) return cached;
             var info = Get(mesh);
             float topUp = float.MinValue;
-            foreach (var p in info.v) topUp = Mathf.Max(topUp, p[ax.up] * ax.upSign);
+            float botUp = float.MaxValue;
+            foreach (var p in info.v) { topUp = Mathf.Max(topUp, p[ax.up] * ax.upSign); botUp = Mathf.Min(botUp, p[ax.up] * ax.upSign); }
+            float len = topUp - botUp;
             if (!_basePx.TryGetValue(baseKey, out var basePx))
             {
                 basePx = new Color32[size * size];
                 var filled = new bool[size * size];
                 for (int i = 0; i + 2 < info.tris.Length; i += 3)
                     Raster(basePx, filled, size, info, info.tris[i], info.tris[i + 1], info.tris[i + 2],
-                        (p, trim) => ColorAt(part, kit, p, trim, ax, info.center, topUp));
+                        (p, trim) => ColorAt(part, kit, p, trim, ax, info.center, topUp, len));
                 Dilate(basePx, filled, size, 4);
                 _basePx[baseKey] = basePx;
             }
@@ -126,8 +135,8 @@ namespace Craquez
                     if (!NearNumber(c, ax, info.center, topUp)) continue;
                     Raster(px, fill2, size, info, info.tris[i], info.tris[i + 1], info.tris[i + 2], (p, trim) =>
                     {
-                        var col = ColorAt(part, kit, p, trim, ax, info.center, topUp);
-                        if (trim > 0.5f) return col;
+                        var col = ColorAt(part, kit, p, trim, ax, info.center, topUp, len);
+                        if (trim < 0.025f) return col;
                         float aa = 1.2f / size * 3f;
                         NumberUv(p, ax, info.center, topUp, out var uvB, out var uvF);
                         float aB = NumberCover(number, uvB, aa, out float eB);
@@ -202,7 +211,12 @@ namespace Craquez
             return a;
         }
 
-        static Color ColorAt(KitPart part, Kit k, Vector3 p, float trim, Axes ax, Vector3 center, float topUp)
+        /// <summary>Cobertura suave de uma faixa: d = distância (m) até a borda, negativa dentro.</summary>
+        static float Soft(float d, float aa = 0.004f) => Mathf.Clamp01(0.5f - d / aa);
+
+        /// <param name="edge">distância (m) até a borda aberta mais próxima da peça</param>
+        /// <param name="len">altura total da peça (m)</param>
+        static Color ColorAt(KitPart part, Kit k, Vector3 p, float edge, Axes ax, Vector3 center, float topUp, float len)
         {
             float x = p[ax.lat] - center[ax.lat];                 // metros, lateral (0 = meio do corpo)
             float h = topUp - p[ax.up] * ax.upSign;               // metros abaixo do topo da peça
@@ -211,51 +225,68 @@ namespace Craquez
             {
                 c = ShirtColor(k, x, h);
                 // mangas de outra cor (ex.: corpo vermelho e mangas brancas): fora do tronco, na altura dos ombros
-                if (k.sleeves.a > 0f && Mathf.Abs(x) > 0.2f && h < 0.36f) c = k.sleeves;
-                if (trim > 0.5f) c = k.trim.a > 0f ? k.trim : Contrast(k.c1, k.c2);
+                if (k.sleeves.a > 0f) c = Color.Lerp(c, k.sleeves, Soft(0.2f - Mathf.Abs(x)) * Soft(h - 0.36f));
+                var trimC = k.trim.a > 0f ? k.trim : Contrast(k.c1, k.c2);
+                bool hem = h > len - 0.1f;                 // barra de baixo: só a costura, na cor da camisa
+                bool collar = h < 0.14f && Mathf.Abs(x) < 0.16f;
+                if (hem) c *= 1f - 0.12f * Soft(edge - 0.008f);
+                else
+                {
+                    // gola um pouco mais larga que o punho; filete fino do tecido entre a gola e a camisa
+                    float band = collar ? 0.02f : 0.016f;
+                    c = Color.Lerp(c, trimC, Soft(edge - band));
+                    if (collar) c *= 1f - 0.1f * Soft(Mathf.Abs(edge - band - 0.004f) - 0.0015f, 0.002f);
+                }
             }
             else if (part == KitPart.Shorts)
             {
                 c = k.shorts;
-                if (Mathf.Abs(Mathf.Abs(x) - 0.17f) < 0.012f) c = Contrast(k.shorts, k.c1);   // friso lateral
-                if (trim > 0.5f) c = Contrast(k.shorts, k.c1);
+                var stripe = Contrast(k.shorts, k.c1);
+                bool waist = h < 0.08f;
+                // friso lateral, com borda suave (antes serrilhado)
+                if (!waist) c = Color.Lerp(c, stripe, Soft(Mathf.Abs(Mathf.Abs(x) - 0.17f) - 0.011f));
+                // cós: elástico na cor do calção, um pouco mais escuro; barras com acabamento de contraste
+                if (waist) c *= 1f - 0.12f * Soft(edge - 0.025f);
+                else c = Color.Lerp(c, stripe, Soft(edge - 0.013f));
             }
             else
             {
                 c = k.socks;
-                if (h > 0.05f && h < 0.075f) c = Contrast(k.socks, k.c2);                     // listra no cano
-                if (trim > 0.5f) c = Contrast(k.socks, k.c2);
+                var stripe = Contrast(k.socks, k.c2);
+                c = Color.Lerp(c, stripe, Soft(Mathf.Abs(h - 0.0625f) - 0.0125f));                  // listra no cano
+                if (h < 0.1f) c = Color.Lerp(c, stripe, Soft(edge - 0.014f));                        // punho do meião
             }
-            // tecido: trama fina
-            float knit = Mathf.Sin(p.x * 1400f) * Mathf.Sin(p.y * 1400f + p.z * 900f) * 0.03f;
-            c *= 0.97f + knit;
+            // tecido: trama fina e discreta
+            float knit = Mathf.Sin(p.x * 1400f) * Mathf.Sin(p.y * 1400f + p.z * 900f) * 0.02f;
+            c *= 0.98f + knit;
             c.a = 1f;
             return c;
         }
 
+        /// <summary>Distância com sinal até o centro mais próximo de uma série periódica (período p).</summary>
+        static float Wrap(float v, float p) => Mathf.Repeat(v + p * 0.5f, p) - p * 0.5f;
+
         /// <summary>Cor da camisa num ponto: x = metros do meio do corpo, h = metros abaixo do ombro.</summary>
         public static Color ShirtColor(Kit k, float x, float h)
         {
+            Color c = k.c1;
+            float t = 0f;   // quanto de c2 (bordas suaves: sem serrilhado nas listras)
+            const float aa = 0.004f;
+            switch (k.pattern)
             {
-                Color c = k.c1;
-                switch (k.pattern)
-                {
-                    case 1: if (Mathf.Repeat(x / 0.17f + 0.25f, 1f) < 0.5f) c = k.c2; break;                  // listras (~8,5 cm)
-                    case 2: if (Mathf.Repeat(h / 0.15f, 1f) < 0.5f) c = k.c2; break;                         // aros
-                    case 3: if (Mathf.Abs(x * 0.95f - (h - 0.28f)) < 0.085f) c = k.c2; break;                // faixa diagonal (ombro -> quadril)
-                    case 4: if (x > 0f) c = k.c2; break;                                                     // metades
-                    case 5: if (Mathf.Repeat(x / 0.07f, 1f) < 0.14f) c = k.c2; break;                         // riscas finas
-                    case 6: if (h > 0.14f && h < 0.25f && Mathf.Abs(x) < 0.3f) c = k.c2; break;               // faixa no peito
-                    case 8: if ((Mathf.FloorToInt(x / 0.075f + 100f) + Mathf.FloorToInt(h / 0.075f)) % 2 == 0) c = k.c2; break;   // xadrez
-                    case 7:                                                                                  // faixa vertical central
-                        if (Mathf.Abs(x) < 0.075f) c = k.c2;
-                        else if (Mathf.Abs(x) < 0.09f) c = Color.white;
-                        break;
-                }
-                // ombros e laterais com painel de contraste discreto
-                if (Mathf.Abs(x) > 0.17f && Mathf.Abs(x) < 0.21f && h > 0.05f) c = Color.Lerp(c, Contrast(k.c1, k.c2), 0.55f);
-                return c;
+                case 1: t = Soft(Mathf.Abs(Wrap(x, 0.17f)) - 0.0425f, aa); break;   // listras (~8,5 cm)
+                case 2: t = Soft(Mathf.Abs(Wrap(h - 0.0375f, 0.15f)) - 0.0375f, aa); break;   // aros
+                case 3: t = Soft(Mathf.Abs(x * 0.95f - (h - 0.28f)) - 0.085f, aa); break;                                        // faixa diagonal
+                case 4: t = Soft(-x, aa); break;                                                                                 // metades
+                case 5: t = Soft(Mathf.Abs(Wrap(x - 0.0049f, 0.07f)) - 0.0049f, aa * 0.6f); break;   // riscas finas
+                case 6: t = Soft(Mathf.Abs(h - 0.195f) - 0.055f, aa) * Soft(Mathf.Abs(x) - 0.3f, aa); break;                       // faixa no peito
+                case 8: t = (Mathf.FloorToInt(x / 0.075f + 100f) + Mathf.FloorToInt(h / 0.075f)) % 2 == 0 ? 1f : 0f; break;      // xadrez
+                case 7:                                                                                                          // faixa vertical central
+                    t = Soft(Mathf.Abs(x) - 0.075f, aa);
+                    c = Color.Lerp(c, Color.white, Soft(Mathf.Abs(Mathf.Abs(x) - 0.0825f) - 0.0075f, aa));
+                    break;
             }
+            return Color.Lerp(c, k.c2, t);
         }
 
         public static Color Contrast(Color a, Color b)
@@ -278,7 +309,7 @@ namespace Craquez
             {
                 // triângulo degenerado no UV (barra extrudada): pinta o texel com o acabamento
                 int x = Mathf.Clamp((int)A.x, 0, size - 1), y = Mathf.Clamp((int)A.y, 0, size - 1);
-                px[y * size + x] = shade(mi.v[ia], Mathf.Max(mi.trim[ia], Mathf.Max(mi.trim[ib], mi.trim[ic])));
+                px[y * size + x] = shade(mi.v[ia], Mathf.Min(mi.trim[ia], Mathf.Min(mi.trim[ib], mi.trim[ic])));
                 filled[y * size + x] = true;
                 return;
             }

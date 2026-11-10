@@ -3308,7 +3308,17 @@ namespace Craquez.Sim
             p.tackleAnim = Mathf.Max(0f, p.tackleAnim - DT);
             p.kickAnim = Mathf.Max(0f, p.kickAnim - DT);
             p.dive = Mathf.Max(0f, p.dive - DT);
-            if (p.saveT > 0f) { p.saveT -= DT; if (p.saveT <= 0f) { p.saveKind = 0; p.saveT = 0f; } }
+            if (p.saveT > 0f)
+            {
+                p.saveT -= DT;
+                if (p.saveT <= 0f)
+                {
+                    // depois do mergulho ele está no chão: levanta antes de voltar a correr (antes saía
+                    // deslizando de pé no instante em que a defesa acabava); bola nas mãos, levanta com calma
+                    if (p.Diving && !p.InHands) p.offBalance = Mathf.Max(p.offBalance, 0.4f);
+                    p.saveKind = 0; p.saveT = 0f;
+                }
+            }
             p.skillCd = Mathf.Max(0f, p.skillCd - DT);
             p.burst = Mathf.Max(0f, p.burst - DT);
             p.offBalance = Mathf.Max(0f, p.offBalance - DT);
@@ -4034,7 +4044,14 @@ namespace Craquez.Sim
             if (keeperZone && backPass) Emit("backpass", p.team, p.id);
             if (keeperZone && !backPass)
             {
-                float catchP = Mathf.Clamp(1.25f - rel / 24f + p.defense * 0.15f + (p.Has(Trait.GoleiroSeguro) ? 0.12f : 0f) - (p.dive > 0f ? 0.15f : 0f), 0.1f, 0.97f);
+                // agarrar depende de onde a bola chega: no peito/corpo atrás da bola (encaixe, baixa) segura
+                // fácil; no mergulho, quanto mais longe das mãos esticadas, mais difícil segurar (espalma)
+                var hpC = KeeperHands(p, out _);
+                float stretch = new Vector3(ball.pos.x - hpC.x, ball.pos.y - hpC.y, ball.z + ball.radius - hpC.z).magnitude;
+                float bodyBonus = p.saveKind == 1 || p.saveKind == 2 ? 0.08f : 0f;
+                float catchP = Mathf.Clamp(1.25f - rel / 24f + p.defense * 0.15f + (p.Has(Trait.GoleiroSeguro) ? 0.12f : 0f) - (p.dive > 0f ? 0.15f : 0f)
+                    - (p.Diving ? Mathf.Clamp01((stretch - 0.12f) / 0.3f) * 0.18f : 0f) + bodyBonus
+                    - (water > 0.25f ? 0.08f : 0f), 0.1f, 0.97f);   // bola molhada escorrega
                 if (rel > 8f && !rng.Chance(catchP))
                 {
                     // espalmada: a bola volta para o campo e abre para o lado (escanteio ou rebote longe do gol)
@@ -4053,6 +4070,9 @@ namespace Craquez.Sim
                     var refl = vin - n * (vn * 2f);
                     float e = rng.Range(0.28f, 0.45f) * (1.1f - p.defense * 0.3f);
                     var vout = refl * e;
+                    // a mão vem com o corpo: no mergulho a palma empurra a bola para o lado do voo (e não de
+                    // volta para o meio da área)
+                    if (p.Diving) vout += new Vector2(0f, p.saveSide) * Mathf.Min(2.5f, Mathf.Abs(p.vel.y) * 0.45f) + new Vector2(p.vel.x * 0.2f, 0f);
                     if (Vector2.Dot(vout, outDir) < 3f) vout += outDir * (3f - Vector2.Dot(vout, outDir));
                     if (ball.z > goalH * 0.75f)
                     {
