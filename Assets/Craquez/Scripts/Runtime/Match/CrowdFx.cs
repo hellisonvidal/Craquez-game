@@ -104,9 +104,17 @@ namespace Craquez
                 bool isAway = mixed ? i % 3 == 2 : awayEnd;
                 var k = isAway ? away : home;
                 int team = isAway ? _awayTeam : _homeTeam;
+                // desenhos variados (sorteados, nunca dois iguais em sequência); seleções às vezes com a bandeira do país
                 Texture2D tex = null;
-                if (team >= 0 && (i % 2 == 0 || isAway)) tex = Craquez.UI.Crest.ClubFlag(team, 128, 80);
-                if (tex == null) tex = FlagTex(k, i);
+                var tt = team >= 0 ? Teams.Get(team) : null;
+                if (tt != null && tt.IsNational && rng.NextDouble() < 0.45) tex = Craquez.UI.Crest.ClubFlag(team, 256, 160);
+                if (tex == null)
+                {
+                    int style;
+                    do style = rng.Next(FlagStyles); while (style == _lastStyle && FlagStyles > 1);
+                    _lastStyle = style;
+                    tex = FlagTex(k, team, style);
+                }
                 // espalhadas pela arquibancada: em fileiras diferentes (frente, meio e fundo) e com sorteio na posição
                 // numa fileira de verdade dessa arquibancada (nunca além da última), com um sorteio lateral pequeno
                 int row = rng.Next(Mathf.Max(1, Mathf.Min(rowsHere - 1, field ? 24 : rowsHere - 1)));
@@ -120,22 +128,101 @@ namespace Craquez
             }
         }
 
-        static Texture2D FlagTex(Kit k, int seed)
+        int _lastStyle = -1;
+        const int FlagStyles = 12;
+        static readonly System.Collections.Generic.Dictionary<string, Texture2D> _flagCache = new System.Collections.Generic.Dictionary<string, Texture2D>();
+
+        /// <summary>
+        /// Bandeira de torcida em alta resolução (256x160), com bordas suavizadas (4 amostras por pixel) e
+        /// o pano inteiro opaco. Antes: 64x40 ou o escudo ampliado por cima de listras, que saía
+        /// serrilhado e "quebrado". Doze desenhos nas cores do time.
+        /// </summary>
+        static Texture2D FlagTex(Kit k, int team, int style)
         {
-            const int w = 64, h = 40;
-            var t = new Texture2D(w, h, TextureFormat.RGBA32, true) { wrapMode = TextureWrapMode.Clamp };
-            var px = new Color32[w * h];
-            int style = seed % 3;
-            for (int y = 0; y < h; y++)
-                for (int x = 0; x < w; x++)
+            string key = Teams.Hex(k.c1) + Teams.Hex(k.c2) + ":" + team + ":" + style;
+            if (_flagCache.TryGetValue(key, out var cached) && cached != null) return cached;
+            const int W = 256, H = 160;
+            var c1 = k.c1;
+            var c2 = Mathf.Abs(k.c1.grayscale - k.c2.grayscale) > 0.08f ? k.c2 : (k.c1.grayscale > 0.5f ? new Color(0.08f, 0.09f, 0.12f) : Color.white);
+            var c3 = c1.grayscale > 0.55f || c2.grayscale > 0.55f ? Color.Lerp(c1, Color.black, 0.45f) : Color.white;   // terceira cor (detalhe)
+            Texture2D crest = null;
+            if ((style == 5 || style == 9) && team >= 0)
+            {
+                var sp = Craquez.UI.Crest.Team(team);
+                if (sp != null) crest = Craquez.UI.Crest.Readable(sp.texture);
+            }
+            var px = new Color32[W * H];
+            float aspect = W / (float)H;
+            for (int y = 0; y < H; y++)
+                for (int x = 0; x < W; x++)
                 {
-                    Color c = style == 0 ? (y < h / 2 ? k.c1 : k.c2) : style == 1 ? ((x / 8) % 2 == 0 ? k.c1 : k.c2) : (Mathf.Abs(x - y * 1.6f) < 7f ? k.c2 : k.c1);
-                    c.a = 1f;
-                    px[y * w + x] = c;
+                    Color acc = Color.clear;
+                    for (int sy = 0; sy < 2; sy++)
+                        for (int sx = 0; sx < 2; sx++)
+                        {
+                            float u = (x + 0.25f + sx * 0.5f) / W, v = (y + 0.25f + sy * 0.5f) / H;
+                            acc += FlagAt(style, u, v, aspect, c1, c2, c3, crest);
+                        }
+                    var c = acc * 0.25f;
+                    // dobras do pano (sombreado leve)
+                    float uu = (x + 0.5f) / W;
+                    float shade = 0.92f + 0.08f * Mathf.Cos(uu * 9f + (y + 0.5f) / H * 1.5f);
+                    px[y * W + x] = new Color(c.r * shade, c.g * shade, c.b * shade, 1f);
                 }
+            var t = new Texture2D(W, H, TextureFormat.RGBA32, true) { wrapMode = TextureWrapMode.Clamp, anisoLevel = 4 };
             t.SetPixels32(px);
             t.Apply(true);
+            _flagCache[key] = t;
             return t;
+        }
+
+        static Color FlagAt(int style, float u, float v, float aspect, Color c1, Color c2, Color c3, Texture2D crest)
+        {
+            float cx = (u - 0.5f) * aspect, cy = v - 0.5f;   // centro, em unidades da altura
+            switch (style)
+            {
+                case 0: return v > 0.5f ? c1 : c2;                                                             // duas faixas
+                case 1: return Mathf.Repeat(u * 5f, 1f) < 0.5f ? c1 : c2;                                       // listras verticais
+                case 2: return Mathf.Abs(cx + cy * 1.1f) < 0.2f ? c2 : c1;                                      // faixa diagonal
+                case 3: return v > 0.333f && v < 0.667f ? c2 : c1;                                              // três faixas
+                case 4: return u < (0.5f - Mathf.Abs(v - 0.5f)) * 0.9f ? c2 : (Mathf.Abs(v - 0.5f) < 0.07f ? c3 : c1);   // triângulo no mastro
+                case 5:                                                                                         // escudo num campo liso com moldura
+                {
+                    if (u < 0.05f || u > 0.95f || v < 0.08f || v > 0.92f) return c2;
+                    var e = CrestAt(crest, cx, cy, 0.68f);
+                    return Color.Lerp(c1, new Color(e.r, e.g, e.b, 1f), e.a);
+                }
+                case 6: return (u < 0.5f) == (v < 0.5f) ? c1 : c2;                                             // quartos
+                case 7: return Mathf.Abs(cy) < 0.09f || Mathf.Abs(u - 0.36f) * aspect < 0.09f ? c2 : c1;       // cruz
+                case 8: return cx * cx + cy * cy < 0.28f * 0.28f ? c2 : c1;                                    // círculo central
+                case 9:                                                                                         // escudo num círculo sobre duas faixas
+                {
+                    var bg = v > 0.5f ? c1 : c2;
+                    float r = Mathf.Sqrt(cx * cx + cy * cy);
+                    if (r < 0.4f) bg = r > 0.37f ? c3 : Color.white;
+                    var e = CrestAt(crest, cx, cy, 0.6f);
+                    return Color.Lerp(bg, new Color(e.r, e.g, e.b, 1f), e.a);
+                }
+                case 10: return (Mathf.FloorToInt(u * 4f) + Mathf.FloorToInt(v * 3f)) % 2 == 0 ? c1 : c2;      // xadrez grande
+                default:                                                                                        // faixa de torcida: barras e listra
+                    if (v < 0.12f || v > 0.88f) return c2;
+                    if (v > 0.17f && v < 0.23f || v > 0.77f && v < 0.83f) return c3;
+                    return Mathf.Abs(cy) < 0.12f ? c2 : c1;
+            }
+        }
+
+        static Color CrestAt(Texture2D crest, float cx, float cy, float size)
+        {
+            if (crest == null)
+            {
+                // sem escudo: uma estrela simples
+                float a = Mathf.Atan2(cy, cx), r = Mathf.Sqrt(cx * cx + cy * cy);
+                float star = 0.16f + 0.08f * Mathf.Cos(a * 5f);
+                return r < star ? Color.white : Color.clear;
+            }
+            float cu = cx / size + 0.5f, cv = cy / size + 0.5f;
+            if (cu < 0f || cu > 1f || cv < 0f || cv > 1f) return Color.clear;
+            return crest.GetPixelBilinear(cu, cv);
         }
 
         ParticleSystem Particles(string name, Color c, float size, float life, int max)
@@ -250,7 +337,7 @@ namespace Craquez
             f._sweepFreq = 0.55f + (float)r.NextDouble() * 0.5f;
             f._restCycle = 9f + (float)r.NextDouble() * 9f;
             var mk = new MeshKit();
-            const int nx = 10, ny = 4;
+            const int nx = 16, ny = 7;   // (10x4 deixava o pano em degraus ao ondular)
             for (int a = 0; a < nx; a++)
                 for (int b = 0; b < ny; b++)
                 {

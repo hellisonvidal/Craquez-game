@@ -72,6 +72,10 @@ namespace Craquez
             ("Campo do Bairro", 1, 0, false), ("Estádio Caldeirão da Vila", 3, 3, false), ("Estádio Olímpico Nacional", 3, 1, true),
             ("Arena do Litoral", 3, 1, false), ("Estádio da Serra", 2, 0, false), ("Arena Imperial", 3, 2, false), ("Estádio Centenário", 2, 1, true),
             ("Arena do Deserto", 3, 3, false), ("Estádio Ribeirinho", 2, 0, false), ("Arena Futuro", 3, 2, false), ("Estádio Alpino", 1, 3, false),
+            ("Arena das Almofadas", 3, 2, false), ("Estádio das Palmeiras", 2, 0, false), ("Arena Cristal", 3, 1, false), ("Estádio Velho Porto", 2, 1, false),
+            ("Estádio Operário", 1, 3, false), ("Arena Azulejo", 3, 2, false), ("Estádio Fortaleza", 3, 0, false), ("Arena Solar", 3, 3, false),
+            ("Estádio Brutalista", 2, 1, true), ("Estádio do Bosque", 1, 1, false), ("Arena Prata", 3, 2, false), ("Arena Glacial", 2, 0, false),
+            ("Estádio Jardim Botânico", 2, 3, true), ("Arena do Sertão", 2, 2, false), ("Estádio da Usina", 3, 1, false),
         };
 
         public static Venue Stadium(MatchSim sim, TeamData home, TeamData away, Kit homeKit, Kit awayKit, bool night, int quality, Transform parent, int model = 0)

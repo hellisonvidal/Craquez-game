@@ -65,6 +65,36 @@ namespace Craquez
             new StadiumStyle(40, true, true, 2, new Color(0.35f, 0.15f, 0.55f), new Color(0.92f, 0.92f, 0.95f), RoofWhite, 1, 0, new Color(0.7f, 0.2f, 1f), true, false, 0.93f),
             // 14 Alpino: pequeno, cadeiras vermelhas, montanhas nevadas e pinheiros, postes baixos
             new StadiumStyle(18, true, false, 1, new Color(0.7f, 0.12f, 0.12f), new Color(0.52f, 0.4f, 0.3f), new Color(0.45f, 0.3f, 0.2f), 2, 6, None, false, false, 0.75f),
+            // 15 Arena das Almofadas: bacia fechada, almofadas vermelhas acesas, cadeiras vermelhas, cidade
+            new StadiumStyle(42, true, true, 2, new Color(0.75f, 0.1f, 0.14f), new Color(0.9f, 0.9f, 0.92f), RoofWhite, 1, 0, new Color(0.95f, 0.15f, 0.2f), true, false, 0.95f),
+            // 16 Palmeiras: médio, cobertura verde só nos lados, torres, campo aberto com árvores
+            new StadiumStyle(24, true, false, 1, new Color(0.1f, 0.5f, 0.25f), new Color(0.75f, 0.74f, 0.68f), new Color(0.15f, 0.42f, 0.25f), 0, 1, None, false, false, 0.8f),
+            // 17 Cristal: bacia alta de vidro escuro com arco prateado, LED ciano
+            new StadiumStyle(44, true, true, 3, new Color(0.1f, 0.12f, 0.18f), new Color(0.25f, 0.28f, 0.33f), new Color(0.7f, 0.72f, 0.76f), 1, 0, new Color(0.1f, 0.85f, 1f), true, false, 0.95f),
+            // 18 Velho Porto: tijolo, cadeiras laranja, alambrado, rio atrás do gol
+            new StadiumStyle(30, true, false, 1, new Color(0.85f, 0.42f, 0.12f), new Color(0.55f, 0.3f, 0.22f), new Color(0.28f, 0.28f, 0.3f), 0, 5, None, false, true, 0.85f),
+            // 19 Operário: um lance só, aço aparente, postes baixos, alambrado
+            new StadiumStyle(14, false, false, 0, new Color(0.9f, 0.55f, 0.1f), new Color(0.45f, 0.45f, 0.47f), RoofWhite, 2, 0, None, false, true, 0.75f),
+            // 20 Azulejo: anel azul e branco à beira-mar
+            new StadiumStyle(38, true, true, 2, new Color(0.12f, 0.35f, 0.8f), new Color(0.92f, 0.93f, 0.95f), RoofWhite, 1, 2, new Color(0.15f, 0.45f, 0.95f), false, false, 0.9f),
+            // 21 Fortaleza: o mais íngreme, pedra escura, cadeiras pretas, montanhas
+            new StadiumStyle(48, true, true, 1, new Color(0.12f, 0.12f, 0.13f), new Color(0.35f, 0.33f, 0.3f), new Color(0.22f, 0.22f, 0.24f), 0, 3, None, false, true, 0.97f),
+            // 22 Solar: anel amarelo no deserto, LED laranja
+            new StadiumStyle(36, true, true, 2, new Color(0.95f, 0.75f, 0.1f), new Color(0.88f, 0.82f, 0.66f), new Color(0.98f, 0.9f, 0.6f), 1, 4, new Color(1f, 0.55f, 0.1f), true, false, 0.88f),
+            // 23 Brutalista: concreto bruto, pista, cobertura nos lados, torres
+            new StadiumStyle(34, true, false, 1, new Color(0.5f, 0.5f, 0.5f), new Color(0.52f, 0.52f, 0.5f), new Color(0.45f, 0.45f, 0.44f), 0, 0, None, false, false, 0.82f),
+            // 24 Bosque: pequeno, madeira, cobertura verde, postes baixos, mata em volta
+            new StadiumStyle(16, true, false, 1, new Color(0.45f, 0.3f, 0.18f), new Color(0.5f, 0.38f, 0.26f), new Color(0.2f, 0.38f, 0.22f), 2, 1, None, false, false, 0.75f),
+            // 25 Prata: bacia com arco, tudo prateado, LED branco
+            new StadiumStyle(40, true, true, 3, new Color(0.62f, 0.64f, 0.68f), new Color(0.8f, 0.82f, 0.85f), new Color(0.86f, 0.87f, 0.9f), 1, 0, new Color(0.9f, 0.95f, 1f), true, false, 0.92f),
+            // 26 Glacial: anel branco com cadeiras ciano, neve em volta
+            new StadiumStyle(28, true, true, 2, new Color(0.15f, 0.7f, 0.8f), new Color(0.9f, 0.93f, 0.96f), RoofWhite, 1, 6, new Color(0.3f, 0.85f, 0.95f), false, false, 0.82f),
+            // 27 Jardim Botânico: só as laterais, pista, vidro verde, campo arborizado
+            new StadiumStyle(26, false, false, 1, new Color(0.1f, 0.45f, 0.4f), new Color(0.3f, 0.42f, 0.36f), new Color(0.55f, 0.75f, 0.65f), 0, 1, None, false, false, 0.8f),
+            // 28 Sertão: terracota, cadeiras laranja, sem cantos, deserto
+            new StadiumStyle(30, true, false, 1, new Color(0.88f, 0.45f, 0.15f), new Color(0.72f, 0.42f, 0.28f), new Color(0.62f, 0.36f, 0.24f), 0, 4, None, false, false, 0.85f),
+            // 29 Usina: bacia escura industrial, cadeiras amarelas, rio, alambrado
+            new StadiumStyle(44, true, true, 2, new Color(0.9f, 0.75f, 0.1f), new Color(0.26f, 0.26f, 0.28f), new Color(0.15f, 0.15f, 0.16f), 1, 5, new Color(1f, 0.8f, 0.1f), false, true, 0.95f),
         };
 
         public static StadiumStyle StyleOf(int model, int homeTier)

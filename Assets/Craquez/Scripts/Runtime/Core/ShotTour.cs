@@ -342,7 +342,7 @@ namespace Craquez
                 yield return new WaitForSecondsRealtime(0.5f);
             }
             // estádios: vista aberta de cada modelo (arquibancada, cobertura, torcida, entorno)
-            foreach (int m in new[] { 1, 2, 5, 6, 7, 9, 11, 13, 14 })
+            foreach (int m in new[] { 1, 6, 13, 15, 17, 18, 21, 26, 29 })
             {
                 var mc = _app.Tour_Match(GameModes.Field, false, m % 2 == 0 ? "noite" : "dia", "sol", m);
                 yield return new WaitForSecondsRealtime(1.5f);
@@ -357,7 +357,7 @@ namespace Craquez
                     bc.cam.fieldOfView = bc.cineFov = 62f;
                     yield return Shot("estadio_" + m, 1.2f);
                     // de fora: vista aérea do entorno e a esplanada na altura de quem chega
-                    if (m == 1 || m == 2 || m == 6 || m == 13)
+                    if (m == 1 || m == 15 || m == 18 || m == 21 || m == 29)
                     {
                         bc.showAll = true;
                         bc.cam.transform.position = bc.cinePos = new Vector3(-hl * 1.4f, 70f, -hw * 3.6f);
