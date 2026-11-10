@@ -95,8 +95,9 @@ namespace Craquez
             // só o tronco e o pescoço: os ossos que dobram (coxa, canela, braço, antebraço) não são
             // escalados — com escala desigual, o joelho e o cotovelo entortavam ao dobrar (pernas
             // "para dentro"); a perna fica com a forma original do modelo
-            ("spine_01", 0.84f, 0.95f), ("spine_02", 0.9f, 1.0f), ("spine_03", 0.95f, 1.05f),
-            ("clavicle_l", 0.98f, 1.03f), ("clavicle_r", 0.98f, 1.03f), ("neck_01", 0.97f, 1.05f),
+            // cintura fina e peito mais cheio (o "V" do atleta)
+            ("spine_01", 0.84f, 0.95f), ("spine_02", 0.92f, 1.02f), ("spine_03", 1.0f, 1.09f),
+            ("clavicle_l", 0.98f, 1.03f), ("clavicle_r", 0.98f, 1.03f), ("neck_01", 1.0f, 1.08f),
         };
 
         /// <summary>
@@ -122,7 +123,10 @@ namespace Craquez
                 var dir = b.InverseTransformDirection(child.position - b.position).normalized;
                 int len = Mathf.Abs(dir.x) > Mathf.Abs(dir.y) ? (Mathf.Abs(dir.x) > Mathf.Abs(dir.z) ? 0 : 2) : (Mathf.Abs(dir.y) > Mathf.Abs(dir.z) ? 1 : 2);
                 var sc = Vector3.one * k;
-                sc[len] = 1f;
+                // comprimento: clavícula mais longa = ombros mais largos (o modelo tinha ombros caídos e
+                // estreitos para um atleta); pescoço um pouco mais curto
+                sc[len] = name.StartsWith("clavicle") ? Mathf.Lerp(1.06f, 1.16f, Mathf.Clamp01(frame * 0.6f + build * 0.4f))
+                    : name == "neck_01" ? 0.88f : 1f;
                 b.localScale = Vector3.Scale(b.localScale, sc);
                 // filhos: desfaz a escala do pai no referencial de cada filho
                 foreach (Transform c in b)

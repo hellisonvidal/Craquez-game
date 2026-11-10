@@ -1,6 +1,7 @@
 using Craquez.Sim;
 using UnityEngine;
 using UnityEngine.InputSystem;
+using UnityEngine.InputSystem.Controls;
 using UnityEngine.InputSystem.DualShock;
 
 namespace Craquez
@@ -26,6 +27,7 @@ namespace Craquez
         public static DeviceKind DefaultP1()
         {
             if (Gamepad.all.Count > 0) return DeviceKind.Gamepad1;
+            if (Platform.IsTv) return DeviceKind.Keyboard1;   // TV sem controle: teclado/controle remoto (sem toque)
             if (Application.isMobilePlatform || (Touchscreen.current != null && Keyboard.current == null)) return DeviceKind.Touch;
             return DeviceKind.Keyboard1;
         }
@@ -35,6 +37,43 @@ namespace Craquez
             if (p1 == DeviceKind.Gamepad1 && Gamepad.all.Count > 1) return DeviceKind.Gamepad2;
             if (p1 != DeviceKind.Gamepad1 && Gamepad.all.Count > 0) return DeviceKind.Gamepad1;
             return p1 == DeviceKind.Keyboard1 ? DeviceKind.Keyboard2 : DeviceKind.Keyboard1;
+        }
+
+#if UNITY_ANDROID && !UNITY_EDITOR
+        /// <summary>
+        /// No Android o layout padrão da Unity lê o gatilho só do eixo "GAS": muitos controles (e caixas de
+        /// TV) mandam o gatilho no eixo RTRIGGER ou como botão R2, e aí o CORRER (R2/RT) nunca chegava.
+        /// Acrescenta esses dois caminhos aos controles do Android.
+        /// </summary>
+        [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.BeforeSceneLoad)]
+        static void AndroidTriggers()
+        {
+            try
+            {
+                // estado: 7 palavras de botões (220 bits) e depois os eixos em float
+                InputSystem.RegisterLayoutOverride(@"{
+                    ""name"": ""CraquezAndroidTriggers"",
+                    ""extendMultiple"": [ ""AndroidGamepad"", ""AndroidGamepadWithDpadAxes"", ""AndroidGamepadWithDpadButtons"", ""DualShock4GamepadAndroid"", ""XboxOneGamepadAndroid"" ],
+                    ""controls"": [
+                        { ""name"": ""craquezLT"", ""layout"": ""Axis"", ""offset"": 96, ""format"": ""FLT"", ""parameters"": ""clamp=1,clampMin=0,clampMax=1"" },
+                        { ""name"": ""craquezRT"", ""layout"": ""Axis"", ""offset"": 100, ""format"": ""FLT"", ""parameters"": ""clamp=1,clampMin=0,clampMax=1"" },
+                        { ""name"": ""craquezL2"", ""layout"": ""Button"", ""offset"": 12, ""bit"": 8, ""format"": ""BIT"" },
+                        { ""name"": ""craquezR2"", ""layout"": ""Button"", ""offset"": 12, ""bit"": 9, ""format"": ""BIT"" }
+                    ]
+                }");
+            }
+            catch (System.Exception e) { Debug.LogWarning("[controle] gatilhos extras: " + e.Message); }
+        }
+#endif
+
+        /// <summary>Gatilho apertado: eixo padrão, eixo alternativo do Android ou botão digital L2/R2.</summary>
+        static bool Trigger(Gamepad g, bool right)
+        {
+            var t = right ? g.rightTrigger : g.leftTrigger;
+            if (t.ReadValue() > 0.35f) return true;
+            if (g.TryGetChildControl(right ? "craquezRT" : "craquezLT") is AxisControl a && a.ReadValue() > 0.35f) return true;
+            if (g.TryGetChildControl(right ? "craquezR2" : "craquezL2") is ButtonControl b && b.isPressed) return true;
+            return false;
         }
 
         static Gamepad Pad(int i) => Gamepad.all.Count > i ? Gamepad.all[i] : null;
@@ -62,9 +101,9 @@ namespace Craquez
                     if (g.buttonEast.isPressed) f.buttons |= InputFrame.Shoot;
                     if (g.buttonWest.isPressed) f.buttons |= InputFrame.Lob;
                     if (g.buttonNorth.isPressed) f.buttons |= InputFrame.Through;
-                    if (g.rightTrigger.ReadValue() > 0.35f) f.buttons |= InputFrame.Sprint;
+                    if (Trigger(g, true)) f.buttons |= InputFrame.Sprint;
                     if (g.leftShoulder.isPressed) f.buttons |= InputFrame.Switch;
-                    if (g.leftTrigger.ReadValue() > 0.35f) f.buttons |= InputFrame.Shield;
+                    if (Trigger(g, false)) f.buttons |= InputFrame.Shield;
                     if (g.rightShoulder.isPressed) f.buttons |= InputFrame.Finesse;
                     if (g.startButton.isPressed) f.buttons |= InputFrame.Pause;
                     break;

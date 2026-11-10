@@ -328,6 +328,25 @@ namespace Craquez
                 _app.Tour_EndMatch();
                 yield return new WaitForSecondsRealtime(0.5f);
             }
+            // arena de treino: só o atacante e o goleiro no CT, câmera atrás do jogador, sem placar
+            {
+                var mc = _app.Tour_Training();
+                yield return new WaitForSecondsRealtime(1f);
+                yield return Shot("treino_inicio", 2f);
+                if (mc != null && mc.view != null)
+                {
+                    var bc = mc.view.bcam;
+                    bc.cinematic = true;
+                    bc.cam.transform.position = bc.cinePos = new Vector3(-mc.sim.halfLen * 0.2f, 34f, -mc.sim.halfW * 2.4f);
+                    bc.cineLook = new Vector3(0f, 0f, 6f);
+                    bc.cam.transform.LookAt(bc.cineLook);
+                    bc.cam.fieldOfView = bc.cineFov = 50f;
+                    yield return Shot("treino_ct", 1f);
+                    bc.cinematic = false;
+                }
+                _app.Tour_EndMatch();
+                yield return new WaitForSecondsRealtime(0.5f);
+            }
             Debug.Log("[shots] fim");
             Application.Quit(0);
         }

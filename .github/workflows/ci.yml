@@ -103,6 +103,13 @@ jobs:
           buildName: Craquez
           versioning: None
           androidExportType: androidPackage
+          # chave de assinatura fixa (segredos do repositório): sem ela cada build sai com uma chave de
+          # depuração nova e o Android não aceita instalar a versão nova por cima (atualização pelo jogo)
+          androidKeystoreName: ${{ secrets.ANDROID_KEYSTORE_BASE64 != '' && 'craquez.keystore' || '' }}
+          androidKeystoreBase64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          androidKeystorePass: ${{ secrets.ANDROID_KEYSTORE_PASS }}
+          androidKeyaliasName: ${{ secrets.ANDROID_KEYALIAS_NAME }}
+          androidKeyaliasPass: ${{ secrets.ANDROID_KEYALIAS_PASS }}
       # option file completo (times, elencos, estádios, bolas, chuteiras) ao lado do executável no PC
       - name: Option file nos pacotes do PC
         if: matrix.targetPlatform == 'StandaloneWindows64' || matrix.targetPlatform == 'StandaloneLinux64'
@@ -245,6 +252,13 @@ jobs:
           buildName: CraquezCasa
           versioning: None
           androidExportType: androidPackage
+          # chave de assinatura fixa (segredos do repositório): sem ela cada build sai com uma chave de
+          # depuração nova e o Android não aceita instalar a versão nova por cima (atualização pelo jogo)
+          androidKeystoreName: ${{ secrets.ANDROID_KEYSTORE_BASE64 != '' && 'craquez.keystore' || '' }}
+          androidKeystoreBase64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          androidKeystorePass: ${{ secrets.ANDROID_KEYSTORE_PASS }}
+          androidKeyaliasName: ${{ secrets.ANDROID_KEYALIAS_NAME }}
+          androidKeyaliasPass: ${{ secrets.ANDROID_KEYALIAS_PASS }}
           allowDirtyBuild: true
       - name: Rascunho de release (privado)
         env:

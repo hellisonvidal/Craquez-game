@@ -1,7 +1,9 @@
 using Craquez.Sim;
 using Craquez.UI;
 using UnityEngine;
+using System.Collections.Generic;
 using UnityEngine.EventSystems;
+using UnityEngine.InputSystem;
 using UnityEngine.UI;
 
 namespace Craquez
@@ -22,6 +24,49 @@ namespace Craquez
             return tc;
         }
 
+        readonly List<TouchButton> _btns = new List<TouchButton>();
+        RectTransform _stickArea;
+
+        /// <summary>
+        /// Botões lidos direto dos toques a cada quadro (multitoque de verdade): o dedo pode escorregar
+        /// um pouco para fora do botão sem soltar (antes o CORRER "caía" assim que o polegar rolava), e
+        /// um dedo que começou no analógico nunca aciona botão.
+        /// </summary>
+        void Update()
+        {
+            int mask = 0;
+            var ts = Touchscreen.current;
+            if (ts != null)
+            {
+                foreach (var t in ts.touches)
+                {
+                    if (!t.press.isPressed) continue;
+                    if (_stickArea != null && RectTransformUtility.RectangleContainsScreenPoint(_stickArea, t.startPosition.ReadValue(), null)) continue;
+                    mask |= Hit(t.position.ReadValue(), t.startPosition.ReadValue());
+                }
+            }
+            var mouse = Mouse.current;
+            if (mouse != null && mouse.leftButton.isPressed && (ts == null || !ts.press.isPressed))
+                mask |= Hit(mouse.position.ReadValue(), mouse.position.ReadValue());
+            TouchState.buttons = (TouchState.buttons & InputFrame.Pause) | mask;
+            foreach (var b in _btns) b.Show((mask & b.bit) != 0);
+        }
+
+        int Hit(Vector2 pos, Vector2 start)
+        {
+            TouchButton best = null;
+            float bestD = float.MaxValue;
+            foreach (var b in _btns)
+            {
+                var c = RectTransformUtility.WorldToScreenPoint(null, b.rt.position);
+                float r = b.rt.rect.width * 0.5f * b.rt.lossyScale.x;
+                float d = Vector2.Distance(pos, c);
+                // segura até 1,45x o raio (polegar rola), mas o toque precisa ter começado perto do botão
+                if (d < r * 1.45f && Vector2.Distance(start, c) < r * 2.2f && d / r < bestD) { bestD = d / r; best = b; }
+            }
+            return best != null ? best.bit : 0;
+        }
+
         void OnDestroy()
         {
             TouchState.active = false;
@@ -33,6 +78,7 @@ namespace Craquez
         {
             // analógico (metade esquerda)
             var stickArea = UiKit.Image(root, new Color(0, 0, 0, 0.001f), null, "area analogico").rectTransform.Place(0, 0, 0.42f, 0.72f);
+            _stickArea = stickArea;
             var stick = stickArea.gameObject.AddComponent<TouchStick>();
             stick.Build(stickArea);
             // área de dribles (faixa central/direita superior)
@@ -52,7 +98,7 @@ namespace Craquez
             // (o botão de pausa fica no HUD, visível em todas as partidas)
         }
 
-        static void Btn(RectTransform root, string label, int bit, Vector2 pos, float size, Color c)
+        void Btn(RectTransform root, string label, int bit, Vector2 pos, float size, Color c)
         {
             var img = UiKit.Image(root, new Color(c.r, c.g, c.b, 0.55f), Theme.Circle, "btn " + label);
             // centro do botão em (pos) a partir do canto inferior direito, sempre dentro da tela
@@ -63,22 +109,30 @@ namespace Craquez
             rt.anchoredPosition = new Vector2(Mathf.Min(pos.x, -size * 0.5f - 16f), Mathf.Max(pos.y, size * 0.5f + 16f));
             var t = UiKit.Label(img.transform, label, size > 120 ? 30 : 22, Theme.Head, Color.white, TextAnchor.MiddleCenter);
             t.rectTransform.Place(0, 0, 1, 1);
+            img.raycastTarget = false;   // lido em Update (multitoque), não por eventos
             var b = img.gameObject.AddComponent<TouchButton>();
             b.bit = bit;
             b.img = img;
+            b.rt = rt;
             b.baseColor = img.color;
+            _btns.Add(b);
         }
     }
 
-    public class TouchButton : MonoBehaviour, IPointerDownHandler, IPointerUpHandler, IPointerExitHandler
+    public class TouchButton : MonoBehaviour
     {
         public int bit;
         public Image img;
+        public RectTransform rt;
         public Color baseColor;
-        public void OnPointerDown(PointerEventData e) { TouchState.buttons |= bit; img.color = new Color(baseColor.r, baseColor.g, baseColor.b, 0.95f); }
-        public void OnPointerUp(PointerEventData e) => Release();
-        public void OnPointerExit(PointerEventData e) { if (e.pointerPress == gameObject) Release(); }
-        void Release() { TouchState.buttons &= ~bit; img.color = baseColor; }
+        bool _on;
+        public void Show(bool on)
+        {
+            if (on == _on) return;
+            _on = on;
+            img.color = on ? new Color(baseColor.r, baseColor.g, baseColor.b, 0.95f) : baseColor;
+            rt.localScale = Vector3.one * (on ? 0.92f : 1f);
+        }
     }
 
     /// <summary>Solta o botão de pausa no quadro seguinte (é um "toque").</summary>

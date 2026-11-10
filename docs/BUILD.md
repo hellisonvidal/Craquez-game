@@ -30,6 +30,44 @@ A licença **Unity Personal é gratuita** (até US$ 200 mil de receita por ano).
 
 Os segredos ficam criptografados no GitHub e só são usados pelos jobs de build.
 
+### Chave de assinatura do Android (para atualizar pelo jogo)
+
+Sem uma chave fixa, cada build sai assinado com uma chave de depuração nova e o Android recusa
+instalar a versão nova por cima da antiga ("app não instalado"). Crie a chave uma vez, no seu PC
+(precisa do Java; troque `SUA_SENHA`), e guarde o arquivo `craquez.keystore` num lugar seguro:
+
+```bash
+keytool -genkeypair -v -keystore craquez.keystore -alias craquez -keyalg RSA -keysize 2048 -validity 36500 -storepass SUA_SENHA -keypass SUA_SENHA -dname "CN=Craquez"
+```
+
+Depois crie quatro segredos em **Settings → Secrets and variables → Actions**:
+
+- `ANDROID_KEYSTORE_BASE64`: o arquivo em base64 (`base64 -w0 craquez.keystore` no Linux,
+  `[Convert]::ToBase64String([IO.File]::ReadAllBytes("craquez.keystore"))` no PowerShell)
+- `ANDROID_KEYSTORE_PASS` e `ANDROID_KEYALIAS_PASS`: a senha
+- `ANDROID_KEYALIAS_NAME`: `craquez`
+
+Ou pelo terminal, com o `gh` instalado:
+
+```bash
+base64 -w0 craquez.keystore | gh secret set ANDROID_KEYSTORE_BASE64 --repo hellisonvidal/Craquez-game
+```
+
+```bash
+gh secret set ANDROID_KEYSTORE_PASS --repo hellisonvidal/Craquez-game --body SUA_SENHA
+```
+
+```bash
+gh secret set ANDROID_KEYALIAS_PASS --repo hellisonvidal/Craquez-game --body SUA_SENHA
+```
+
+```bash
+gh secret set ANDROID_KEYALIAS_NAME --repo hellisonvidal/Craquez-game --body craquez
+```
+
+A primeira versão assinada com essa chave precisa ser instalada desinstalando a antiga uma vez;
+daí em diante o botão **ATUALIZAR** do jogo baixa o APK novo e abre o instalador do Android.
+
 ## No seu PC
 
 1. Abra a pasta do repositório no Unity Hub (**Add project from disk**) com o editor 6000.3.28f1

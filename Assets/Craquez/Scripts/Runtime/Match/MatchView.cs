@@ -60,12 +60,13 @@ namespace Craquez
             var away = Teams.Get(c.teamB);
             kits = Teams.PickKits(home, away, c.kitA, c.kitB);
             // society e rua: sem som de torcida (campo pequeno, sem arquibancada cheia)
-            Sfx.NoCrowd = s.mode.id == GameModes.Society || s.mode.id == GameModes.Street;
+            Sfx.NoCrowd = s.mode.id == GameModes.Society || s.mode.id == GameModes.Street || c.training;
             _quietOwner = this;
             _night = c.timeOfDay == "noite";
             Lighting(c.timeOfDay, s.mode.id, q);
             FanCrowd.HomeKits = home.kits; FanCrowd.AwayKits = away.kits;   // torcedores com os uniformes dos times
-            if (s.mode.id == GameModes.Futsal) venue = VenueBuilder.Futsal(s, home, away, kits[0], kits[1], c.venue, _night, q, transform);
+            if (c.training) venue = VenueBuilder.TrainingGround(s, home, kits[0], _night, q, transform);   // só o campo: sem torcida, placar, juiz
+            else if (s.mode.id == GameModes.Futsal) venue = VenueBuilder.Futsal(s, home, away, kits[0], kits[1], c.venue, _night, q, transform);
             else if (s.mode.id == GameModes.Street) venue = VenueBuilder.Street(s, home, away, kits[0], kits[1], c.venue, _night, q, transform);
             else if (s.mode.id == GameModes.Society) venue = VenueBuilder.Society(s, home, away, kits[0], kits[1], c.venue, _night, q, transform);
             else venue = VenueBuilder.Stadium(s, home, away, kits[0], kits[1], _night, q, transform, c.stadium);
@@ -76,9 +77,9 @@ namespace Craquez
             var parent = new GameObject("Atletas").transform;
             _athParent = parent;
             parent.SetParent(transform, false);
-            if (s.mode.id != GameModes.Street) _crowd = CrowdFx.Create(transform, s, venue, kits[0], kits[1], _night, q, c.teamA, c.teamB);
-            life = VenueLife.Create(transform, s, venue, kits[0], kits[1], home, away, _night, q, cam, c.venue);
-            var extras = VenueExtras.Create(transform, s, venue, kits[0], kits[1], _night, q, c.venue);
+            if (s.mode.id != GameModes.Street && !c.training) _crowd = CrowdFx.Create(transform, s, venue, kits[0], kits[1], _night, q, c.teamA, c.teamB);
+            if (!c.training) life = VenueLife.Create(transform, s, venue, kits[0], kits[1], home, away, _night, q, cam, c.venue);
+            var extras = c.training ? null : VenueExtras.Create(transform, s, venue, kits[0], kits[1], _night, q, c.venue);
             _occRoots = new[] { _crowd != null ? _crowd.transform : null, life != null ? life.transform : null, extras != null ? extras.transform : null };
             AthleteFactory.IndoorShoes = c.mode == GameModes.Futsal;
             // capitão: o primeiro "Líder" de cada time (ou o camisa de número mais baixo entre os de linha)
@@ -94,15 +95,16 @@ namespace Craquez
                 av.Setup(p, rig, this);
                 athletes.Add(av);
             }
-            if (s.mode.id == GameModes.Field) BuildReferee(parent, q);
-            if (s.mode.id == GameModes.Field) BuildBench(parent, q);
+            if (s.mode.id == GameModes.Field && !c.training) BuildReferee(parent, q);
+            if (s.mode.id == GameModes.Field && !c.training) BuildBench(parent, q);
             BuildBall(q);
-            BuildStations();
+            if (!c.training) BuildStations();
             _marker0 = Marker(new Color(0.1f, 0.85f, 1f));
             _marker1 = Marker(new Color(1f, 0.55f, 0.1f));
             bcam = cam.gameObject.GetComponent<BroadcastCamera>();
             if (bcam == null) bcam = cam.gameObject.AddComponent<BroadcastCamera>();
-            bcam.Setup(cam, s, Settings.Camera);
+            // treino: câmera que acompanha o jogador (atrás dele), sem mexer na escolhida para as partidas
+            bcam.Setup(cam, s, c.training ? (int)BroadcastCamera.Kind.Behind : Settings.Camera);
             // tudo o que é cenário (estrutura, torcida, bandeiras, gente da rua, extras) some quando tapa o jogo
             var roots = new System.Collections.Generic.List<Transform> { venue.root };
             if (_occRoots != null) roots.AddRange(_occRoots);
@@ -118,7 +120,8 @@ namespace Craquez
             s.SetPitch(weather.Water, weather.SnowCover);
             PuddleFx.Create(venue.root, s, weather, this);
             UrpSetup.Camera(cam, q);
-            Sfx.Crowd(s.mode.id == GameModes.Field ? 0.55f : 0.3f, s.mode.id == GameModes.Field ? 0.25f : 0f);
+            if (c.training) Sfx.Crowd(0f, 0f);
+            else Sfx.Crowd(s.mode.id == GameModes.Field ? 0.55f : 0.3f, s.mode.id == GameModes.Field ? 0.25f : 0f);
             FanCrowd.Hype = 0f; FanCrowd.GoalT = 0f; FanCrowd.GoalTeam = -1; FanCrowd.OlaStart = -100f; FanCrowd.ShotT = 0f; FanCrowd.FoulT = 0f;
         }
 

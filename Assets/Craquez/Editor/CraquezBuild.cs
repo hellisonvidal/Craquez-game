@@ -20,7 +20,11 @@ namespace Craquez.EditorTools
 
         // o CI (GameCI) usa o próprio script de build: as configurações do jogo (tela cheia,
         // orientação, ícones, materiais) entram aqui, antes de qualquer build
-        public void OnPreprocessBuild(BuildReport report) => Common();
+        public void OnPreprocessBuild(BuildReport report)
+        {
+            Common();
+            if (report.summary.platform == BuildTarget.Android) AndroidTv();
+        }
 
         [InitializeOnLoadMethod]
         static void OnLoad()
@@ -272,6 +276,43 @@ namespace Craquez.EditorTools
             if (Application.isBatchMode) EditorApplication.Exit(report.summary.result == BuildResult.Succeeded ? 0 : 1);
         }
 
+        /// <summary>
+        /// Android TV (inclusive 4K): aparece na tela inicial da TV (leanback, com banner), não exige tela
+        /// de toque e aceita o controle remoto/D-pad. A resolução 4K é tratada em tempo de execução
+        /// (escala de renderização, ver UrpSetup).
+        /// </summary>
+        static void AndroidTv()
+        {
+            PlayerSettings.Android.androidTVCompatibility = true;
+            var path = IconDir + "craquez_tv_banner.png";
+            if (AssetImporter.GetAtPath(path) is TextureImporter ti && (ti.textureCompression != TextureImporterCompression.Uncompressed || ti.mipmapEnabled))
+            {
+                ti.textureCompression = TextureImporterCompression.Uncompressed;
+                ti.mipmapEnabled = false;
+                ti.npotScale = TextureImporterNPOTScale.None;
+                ti.SaveAndReimport();
+            }
+            var banner = AssetDatabase.LoadAssetAtPath<Texture2D>(path);
+            var ps = Unsupported.GetSerializedAssetInterfaceSingleton("PlayerSettings");
+            if (banner != null && ps != null)
+            {
+                var so = new SerializedObject(ps);
+                var en = so.FindProperty("androidEnableBanner");
+                if (en != null) en.boolValue = true;
+                var b = so.FindProperty("m_AndroidBanners");
+                if (b != null && b.isArray)
+                {
+                    if (b.arraySize == 0) b.arraySize = 1;
+                    var e = b.GetArrayElementAtIndex(0);
+                    e.FindPropertyRelative("width").intValue = 320;
+                    e.FindPropertyRelative("height").intValue = 180;
+                    e.FindPropertyRelative("banner").objectReferenceValue = banner;
+                }
+                so.ApplyModifiedPropertiesWithoutUndo();
+                Debug.Log("[build] Android TV: banner aplicado");
+            }
+        }
+
         [MenuItem("Craquez/Build Android (APK)")]
         public static void BuildAndroid()
         {
@@ -281,6 +322,7 @@ namespace Craquez.EditorTools
             PlayerSettings.Android.minSdkVersion = AndroidSdkVersions.AndroidApiLevel26;
             PlayerSettings.SetApplicationIdentifier(NamedBuildTarget.Android, Casa ? "com.hellisonvidal.craquez.casa" : "com.hellisonvidal.craquez");
             EditorUserBuildSettings.buildAppBundle = false;
+            AndroidTv();
             Run(BuildTarget.Android, BuildTargetGroup.Android, Out("Builds/Android/Craquez.apk"));
         }
 

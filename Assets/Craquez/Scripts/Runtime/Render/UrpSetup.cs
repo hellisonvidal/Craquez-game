@@ -38,7 +38,14 @@ namespace Craquez
                 urp.shadowCascadeCount = mobile ? (sh >= 4 ? 2 : 1) : (sh >= 4 ? 4 : sh == 3 ? 2 : 1);
                 // escala de render: automática (nativa; só o "Leve" do celular reduz) ou a escolhida
                 float rs = Settings.RenderScaleValues[Mathf.Clamp(Settings.RenderScale, 0, Settings.RenderScaleValues.Length - 1)];
-                urp.renderScale = rs > 0f ? rs : (mobile ? (q >= 1 ? 1f : 0.8f) : 1f);
+                float auto = mobile ? (q >= 1 ? 1f : 0.8f) : 1f;
+                // telas grandes (TV 4K, monitores 1440p/4K): limita a altura do 3D e amplia com FSR
+                int h = Mathf.Max(Screen.height, 1);
+                auto = Mathf.Min(auto, Platform.MaxRenderHeight(q) / (float)h);
+                urp.renderScale = Mathf.Clamp(rs > 0f ? rs : auto, 0.3f, 2f);
+                urp.upscalingFilter = urp.renderScale < 0.99f ? UpscalingFilterSelection.FSR : UpscalingFilterSelection.Auto;
+                urp.fsrOverrideSharpness = true;
+                urp.fsrSharpness = 0.85f;
                 int aa = Settings.Antialias;
                 urp.msaaSampleCount = aa == 5 ? 2 : aa == 6 ? 4 : aa == 7 ? 8 : 1;
                 urp.supportsHDR = q >= 1;

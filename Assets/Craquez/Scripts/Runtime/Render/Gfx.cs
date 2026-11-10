@@ -435,6 +435,35 @@ namespace Craquez
             return t;
         }
 
+        /// <summary>
+        /// Concreto aparente de estádio (pré-moldado): claro e liso, com variação suave de tom, manchas leves
+        /// de chuva escorrendo e as juntas das placas. Antes usava a textura de asfalto (cinza manchado).
+        /// </summary>
+        public static Texture2D Concrete(int size, int seed)
+        {
+            var t = Tex(size, size);
+            var px = new Color32[size * size];
+            for (int y = 0; y < size; y++)
+                for (int x = 0; x < size; x++)
+                {
+                    float u = x / (float)size, v = y / (float)size;
+                    float n = Fbm(u * 3, v * 3, 3, seed, 4);
+                    float grit = Hash(x, y, seed) - 0.5f;
+                    // escorridos verticais (mais escuros embaixo de cada placa)
+                    float streak = VNoise(u * 24, v * 2, 24, seed + 3) * Mathf.Clamp01(1f - (v * 2f - Mathf.Floor(v * 2f)) * 1.4f);
+                    float b = 0.93f + (n - 0.5f) * 0.1f + grit * 0.035f - streak * 0.07f;
+                    // juntas das placas (2 x 4 por repetição) e furos da fôrma
+                    float jx = Mathf.Abs(u * 2f - Mathf.Round(u * 2f)), jy = Mathf.Abs(v * 4f - Mathf.Round(v * 4f));
+                    if (jx < 0.006f || jy < 0.012f) b *= 0.74f;
+                    float hx = u * 8f - Mathf.Floor(u * 8f), hy = v * 8f - Mathf.Floor(v * 8f);
+                    if ((hx - 0.5f) * (hx - 0.5f) + (hy - 0.5f) * (hy - 0.5f) < 0.0016f) b *= 0.82f;
+                    px[y * size + x] = new Color(b, b, b * 1.01f, 1f);
+                }
+            t.SetPixels32(px);
+            t.Apply(true);
+            return t;
+        }
+
         /// <summary>Arquibancada lotada: "pixels" de gente com camisas nas cores do time e da torcida rival.</summary>
         public static Texture2D CrowdTex(int w, int h, Color home, Color home2, Color away, int seed, float occupancy = 0.92f, Color? seatColor = null, float awayShare = 0.18f)
         {
