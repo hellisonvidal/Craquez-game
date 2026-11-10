@@ -56,6 +56,7 @@ namespace Craquez
             sim.startSwapped = c.swapSides;
             sim.training = c.training;
             sim.trainingRoster = c.trainingRoster;
+            sim.trainingKeeper = c.trainingKeeper;
             if (c.toss && !c.training)
             {
                 // sorteio: quem ganha escolhe o lado; quem perde dá a saída
@@ -150,6 +151,7 @@ namespace Craquez
                     p.position = new Vector2(side * lane, z);
                 }
                 p.facing = new Vector2(0, 1);
+                _cereStart[p.id] = p.position;
                 a.Snap();
             }
         }
@@ -215,6 +217,22 @@ namespace Craquez
                 if (step == 4 && view.captains != null && (p.id == view.captains[0] || p.id == view.captains[1]))
                     target = new Vector2(side * 0.75f, 0.35f);
                 var to = target - p.position;
+                if (_cereT > 4f && step < 4 && _cereStart.TryGetValue(p.id, out var st0))
+                {
+                    // em fila: o mesmo caminho para todos (saída do túnel -> beira do campo -> sobe até perto
+                    // do meio -> vira para o lugar), cada um saindo meio segundo depois do da frente
+                    float order = p.index;
+                    float sDist = Mathf.Max(0f, _cereT - 4.8f - order * 0.55f) * 1.55f;
+                    var path = new[] { st0, new Vector2(side * 1.0f, -(hw + 0.6f)), new Vector2(side * 1.0f, -hw * 0.12f - 1.2f), target };
+                    var pos = PathAt(path, sDist, out var tangent);
+                    var vNew = (pos - p.position) / Mathf.Max(dt, 1e-4f);
+                    p.vel = Vector2.Lerp(p.vel, vNew, 0.5f);
+                    p.position = pos;
+                    if (tangent.sqrMagnitude > 0.01f && (pos - target).magnitude > 0.2f) p.facing = Vector2.Lerp(p.facing, tangent, 0.15f).normalized;
+                    else if (_cereT > 8f) p.facing = Vector2.Lerp(p.facing, new Vector2(0, -1), 0.05f).normalized;
+                    av.OnTick();
+                    continue;
+                }
                 if (_cereT > 4f && to.magnitude > 0.3f)
                 {
                     p.vel = Vector2.MoveTowards(p.vel, to.normalized * 1.6f, 4f * dt);
@@ -230,8 +248,47 @@ namespace Craquez
                 p.position += p.vel * dt;
                 av.OnTick();
             }
+            // trio de arbitragem à frente das filas: juiz no meio, assistentes um de cada lado
+            if (step < 4)
+            {
+                var refs = new List<AthleteView>();
+                if (view.Referee != null) refs.Add(view.Referee);
+                if (view.Assistants != null) foreach (var a in view.Assistants) if (a != null) refs.Add(a);
+                for (int k = 0; k < refs.Count; k++)
+                {
+                    var rp = refs[k].p;
+                    float lx = k == 0 ? 0f : k == 1 ? -0.9f : 0.9f;
+                    var startR = new Vector2(lx, view.venue.tunnel.z + 2.5f);
+                    var endR = new Vector2(lx * 2f, -hw * 0.12f + 0.2f);
+                    float sD = Mathf.Max(0f, _cereT - 4.0f) * 1.55f;
+                    var pathR = new[] { startR, new Vector2(lx, -(hw + 0.6f)), endR };
+                    var posR = PathAt(pathR, sD, out var tanR);
+                    rp.vel = Vector2.Lerp(rp.vel, (posR - rp.position) / Mathf.Max(dt, 1e-4f), 0.5f);
+                    rp.position = posR;
+                    rp.facing = (posR - endR).magnitude > 0.2f && tanR.sqrMagnitude > 0.01f ? tanR : new Vector2(0f, -1f);
+                    refs[k].OnTick();
+                }
+            }
             view.Alpha = 1f;
             if (InputRouter.AnyPressedThisFrame() && _cereT > 0.6f) EndCeremony();
+        }
+
+        readonly Dictionary<int, Vector2> _cereStart = new Dictionary<int, Vector2>();
+
+        /// <summary>Ponto a <paramref name="d"/> metros ao longo do caminho (e a direção do trecho).</summary>
+        static Vector2 PathAt(Vector2[] pts, float d, out Vector2 tangent)
+        {
+            tangent = Vector2.zero;
+            for (int i = 0; i + 1 < pts.Length; i++)
+            {
+                var seg = pts[i + 1] - pts[i];
+                float L = seg.magnitude;
+                if (L < 1e-4f) continue;
+                tangent = seg / L;
+                if (d <= L) return pts[i] + tangent * d;
+                d -= L;
+            }
+            return pts[pts.Length - 1];
         }
 
         /// <summary>

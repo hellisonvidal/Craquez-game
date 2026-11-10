@@ -210,7 +210,7 @@ namespace Craquez
         public static Texture2D Tex(int w, int h, bool mips = true, TextureWrapMode wrap = TextureWrapMode.Repeat)
             => new Texture2D(w, h, TextureFormat.RGBA32, mips) { wrapMode = wrap, filterMode = FilterMode.Trilinear, anisoLevel = 8 };
 
-        static float Hash(int x, int y, int s)
+        public static float Hash(int x, int y, int s)
         {
             unchecked
             {
@@ -527,6 +527,8 @@ namespace Craquez
         /// </summary>
         /// <summary>Silhuetas da torcida com capa de chuva (e sem bandeiras): defina antes de montar o local.</summary>
         public static bool CrowdRain;
+        /// <summary>Arquibancada vazia (treino): as silhuetas não desenham ninguém.</summary>
+        public static bool CrowdEmpty;
 
         public static Texture2D CrowdPeople(int w, int h, Color home, Color home2, Color away, int seed, float cheer = 0f, bool stripes = false, float awayShare = 0.18f)
         {
@@ -537,7 +539,7 @@ namespace Craquez
             for (int i = 0; i < n; i++)
             {
                 float r = Hash(i, 1, seed);
-                if (r > 0.95f) continue;   // lugar vazio
+                if (r > 0.95f || CrowdEmpty) continue;   // lugar vazio
                 bool awaySide = i >= n * (1f - awayShare);
                 bool fanShirt = r < 0.8f;
                 Color shirt = awaySide ? away : (r < 0.55f ? home : r < 0.8f ? home2 : Color.HSVToRGB(Hash(i, 5, seed), 0.35f, 0.75f));

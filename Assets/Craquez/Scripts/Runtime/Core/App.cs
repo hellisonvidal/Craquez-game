@@ -790,6 +790,9 @@ namespace Craquez
             var venueName = UiKit.Label(vHolder, "", 34, Theme.HeadItalic, Color.white, TextAnchor.LowerLeft);
             venueName.rectTransform.Place(0, 0, 1, 0.4f, 100, 12, 100, 0);
             UiKit.Shadow(venueName, 3, 0.9f);
+            var venueLoading = UiKit.Label(vHolder, "montando o local…", 26, Theme.Body, Theme.TextDim, TextAnchor.MiddleCenter);
+            venueLoading.rectTransform.Place(0, 0.35f, 1, 0.75f);
+            venueLoading.raycastTarget = false;
             Texture2D venueTex = null;
             int VenueCount() => _cfg.mode == GameModes.Field ? VenueBuilder.StadiumModels.Length : VenueNames(_cfg.mode).Length;
             int VenueIdx() => _cfg.mode == GameModes.Field ? _cfg.stadium : _cfg.venue;
@@ -826,20 +829,26 @@ namespace Craquez
                 var home = Teams.Get(_cfg.teamA);
                 int vi = VenueIdx();
                 venueCount.text = (vi + 1) + " / " + VenueCount();
-                venueTex = MenuArt.Venue(_cfg.mode, vi, home != null ? home.c1 : Theme.Accent);
+                // (o desenho 2D do local não é mais usado)
                 // foto de verdade do local, de fora (montada fora da vista na primeira vez; até lá, o desenho)
+                // só a foto de verdade do local (o desenho antigo não aparece mais); enquanto monta, fundo neutro
                 var shot = VenueShot.Cached(_cfg.mode, vi, _cfg.teamA);
-                venueImg.texture = shot != null ? shot : venueTex;
+                venueImg.texture = shot != null ? shot : Texture2D.whiteTexture;
+                venueImg.color = shot != null ? Color.white : new Color(0.08f, 0.11f, 0.2f);
+                if (venueLoading != null) venueLoading.gameObject.SetActive(shot == null);
                 if (shot == null)
                 {
                     string modeAt = _cfg.mode;
                     StartCoroutine(VenueShot.Render(_cfg.mode, vi, _cfg.teamA, _cfg.teamB, _cfg.streetPlayers, tex =>
                     {
-                        if (tex != null && venueImg != null && _cfg.mode == modeAt && VenueIdx() == vi) venueImg.texture = tex;
+                        if (tex != null && venueImg != null && _cfg.mode == modeAt && VenueIdx() == vi)
+                        {
+                            venueImg.texture = tex;
+                            venueImg.color = Color.white;
+                            if (venueLoading != null) venueLoading.gameObject.SetActive(false);
+                        }
                     }));
                 }
-                // de noite, o desenho escurece e azula
-                venueImg.color = _cfg.timeOfDay == "noite" ? new Color(0.55f, 0.62f, 0.85f) : _cfg.timeOfDay == "tarde" ? new Color(1f, 0.86f, 0.72f) : Color.white;
                 venueName.text = _cfg.mode != GameModes.Field ? VenueNames(_cfg.mode)[_cfg.venue % VenueNames(_cfg.mode).Length]
                     : _cfg.stadium > 0 ? VenueBuilder.StadiumModels[_cfg.stadium].name
                     : (home != null && !string.IsNullOrEmpty(home.stadium.name) ? home.stadium.name : "Estádio do mandante");
@@ -1529,32 +1538,67 @@ namespace Craquez
         /// Arena de treino: você conduz um atacante contra o goleiro, no campo do seu time; a cada chute
         /// (gol, defesa ou bola fora) uma bola nova aparece no seu pé em outro ponto. Sem relógio.
         /// </summary>
-        /// <summary>Arena de treino: escolha do atleta (jogadores de linha do seu time).</summary>
+        // escolhas do treino (ficam guardadas enquanto o jogo está aberto)
+        string _trMode = GameModes.Field;
+        int _trTeam = -1, _trPlayer = -1, _trGkTeam = -1, _trGk = -1, _trVenue;
+
+        /// <summary>Times de uma modalidade para o treino: clubes e seleções (rua: times de rua).</summary>
+        static List<int> TrainingTeams(string mode)
+        {
+            var ids = new List<int>();
+            foreach (var nat in new[] { false, true })
+                foreach (var lg in LeaguesFor(mode, nat))
+                    for (int i = lg.first; i < lg.first + lg.count; i++) if (!ids.Contains(i)) ids.Add(i);
+            return ids;
+        }
+
+        /// <summary>
+        /// Arena de treino: modalidade (campo, futsal, society ou rua — na rua sem goleiro), o atleta
+        /// (de qualquer clube ou seleção) e o goleiro adversário (de qualquer elenco).
+        /// </summary>
         void ShowTrainingPicker()
         {
             var root = Page("JOGAR › TREINO");
-            Title(root, "TREINO", "Escolha quem vai treinar finalizações");
-            var team = Teams.Get(_cfg.teamA);
-            if (team == null || team.IsNational) team = Teams.Get(0);
-            var list = Scroll(UiKit.Rect(root, "atletas").Place(0.12f, 0, 0.88f, 1, 0, 120, 0, 250), 8f);
-            Selectable first = null;
-            var roster = team.roster;
-            // atacantes primeiro, depois meias e defensores
-            var order = new List<int>();
+            Title(root, "TREINO", "Escolha a quadra, o atleta e o goleiro");
+            var list = Scroll(UiKit.Rect(root, "opções").Place(0.12f, 0, 0.88f, 1, 0, 120, 0, 250), 8f);
+            string[] modes = { GameModes.Field, GameModes.Futsal, GameModes.Society, GameModes.Street };
+            string[] modeNames = { "Campo (CT)", "Futsal", "Society", "Rua (sem goleiro)" };
+            int mi = Mathf.Max(0, System.Array.IndexOf(modes, _trMode));
+            var teams = TrainingTeams(_trMode);
+            if (teams.Count == 0) teams.Add(0);
+            if (!teams.Contains(_trTeam)) _trTeam = teams.Contains(_cfg.teamA) ? _cfg.teamA : teams[0];
+            if (!teams.Contains(_trGkTeam)) _trGkTeam = teams[Mathf.Min(1, teams.Count - 1)];
+            var tNames = new List<string>();
+            foreach (int t in teams) tNames.Add(Teams.Get(t).name);
+            // atletas de linha do time escolhido (atacantes primeiro) e goleiros do outro
+            var roster = Teams.Get(_trTeam).roster;
+            var pIdx = new List<int>(); var pNames = new List<string>();
             foreach (var want in new[] { "FW", "MF", "DF" })
-                for (int i = 0; i < roster.Count; i++) if (roster[i].pos == want) order.Add(i);
-            foreach (int i in order)
+                for (int i = 0; i < roster.Count; i++)
+                    if (roster[i].pos == want) { pIdx.Add(i); pNames.Add(roster[i].num + "  " + roster[i].n + "  (" + (want == "FW" ? "ATA" : want == "MF" ? "MEI" : "ZAG") + ")"); }
+            if (pIdx.Count == 0) for (int i = 0; i < roster.Count; i++) { pIdx.Add(i); pNames.Add(roster[i].num + "  " + roster[i].n); }
+            if (!pIdx.Contains(_trPlayer)) _trPlayer = pIdx.Count > 0 ? pIdx[0] : -1;
+            var gRoster = Teams.Get(_trGkTeam).roster;
+            var gIdx = new List<int>(); var gNames = new List<string>();
+            for (int i = 0; i < gRoster.Count; i++) if (gRoster[i].pos == "GK") { gIdx.Add(i); gNames.Add(gRoster[i].num + "  " + gRoster[i].n); }
+            if (!gIdx.Contains(_trGk)) _trGk = gIdx.Count > 0 ? gIdx[0] : -1;
+            Selectable first = null;
+            Selectable Add(Selectable c) { UiKit.Size(c, 64, 64); if (first == null) first = c; return c; }
+            Add(UiKit.Cycler(list, "Modalidade", modeNames, mi, i => { _trMode = modes[i]; _trTeam = -1; _trGkTeam = -1; ShowTrainingPicker(); }));
+            Add(UiKit.Cycler(list, "Time do atleta", tNames, Mathf.Max(0, teams.IndexOf(_trTeam)), i => { _trTeam = teams[i]; _trPlayer = -1; ShowTrainingPicker(); }));
+            if (pNames.Count > 0) Add(UiKit.Cycler(list, "Atleta", pNames, Mathf.Max(0, pIdx.IndexOf(_trPlayer)), i => _trPlayer = pIdx[i]));
+            if (_trMode != GameModes.Street)
             {
-                var e = roster[i];
-                int ri = i;
-                string pos = e.pos == "FW" ? "ATA" : e.pos == "MF" ? "MEI" : "ZAG";
-                var b = UiKit.Button(list, e.num + "   " + e.n.ToUpperInvariant() + "   •   " + pos + (e.ovr > 0 ? "   •   " + e.ovr : ""), () => StartTraining(ri), 28);
-                UiKit.Size(b, 64, 64);
-                var lbl = b.GetComponentInChildren<Text>();
-                lbl.alignment = TextAnchor.MiddleLeft;
-                lbl.rectTransform.Place(0, 0, 1, 1, 28, 0, 12, 0);
-                if (first == null) first = b;
+                Add(UiKit.Cycler(list, "Time do goleiro", tNames, Mathf.Max(0, teams.IndexOf(_trGkTeam)), i => { _trGkTeam = teams[i]; _trGk = -1; ShowTrainingPicker(); }));
+                if (gNames.Count > 0) Add(UiKit.Cycler(list, "Goleiro", gNames, Mathf.Max(0, gIdx.IndexOf(_trGk)), i => _trGk = gIdx[i]));
             }
+            if (_trMode != GameModes.Field)
+            {
+                var vn = VenueNames(_trMode);
+                Add(UiKit.Cycler(list, "Quadra", vn, Mathf.Clamp(_trVenue, 0, vn.Length - 1), i => _trVenue = i));
+            }
+            var go = UiKit.Button(list, "COMEÇAR O TREINO  ›", () => StartTraining(_trPlayer), 32, new Color(0.13f, 0.6f, 0.3f));
+            UiKit.Size(go, 76, 76);
             _back = ShowPlay;
             if (first != null) UiKit.Select(first);
         }
@@ -1563,17 +1607,23 @@ namespace Craquez
         {
             var c = _cfg;
             _trainBak = (c.mode, c.national, c.teamB, c.tacticsA, c.tacticsB, c.timeOfDay, c.weather, c.ceremony, c.minutes, c.sideA, c.sideB, c.stadium, c.toss);
-            if (Teams.Get(c.teamA) == null || Teams.Get(c.teamA).IsNational) c.teamA = 0;
-            c.mode = GameModes.Field; c.national = false;
-            if (c.teamB == c.teamA) c.teamB = c.teamA + 1;
+            _trainBakA = (c.teamA, c.venue);
+            c.mode = _trMode;
+            if (_trTeam >= 0) c.teamA = _trTeam;
+            if (Teams.Get(c.teamA) == null) c.teamA = 0;
+            c.national = Teams.Get(c.teamA).IsNational;
+            c.teamB = _trGkTeam >= 0 && _trGkTeam != c.teamA ? _trGkTeam : (c.teamB == c.teamA ? c.teamA + 1 : c.teamB);
             c.tacticsA = new Tactics(); c.tacticsB = new Tactics();
             c.timeOfDay = "dia"; c.weather = "sol"; c.ceremony = false; c.minutes = 45;
             c.sideA = Side.Player1; c.sideB = Side.Cpu; c.stadium = 0; c.toss = false;
+            c.venue = _trVenue;
             c.training = true;
             c.trainingRoster = rosterIdx;
+            c.trainingKeeper = _trMode == GameModes.Street ? -1 : _trGk;
             StartMatch();
         }
 
+        (int teamA, int venue) _trainBakA;
         (string mode, bool national, int teamB, Tactics ta, Tactics tb, string tod, string weather, bool ceremony, int minutes, Side sa, Side sb, int stadium, bool toss) _trainBak;
 
         void EndTraining()
@@ -1582,6 +1632,7 @@ namespace Craquez
             if (!c.training) return;
             c.training = false;
             (c.mode, c.national, c.teamB, c.tacticsA, c.tacticsB, c.timeOfDay, c.weather, c.ceremony, c.minutes, c.sideA, c.sideB, c.stadium, c.toss) = _trainBak;
+            (c.teamA, c.venue) = _trainBakA;
         }
 
 
@@ -1634,7 +1685,7 @@ namespace Craquez
             return _match;
         }
         public void Tour_EndMatch() { EndMatch(); EndTraining(); ShowModes(); }
-        public MatchController Tour_Training() { StartTraining(); return _match; }
+        public MatchController Tour_Training() { _trMode = GameModes.Field; _trTeam = -1; StartTraining(); return _match; }
 
         void EndMatch()
         {

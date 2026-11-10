@@ -66,6 +66,7 @@ namespace Craquez.Sim
         public bool training;
         /// <summary>Treino: atleta escolhido pelo jogador (índice no elenco; -1 = o melhor finalizador).</summary>
         public int trainingRoster = -1;
+        public int trainingKeeper = -1;
         float _trainReset;
         public int protectTeam = -1;
         public float protectT;
@@ -1854,6 +1855,10 @@ namespace Craquez.Sim
             victim.windup = 0f;
             victim.skill = Skill.None;
             victim.fallRoll = force > 0.3f && rng.Chance(0.35f);   // às vezes rola no chão
+            victim.fallLight = false;
+            // carrinho: tropeça por cima da perna e cai para a frente
+            victim.fallTrip = offender.slide > 0f;
+            if (victim.fallTrip) victim.fallKind = 1;
             if (ball.owner == victim.id || ball.owner == offender.id)
             {
                 ball.owner = -1;
@@ -2655,8 +2660,8 @@ namespace Craquez.Sim
                 {
                     p.hold -= DT;
                     p.heldT += DT;
-                    // ninguém livre: espera mais um pouco (até 4 s no futsal, 5 s nos outros)
-                    float maxHold = mode.id == GameModes.Futsal ? 3.6f : 5f;
+                    // ninguém livre: espera mais um pouco (regra: 4 s no futsal, 8 s nos outros — solta antes)
+                    float maxHold = mode.id == GameModes.Futsal ? 3.6f : 7.2f;
                     if (p.hold <= 0f)
                     {
                         bool done = p.goalKick ? KeeperFootPlay(p, p.heldT >= maxHold * 0.7f) : KeeperDistribute(p, p.heldT >= maxHold);
@@ -2952,6 +2957,8 @@ namespace Craquez.Sim
                 if (fs > farS) { farS = fs; far = m; }
             }
             if (best == null && !force) return false;   // espera alguém se desmarcar
+            // no limite do tempo e sem ninguém livre: chutão para o mais isolado lá na frente (não rola
+            // para um companheiro marcado, que entregava a bola ao adversário)
             bool punt = canPunt && (best == null || rng.Chance(field ? 0.08f : 0.05f));   // com alguém livre, quase sempre sai jogando
             if (punt && far != null) { Punt(p, far); return true; }
             if (best == null) best = safest ?? far;
@@ -3401,6 +3408,7 @@ namespace Craquez.Sim
                 float side = 1f - Mathf.Abs(Vector2.Dot(intent.normalized, p.facing));
                 maxS *= 1f - 0.4f * back - 0.15f * side;
             }
+            if (p.bumpCd > 0f) p.bumpCd -= DT;
             if (p.burst > 0f) maxS *= 1.07f;
             if (p.pulledT > 0f) { p.pulledT -= DT; maxS *= 0.72f; }   // sendo puxado pela camisa
             if (water > 0.25f || snow > 0.05f) maxS *= (1f - 0.12f * PuddleAt(p.position)) * (1f - 0.1f * snow);   // poça e neve pesam
@@ -3617,8 +3625,9 @@ namespace Craquez.Sim
                         if (a.team != b.team)
                         {
                             float closing = Vector2.Dot(b.vel - a.vel, -d / l);
-                            if (closing > 2.5f)
+                            if (closing > 2.5f && a.bumpCd <= 0f && b.bumpCd <= 0f)
                             {
+                                a.bumpCd = b.bumpCd = 0.35f;
                                 float sa = a.defense + a.vel.magnitude * 0.05f + rng.Range(0f, 0.3f), sb = b.defense + b.vel.magnitude * 0.05f + rng.Range(0f, 0.3f);
                                 var weak = sa < sb ? a : b;
                                 // choque de corpo: impulso só na direção do contato (inelástico, e = 0,2);
@@ -3626,7 +3635,7 @@ namespace Craquez.Sim
                                 // da velocidade (de lado) continua — um passa raspando pelo outro
                                 var nAB = d / l;
                                 float ma = 1f + a.defense * 0.35f + a.vel.magnitude * 0.03f, mb = 1f + b.defense * 0.35f + b.vel.magnitude * 0.03f;
-                                float imp = closing * 1.2f / (1f / ma + 1f / mb);
+                                float imp = closing * 0.95f / (1f / ma + 1f / mb);
                                 a.vel -= nAB * (imp / ma);
                                 b.vel += nAB * (imp / mb);
                                 a.vel *= 0.92f; b.vel *= 0.92f;
@@ -3634,14 +3643,16 @@ namespace Craquez.Sim
                                 var strong = weak == a ? b : a;
                                 Emit("bump", weak.team, weak.id, null, false, closing, strong.id);
                                 // trombada forte de verdade (sem falta): de vez em quando quem perde cai e levanta
-                                if (closing > 4.5f && weak.down <= 0f && !weak.isKeeper && state == MatchState.Playing && rng.Chance(0.22f))
+                                if (closing > 5.5f && weak.down <= 0f && !weak.isKeeper && state == MatchState.Playing && rng.Chance(0.1f))
                                 {
                                     weak.fallDir = (weak.position - strong.position).Norm();
                                     weak.fallKind = Vector2.Dot(weak.fallDir, weak.facing) > 0.3f ? 1 : Vector2.Dot(weak.fallDir, weak.facing) < -0.3f ? 0 : 2;
                                     weak.down = rng.Range(1.1f, 1.9f);
                                     weak.downTotal = weak.down;
                                     weak.stun = weak.down + 0.1f;
-                                    weak.fallRoll = rng.Chance(0.3f);
+                                    weak.fallRoll = false;
+                                    weak.fallLight = true; weak.fallTrip = false;
+                                    weak.down = rng.Range(0.9f, 1.4f); weak.downTotal = weak.down; weak.stun = weak.down + 0.1f;
                                     if (ball.owner == weak.id) { ball.owner = -1; ball.vel = ball.vel * 0.5f + weak.fallDir * 1.2f; }
                                 }
                                 // quem conduz pode perder a bola no choque
@@ -3656,8 +3667,10 @@ namespace Craquez.Sim
                         // goleiro (sobretudo com a bola) não é empurrado: quem sai é o outro
                         if (a.isKeeper && !b.isKeeper) wa = a.hold > 0f ? 0f : 0.2f;
                         else if (b.isKeeper && !a.isKeeper) wa = b.hold > 0f ? 1f : 0.8f;
-                        a.position -= push * 2f * wa;
-                        b.position += push * 2f * (1f - wa);
+                        // separa em alguns quadros (sem "estalo" de posição), mas sem deixar atravessar
+                        float k = l < minD * 0.6f ? 2f : 1.2f;
+                        a.position -= push * k * wa;
+                        b.position += push * k * (1f - wa);
                         // ninguém fica "correndo parado" empurrando o outro: some a velocidade contra o contato
                         var nn = d / l;
                         float va = Vector2.Dot(a.vel, nn), vb = Vector2.Dot(b.vel, -nn);
@@ -4058,7 +4071,8 @@ namespace Craquez.Sim
                     return;
                 }
                 ball.owner = p.id;
-                p.hold = 2.2f;
+                // segura com calma (regra: até 8 s; futsal 4 s) e espera alguém se desmarcar
+                p.hold = mode.id == GameModes.Futsal ? rng.Range(1.4f, 2.2f) : rng.Range(2.8f, 4.2f);
                 p.goalKick = false;
                 p.vel *= 0.3f;
                 // goleiro com a bola nas mãos: adversários se afastam (não podem disputar)
@@ -4561,6 +4575,10 @@ namespace Craquez.Sim
                 p.sentOffT = -1f;   // fora para sempre (some da tela)
                 ParkSentOff(p);
             }
+            // goleiro escolhido (do elenco do time B)
+            if (trainingKeeper >= 0)
+                foreach (var p in players)
+                    if (p.team == 1 && p.isKeeper && p.rosterIndex != trainingKeeper) { Substitute(p.id, trainingKeeper); break; }
             if (striker != null) ctrl[0].player = striker.id;
             foreach (var p in players) if (p.team == 1 && p.isKeeper) ctrl[1].player = p.id;
             TrainingReset();
