@@ -179,7 +179,8 @@ namespace Craquez
                     var tape = new MeshKit();
                     // fita fina no pulso, acima da mão (antes era larga e cobria a mão: parecia um toco escuro)
                     tape.Cylinder(hd.position - armDir * 0.075f, hd.position - armDir * 0.035f, 0.029f, 12);
-                    var tg = tape.Object("Fita no punho" + sfx, Gfx.Character(look.tape == 1 ? Color.white : Color.Lerp(kit.c1, Color.white, 0.55f), null, 0.2f), null, false);
+                    // (material sem contorno: com o contorno do cel shading, a fita fina virava um borrão escuro sobre a mão)
+                    var tg = tape.Object("Fita no punho" + sfx, Gfx.Lit(look.tape == 1 ? Color.white : Color.Lerp(kit.c1, Color.white, 0.55f), null, 0.2f), null, false);
                     tg.transform.SetParent(lo, true);
                 }
                 if (captain && sfx == "_l")
