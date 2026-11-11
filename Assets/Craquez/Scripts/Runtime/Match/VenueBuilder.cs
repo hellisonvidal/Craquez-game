@@ -82,6 +82,7 @@ namespace Craquez
 
         public static Venue Stadium(MatchSim sim, TeamData home, TeamData away, Kit homeKit, Kit awayKit, bool night, int quality, Transform parent, int model = 0)
         {
+            PropKit.Setup(quality, night);
             var v = new Venue { root = new GameObject("Estadio").transform };
             v.root.SetParent(parent, false);
             float hl = sim.halfLen, hw = sim.halfW;
@@ -450,7 +451,8 @@ namespace Craquez
             var postMat = Gfx.Character(street ? new Color(0.98f, 0.78f, 0.12f) : Color.white, null, street ? 0.35f : 0.55f);
             var stripeMat = Gfx.Character(new Color(0.85f, 0.1f, 0.12f), null, 0.5f);
             // rua e quadras pequenas: fio mais grosso (o gol é pequeno e o fio fino some sobre o chão claro)
-            var netTex = street ? Gfx.Net(256, 26f, 5f) : futsal ? Gfx.Net(256, 28f, 4f) : Gfx.Net(256, 32f, 3.2f);
+            // malha em losango (nó de rede de verdade)
+            var netTex = street ? Gfx.NetDiamond(256, 32f, 5f) : futsal ? Gfx.NetDiamond(256, 32f, 4f) : Gfx.NetDiamond(256, 32f, 3.2f);
             foreach (float s in new[] { -1f, 1f })
             {
                 var k = new MeshKit();
@@ -1153,6 +1155,7 @@ namespace Craquez
         /// </summary>
         public static Venue Society(MatchSim sim, TeamData home, TeamData away, Kit homeKit, Kit awayKit, int variant, bool night, int quality, Transform parent)
         {
+            PropKit.Setup(quality, night);
             variant = Mathf.Abs(variant) % SocietyNames.Length;
             float hl = sim.halfLen, hw = sim.halfW;
             bool naturalT = variant == 9;
@@ -1326,6 +1329,7 @@ namespace Craquez
         // ------------------------------------------------------------------ futsal
         public static Venue Futsal(MatchSim sim, TeamData home, TeamData away, Kit homeKit, Kit awayKit, int variant, bool night, int quality, Transform parent)
         {
+            PropKit.Setup(quality, night);
             variant = Mathf.Abs(variant) % FutsalNames.Length;
             var v = new Venue { root = new GameObject("Quadra").transform, name = FutsalNames[variant] };
             v.root.SetParent(parent, false);
@@ -1842,6 +1846,7 @@ namespace Craquez
         // ------------------------------------------------------------------ rua
         public static Venue Street(MatchSim sim, TeamData home, TeamData away, Kit homeKit, Kit awayKit, int variant, bool night, int quality, Transform parent)
         {
+            PropKit.Setup(quality, night);
             variant = Mathf.Abs(variant) % StreetNames.Length;
             var v = new Venue { root = new GameObject("Rua").transform, name = StreetNames[variant] };
             // ruas com gol grande e goleiro: o cenário segue uma rua parecida (quadra do conjunto, campinho
@@ -1983,6 +1988,7 @@ namespace Craquez
                 int n = variant == 1 ? 40 : variant == 13 ? 30 : variant == 9 ? 12 : 18;
                 var bk = new MeshKit[4];
                 var roofK = new MeshKit();
+                var vilaHouses = PropKit.UseModels && (variant == 1 || variant == 13) ? new PropBatch() : null;
                 for (int i = 0; i < 4; i++) bk[i] = new MeshKit();
                 for (int i = 0; i < n; i++)
                 {
@@ -1995,10 +2001,21 @@ namespace Craquez
                         : variant == 8 ? 14f + (float)rng.NextDouble() * 14f
                         : 8f + (float)rng.NextDouble() * 22f;
                     float by = variant == 1 ? Mathf.Max(0, -c.z - 10f) * 0.5f : 0f;
+                    // morro e vila: casinhas de verdade (modelos), de frente para a quadra
+                    if (vilaHouses != null && bh < 9f)
+                    {
+                        House(vilaHouses, rng, c + Vector3.up * by, YawFacing(-c), i % 6, variant == 1 ? 2 : 3, 2.4f, true);
+                        if (by > 0.5f) roofK.Box(c + Vector3.up * (by * 0.5f - 0.1f), new Vector3(6.5f, by, 6.5f));   // base da casa no morro
+                        continue;
+                    }
                     Building(bk[i % 4], roofK, c + Vector3.up * by, new Vector3(6f + (float)rng.NextDouble() * 6f, bh, 6f + (float)rng.NextDouble() * 4f), (float)rng.Next(4) * 0.25f);
                 }
-                for (int i = 0; i < 4; i++) bk[i].Object("Prédios " + i, bmat[i], v.root, quality >= 1);
-                roofK.Object("Lajes", Gfx.Lit(new Color(0.45f, 0.44f, 0.43f), null, 0.1f), v.root, false);
+                if (vilaHouses != null && !vilaHouses.Empty)
+                    vilaHouses.Emit(v.root, quality >= 1, Color.white, night, variant == 13
+                        ? new[] { new Color(0.92f, 0.55f, 0.5f), new Color(0.5f, 0.72f, 0.88f), new Color(0.96f, 0.8f, 0.4f), new Color(0.6f, 0.8f, 0.55f), new Color(0.95f, 0.65f, 0.3f), new Color(0.78f, 0.6f, 0.85f) }
+                        : new[] { new Color(0.72f, 0.48f, 0.38f), new Color(0.82f, 0.76f, 0.66f), new Color(0.66f, 0.64f, 0.6f), new Color(0.86f, 0.7f, 0.5f), new Color(0.62f, 0.4f, 0.32f), new Color(0.9f, 0.88f, 0.82f) });
+                for (int i = 0; i < 4; i++) if (bk[i].Count > 0) bk[i].Object("Prédios " + i, bmat[i], v.root, quality >= 1);
+                if (roofK.Count > 0) roofK.Object("Lajes", Gfx.Lit(new Color(0.45f, 0.44f, 0.43f), null, 0.1f), v.root, false);
             }
             if (variant == 13)
             {
@@ -2210,19 +2227,38 @@ namespace Craquez
                     k.Quad(new Vector3(bx0 + side * sg0, y0, z0), new Vector3(bx1 + side * sg01, y1, z0), new Vector3(bx1 + side * sg1, y1, z1), new Vector3(bx0 + side * sg10, y0, z1),
                         new Vector2(z0, y0) / 0.9f, new Vector2(z1, y1) / 0.9f);
                 }
+            // teto: cede no meio (caimento da rede entre o travessão e o fundo), em 4 faixas
+            const int nd = 4;
+            float Sag(float zf, float df) => 0.11f * Mathf.Sin(Mathf.PI * zf) * Mathf.Sin(Mathf.PI * df);
             for (int i = 0; i < nx; i++)
-            {
-                float z0 = -gw + 2 * gw * i / nx, z1 = -gw + 2 * gw * (i + 1) / nx;
-                k.Quad(new Vector3(x0, gh, z0), new Vector3(x0 + side * topD, gh, z0), new Vector3(x0 + side * topD, gh, z1), new Vector3(x0, gh, z1),
-                    new Vector2(0, z0) / 0.9f, new Vector2(topD, z1) / 0.9f);
-            }
+                for (int d = 0; d < nd; d++)
+                {
+                    float z0 = -gw + 2 * gw * i / nx, z1 = -gw + 2 * gw * (i + 1) / nx;
+                    float f0 = d / (float)nd, f1 = (d + 1) / (float)nd;
+                    float zf0 = i / (float)nx, zf1 = (i + 1) / (float)nx;
+                    k.Quad(new Vector3(x0 + side * topD * f0, gh - Sag(zf0, f0), z0), new Vector3(x0 + side * topD * f1, gh - Sag(zf0, f1), z0),
+                        new Vector3(x0 + side * topD * f1, gh - Sag(zf1, f1), z1), new Vector3(x0 + side * topD * f0, gh - Sag(zf1, f0), z1),
+                        new Vector2(topD * f0, z0) / 0.9f, new Vector2(topD * f1, z1) / 0.9f);
+                }
+            // a sobra da rede no pé do fundo fica deitada na grama (como nos estádios)
+            if (curveH > 0f)
+                for (int i = 0; i < nx; i++)
+                {
+                    float z0 = -gw + 2 * gw * i / nx, z1 = -gw + 2 * gw * (i + 1) / nx;
+                    float bx = BackX(0f);
+                    k.Quad(new Vector3(bx, 0.015f, z0), new Vector3(bx + side * 0.28f, 0.012f, z0), new Vector3(bx + side * 0.28f, 0.012f, z1), new Vector3(bx, 0.015f, z1),
+                        new Vector2(0, z0) / 0.9f, new Vector2(0.28f, z1) / 0.9f);
+                }
             foreach (float zs in new[] { -gw, gw })
                 for (int j = 0; j < ny; j++)
                 {
                     float y0 = gh * j / ny, y1 = gh * (j + 1) / ny;
                     float bx0 = BackX(y0), bx1 = BackX(y1);
-                    k.Quad(new Vector3(x0, y0, zs), new Vector3(x0, y1, zs), new Vector3(bx1, y1, zs), new Vector3(bx0, y0, zs),
-                        new Vector2(0, y0) / 0.9f, new Vector2(gd, y1) / 0.9f);
+                    // a lateral cai solta: barriga para fora na parte de baixo, no meio da profundidade
+                    float out0 = Mathf.Sign(zs) * 0.07f * (1f - y0 / gh), out1 = Mathf.Sign(zs) * 0.07f * (1f - y1 / gh);
+                    var mA = new Vector3((x0 + bx0) * 0.5f, y0, zs + out0); var mB = new Vector3((x0 + bx1) * 0.5f, y1, zs + out1);
+                    k.Quad(new Vector3(x0, y0, zs), new Vector3(x0, y1, zs), mB, mA, new Vector2(0, y0) / 0.9f, new Vector2(gd * 0.5f, y1) / 0.9f);
+                    k.Quad(mA, mB, new Vector3(bx1, y1, zs), new Vector3(bx0, y0, zs), new Vector2(gd * 0.5f, y0) / 0.9f, new Vector2(gd, y1) / 0.9f);
                 }
             n._mesh = k.Build("rede");
             n._mesh.MarkDynamic();

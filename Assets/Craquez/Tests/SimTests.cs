@@ -949,6 +949,109 @@ namespace Craquez.Tests
             Assert.AreEqual(0, creep, "gol com a bola quase parada depois do toque do goleiro");
         }
 
+        /// <summary>
+        /// Condução com o jogador controlado, sem marcador perto: pique reto, curva de 90°, meia-volta e
+        /// zigue-zague. Mede bolas perdidas sozinho, tempo para o corpo seguir o comando e a bola longe do pé.
+        /// </summary>
+        [TestCase(GameModes.Field)]
+        [TestCase(GameModes.Futsal)]
+        public void DribbleFollowsTheStick(string mode)
+        {
+            var sim = NewMatch(mode, 7);
+            for (int i = 0; i < 70; i++) sim.Step(new InputFrame[2]);
+            var p = sim.Controlled(0);
+            Assume.That(sim.ball.owner == p.id);
+            sim.kickoffPass = false;
+            float dir = sim.TeamDir(0);
+            p.position = new Vector2(-dir * sim.halfLen * 0.3f, 0f);
+            p.facing = new Vector2(dir, 0f);
+            sim.ball.pos = p.position + p.facing * 0.35f;
+            sim.ball.vel = Vector2.zero;
+            int lost = 0, ticks = 0, heavy = 0; float maxD = 0f, sumD = 0f;
+            var lags = new System.Collections.Generic.List<float>();
+            void Keep()
+            {
+                foreach (var o in sim.players)
+                    if (o.team != p.team && o.position.Dist(p.position) < 12f) o.position = p.position + (o.position - p.position).Norm() * 12f;
+            }
+            void Drive(Vector2 mv, int n, bool sprint)
+            {
+                int lagT = -1;
+                for (int i = 0; i < n; i++)
+                {
+                    Keep();
+                    // (perto da linha: volta para o meio)
+                    if (Mathf.Abs(p.position.x) > sim.halfLen - 8f || Mathf.Abs(p.position.y) > sim.halfW - 5f) { p.position *= 0.6f; sim.ball.pos = p.position + p.facing * 0.35f; sim.ball.owner = p.id; }
+                    sim.Step(new[] { new InputFrame { move = mv, buttons = sprint ? InputFrame.Sprint : 0 }, default });
+                    ticks++;
+                    foreach (var ev in sim.events) if (ev.type == "heavytouch" && ev.id == p.id) { heavy++; System.Console.WriteLine($"  toque longo no passo {ticks}"); }
+                    if (sim.ball.owner != p.id)
+                    {
+                        System.Console.WriteLine($"  perdeu: passo {ticks}, dono {sim.ball.owner}, dist {p.position.Dist(sim.ball.pos):F2}, vel {p.vel.magnitude:F1}, bola {sim.ball.vel.magnitude:F1} z {sim.ball.z:F2}, mv {mv}, stun {p.stun:F2} slide {p.slide:F2} skill {p.skill}");
+                        lost++;
+                        sim.ball.owner = p.id; sim.ball.pos = p.position + p.facing * 0.35f; sim.ball.vel = p.vel;
+                    }
+                    float d = p.position.Dist(sim.ball.pos);
+                    maxD = Mathf.Max(maxD, d); sumD += d;
+                    if (lagT < 0 && p.vel.magnitude > 1f && Vector2.Angle(p.vel, mv) < 30f) { lagT = i; lags.Add(i * MatchSim.DT); }
+                }
+                if (lagT < 0) lags.Add(n * MatchSim.DT);
+            }
+            var fw = new Vector2(dir, 0f); var up = new Vector2(0f, 1f);
+            Drive(fw, 120, true);
+            Drive(up, 90, true);
+            Drive(-up, 90, true);
+            Drive(-fw, 90, false);
+            for (int z = 0; z < 6; z++) Drive((fw + (z % 2 == 0 ? up : -up)).normalized, 45, z % 3 != 0);
+            Drive(fw, 60, false);
+            float meanLag = 0f; foreach (var l in lags) meanLag += l; meanLag /= lags.Count;
+            System.Console.WriteLine($"[condução {mode}] {ticks} passos: perdeu sozinho {lost}x, bola a {sumD / ticks:F2} m do pé (máx {maxD:F2}), corpo segue o comando em {meanLag:F2}s (pior {Mathf.Max(lags.ToArray()):F2}s)");
+            Assert.LessOrEqual(lost, 1, "perdeu a bola sozinho conduzindo");
+            Assert.Less(meanLag, 0.6f, "o jogador demora a seguir o analógico");
+        }
+
+        /// <summary>Passe rasteiro para um companheiro livre a 8, 15 e 25 m: ele domina sem a bola fugir.</summary>
+        [Test] public void FreePassIsControlled()
+        {
+            int ok = 0, tries = 0; float worst = 0f;
+            foreach (float dist in new[] { 8f, 15f, 25f })
+                for (int k = 0; k < 4; k++)
+                {
+                    var sim = NewMatch(GameModes.Field, (uint)(11 + k));
+                    for (int i = 0; i < 70; i++) sim.Step(new InputFrame[2]);
+                    var p = sim.Controlled(0);
+                    if (sim.ball.owner != p.id) continue;
+                    sim.kickoffPass = false;
+                    float dir = sim.TeamDir(0);
+                    p.position = new Vector2(-dir * 10f, -6f + k * 3f);
+                    p.facing = new Vector2(dir, 0f); p.vel = Vector2.zero;
+                    sim.ball.pos = p.position + p.facing * 0.35f; sim.ball.vel = Vector2.zero;
+                    SimPlayer mate = null;
+                    foreach (var m in sim.players) if (m.team == p.team && m.id != p.id && !m.isKeeper) { mate = m; break; }
+                    var aim = new Vector2(dir, k % 2 == 0 ? 0.3f : -0.3f).normalized;
+                    mate.position = p.position + aim * dist; mate.vel = Vector2.zero;
+                    foreach (var o in sim.players) if (o.team != p.team && !o.isKeeper) o.position = new Vector2(dir * 40f, o.position.y);
+                    for (int i = 0; i < 3; i++) sim.Step(new[] { new InputFrame { move = aim }, default });
+                    sim.Step(new[] { new InputFrame { move = aim, buttons = InputFrame.Pass }, default });
+                    for (int i = 0; i < 8; i++) sim.Step(new[] { new InputFrame { move = aim }, default });
+                    tries++;
+                    int got = -1; float t = 0f;
+                    for (int i = 0; i < 300 && got < 0; i++)
+                    {
+                        foreach (var o in sim.players) if (o.team != p.team && !o.isKeeper) o.position = new Vector2(dir * 40f, o.position.y);
+                        sim.Step(new InputFrame[2]); t += MatchSim.DT;
+                        if (sim.ball.owner >= 0 && sim.ball.owner != p.id) got = sim.ball.owner;
+                    }
+                    // depois do domínio: a bola fica no pé por 1 s
+                    bool kept = got >= 0;
+                    for (int i = 0; i < 60 && kept; i++) { sim.Step(new InputFrame[2]); if (sim.ball.owner != got && sim.ball.owner >= 0 && sim.players[sim.ball.owner].team != p.team) kept = false; }
+                    if (got >= 0 && sim.players[got].team == p.team && kept) { ok++; worst = Mathf.Max(worst, t); }
+                    else System.Console.WriteLine($"  passe de {dist} m não dominado (dono {got}, bola {sim.ball.pos}, vel {sim.ball.vel.magnitude:F1}; passador {p.position}, alvo {mate.id} em {mate.position}, recebedor {sim.passReceiver}, estado {sim.state}, dir {dir})");
+                }
+            System.Console.WriteLine($"[domínio] {ok}/{tries} passes livres dominados; o mais demorado chegou em {worst:F2}s");
+            Assert.GreaterOrEqual(ok, tries - 1);
+        }
+
         [Test] public void JsonRoundTrip()
         {
             var o = MiniJson.Parse("{\"a\": [1, 2.5, \"x\\n\"], \"b\": {\"c\": true, \"d\": null}}");

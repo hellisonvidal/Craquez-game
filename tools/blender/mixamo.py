@@ -17,6 +17,9 @@ MAP = {
     "thigh_r": "RightUpLeg", "calf_r": "RightLeg", "foot_r": "RightFoot", "ball_r": "RightToeBase",
 }
 
+# Universal Animation Library (Quaternius): esqueleto do manequim da Unreal, os mesmos nomes dos nossos
+UAL_MAP = {tb: ("Head" if tb == "head" else tb) for tb in MAP}
+
 # ossos que guardam a postura de repouso do atleta (recebem só o giro do Mixamo desde o repouso)
 KEEP_REST = {"pelvis", "spine_01", "spine_02", "spine_03", "neck_01", "head", "clavicle_l", "clavicle_r",
              "foot_l", "foot_r", "ball_l", "ball_r"}
@@ -48,34 +51,47 @@ class Clip:
         return Clip(G, hips, rd, self.hip_h, self.fps)
 
 
-def load(path):
+def load(path, action=None):
+    """Lê um FBX do Mixamo ou, com action, uma ação da Universal Animation Library (vários clipes num
+    arquivo só). O resultado sai sempre com o boneco de frente para -Y, como o Mixamo."""
     before = set(bpy.data.objects)
     acts_before = set(bpy.data.actions)
     bpy.ops.import_scene.fbx(filepath=path)
-    new = [o for o in bpy.data.objects if o not in before]
-    arm = next(o for o in new if o.type == "ARMATURE")
-    pre = arm.data.bones[0].name.split(":")[0] + ":" if ":" in arm.data.bones[0].name else ""
+    new = [o for o in bpy.data.objects if o.type == "ARMATURE" and o not in before] + [o for o in bpy.data.objects if o.type != "ARMATURE" and o not in before]
+    arm = new[0]
+    names = {b.name for b in arm.data.bones}
+    ual = "pelvis" in names
+    mp = UAL_MAP if ual else MAP
+    pre = "" if ual else (arm.data.bones[0].name.split(":")[0] + ":" if ":" in arm.data.bones[0].name else "")
+    if action:
+        act = next(a for a in bpy.data.actions if a not in acts_before and a.name.split("|")[-1] == action)
+        arm.animation_data.action = act
     act = arm.animation_data.action
     f0, f1 = int(round(act.frame_range[0])), int(round(act.frame_range[1]))
     sc = bpy.context.scene
     fps = sc.render.fps / sc.render.fps_base
     MW = arm.matrix_world
+    hipn = pre + ("pelvis" if ual else "Hips")
+    # de frente para -Y (o manequim da Unreal olha para +Y): gira tudo 180° em torno de z se precisar
+    fb, bb = arm.data.bones[pre + mp["foot_l"]], arm.data.bones[pre + mp["ball_l"]]
+    fwd = (MW @ bb.head_local) - (MW @ fb.head_local)
+    F = np.diag([-1.0, -1.0, 1.0]) if fwd.y > 0 else np.eye(3)
     rest, rest_dir = {}, {}
-    for tb, sb in MAP.items():
+    for tb, sb in mp.items():
         b = arm.data.bones[pre + sb]
         rest[tb] = _rot(MW @ b.matrix_local)
-        rest_dir[tb] = np.array(MW @ b.tail_local - MW @ b.head_local)
-    hb = arm.data.bones[pre + "Hips"]
+        rest_dir[tb] = F @ np.array(MW @ b.tail_local - MW @ b.head_local)
+    hb = arm.data.bones[hipn]
     hip_h = float((MW @ hb.head_local).z)
     G, hips = [], []
     for f in range(f0, f1 + 1):
         sc.frame_set(f)
         g = {}
-        for tb, sb in MAP.items():
+        for tb, sb in mp.items():
             pb = arm.pose.bones[pre + sb]
-            g[tb] = _rot(MW @ pb.matrix) @ rest[tb].T
+            g[tb] = F @ (_rot(MW @ pb.matrix) @ rest[tb].T) @ F.T
         G.append(g)
-        hips.append(np.array(MW @ arm.pose.bones[pre + "Hips"].head))
+        hips.append(F @ np.array(MW @ arm.pose.bones[hipn].head))
     for o in new:
         bpy.data.objects.remove(o, do_unlink=True)
     for a in list(bpy.data.actions):

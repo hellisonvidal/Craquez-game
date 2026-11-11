@@ -216,5 +216,178 @@
   "speed": 0.981,
   "source": "mixamo:soccer/goalkeeper drop kick",
   "contact": 2.133
+ },
+ "GkDiveL": {
+  "frames": 96,
+  "fps": 30,
+  "loop": false,
+  "speed": 1.335,
+  "source": "mixamo:soccer/goalkeeper diving save",
+  "contact": 0.933
+ },
+ "GkDiveR": {
+  "frames": 97,
+  "fps": 30,
+  "loop": false,
+  "speed": 1.355,
+  "source": "mixamo:soccer/goalkeeper diving save (2)",
+  "contact": 0.9
+ },
+ "GkBlockR": {
+  "frames": 75,
+  "fps": 30,
+  "loop": false,
+  "speed": 0.954,
+  "source": "mixamo:soccer/goalkeeper body block (2)",
+  "contact": 0.8
+ },
+ "GkBlockL": {
+  "frames": 75,
+  "fps": 30,
+  "loop": false,
+  "speed": 0.954,
+  "source": "mixamo:soccer/goalkeeper body block (2) (espelhado)",
+  "contact": 0.8
+ },
+ "GkCatch": {
+  "frames": 30,
+  "fps": 30,
+  "loop": false,
+  "speed": 0.606,
+  "source": "mixamo:soccer/goalkeeper catch (2)",
+  "contact": 0.367
+ },
+ "GkCatchLow": {
+  "frames": 62,
+  "fps": 30,
+  "loop": false,
+  "speed": 0.684,
+  "source": "mixamo:soccer/goalkeeper catch",
+  "contact": 0.733
+ },
+ "GkCatchHigh": {
+  "frames": 83,
+  "fps": 30,
+  "loop": false,
+  "speed": 0.574,
+  "source": "mixamo:soccer/goalkeeper catch (4)",
+  "contact": 0.867
+ },
+ "GkRoll": {
+  "frames": 95,
+  "fps": 30,
+  "loop": false,
+  "speed": 0.701,
+  "source": "mixamo:soccer/goalkeeper pass",
+  "contact": 1.133
+ },
+ "GkPlace": {
+  "frames": 106,
+  "fps": 30,
+  "loop": false,
+  "speed": 0.859,
+  "source": "mixamo:soccer/goalkeeper placing ball",
+  "contact": 0.833
+ },
+ "GkDirect": {
+  "frames": 216,
+  "fps": 30,
+  "loop": false,
+  "speed": 0.964,
+  "source": "mixamo:soccer/goalkeeper directing"
+ },
+ "SlideIn": {
+  "frames": 26,
+  "fps": 30,
+  "loop": false,
+  "speed": 0.412,
+  "source": "mixamo:ual/Slide_Start"
+ },
+ "SlideLoop": {
+  "frames": 61,
+  "fps": 30,
+  "loop": true,
+  "speed": 0.065,
+  "source": "mixamo:ual/Slide_Loop"
+ },
+ "SlideOut": {
+  "frames": 16,
+  "fps": 30,
+  "loop": false,
+  "speed": 0.855,
+  "source": "mixamo:ual/Slide_Exit"
+ },
+ "GetUp": {
+  "frames": 47,
+  "fps": 30,
+  "loop": false,
+  "speed": 0.154,
+  "source": "mixamo:ual/LayToIdle"
+ },
+ "Knockback": {
+  "frames": 26,
+  "fps": 30,
+  "loop": false,
+  "speed": 0.346,
+  "source": "mixamo:ual/Hit_Knockback"
+ },
+ "Protest": {
+  "frames": 76,
+  "fps": 30,
+  "loop": true,
+  "speed": 0.008,
+  "source": "mixamo:ual/Idle_No_Loop"
+ },
+ "ArmsFolded": {
+  "frames": 76,
+  "fps": 30,
+  "loop": true,
+  "speed": 0.008,
+  "source": "mixamo:ual/Idle_FoldArms_Loop"
+ },
+ "Trip": {
+  "frames": 47,
+  "fps": 30,
+  "loop": false,
+  "speed": 2.77,
+  "source": "mixamo:soccer/soccer trip"
+ },
+ "FallenIdle": {
+  "frames": 40,
+  "fps": 30,
+  "loop": true,
+  "speed": 0.016,
+  "source": "mixamo:soccer/fallen idle"
+ },
+ "StandUp": {
+  "frames": 51,
+  "fps": 30,
+  "loop": false,
+  "speed": 0.716,
+  "source": "mixamo:soccer/standing up"
+ },
+ "Tackle1": {
+  "frames": 83,
+  "fps": 30,
+  "loop": false,
+  "speed": 1.755,
+  "source": "mixamo:soccer/soccer tackle",
+  "contact": 0.633
+ },
+ "Tackle2": {
+  "frames": 54,
+  "fps": 30,
+  "loop": false,
+  "speed": 2.674,
+  "source": "mixamo:soccer/soccer tackle (2)",
+  "contact": 0.167
+ },
+ "Tackle3": {
+  "frames": 70,
+  "fps": 30,
+  "loop": false,
+  "speed": 0.69,
+  "source": "mixamo:soccer/soccer tackle (3)",
+  "contact": 0.333
  }
 }

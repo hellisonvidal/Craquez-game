@@ -12,8 +12,37 @@ namespace Craquez
         public PropKit(int seed) { _rng = new System.Random(seed); }
         public float R() => (float)_rng.NextDouble();
 
+        /// <summary>Modelos de verdade (árvores, arbustos, pedras do Quaternius) no lugar das peças simples.</summary>
+        public readonly PropBatch models = new PropBatch();
+        public static bool UseModels, Night;
+        public static void Setup(int quality, bool night) { UseModels = quality >= 1 && PropLib.Ready; Night = night; }
+
+        /// <summary>Arbusto, flores, capim ou pedra (modelos; nada nas qualidades mais baixas).</summary>
+        public void Bush(Vector3 p, float s) { if (UseModels) models.Add(R() < 0.6f ? "Bush" : "BushFlowers", p, R() * 360f, s); }
+        public void Flowers(Vector3 p, float s) { if (UseModels) models.Add(R() < 0.5f ? "Flowers3" : "Flowers4", p, R() * 360f, s); }
+        public void Grass(Vector3 p, float s) { if (UseModels) models.Add(R() < 0.5f ? "Grass1" : "Grass2", p, R() * 360f, s); }
+        public void Rock(Vector3 p, float s) { if (UseModels) models.Add(PropBatch.Pick("Rock", R()), p, R() * 360f, s); }
+        public void Plant(Vector3 p, float s) { if (UseModels) models.Add(R() < 0.5f ? "Plant1" : "Fern", p, R() * 360f, R() < 0.5f ? s : s * 0.35f); }
+
+        /// <summary>Volta de arbustos, flores e capim em volta de um ponto (canteiro, pé de árvore).</summary>
+        public void Garden(Vector3 c, float r, int n)
+        {
+            if (!UseModels) return;
+            for (int i = 0; i < n; i++)
+            {
+                float a = R() * Mathf.PI * 2f, d = r * Mathf.Sqrt(R());
+                var p = c + new Vector3(Mathf.Cos(a) * d, 0f, Mathf.Sin(a) * d);
+                float q = R();
+                if (q < 0.4f) Bush(p, 0.7f + R() * 0.5f);
+                else if (q < 0.65f) Grass(p, 0.6f + R() * 0.5f);
+                else if (q < 0.85f) Flowers(p, 0.5f + R() * 0.4f);
+                else Rock(p, 0.25f + R() * 0.3f);
+            }
+        }
+
         public void Tree(Vector3 p, float h)
         {
+            if (UseModels) { models.Tree(p, h * 1.1f, R(), R() * 360f); return; }
             trunk.Cylinder(p, p + Vector3.up * h * 0.55f, 0.16f + h * 0.01f, 6);
             for (int k = 0; k < 3; k++)
             {
@@ -24,6 +53,7 @@ namespace Craquez
 
         public void Pine(Vector3 p, float h)
         {
+            if (UseModels) { models.Pine(p, h * 1.05f, R(), R() * 360f); return; }
             trunk.Cylinder(p, p + Vector3.up * h * 0.3f, 0.14f, 6);
             for (int k = 0; k < 4; k++)
             {
@@ -80,6 +110,8 @@ namespace Craquez
             if (cloth2.Count > 0) cloth2.Object("Guarda-sóis 2", Gfx.Lit(cloth2C, null, 0.15f), root, sh);
             if (water.Count > 0) water.Object("Água", Gfx.Lit(new Color(0.18f, 0.6f, 0.85f), null, 0.92f), root, false);
             if (dark.Count > 0) dark.Object("Detalhes", Gfx.Lit(new Color(0.14f, 0.14f, 0.16f), null, 0.3f), root, false);
+            // (folhas: o tom pedido clareado, porque a textura já é verde)
+            if (!models.Empty) models.Emit(root, quality >= 2, Color.Lerp(leafC, Color.white, 0.55f), Night);
         }
     }
 
@@ -109,6 +141,7 @@ namespace Craquez
                     k.wood.Box(new Vector3(-fx - 6f, 1.3f, 4f), new Vector3(3.4f, 2.6f, 3.4f));
                     k.leaves.Cylinder(new Vector3(-fx - 6f, 2.6f, 4f), new Vector3(-fx - 6f, 3.4f, 4f), 2.8f, 10);
                     for (int i = 0; i < 5; i++) k.Table(new Vector3(-fx - 3f - k.R() * 6f, 0, fz + 3f + i * 2.4f), true, i + 1);
+                    for (int i = 0; i < 12; i++) { var p = new Vector3(-fx - 6f + k.R() * (fx * 2f + 12f), 0, fz + 5f + k.R() * 12f); if (k.R() < 0.5f) k.Grass(p, 0.9f); else k.Rock(p, 0.2f + k.R() * 0.3f); }
                     break;
                 }
                 case 5: // cobertura: laje com mureta, caixas d'água, heliponto e a cidade em volta
@@ -187,6 +220,14 @@ namespace Craquez
                         if (p.z < -fz - 2f) continue;
                         if (i % 3 == 0) k.Pine(p, 8f + k.R() * 4f); else k.Tree(p, 6f + k.R() * 3f);
                     }
+                    for (int i = 0; i < 26; i++)
+                    {
+                        float a = k.R() * Mathf.PI * 2f;
+                        var p = new Vector3(Mathf.Cos(a) * (fx + 5f + k.R() * 12f), 0, Mathf.Sin(a) * (fz + 4f + k.R() * 9f));
+                        if (p.z < -fz - 1f) continue;
+                        float q = k.R();
+                        if (q < 0.35f) k.Bush(p, 0.8f + k.R() * 0.6f); else if (q < 0.6f) k.Rock(p, 0.3f + k.R() * 0.4f); else if (q < 0.8f) k.Flowers(p, 0.6f); else k.Grass(p, 0.8f);
+                    }
                     var mnt = new MeshKit();
                     for (int i = 0; i < 6; i++) mnt.Cylinder(new Vector3(-150f + i * 60f, -2f, 190f + (i % 2) * 30f), new Vector3(-150f + i * 60f, 45f + (i % 3) * 18f, 190f + (i % 2) * 30f), 55f, 7);
                     mnt.Object("Montanhas", Gfx.Lit(new Color(0.3f, 0.42f, 0.32f), null, 0.05f), v.root, false);
@@ -228,6 +269,8 @@ namespace Craquez
                         k.white.Box(c + new Vector3(0, 0.3f, -0.85f), new Vector3(0.7f, 0.5f, 0.12f));
                     }
                     for (int i = 0; i < 4; i++) k.Palm(pool + new Vector3(-6f + (i % 2) * 12f, 0, -8f + (i / 2) * 16f), 6f + k.R() * 2f, (k.R() - 0.5f));
+                    for (int i = 0; i < 4; i++) k.Garden(pool + new Vector3(-6f + (i % 2) * 12f, 0, -8f + (i / 2) * 16f), 1.4f, 4);
+                    for (int i = 0; i < 6; i++) k.Garden(new Vector3(-fx - 10f + i * (fx * 2f + 20f) / 5f, 0, fz + 15f), 2.2f, 4);
                     break;
                 }
                 case 9: // gramado natural: arquibancada de madeira, árvores e caixa-d'água do clube
@@ -238,6 +281,7 @@ namespace Craquez
                         k.Tree(new Vector3(x + k.R() * 2f, 0, fz + 9f + k.R() * 4f), 7f + k.R() * 3f);
                     }
                     foreach (float sx in new[] { -1f, 1f }) for (int i = 0; i < 3; i++) k.Tree(new Vector3(sx * (fx + 11f + k.R() * 3f), 0, -6f + i * 6f), 6f + k.R() * 3f);
+                    for (int i = 0; i < 8; i++) k.Garden(new Vector3(-fx - 4f + i * (fx * 2f + 8f) / 7f, 0, fz + 6.5f + k.R() * 2f), 1.6f, 3);
                     var p = new Vector3(-fx - 8f, 0, fz + 4f);
                     foreach (float a in new[] { -1f, 1f }) foreach (float b in new[] { -1f, 1f }) k.metal.Cylinder(p + new Vector3(a, 0, b), p + new Vector3(a * 0.7f, 9f, b * 0.7f), 0.1f, 6);
                     k.white.Cylinder(p + Vector3.up * 9f, p + Vector3.up * 12f, 1.6f, 12);

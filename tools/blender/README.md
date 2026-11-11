@@ -14,3 +14,13 @@ bpyenv/bin/python tools/blender/retarget.py out/Athlete_afro.blend mocap out --m
 ```
 
 Copie os FBX, `anims.json` e as texturas para `Assets/Craquez/Resources/Athletes/`.
+
+## Cenário (Quaternius, CC0)
+
+```bash
+# "Stylized Nature MegaKit" + casas/sobrados (variante _Mat, cores lisas) + as texturas da natureza
+bpyenv/bin/python tools/blender/props.py qt/kit qt/tex out --sheet   # -> out/props.bytes + out/Tex/*.png
+```
+
+Copie `props.bytes` e `Tex/` para `Assets/Craquez/Resources/Props/` (lidos por `PropLib.cs`). Os
+arquivos originais do pacote não vão para o repositório: só o resultado convertido.

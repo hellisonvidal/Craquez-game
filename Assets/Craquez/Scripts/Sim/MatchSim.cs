@@ -904,6 +904,7 @@ namespace Craquez.Sim
                     p.hold = 1.4f;
                     p.goalKick = true;
                     gkFetch = -1;
+                    Emit("gkplace", p.team, p.id);
                     stateTimer = 0.5f;
                 }
             }
@@ -1151,6 +1152,14 @@ namespace Craquez.Sim
             var p = players[c.player];
             p.intent = f.move.Limit(1f);
             p.wantSprint = f.Has(InputFrame.Sprint);
+            // recebendo um passe com o analógico solto: vai ao encontro da bola sozinho (antes ficava parado
+            // ao ganhar o controle e a bola, mirada para onde ele corria, passava direto)
+            if (p.id == passReceiver && ball.owner < 0 && f.move.magnitude < 0.25f && state == MatchState.Playing && !p.isKeeper)
+            {
+                var ip = InterceptPoint(p) - p.position;
+                float di = ip.magnitude;
+                if (di > 0.3f) p.intent = ip / di * Mathf.Clamp(di / 2f, 0.35f, 0.9f);
+            }
             p.shielding = f.Has(InputFrame.Shield);
             // proteger + colocado colado atrás/do lado de quem está com a bola = puxão de camisa
             // (só proteger é "conter", a marcação de frente)
@@ -2020,7 +2029,7 @@ namespace Craquez.Sim
             // caía "sozinha", fora do lance
             // (corpo ~0,3 m de raio: só há encontro de verdade abaixo de ~0,8 m; no carrinho a perna alcança ~1,2 m)
             float contact = offender.position.Dist(victim.position);
-            if (contact > (holding ? 1.0f : 0.9f) + (offender.slide > 0f ? 0.5f : 0f)) return;
+            if (contact > (holding ? 1.0f : 0.8f) + (offender.slide > 0f ? 0.6f : 0f)) return;
             offender.stun = Mathf.Max(offender.stun, 0.8f);
             offender.slide = Mathf.Min(offender.slide, 0.15f);
             // a vítima vai ao chão: tropeça, cai, rola e levanta (o tempo no chão varia com a pancada)
@@ -2095,10 +2104,11 @@ namespace Craquez.Sim
                 victim.downTotal = victim.down;
                 victim.stun = victim.down + 0.15f;
             }
-            else if (!quickRestarts && mode.id != GameModes.Street && rng.Chance(0.55f))
+            else if (!quickRestarts && mode.id != GameModes.Street && rng.Chance(0.85f))
             {
+                // (quase sempre alguém vem dar a mão: um companheiro ou, às vezes, quem fez a falta)
                 bool rival = rng.Chance(0.3f) && !offender.sentOff;
-                SimPlayer h = null; float hd = 8f;
+                SimPlayer h = null; float hd = 13f;
                 foreach (var q in players)
                 {
                     if (q == victim || q.isKeeper || q.sentOff || q.down > 0f) continue;
@@ -2794,6 +2804,26 @@ namespace Craquez.Sim
         Vector2 InterceptPoint(SimPlayer p)
         {
             float mySpeed = p.TopSpeed();
+            // bola rolando NA DIREÇÃO dele: vai ao ponto da linha da bola mais perto (entra na frente dela e
+            // espera), em vez de correr em pique para o primeiro ponto alcançável e passar da linha com o embalo
+            float bs = ball.vel.magnitude;
+            if (bs > 2f && ball.z < 0.6f && p.id == passReceiver && !p.isKeeper)
+            {
+                var u = ball.vel / bs;
+                float along = Vector2.Dot(p.position - ball.pos, u);
+                // (quem já corre no rumo da bola — enfiada, passe na frente — segue a corrida e pega lá adiante)
+                if (along > 1f && Vector2.Dot(p.vel, u) < 1.5f && (p.position - (ball.pos + u * along)).magnitude < 4f)
+                {
+                    var q = ball.pos + u * along;
+                    float off = (p.position - q).magnitude;
+                    // tempo da bola até lá (com o atrito) contra o tempo do atleta (arrancada de ~0,3 s)
+                    float dec = mode.rollDecel + mode.groundDrag * bs * bs * 0.5f;
+                    float disc = bs * bs - 2f * dec * along;
+                    float tb = disc > 0f ? (bs - Mathf.Sqrt(disc)) / Mathf.Max(0.1f, dec) : 99f;
+                    float tp = off / mySpeed + 0.3f;
+                    if (tp <= tb + 0.15f) return q + u * Mathf.Min(0.6f, off * 0.25f);   // (meio passo à frente: domina andando)
+                }
+            }
             var best = ball.pos;
             var simPos = ball.pos;
             var v = ball.vel;
@@ -3973,7 +4003,7 @@ namespace Craquez.Sim
                 return;
             }
             float spd = o.vel.magnitude;
-            float lose = spd > 5f ? 2.4f : 1.7f;
+            float lose = spd > 5f ? 2.4f : 1.9f;
             if (o.windup > 0f) lose = 2.8f;   // preparando o chute: a bola é trazida ao pé, não se perde por distância
             if (o.stun > 0f || o.slide > 0f || o.position.Dist(ball.pos) > lose)
             {
@@ -4043,7 +4073,24 @@ namespace Craquez.Sim
                 float sideErr = Mathf.Clamp(side - foot, -0.3f, 0.3f);
                 // mudança brusca de direção com a bola perto: toque de corte na hora (responde ao comando)
                 float turn = ball.vel.sqrMagnitude > 1f ? Vector2.Angle(ball.vel, fwd) : 0f;
-                bool cut = turn > 50f && rel.magnitude < 1.1f && o.touchT <= 0f;
+                // (compara com o comando do analógico, não só com o rumo do corpo, que vira devagar: antes a
+                // bola seguia reto no pique enquanto o jogador virava e escapava)
+                bool wants = o.intent.sqrMagnitude > 0.09f;
+                float turnI = wants && ball.vel.sqrMagnitude > 1f ? Vector2.Angle(ball.vel, o.intent) : 0f;
+                bool cut = (turn > 50f || turnI > 38f) && rel.magnitude < 1.45f && o.touchT <= 0f;
+                // saiu do pique (soltou o CORRER): segura a bola com a sola em vez de deixá-la ir embora
+                if (!o.sprinting && ball.vel.magnitude > spd + 1.5f && rel.magnitude < 1.5f && along > 0.3f && o.touchT <= 0f) cut = true;
+                if (cut && wants)
+                {
+                    // o toque de corte vai para onde o analógico manda; se a bola ficou um pouco à frente, o
+                    // atleta estica a perna e a traz (ela não muda de rumo lá longe, sozinha)
+                    fwd = (o.facing * 0.3f + o.intent.normalized * 0.7f).Norm();
+                    perp = new Vector2(-fwd.y, fwd.x);
+                    if (rel.magnitude > 0.7f) ball.pos = Vector2.Lerp(ball.pos, o.position + rel.normalized * 0.7f, 0.5f);
+                    rel = ball.pos - o.position;
+                    along = Vector2.Dot(rel, fwd); side = Vector2.Dot(rel, perp);
+                    sideErr = Mathf.Clamp(side - foot, -0.3f, 0.3f);
+                }
                 if (along < 0.26f + spd * 0.012f || cut)
                 {
                     // toque: a bola sai um pouco à frente (mais no pique e para quem tem menos controle;
@@ -4069,7 +4116,10 @@ namespace Craquez.Sim
                     if (cut) lead *= 0.6f;   // corte: toque curto, a bola fica perto
                     float decel = mode.rollDecel + mode.groundDrag * spd * spd;
                     float extra = Mathf.Sqrt(2f * decel * lead);
-                    ball.vel = fwd * (spd * (cut ? 0.85f : 1f) + extra) - perp * sideErr * 4f;
+                    // (velocidade do atleta NA DIREÇÃO do toque: virando, ele ainda vai para o lado antigo e a bola
+                    // tocada com a velocidade cheia disparava à frente e escapava logo depois de cada curva)
+                    float vAlong = Mathf.Max(Vector2.Dot(o.vel, fwd), spd * 0.35f);
+                    ball.vel = fwd * (vAlong * (cut ? 0.85f : 1f) + extra) - perp * sideErr * 4f;
                     // o atleta passou da bola (arrancada): ela é puxada para o pé em vez de atravessar o corpo
                     if (along < 0.05f) ball.pos = Vector2.Lerp(ball.pos, o.position + fwd * 0.2f + perp * foot, 0.5f);
                     ball.z = 0f;

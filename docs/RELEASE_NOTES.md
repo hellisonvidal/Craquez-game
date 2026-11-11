@@ -1,3 +1,66 @@
+## Craquez 2.11.0
+
+Jogo de futebol feito 100% com inteligência artificial, **gratuito**.
+
+### Download
+- **Celular Android**: `Craquez-v2.11.0.apk`
+- **TV (Google TV / Android TV, ex.: TCL C6K)**: `Craquez-TV-v2.11.0.apk` — use este na TV (32 e 64 bits).
+
+### Novidades
+- **Nova abertura em vídeo**: o cinematográfico do Craquez abre o jogo e termina na logo, que vira a
+  tela de "toque para iniciar" (preenche telas largas sem faixas pretas).
+- **Replay com controles de verdade**: a barra de controles (linha do tempo, voltar/avançar 5 s,
+  pausar, velocidade, câmeras, foco e zoom) aparecia fora da tela; agora aparece embaixo. O menu
+  passou a se chamar só "Replay" e o selo REPLAY não cobre mais o placar.
+- **Escolha de times unificada**: depois da modalidade, uma tela só para clubes e seleções; na lista
+  de ligas há a aba das seleções (todas pelo ranking e por continente).
+- **211 seleções**: o quadro completo da FIFA, com bandeiras, cores, uniformes e elencos.
+- **Quedas e levantar com captura de movimento**: tropeço e queda, caído segurando a perna e levantar
+  do chão; quem faz a falta estica a perna no adversário (a pancada aparece) e o contato precisa ser
+  de verdade. Quase sempre um companheiro (ou o próprio adversário) vem dar a mão.
+
+## Craquez 2.10.1
+
+Jogo de futebol feito 100% com inteligência artificial, **gratuito**.
+
+### Download
+- **Celular Android**: `Craquez-v2.10.1.apk`
+- **TV (Google TV / Android TV, ex.: TCL C6K)**: `Craquez-TV-v2.10.1.apk` — use este na TV (32 e 64 bits).
+
+### Novidades
+- **Controles de toque mais precisos** (ajustados para telas rápidas como a do Galaxy S24+): cada dedo é
+  lido direto da tela, toques rápidos nos botões não se perdem mais, o analógico nasce onde o polegar
+  encosta, acompanha o dedo sem travar na borda, tem o mesmo tamanho em centímetros em qualquer tela e
+  responde com menos atraso.
+- **Condução de bola**: a bola não escapa mais sozinha nas curvas; o corte segue o analógico na hora e,
+  ao soltar o CORRER, o jogador segura a bola em vez de deixá-la ir.
+- **Domínio de passe**: quem recebe entra na linha da bola e a espera (antes passava da bola com o
+  embalo); com o analógico solto, vai sozinho ao encontro do passe.
+- **Corpo dos atletas**: tronco um pouco mais curto (pernas proporcionalmente mais longas), braços mais
+  compridos e quadril um pouco mais largo.
+- **Redes e bola**: rede em malha de losango com caimento natural (teto cedendo no meio, sobra deitada
+  na grama e laterais soltas); bolas com tom de cada gomo levemente diferente e marcas de uso.
+
+## Craquez 2.10.0
+
+Jogo de futebol feito 100% com inteligência artificial, **gratuito**.
+
+### Download
+- **Celular Android**: `Craquez-v2.10.0.apk`
+- **TV (Google TV / Android TV, ex.: TCL C6K)**: `Craquez-TV-v2.10.0.apk` — use este na TV (32 e 64 bits).
+
+### Novidades
+- **Goleiro com movimentos de captura**: mergulho para cada lado, bloqueio com o corpo, pegadas
+  (rasteira, na altura do peito e no alto), rolar a bola, colocar a bola no tiro de meta e organizar
+  a barreira nas faltas e escanteios.
+- **Carrinho, levantar do chão e reclamação** com captura de movimento: o carrinho entra deslizando e o
+  jogador levanta no fim; quem cai de costas senta, apoia a mão e fica de pé; quem fez a falta balança
+  a cabeça e abre os braços. O técnico assiste ao jogo de braços cruzados.
+- **Cenários com modelos de verdade** (pacotes gratuitos do Quaternius): árvores, pinheiros, arbustos,
+  flores, capim e pedras no entorno dos estádios, nos society, na chácara e no centro de treinamento;
+  canteiros com plantas na esplanada; sobrados e casinhas na rua (Morro, Vila Colorida e quarteirões
+  baixos), com as cores de cada lugar e janelas acesas à noite.
+
 ## Craquez 2.9.1
 
 Jogo de futebol feito 100% com inteligência artificial, **gratuito**.

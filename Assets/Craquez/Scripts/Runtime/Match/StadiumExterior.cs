@@ -245,6 +245,8 @@ namespace Craquez
                     else if (st.scene == 3 || st.scene == 6) props[sd].Pine(p, h + 1f);
                     else props[sd].Tree(p, h);
                     planters[sd].Box(p + Vector3.up * 0.25f, new Vector3(2.4f, 0.5f, 2.4f));
+                    // canteiro com arbustos e flores (modelos), em cima da borda de concreto
+                    props[sd].Garden(p + Vector3.up * 0.5f, 1.0f, 3);
                 }
                 else
                 {

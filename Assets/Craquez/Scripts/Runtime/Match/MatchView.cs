@@ -669,6 +669,8 @@ namespace Craquez
                     }
                 }
                 if (_coachPointT[t] > 0f) { _coachPointT[t] -= dt; if (_coachPointT[t] <= 0f) av.point = Vector3.zero; }
+                // parado olhando o jogo: braços cruzados (solta para apontar, comemorar ou andar)
+                av.ArmsFolded(_coachPointT[t] <= 0f && !av.Celebrating && p.vel.magnitude < 0.5f);
                 // lance de perigo do time dele: aplaude / vibra na beira do campo
                 if (sim.tick - sim.lastShotTick < 4 && sim.ball.lastTouchTeam == t && !av.Celebrating) av.Celebrate(1.4f);
                 av.OnTick();
@@ -904,6 +906,10 @@ namespace Craquez
         void OnEvent(SimEvent e)
         {
             if (e.id >= 0 && e.id < athletes.Count) athletes[e.id].OnEvent(e);
+            // falta ou escanteio contra: o goleiro organiza a barreira/a área
+            if (e.type == "whistle" && (e.kind == "corner" || e.kind == "freekick"))
+                foreach (var a in athletes)
+                    if (a != null && a.p != null && a.p.isKeeper && a.p.team != e.team) a.Directing();
             life?.OnEvent(e);
             switch (e.type)
             {

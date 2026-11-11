@@ -166,7 +166,13 @@ jobs:
       - name: Screenshots
         if: matrix.targetPlatform == 'StandaloneLinux64'
         run: |
-          sudo apt-get update -qq && sudo apt-get install -y -qq xvfb libgl1-mesa-dri mesa-utils mesa-vulkan-drivers libvulkan1 > /dev/null
+          # security.ubuntu.com às vezes não resolve no runner: usa o espelho do Azure e tenta de novo
+          sudo sed -i 's#https\?://security.ubuntu.com#http://azure.archive.ubuntu.com#g' /etc/apt/apt-mirrors.txt /etc/apt/sources.list /etc/apt/sources.list.d/* 2>/dev/null || true
+          for i in 1 2 3 4; do
+            sudo apt-get update -qq || true
+            sudo apt-get install -y -qq --fix-missing xvfb libgl1-mesa-dri mesa-utils mesa-vulkan-drivers libvulkan1 > /dev/null && break
+            sleep $((i * 15))
+          done
           cd build/StandaloneLinux64
           sudo chown -R "$USER" . && chmod +x Craquez
           mkdir -p "$GITHUB_WORKSPACE/shots"
