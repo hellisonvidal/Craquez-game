@@ -8,7 +8,9 @@ mkdir -p ~/.config/blender/5.2/extensions/user_default && cp -r mpfb2/src/mpfb ~
 # descompacte em ~/.config/blender/5.2/extensions/.user/user_default/mpfb/data/
 bpyenv/bin/python tools/blender/build_athletes.py out --preview          # 4 biotipos -> out/Athlete_*.fbx
 # captura CMU (ASF/AMC) de mocap.cs.cmu.edu: sujeitos 9, 10, 11, 35, 102, 127, 141
-bpyenv/bin/python tools/blender/retarget.py out/Athlete_afro.blend mocap out --preview   # -> Athlete_Anims.fbx + anims.json
+# Mixamo (FBX sem pele, 30 fps, T-pose): "Soccer Game Pack" em mx/soccer e "Locomotion Pack" em mx/loco
+# (os arquivos do Mixamo não vão para o repositório: só o resultado convertido)
+bpyenv/bin/python tools/blender/retarget.py out/Athlete_afro.blend mocap out --mixamo=mx --sheet   # -> Athlete_Anims.fbx + anims.json
 ```
 
 Copie os FBX, `anims.json` e as texturas para `Assets/Craquez/Resources/Athletes/`.

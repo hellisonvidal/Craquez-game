@@ -167,15 +167,26 @@ namespace Craquez
     /// </summary>
     public class AthleteAnimator
     {
-        public static readonly string[] Loco = { "Idle", "Walk", "Jog", "Run", "Backpedal", "Jockey", "Sprint" };
-        const int IIdle = 0, IWalk = 1, IJog = 2, IRun = 3, IBack = 4, IJockey = 5, ISprint = 6;
+        public static readonly string[] Loco = { "Idle", "Walk", "Jog", "Run", "Backpedal", "Jockey", "Sprint", "JockeyR", "GkReady", "GkSideL", "GkSideR" };
+        const int IIdle = 0, IWalk = 1, IJog = 2, IRun = 3, IBack = 4, IJockey = 5, ISprint = 6, IJockeyR = 7, IGkReady = 8, IGkSideL = 9, IGkSideR = 10;
 
         public class ClipInfo
         {
             public AnimationClip clip;
             public float speed;   // m/s médio do clipe (anims.json)
             public bool loop;
+            public float contact = -1f;   // instante do toque na bola (s), medido na conversão (anims.json)
         }
+
+        /// <summary>
+        /// Animações do Mixamo (captura limpa, feita para jogos): o jogo usa a passada, os braços e a
+        /// postura da captura como estão, sem as correções desenhadas por cima que a captura CMU pedia.
+        /// </summary>
+        public static bool Mocap
+        {
+            get { var _ = Clips; return _mocap; }
+        }
+        static bool _mocap;
 
         static Dictionary<string, ClipInfo> _clips;
 
@@ -195,7 +206,9 @@ namespace Craquez
                     if (n.StartsWith("__")) continue;
                     object m = null;
                     md?.TryGetValue(n, out m);
-                    _clips[n] = new ClipInfo { clip = c, speed = Sim.MiniJson.F(m, "speed", 0f), loop = m is Dictionary<string, object> d && d.TryGetValue("loop", out var l) && l is bool b && b };
+                    var md2 = m as Dictionary<string, object>;
+                    _clips[n] = new ClipInfo { clip = c, speed = Sim.MiniJson.F(m, "speed", 0f), loop = md2 != null && md2.TryGetValue("loop", out var l) && l is bool b && b, contact = Sim.MiniJson.F(m, "contact", -1f) };
+                    if (md2 != null && md2.TryGetValue("source", out var src) && src is string ss && ss.StartsWith("mixamo:")) _mocap = true;
                 }
                 if (_clips.Count == 0) Debug.LogError("Nenhuma animação encontrada em Resources/Athletes/Athlete_Anims");
                 return _clips;
@@ -207,6 +220,7 @@ namespace Craquez
         readonly AnimationClipPlayable[] _locoP = new AnimationClipPlayable[Loco.Length];
         readonly float[] _locoW = new float[Loco.Length];
         readonly float[] _locoSpeed = new float[Loco.Length];
+        readonly bool[] _has = new bool[Loco.Length];   // o clipe existe (senão o lugar usa o parado)
         AnimationClipPlayable _action;
         float _actionW, _actionT, _actionEnd, _actionRate, _fadeOut;
         float _phase;
@@ -214,7 +228,7 @@ namespace Craquez
         readonly float[] _locoTarget = new float[Loco.Length];
         static float[] _contact;   // fase (0..1) do apoio do pé esquerdo em cada clipe de locomoção
         static float[] _groundSpeed; // velocidade real dos pés no chão em cada clipe (m/s), medida na pose
-        float _idleRate = 1f;
+        float _idleRate = 1f, _idleT, _idleOff;
         /// <summary>Quadro (0..1) da captura parada que fica segurado: os dois pés apoiados.</summary>
         public static float IdleHold = 0f;
         readonly float[] _sp4 = new float[4], _sp5 = new float[5];
@@ -255,7 +269,7 @@ namespace Craquez
             }
             for (int i = 0; i < Loco.Length; i++)
             {
-                if (!Clips.TryGetValue(Loco[i], out var ci) || !ci.loop || i == IIdle) continue;
+                if (!Clips.TryGetValue(Loco[i], out var ci) || !ci.loop || i == IIdle || i == IGkReady) continue;
                 float len = ci.clip.length, best = float.MaxValue, bt = 0f;
                 const int N = 40;
                 var rigRoot = go.GetComponentInParent<AthleteRig>();
@@ -297,7 +311,7 @@ namespace Craquez
                     }
                 }
                 float gs = cnt >= 3 ? sum / cnt : 0f;
-                if (i == IBack) gs = 0f;   // de costas a medida é ruidosa: usa o valor do json
+                if (i == IBack || i == IJockey || i >= IJockeyR) gs = 0f;   // de costas/de lado a medida (para a frente) não vale: usa o valor do json
                 _groundSpeed[i] = gs;
                 Debug.Log($"[anim] {Loco[i]}: apoio do pé esq. em {bt:F2} do ciclo, chão a {gs:F2} m/s (json {ci.speed:F2})");
             }
@@ -315,6 +329,7 @@ namespace Craquez
             foreach (var name in KickClips)
             {
                 if (!Clips.TryGetValue(name, out var ci)) continue;
+                if (ci.contact >= 0f) { _kickContact[name] = ci.contact; continue; }   // medido na conversão
                 float len = ci.clip.length;
                 const float step = 1f / 60f;
                 Vector3 pl = Vector3.zero, pr = Vector3.zero;
@@ -341,7 +356,10 @@ namespace Craquez
         }
 
         /// <summary>Instante do contato com a bola no clipe (s); 1,1 s se não medido.</summary>
-        public static float KickContact(string clip) => _kickContact.TryGetValue(clip, out var t) ? t : 1.1f;
+        public static float KickContact(string clip) =>
+            _kickContact.TryGetValue(clip, out var t) ? t : Clips.TryGetValue(clip, out var ci) && ci.contact >= 0f ? ci.contact : 1.1f;
+
+        public static bool Has(string clip) => Clips.ContainsKey(clip);
 
         public string CurrentAction { get; private set; }
         public float ActionWeight => _actionW;
@@ -352,6 +370,7 @@ namespace Craquez
             uint h = (uint)(seed * 2654435761u + 12345u);
             _phase = (h % 1000u) / 1000f;
             _idleRate = 0.9f + ((h >> 10) % 200u) / 1000f;
+            _idleOff = ((h >> 4) % 1000u) / 1000f * 8f;   // cada um num ponto da respiração
             var clips = Clips;
             if (clips.Count == 0 || animator == null) return;
             if (_contact == null)
@@ -366,7 +385,8 @@ namespace Craquez
             _loco = AnimationMixerPlayable.Create(_graph, Loco.Length);
             for (int i = 0; i < Loco.Length; i++)
             {
-                if (!clips.TryGetValue(Loco[i], out var ci)) ci = clips.TryGetValue("Idle", out var idle) ? idle : null;
+                _has[i] = clips.TryGetValue(Loco[i], out var ci);
+                if (!_has[i]) ci = clips.TryGetValue("Idle", out var idle) ? idle : null;
                 if (ci == null) continue;
                 _locoP[i] = AnimationClipPlayable.Create(_graph, ci.clip);
                 _locoP[i].SetApplyFootIK(false);
@@ -426,7 +446,7 @@ namespace Craquez
         /// <summary>Ritmo das passadas (1 = natural; >1 passadas mais curtas e rápidas, como conduzindo a bola).</summary>
         public float cadence = 1f;
 
-        public void Tick(float dt, float speed, float fwd, float side, bool guard)
+        public void Tick(float dt, float speed, float fwd, float side, bool guard, bool keeper = false)
         {
             if (!_valid) return;
             var _w = _locoTarget;
@@ -434,15 +454,25 @@ namespace Craquez
             float back = Mathf.Clamp01(-fwd / Mathf.Max(0.4f, speed));
             // passo lateral só quando anda quase de lado (e devagar); correndo, gira o corpo
             float lateral = speed > 3.5f ? 0f : Mathf.Clamp01(Mathf.Abs(side) / Mathf.Max(0.4f, speed) - 0.35f) * 1.6f;
-            if (speed < 0.25f)
+            bool gk = keeper && guard && _has[IGkReady];
+            bool strafeLR = _has[IJockeyR];
+            if (gk && (speed < 0.25f || Mathf.Abs(side) > Mathf.Abs(fwd) * 0.8f))
             {
-                if (guard) _w[IJockey] = 1f;
+                // goleiro em posição de espera e, deslocando, passos laterais (base larga, joelhos dobrados)
+                float k = Mathf.Clamp01(speed / 1.2f);
+                _w[side < 0f ? IGkSideL : IGkSideR] = k;
+                _w[IGkReady] = 1f - k;
+            }
+            else if (speed < 0.25f)
+            {
+                if (guard && !strafeLR) _w[IJockey] = 1f;
                 else _w[IIdle] = 1f;
             }
             else if (guard || lateral > 0.85f)
             {
                 float k = Mathf.Clamp01(speed / 1.2f);
-                _w[IJockey] = k;
+                // marcação de lado: passo lateral para o lado do movimento (esquerda/direita)
+                _w[strafeLR && side > 0f ? IJockeyR : IJockey] = k;
                 _w[IIdle] = 1f - k;
             }
             else if (back > 0.55f && speed < 4.5f)
@@ -478,11 +508,12 @@ namespace Craquez
                 if (!_locoP[i].IsValid() || _locoW[i] <= 0f) continue;
                 float len = (float)_locoP[i].GetAnimationClip().length;
                 // ritmo casado com a velocidade (pés sem patinar), dentro de limites naturais
-                float rate = (i == IIdle || speed < 0.2f) ? _idleRate : Mathf.Clamp(speed / _locoSpeed[i] * cadence, 0.7f, 1.8f);
+                float rate = (i == IIdle || i == IGkReady || speed < 0.2f) ? _idleRate : Mathf.Clamp(speed / _locoSpeed[i] * cadence, 0.7f, 1.8f);
                 cyclesPerSec += _locoW[i] * rate / Mathf.Max(0.1f, len);
                 wsum += _locoW[i];
             }
             if (wsum > 0f) _phase = Mathf.Repeat(_phase + dt * cyclesPerSec / wsum, 1f);
+            _idleT += dt * _idleRate;
             for (int i = 0; i < Loco.Length; i++)
             {
                 if (!_locoP[i].IsValid()) continue;
@@ -490,7 +521,14 @@ namespace Craquez
                 float off = (_contact != null && i != IIdle) ? _contact[i] : 0f;
                 // parado: a captura "Idle" dá passos no lugar (0,8 m/s de pé mexendo) — ninguém fica assim
                 // em jogo; segura um quadro com os dois pés no chão (o corpo respira por cima, na pose)
-                if (i == IIdle) { _locoP[i].SetTime(IdleHold * len); _loco.SetInputWeight(i, _locoW[i]); continue; }
+                // (a captura do Mixamo parada é um "respirar" de verdade: toca normalmente, no ritmo de cada um)
+                if (i == IIdle || i == IGkReady)
+                {
+                    if (_mocap) { _locoP[i].SetTime(Mathf.Repeat(_idleT + _idleOff, len)); }
+                    else _locoP[i].SetTime(IdleHold * len);
+                    _loco.SetInputWeight(i, _locoW[i]);
+                    continue;
+                }
                 _locoP[i].SetTime(Mathf.Repeat(_phase + off, 1f) * len);
                 _loco.SetInputWeight(i, _locoW[i]);
             }
