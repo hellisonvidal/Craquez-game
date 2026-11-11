@@ -659,7 +659,14 @@ namespace Craquez
         void ShowOnline()
         {
             var root = Page("ON-LINE");
-            _back = ShowModes;
+            _back = () => { OnlineHooks.Leave?.Invoke(); ShowModes(); };
+            if (Craquez.Sim.Net.Online.Enabled && OnlineHooks.BuildPage != null)
+            {
+                Title(root, "ON-LINE", "Partidas pela internet, cada um no seu aparelho");
+                var area = UiKit.Rect(root, "on-line").Place(0.1f, 0, 0.9f, 1, 0, 120, 0, 280);
+                OnlineHooks.BuildPage(this, area);
+                return;
+            }
             Title(root, "ON-LINE", Craquez.Sim.Net.Online.Enabled ? "Partidas pela internet" : "Em preparação");
             var card = UiKit.Panel(root).rectTransform.Place(0.12f, 0, 0.88f, 1, 0, 190, 0, 300);
             var txt = UiKit.Label(card,
@@ -667,7 +674,7 @@ namespace Craquez
                 "•  Partida rápida: o jogo encontra um adversário do seu nível.\n" +
                 "•  Sala com código: crie uma sala e passe o código para o amigo.\n" +
                 "•  Mesmo jogo nos dois aparelhos: só os comandos viajam pela rede, então a partida é leve e fiel.\n\n" +
-                (Craquez.Sim.Net.Online.Enabled ? "" : "O motor da partida on-line já está pronto e testado; falta ligar o servidor. Em breve!"),
+                (Craquez.Sim.Net.Online.Enabled ? "" : string.IsNullOrEmpty(Craquez.Sim.Net.Online.DisabledReason) ? "O motor da partida on-line já está pronto e testado; falta ligar o servidor. Em breve!" : Craquez.Sim.Net.Online.DisabledReason),
                 30, Theme.Body, Theme.Text, TextAnchor.UpperLeft);
             txt.rectTransform.Place(0, 0, 1, 1, 40, 40, 40, 40);
             var back = UiKit.Button(root, "‹  Voltar", ShowModes, 30);
@@ -1709,6 +1716,31 @@ namespace Craquez
             _match.onExit = () => { EndMatch(); EndTraining(); ShowPlay(); };
             _match.onRestart = c => { EndMatch(); StartMatch(); };
             _match.Begin(_cfg, cam);
+        }
+
+        // ------------------------------------------------------------ on-line (usado por Craquez.Online)
+        /// <summary>Times da modalidade (clubes e seleções) para a escolha na tela on-line.</summary>
+        public static List<League> OnlineLeagues(string mode) => AllFor(mode);
+        /// <summary>Volta para a tela ON-LINE (recria a página).</summary>
+        public void OnlineRefresh() => ShowOnline();
+        public void OnlineBack() { OnlineHooks.Leave?.Invoke(); ShowModes(); }
+
+        /// <summary>Começa a partida on-line: os dois aparelhos com a mesma configuração e semente.</summary>
+        public void StartOnlineMatch(MatchConfig c, Craquez.Sim.Net.LockstepSession session)
+        {
+            Sfx.MenuMusic(false);
+            StopAttract();
+            UiKit.Clear(_root);
+            _bg.color = new Color(0, 0, 0, 0);
+            _backdrop.gameObject.SetActive(false);
+            _wasMenu = false;
+            _back = null;
+            var go = new GameObject("Partida on-line");
+            go.transform.SetParent(transform, false);
+            _match = go.AddComponent<MatchController>();
+            _match.net = session;
+            _match.onExit = () => { EndMatch(); OnlineHooks.Leave?.Invoke(); ShowModes(); };
+            _match.Begin(c, cam);
         }
 
         // ------------------------------------------------------------ roteiro de screenshots (CI)

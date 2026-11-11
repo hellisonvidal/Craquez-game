@@ -48,6 +48,11 @@ namespace Craquez
             _count = Mathf.Min(_count + 1, Keep);
         }
 
+        /// <summary>Retrato completo do estado dos atletas e da bola (partida on-line: a comemoração do gol mexe
+        /// na simulação para o replay e, ao voltar, os dois aparelhos precisam estar exatamente iguais).</summary>
+        public static object Snapshot(MatchSim sim) { var f = new Frame(); Capture(sim, f, false); return f; }
+        public static void Restore(MatchSim sim, object snap) { if (snap is Frame f) { Apply(sim, f, false); sim.events.Clear(); } }
+
         static void Capture(MatchSim sim, Frame f, bool events)
         {
             int n = sim.players.Count;

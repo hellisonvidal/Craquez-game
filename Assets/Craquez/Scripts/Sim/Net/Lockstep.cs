@@ -15,6 +15,8 @@ namespace Craquez.Sim.Net
     {
         /// <summary>Liga o modo on-line no menu (fica desligado até o resultado estar perfeito).</summary>
         public static bool Enabled = false;
+        /// <summary>Motivo de o on-line estar desligado (mostrado na tela do on-line).</summary>
+        public static string DisabledReason = "";
         /// <summary>Passos de atraso dos comandos (3 = 50 ms): cobre a ida e volta numa rede boa.</summary>
         public const int DefaultDelay = 3;
     }
@@ -58,6 +60,10 @@ namespace Craquez.Sim.Net
         readonly Dictionary<int, int> _hashLocal = new Dictionary<int, int>(), _hashRemote = new Dictionary<int, int>();
         int _nextSend;
         public int Tick { get; private set; }
+        /// <summary>Quantos passos de comando local já foram enviados à frente do passo atual.</summary>
+        public int Ahead => _nextSend - Tick;
+        /// <summary>O canal com o outro aparelho ainda está de pé?</summary>
+        public bool Connected => _net.Connected;
         public bool Desynced { get; private set; }
         public int DesyncTick { get; private set; } = -1;
 

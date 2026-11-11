@@ -27,6 +27,9 @@ namespace Craquez { public static class UrpSetup {
  public static void Grade(bool n, float b, float e, float s, float c, float v){} } }
 CS
 $CSC $REFS -r:$W/Sim.dll -r:$W/UnityEngine.UI.dll -r:$W/Unity.InputSystem.dll -define:UNITY_ANDROID -out:$W/Runtime.dll $(find $ROOT/Assets/Craquez/Scripts/Runtime -name "*.cs" | grep -v UrpSetup) $W/UrpStub.cs
+echo "== Craquez.Online (contra stubs dos pacotes da Unity Gaming Services)"
+$CSC $REFS -r:$W/Sim.dll -r:$W/Runtime.dll -r:$W/UnityEngine.UI.dll -define:UNITY_ANDROID -out:$W/UgsStubs.dll $ROOT/tools/ci/UgsStubs.cs
+$CSC $REFS -r:$W/Sim.dll -r:$W/Runtime.dll -r:$W/UnityEngine.UI.dll -r:$W/UgsStubs.dll -define:UNITY_ANDROID -out:$W/Online.dll $(find $ROOT/Assets/Craquez/Scripts/Online -name "*.cs")
 echo "== Craquez.Editor"
 EREFS=""
 for d in $E/Managed/UnityEngine/UnityEditor*.dll; do EREFS="$EREFS -r:$d"; done
