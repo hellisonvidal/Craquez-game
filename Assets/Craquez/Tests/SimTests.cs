@@ -906,6 +906,45 @@ namespace Craquez.Tests
         }
 
         /// <summary>
+        /// Bola pela lateral: segue para fora, o juiz marca depois, o gandula devolve e o cobrador fica com a
+        /// bola nas mãos (não fica parada na linha); adversário a 2 m dele.
+        /// </summary>
+        [TestCase(false)]
+        [TestCase(true)]
+        public void TouchlineRunsOutAndIsTossedBack(bool quick)
+        {
+            var sim = new MatchSim();
+            sim.Setup(GameModes.Field, new TeamSetup { data = Teams.Get(0) }, new TeamSetup { data = Teams.Get(1) }, 5, 120f);
+            sim.quickRestarts = quick;
+            for (int i = 0; i < 60 * 4; i++) sim.Step(null);
+            sim.state = MatchState.Playing;
+            sim.ball.owner = -1;
+            sim.ball.pos = new Vector2(5f, sim.halfW - 4f);
+            sim.ball.vel = new Vector2(2f, 9f);
+            sim.ball.z = 0f; sim.ball.vz = 0f;
+            sim.ball.lastTouchTeam = 0; sim.ball.lastTouchId = 3;
+            float maxBeyond = 0f; bool toss = false, inHands = false; float minOpp = 99f;
+            for (int i = 0; i < 60 * 10 && !inHands; i++)
+            {
+                sim.Step(null);
+                if (sim.runOut) maxBeyond = Mathf.Max(maxBeyond, sim.ball.pos.y - sim.halfW);
+                if (sim.ballToss) toss = true;
+                if (sim.throwIn && sim.ball.owner == sim.throwInTaker && sim.ball.z > 1.5f) inHands = true;
+            }
+            for (int i = 0; i < 30 && inHands; i++)
+            {
+                sim.Step(null);
+                if (!(sim.throwIn && sim.ball.owner == sim.throwInTaker)) break;
+                var tk = sim.players[sim.throwInTaker];
+                foreach (var o in sim.players) if (o.team != tk.team && !o.sentOff) minOpp = Mathf.Min(minOpp, o.position.Dist(tk.position));
+            }
+            System.Console.WriteLine($"[lateral] correu {maxBeyond:F1} m para fora, gandula: {toss}, nas mãos: {inHands}, adversário mais perto {minOpp:F1} m");
+            Assert.Greater(maxBeyond, 0.8f, "a bola segue para fora da linha");
+            Assert.IsTrue(inHands, "o cobrador fica com a bola nas mãos");
+            Assert.GreaterOrEqual(minOpp, 2.0f, "adversário respeita os 2 m");
+        }
+
+        /// <summary>
         /// Defesas do goleiro em chutes de verdade: depois do toque dele (espalmada ou ponta dos dedos) a
         /// bola nunca entra devagarinho no gol — ou sai forte para o lado/para fora, ou entra com força.
         /// </summary>

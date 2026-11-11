@@ -137,7 +137,8 @@ namespace Craquez
 
         static Texture2D _grassN, _woodN, _knitN, _asphaltN;
         public static Texture2D GrassNormal => _grassN ??= NormalFromHeight(256, (u, v) => Hash((int)(u * 256), (int)(v * 256), 41) * 0.6f + VNoise(u * 64, v * 6, 64, 9) * 0.4f, 6f);
-        public static Texture2D WoodNormal => _woodN ??= NormalFromHeight(256, (u, v) => VNoise(u * 4, v * 64, 64, 5) * 0.7f + (Mathf.Abs(v * 8 - Mathf.Round(v * 8)) < 0.02f ? -0.6f : 0f), 3f);
+        // (piso duro: só as emendas das réguas e um veio quase imperceptível — o relevo ondulado de antes parecia areia)
+        public static Texture2D WoodNormal => _woodN ??= NormalFromHeight(256, (u, v) => VNoise(u * 2, v * 128, 128, 5) * 0.06f + (Mathf.Abs(v * 16 - Mathf.Round(v * 16)) < 0.03f ? -0.5f : 0f), 1.5f);
         public static Texture2D KnitNormal => _knitN ??= NormalFromHeight(128, (u, v) => Mathf.Sin(u * Mathf.PI * 2 * 64) * Mathf.Sin(v * Mathf.PI * 2 * 64) * 0.5f + VNoise(u * 16, v * 16, 16, 7) * 0.3f, 2.5f);
         public static Texture2D AsphaltNormal => _asphaltN ??= NormalFromHeight(256, (u, v) => Hash((int)(u * 256), (int)(v * 256), 17) * 0.5f + Fbm(u * 8, v * 8, 8, 3, 3) * 0.6f, 4f);
 
@@ -328,24 +329,29 @@ namespace Craquez
             return t;
         }
 
-        /// <summary>Madeira de quadra (tábuas).</summary>
+        /// <summary>
+        /// Madeira de quadra (piso duro envernizado): réguas estreitas com tom próprio, veio fino e reto ao
+        /// longo da régua e emendas. (Antes os anéis largos e ondulados pareciam dunas: "terra fofa".)
+        /// </summary>
         public static Texture2D Wood(int size, Color baseC, int seed)
         {
             var t = Tex(size, size);
             var px = new Color32[size * size];
-            int boards = 8;
+            const int boards = 16;   // réguas de ~25 cm (a textura cobre 4 m)
             for (int y = 0; y < size; y++)
                 for (int x = 0; x < size; x++)
                 {
                     float u = x / (float)size, v = y / (float)size;
                     int bi = (int)(v * boards);
-                    float off = Hash(bi, 0, seed) * 3f;
-                    float grain = Fbm(u * 3 + off, v * 40, 16, seed + bi, 3);
-                    float rings = Mathf.Sin((u * 30 + grain * 6 + off) * 2.2f) * 0.5f + 0.5f;
-                    float tone = 0.86f + Hash(bi, 7, seed) * 0.18f;
-                    float gap = Mathf.Abs(v * boards - bi - 0.5f) > 0.48f ? 0.55f : 1f;
-                    float joint = Mathf.Abs(((u + Hash(bi, 3, seed)) * 2f) % 1f) < 0.004f ? 0.6f : 1f;
-                    var c = baseC * (tone * (0.85f + rings * 0.15f + grain * 0.1f) * gap * joint);
+                    float fv = v * boards - bi;
+                    float off = Hash(bi, 0, seed);
+                    // veio: linhas finas e quase retas ao longo da régua (u), leve variação
+                    float streak = Fbm(u * 1.5f + off * 7f, fv * 9f, 16, seed + bi, 3);
+                    float lines = Mathf.Abs(Mathf.Sin((fv * 18f + streak * 1.2f) * Mathf.PI)) ;
+                    float tone = 0.88f + (Hash(bi, 7, seed) - 0.5f) * 0.14f + (Hash(bi, Mathf.FloorToInt((u + off) * 3f), seed + 3) - 0.5f) * 0.06f;
+                    float gap = fv < 0.03f || fv > 0.97f ? 0.72f : 1f;
+                    float joint = Mathf.Abs(Mathf.Repeat((u + off) * 3f, 1f)) < 0.0035f ? 0.7f : 1f;
+                    var c = baseC * (tone * (0.95f + lines * 0.05f + (streak - 0.5f) * 0.05f) * gap * joint);
                     c.a = 1;
                     px[y * size + x] = c;
                 }

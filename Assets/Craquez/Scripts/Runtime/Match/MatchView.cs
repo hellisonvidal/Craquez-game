@@ -254,18 +254,20 @@ namespace Craquez
             for (int i = 0; i < st.Count; i++)
             {
                 var c = new Vector3(st[i].x, 0f, st[i].y);
-                // cone de treino baixo com a "boca" em cima onde a bola fica apoiada
-                const int seg = 14;
+                // marcador de treino ("chapéu chinês"): disco baixo e largo com o furo em cima, onde a bola fica
+                // apoiada (o cone alto de antes parecia de obra)
+                const int seg = 18;
                 for (int k = 0; k < seg; k++)
                 {
                     float a0 = k / (float)seg * Mathf.PI * 2f, a1 = (k + 1) / (float)seg * Mathf.PI * 2f;
                     Vector3 P(float r, float a, float y) => c + new Vector3(Mathf.Cos(a) * r, y, Mathf.Sin(a) * r);
-                    cones.Quad(P(0.17f, a0, 0f), P(0.17f, a1, 0f), P(0.07f, a1, 0.3f), P(0.07f, a0, 0.3f));
-                    cones.Quad(P(0.22f, a1, 0.012f), P(0.22f, a0, 0.012f), c + Vector3.up * 0.012f, c + Vector3.up * 0.012f);
+                    cones.Quad(P(0.2f, a0, 0.004f), P(0.2f, a1, 0.004f), P(0.14f, a1, 0.045f), P(0.14f, a0, 0.045f));
+                    cones.Quad(P(0.14f, a0, 0.045f), P(0.14f, a1, 0.045f), P(0.065f, a1, 0.068f), P(0.065f, a0, 0.068f));
+                    cones.Quad(P(0.065f, a0, 0.068f), P(0.065f, a1, 0.068f), P(0.05f, a1, 0.05f), P(0.05f, a0, 0.05f));   // borda do furo
                 }
                 var b = Instantiate(_ball.gameObject, transform).transform;
                 b.name = "Bola do cone";
-                b.position = c + Vector3.up * (0.3f + sim.ball.radius * 0.75f);
+                b.position = c + Vector3.up * (0.05f + sim.ball.radius * 0.93f);
                 b.rotation = Quaternion.Euler(i * 37f, i * 71f, 0f);
                 _stationBalls.Add(b);
             }
@@ -287,6 +289,9 @@ namespace Craquez
                 }
             }
         }
+
+        /// <summary>A bola desenhada (o cobrador do lateral a coloca entre as mãos depois da pose).</summary>
+        public Transform BallTransform => _ball;
 
         void BuildBall(int q)
         {
@@ -1138,7 +1143,7 @@ namespace Craquez
                 // sombra de contato pequena (o tamanho da bola): a mancha grande e escura em volta
                 // fazia a bola parecer afundada no gramado; no alto ela se espalha e some
                 float hz = Mathf.Clamp01(sim.ball.z / 3f);
-                _ballShadow.localScale = Vector3.one * Mathf.Lerp(sim.ball.radius * 2.4f, sim.ball.radius * 5f, hz);
+                _ballShadow.localScale = Vector3.one * Mathf.Lerp(sim.ball.radius * (sim.mode.id == GameModes.Futsal ? 1.7f : 2.4f), sim.ball.radius * 5f, hz);   // (piso duro: sombra de contato pequena e nítida)
                 if (_ballShadowMat != null) { var sc = new Color(0f, 0f, 0f, 0.32f * (1f - hz)); _ballShadowMat.color = sc; _ballShadowMat.SetColor("_BaseColor", sc); }
             }
             // marcadores dos jogadores controlados
