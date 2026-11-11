@@ -1,3 +1,19 @@
+## Craquez 2.15.0
+
+Jogo de futebol feito 100% com inteligência artificial, **gratuito**.
+
+### Download
+- **Celular Android**: `Craquez-v2.15.0.apk`
+- **TV (Google TV / Android TV, ex.: TCL C6K)**: `Craquez-TV-v2.15.0.apk` — use este na TV (32 e 64 bits).
+
+### Novidades
+- **Modo on-line (preparado)**: partida rápida, sala com código e convite pelo WhatsApp, com a partida
+  rodando igual nos dois aparelhos (só os comandos viajam pela internet, pelo Relay da Unity). O cartão
+  ON-LINE liga assim que o projeto do jogo na Unity Cloud estiver configurado (ver docs/ONLINE.md).
+- **Link do convite**: `craquez://sala/CODIGO` abre o jogo direto na sala.
+
+Inclui tudo da 2.14.0 abaixo.
+
 ## Craquez 2.14.0
 
 Jogo de futebol feito 100% com inteligência artificial, **gratuito**.
