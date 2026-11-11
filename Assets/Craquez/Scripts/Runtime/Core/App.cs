@@ -936,7 +936,7 @@ namespace Craquez
                 all.Sort((x, y) => Teams.Get(x).rank.CompareTo(Teams.Get(y).rank));
                 if (all.Count > 0)
                 {
-                    groups.Add(("Seleções  •  Todas (ranking)", all));
+                    groups.Add(("Seleções (ranking)", all));
                     foreach (var c in Teams.Continents)
                     {
                         var ids = all.FindAll(i => Teams.Continent(Teams.Get(i).iso) == c);

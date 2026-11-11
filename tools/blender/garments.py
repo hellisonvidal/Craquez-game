@@ -459,10 +459,16 @@ def shrink_body(body, rig):
     me.update()
 
 
-def make_all(body, rig):
+def make_all(body, rig, mh_cloth=None):
     slots = {n: i for i, n in enumerate(SLOTS)}
-    parts = [make_shirt(body, rig, slots["Shirt"]), make_shorts(body, rig, slots["Shorts"]),
-             make_socks(body, rig, slots["Socks"]), make_boots(body, rig, slots["Boots"])]
+    if mh_cloth is not None:
+        # camisa e calção vindos das roupas do MakeHuman (tecido de verdade: gola, mangas, caimento)
+        import mh_kit
+        mats = {n: body.data.materials[slots[n]] for n in ("Shirt", "Shorts")}
+        shirt, shorts = mh_kit.make(mh_cloth, body, rig, mats)
+    else:
+        shirt, shorts = make_shirt(body, rig, slots["Shirt"]), make_shorts(body, rig, slots["Shorts"])
+    parts = [shirt, shorts, make_socks(body, rig, slots["Socks"]), make_boots(body, rig, slots["Boots"])]
     shrink_body(body, rig)
     bones = set(rig.data.bones.keys())
     for ob in parts:

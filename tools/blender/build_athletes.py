@@ -31,6 +31,7 @@ from mpfb_env import (AssetService, ExportService, HumanObjectProperties,  # noq
 
 OUT = sys.argv[sys.argv.index("--") + 1] if "--" in sys.argv else (sys.argv[1] if len(sys.argv) > 1 else "out")
 PREVIEW = "--preview" in sys.argv
+MH_KIT = "--mh-kit" in sys.argv   # camisa/calção das roupas do MakeHuman
 ONLY = None
 for a in sys.argv:
     if a.startswith("--only="):
@@ -107,6 +108,9 @@ def make_human(v):
         HumanService.add_mhclo_asset(asset(fname, sub), h, asset_type=atype, material_type="GAMEENGINE")
     for hair in HAIRS:
         HumanService.add_mhclo_asset(asset(hair, "hair"), h, asset_type="Hair", material_type="GAMEENGINE")
+    if MH_KIT:
+        # camiseta e calça do MakeHuman (CC0), encaixadas no corpo: viram camisa e calção de jogo
+        HumanService.add_mhclo_asset(asset("male_casualsuit04.mhclo", "clothes"), h, asset_type="Clothes", material_type="GAMEENGINE")
     return h, rig
 
 
@@ -298,7 +302,10 @@ def build(name, v):
             h.modifiers.remove(m)
     apply_kit(h, rig)
     import garments
-    garments.make_all(h, rig)
+    cloth = None
+    if MH_KIT:
+        cloth = next((c for c in ObjectService.get_list_of_children(rig) if "casualsuit04" in c.name.lower()), None)
+    garments.make_all(h, rig, cloth)
     h.name = "Body"
     h.data.name = "Body"
     rig.name = "Armature"

@@ -6,7 +6,8 @@ git clone --depth 1 https://github.com/makehumancommunity/mpfb2
 mkdir -p ~/.config/blender/5.2/extensions/user_default && cp -r mpfb2/src/mpfb ~/.config/blender/5.2/extensions/user_default/mpfb
 # assets CC0: https://files2.makehumancommunity.org/asset_packs/makehuman_system_assets/makehuman_system_assets_cc0.zip
 # descompacte em ~/.config/blender/5.2/extensions/.user/user_default/mpfb/data/
-bpyenv/bin/python tools/blender/build_athletes.py out --preview          # 4 biotipos -> out/Athlete_*.fbx
+bpyenv/bin/python tools/blender/build_athletes.py out --mh-kit --preview   # 4 biotipos -> out/Athlete_*.fbx
+# (--mh-kit: camisa e calção feitos da camiseta e da calça "male_casualsuit04" do MakeHuman, CC0)
 # captura CMU (ASF/AMC) de mocap.cs.cmu.edu: sujeitos 9, 10, 11, 35, 102, 127, 141
 # Mixamo (FBX sem pele, 30 fps, T-pose): "Soccer Game Pack" em mx/soccer e "Locomotion Pack" em mx/loco
 # (os arquivos do Mixamo não vão para o repositório: só o resultado convertido)
