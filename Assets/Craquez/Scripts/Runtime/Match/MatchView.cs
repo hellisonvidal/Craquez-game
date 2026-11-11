@@ -904,6 +904,10 @@ namespace Craquez
         void OnEvent(SimEvent e)
         {
             if (e.id >= 0 && e.id < athletes.Count) athletes[e.id].OnEvent(e);
+            // falta ou escanteio contra: o goleiro organiza a barreira/a área
+            if (e.type == "whistle" && (e.kind == "corner" || e.kind == "freekick"))
+                foreach (var a in athletes)
+                    if (a != null && a.p != null && a.p.isKeeper && a.p.team != e.team) a.Directing();
             life?.OnEvent(e);
             switch (e.type)
             {

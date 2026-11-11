@@ -904,6 +904,7 @@ namespace Craquez.Sim
                     p.hold = 1.4f;
                     p.goalKick = true;
                     gkFetch = -1;
+                    Emit("gkplace", p.team, p.id);
                     stateTimer = 0.5f;
                 }
             }

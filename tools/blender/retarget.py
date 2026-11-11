@@ -95,6 +95,17 @@ MIXAMO_CLIPS = [
     ("Header", "soccer/header soccerball", False, False, 0.0, 99.0, "head"),
     ("GkThrow", "soccer/goalkeeper overhand throw", False, False, 0.0, 99.0, "hand"),
     ("GkPunt", "soccer/goalkeeper drop kick", False, False, 0.0, 99.0, "foot"),
+    # goleiro (no lugar: quem desloca o goleiro é a simulação; a captura dá o corpo)
+    ("GkDiveL", "soccer/goalkeeper diving save", False, False, 0.0, 99.0, "apex", True),
+    ("GkDiveR", "soccer/goalkeeper diving save (2)", False, False, 0.0, 99.0, "apex", True),
+    ("GkBlockR", "soccer/goalkeeper body block (2)", False, False, 0.0, 99.0, "low", True),
+    ("GkBlockL", "soccer/goalkeeper body block (2)", False, True, 0.0, 99.0, "low", True),
+    ("GkCatch", "soccer/goalkeeper catch (2)", False, False, 0.0, 99.0, "fwd", True),
+    ("GkCatchLow", "soccer/goalkeeper catch", False, False, 0.0, 99.0, "handlow", True),
+    ("GkCatchHigh", "soccer/goalkeeper catch (4)", False, False, 0.0, 99.0, "apex", True),
+    ("GkRoll", "soccer/goalkeeper pass", False, False, 0.0, 99.0, "handlow", True),
+    ("GkPlace", "soccer/goalkeeper placing ball", False, False, 0.0, 99.0, "handlow", True),
+    ("GkDirect", "soccer/goalkeeper directing", False, False, 0.0, 99.0, None, True),
 ]
 
 
@@ -200,7 +211,7 @@ def retarget_clip(tgt, skel, frames_src, src_fps=120):
 
 
 
-def retarget_mixamo(tgt, clip, loop=False, keep_yaw=False, t0=0.0, t1=99.0):
+def retarget_mixamo(tgt, clip, loop=False, keep_yaw=False, t0=0.0, t1=99.0, inplace=False):
     """Mesmo resultado de retarget_clip, a partir de um clipe do Mixamo (mixamo.load)."""
     a = int(round(t0 * clip.fps))
     b = min(len(clip.G), int(round(t1 * clip.fps)) + 1)
@@ -226,6 +237,8 @@ def retarget_mixamo(tgt, clip, loop=False, keep_yaw=False, t0=0.0, t1=99.0):
         # ciclo: tira a deriva linear (o ciclo emenda no mesmo lugar)
         k = np.linspace(0.0, 1.0, n)[:, None]
         traj = root_l[0] + (root_l[-1] - root_l[0]) * k
+    elif inplace:
+        traj = root_l.copy()   # o quadril não sai do lugar (só sobe e desce)
     else:
         traj = smooth(root_l, FPS * 0.4)
     speeds = np.linalg.norm(np.diff(hips[:, :2], axis=0), axis=1) * FPS * scale
@@ -365,8 +378,28 @@ def finish(rig, act, name, n):
 def contact_time(rig, n, kind):
     """Instante (s) do toque na bola: pico de velocidade do pé (perto do chão), da cabeça ou da mão,
     em relação ao quadril."""
-    bones = {"foot": ["foot_l", "foot_r"], "head": ["head"], "hand": ["hand_l", "hand_r"]}[kind]
     sc = bpy.context.scene
+    if kind in ("apex", "low", "fwd", "handlow"):
+        vals = []
+        for f in range(1, n + 1):
+            sc.frame_set(f)
+            pb = rig.pose.bones
+            pel = pb["pelvis"].head
+            if kind in ("apex", "low"):
+                vals.append(pel.z)
+            elif kind == "fwd":
+                vals.append(max(-(pb[h].tail.y - pel.y) for h in ("hand_l", "hand_r")))
+            else:
+                vals.append(-min(pb[h].tail.z for h in ("hand_l", "hand_r")))
+        lo, hi = int(0.08 * n), int(0.75 * n)
+        win = vals[lo:hi]
+        if kind == "low":
+            m = min(win)
+            i = next(k for k, v in enumerate(win) if v < m + 0.03)   # primeira vez que chega ao chão
+        else:
+            i = max(range(len(win)), key=lambda k: win[k])
+        return round((lo + i) / FPS, 3), round(float(win[i]), 2)
+    bones = {"foot": ["foot_l", "foot_r"], "head": ["head"], "hand": ["hand_l", "hand_r"]}[kind]
     prev, best, bt = None, 0.0, 0.0
     for f in range(1, n + 1):
         sc.frame_set(f)
@@ -410,13 +443,15 @@ def main():
         log(name, len(poses), "quadros", "vel", round(speed, 2), "m/s")
         finish(rig, act, name, len(poses))
     cache = {}
-    for name, f, loop, mirror, t0, t1, ck in (MIXAMO_CLIPS if MIXAMO else []):
+    for row in (MIXAMO_CLIPS if MIXAMO else []):
+        name, f, loop, mirror, t0, t1, ck = row[:7]
+        inplace = len(row) > 7 and row[7]
         if ONLY and name not in ONLY:
             continue
         if f not in cache:
             cache[f] = mixamo.load(os.path.join(MIXAMO, f + ".fbx"))
         clip = cache[f].mirrored() if mirror else cache[f]
-        poses, speed = retarget_mixamo(tgt, clip, loop=loop, keep_yaw=not loop, t0=t0, t1=t1)
+        poses, speed = retarget_mixamo(tgt, clip, loop=loop, keep_yaw=not loop, t0=t0, t1=t1, inplace=inplace)
         act = build_action(tgt, name, poses)
         meta[name] = {"frames": len(poses), "fps": FPS, "loop": loop, "speed": round(speed, 3),
                       "source": "mixamo:" + f + (" (espelhado)" if mirror else "")}

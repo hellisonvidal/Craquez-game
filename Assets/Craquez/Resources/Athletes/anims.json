@@ -216,5 +216,84 @@
   "speed": 0.981,
   "source": "mixamo:soccer/goalkeeper drop kick",
   "contact": 2.133
+ },
+ "GkDiveL": {
+  "frames": 96,
+  "fps": 30,
+  "loop": false,
+  "speed": 1.335,
+  "source": "mixamo:soccer/goalkeeper diving save",
+  "contact": 0.933
+ },
+ "GkDiveR": {
+  "frames": 97,
+  "fps": 30,
+  "loop": false,
+  "speed": 1.355,
+  "source": "mixamo:soccer/goalkeeper diving save (2)",
+  "contact": 0.9
+ },
+ "GkBlockR": {
+  "frames": 75,
+  "fps": 30,
+  "loop": false,
+  "speed": 0.954,
+  "source": "mixamo:soccer/goalkeeper body block (2)",
+  "contact": 0.8
+ },
+ "GkBlockL": {
+  "frames": 75,
+  "fps": 30,
+  "loop": false,
+  "speed": 0.954,
+  "source": "mixamo:soccer/goalkeeper body block (2) (espelhado)",
+  "contact": 0.8
+ },
+ "GkCatch": {
+  "frames": 30,
+  "fps": 30,
+  "loop": false,
+  "speed": 0.606,
+  "source": "mixamo:soccer/goalkeeper catch (2)",
+  "contact": 0.367
+ },
+ "GkCatchLow": {
+  "frames": 62,
+  "fps": 30,
+  "loop": false,
+  "speed": 0.684,
+  "source": "mixamo:soccer/goalkeeper catch",
+  "contact": 0.733
+ },
+ "GkCatchHigh": {
+  "frames": 83,
+  "fps": 30,
+  "loop": false,
+  "speed": 0.574,
+  "source": "mixamo:soccer/goalkeeper catch (4)",
+  "contact": 0.867
+ },
+ "GkRoll": {
+  "frames": 95,
+  "fps": 30,
+  "loop": false,
+  "speed": 0.701,
+  "source": "mixamo:soccer/goalkeeper pass",
+  "contact": 1.133
+ },
+ "GkPlace": {
+  "frames": 106,
+  "fps": 30,
+  "loop": false,
+  "speed": 0.859,
+  "source": "mixamo:soccer/goalkeeper placing ball",
+  "contact": 0.833
+ },
+ "GkDirect": {
+  "frames": 216,
+  "fps": 30,
+  "loop": false,
+  "speed": 0.964,
+  "source": "mixamo:soccer/goalkeeper directing"
  }
 }
