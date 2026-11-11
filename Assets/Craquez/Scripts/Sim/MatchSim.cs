@@ -1152,6 +1152,14 @@ namespace Craquez.Sim
             var p = players[c.player];
             p.intent = f.move.Limit(1f);
             p.wantSprint = f.Has(InputFrame.Sprint);
+            // recebendo um passe com o analógico solto: vai ao encontro da bola sozinho (antes ficava parado
+            // ao ganhar o controle e a bola, mirada para onde ele corria, passava direto)
+            if (p.id == passReceiver && ball.owner < 0 && f.move.magnitude < 0.25f && state == MatchState.Playing && !p.isKeeper)
+            {
+                var ip = InterceptPoint(p) - p.position;
+                float di = ip.magnitude;
+                if (di > 0.3f) p.intent = ip / di * Mathf.Clamp(di / 2f, 0.35f, 0.9f);
+            }
             p.shielding = f.Has(InputFrame.Shield);
             // proteger + colocado colado atrás/do lado de quem está com a bola = puxão de camisa
             // (só proteger é "conter", a marcação de frente)
@@ -2795,6 +2803,26 @@ namespace Craquez.Sim
         Vector2 InterceptPoint(SimPlayer p)
         {
             float mySpeed = p.TopSpeed();
+            // bola rolando NA DIREÇÃO dele: vai ao ponto da linha da bola mais perto (entra na frente dela e
+            // espera), em vez de correr em pique para o primeiro ponto alcançável e passar da linha com o embalo
+            float bs = ball.vel.magnitude;
+            if (bs > 2f && ball.z < 0.6f && p.id == passReceiver && !p.isKeeper)
+            {
+                var u = ball.vel / bs;
+                float along = Vector2.Dot(p.position - ball.pos, u);
+                // (quem já corre no rumo da bola — enfiada, passe na frente — segue a corrida e pega lá adiante)
+                if (along > 1f && Vector2.Dot(p.vel, u) < 1.5f && (p.position - (ball.pos + u * along)).magnitude < 4f)
+                {
+                    var q = ball.pos + u * along;
+                    float off = (p.position - q).magnitude;
+                    // tempo da bola até lá (com o atrito) contra o tempo do atleta (arrancada de ~0,3 s)
+                    float dec = mode.rollDecel + mode.groundDrag * bs * bs * 0.5f;
+                    float disc = bs * bs - 2f * dec * along;
+                    float tb = disc > 0f ? (bs - Mathf.Sqrt(disc)) / Mathf.Max(0.1f, dec) : 99f;
+                    float tp = off / mySpeed + 0.3f;
+                    if (tp <= tb + 0.15f) return q + u * Mathf.Min(0.6f, off * 0.25f);   // (meio passo à frente: domina andando)
+                }
+            }
             var best = ball.pos;
             var simPos = ball.pos;
             var v = ball.vel;
