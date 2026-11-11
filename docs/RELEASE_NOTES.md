@@ -1,3 +1,20 @@
+## Craquez 2.9.1
+
+Jogo de futebol feito 100% com inteligência artificial, **gratuito**.
+
+### Download
+- **Celular Android**: `Craquez-v2.9.1.apk`
+- **TV (Google TV / Android TV, ex.: TCL C6K)**: `Craquez-TV-v2.9.1.apk` — use este na TV (32 e 64 bits).
+
+### Novidades
+- **Braços ligados ao tronco**: saíram os ajustes antigos que baixavam e apertavam os ombros (a manga
+  parecia solta do corpo com os movimentos novos).
+- **Mãos menores**, na proporção do corpo.
+- **Defesas do goleiro**: a bola tocada na ponta dos dedos mantém a força (sai rente à trave ou entra
+  forte, nunca "devagarinho" no gol); a tirada por cima do travessão passa mesmo por cima.
+- **Bola saindo pela linha de fundo**: segue rolando/voando lá fora, quica, bate na placa e para; só
+  então o juiz apita o tiro de meta ou o escanteio, e o goleiro busca a bola onde ela parou.
+
 ## Craquez 2.9.0
 
 Jogo de futebol feito 100% com inteligência artificial, **gratuito**.

@@ -147,7 +147,7 @@ namespace Craquez
             inst.transform.localScale = Vector3.one * Mathf.Clamp(tall / Mathf.Max(1.2f, modelH), 0.82f, 1.08f);
             // mãos do modelo eram grandes demais para o corpo: um pouco menores
             foreach (var hn in new[] { "hand_l", "hand_r" })
-                if (rig.bones.TryGetValue(hn, out var hb)) hb.localScale = hb.localScale * 0.85f;   // (0,68 sumia com a mão)
+                if (rig.bones.TryGetValue(hn, out var hb)) hb.localScale = hb.localScale * 0.75f;   // (0,85 ainda parecia mão grande; 0,68 sumia com a mão)
             Dress(rig, look, p.isKeeper ? keeperKit : kit, p.id < 0 && p.number <= 0 ? -1 : p.number, quality);   // (juiz e técnico: sem número)
             Accessories(rig, look, p.isKeeper ? keeperKit : kit, p.isKeeper, captain, quality);
             return rig;

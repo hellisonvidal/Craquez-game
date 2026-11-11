@@ -731,7 +731,7 @@ namespace Craquez.Sim
                 gkFetchFacing = taker.facing;
                 // a bola parou logo depois da linha (na boca do gol, na linha: o goleiro não entra no gol)
                 bool mouth = Mathf.Abs(outPos.y) < goalHalf + 0.8f;
-                float beyond = mouth ? 0.15f : Mathf.Clamp(Mathf.Abs(outPos.x) - halfLen, 0.6f, 2.2f);
+                float beyond = mouth ? 0.15f : Mathf.Clamp(Mathf.Abs(outPos.x) - halfLen, 0.6f, RunOutLimit - 0.3f);
                 gkFetchBall = new Vector2(gxL + Mathf.Sign(gxL) * beyond, Mathf.Clamp(outPos.y, -halfW + 1f, halfW - 1f));
                 // longe (perto da bandeirinha): pega uma bola no cone atrás do gol, a que saiu fica lá
                 float best = taker.position.Dist(gkFetchBall) - 2f;
@@ -986,6 +986,7 @@ namespace Craquez.Sim
             {
                 case MatchState.Kickoff:
                 case MatchState.Restart:
+                    if (runOut) { StepRunOut(); break; }
                     stateTimer -= DT;
                     for (int t = 0; t < 2; t++) ctrl[t].prev = frames != null && t < frames.Length ? frames[t].buttons : 0;
                     AiAll(true);
@@ -4156,6 +4157,11 @@ namespace Craquez.Sim
                             v3.y += yOut * rng.Range(0.8f, 3f) * (0.6f + 0.4f * p.defense);
                             if ((v3.x * TeamDir(p.team)) < 0f) v3.x *= rng.Range(0.7f, 0.92f);
                             if (hands.z > goalH * 0.75f) v3.z += rng.Range(1.5f, 3f);   // no alto: por cima do travessão
+                            // a ponta dos dedos muda a direção, não "freia" a bola: ela segue forte (para fora,
+                            // rente à trave, ou ainda para dentro) — nunca entrando devagarinho
+                            var vin3 = new Vector3(ball.vel.x, ball.vel.y, ball.vz);
+                            float keep = vin3.magnitude * rng.Range(0.62f, 0.78f);
+                            if (v3.magnitude < keep && v3.sqrMagnitude > 1e-4f) v3 = v3.normalized * keep;
                             ball.vel = new Vector2(v3.x, v3.y);
                             ball.vz = v3.z;
                             ball.lastTouchTeam = p.team;
@@ -4326,9 +4332,15 @@ namespace Craquez.Sim
                     if (Vector2.Dot(vout, outDir) < 3f) vout += outDir * (3f - Vector2.Dot(vout, outDir));
                     if (ball.z > goalH * 0.75f)
                     {
-                        // ponta dos dedos por cima do travessão
-                        vout = new Vector2(-outDir.x * rng.Range(1f, 2.5f), vin.y * 0.2f + sideY * rng.Range(0.5f, 2f));
-                        ball.vz = rng.Range(3.5f, 5f);
+                        // ponta dos dedos por cima do travessão: a bola sobe e passa a linha no alto da curva,
+                        // acima do travessão (antes subia pouco, voltava devagar e caía dentro do gol)
+                        float vzT = rng.Range(3.5f, 5f);
+                        float clear = goalH + ball.radius + 0.35f - ball.z;
+                        if (clear > 0f) vzT = Mathf.Max(vzT, Mathf.Sqrt(2f * SimBall.G * clear) + 0.3f);
+                        float tTop = vzT / SimBall.G;
+                        float toLine = Mathf.Max(0.3f, Mathf.Abs(-halfLen * TeamDir(p.team) - ball.pos.x));
+                        vout = new Vector2(-outDir.x * Mathf.Max(rng.Range(1f, 2.5f), toLine / tTop + 0.4f), vin.y * 0.2f + sideY * rng.Range(0.5f, 2f));
+                        ball.vz = vzT;
                     }
                     else if (p.saveKind == 7) ball.vz = rng.Range(0f, 1.2f);   // desvio com o pé: sai rasteira/baixa
                     else if (p.saveKind == 2) ball.vz = rng.Range(0.2f, 1.2f);  // abafada: a bola espirra rente ao chão
@@ -4766,6 +4778,48 @@ namespace Craquez.Sim
                 }
         }
 
+        /// <summary>A bola saiu pela linha de fundo e ainda está correndo lá fora (antes do apito do reinício).</summary>
+        public bool runOut;
+        float _runOutT, _runOutSide;
+
+        /// <summary>Até onde a bola corre além da linha de fundo (placas de publicidade / grade).</summary>
+        float RunOutLimit => mode.id == GameModes.Field ? 5.5f : 2.6f;
+
+        void StepRunOut()
+        {
+            _runOutT += DT;
+            AiAll(true);
+            // todos desaceleram (o lance acabou), ninguém corre atrás da bola fora
+            foreach (var p in players) { p.intent *= 0.35f; p.wantSprint = false; MovePlayer(p); }
+            ClampKeepers();
+            float side = _runOutSide, line = halfLen * side;
+            ball.Step(DT, mode);
+            // rede do gol por fora (a bola raspou a trave por fora e bateu na lateral da rede)
+            float beyond = (ball.pos.x - line) * side;
+            if (beyond > 0f && beyond < mode.goalDepth && Mathf.Abs(ball.pos.y) < goalHalf + 0.15f && ball.z < goalH)
+            {
+                ball.pos.y = Mathf.Sign(ball.pos.y) * (goalHalf + 0.15f);
+                ball.vel *= 0.25f; ball.vz *= 0.3f;
+            }
+            // placa/grade lá atrás: bate e volta um pouco
+            if (beyond > RunOutLimit)
+            {
+                ball.pos.x = line + side * RunOutLimit;
+                if (ball.vel.x * side > 0f) { ball.vel.x *= -0.15f; ball.vel.y *= 0.6f; Emit("wall"); }
+                if (ball.z > 1.1f) { ball.z = 1.1f; ball.vz = Mathf.Min(ball.vz, 0f); }
+            }
+            // não volta para dentro do campo (rebote da placa morre antes da linha)
+            if ((ball.pos.x - line) * side < 0.3f) { ball.pos.x = line + side * 0.3f; ball.vel.x = 0f; }
+            if (Mathf.Abs(ball.pos.y) > halfW + 3f) { ball.pos.y = Mathf.Sign(ball.pos.y) * (halfW + 3f); ball.vel.y *= -0.3f; }
+            bool still = ball.Speed < 0.8f && ball.z < 0.05f;
+            if ((_runOutT > 1.1f && still) || _runOutT > 2.6f)
+            {
+                runOut = false;
+                ball.vel = Vector2.zero; ball.vz = 0f; ball.z = 0f;
+                OutGoalLine(side, true);
+            }
+        }
+
         void GoalAndBounds(Vector2 prev)
         {
             float r = ball.radius;
@@ -4811,10 +4865,22 @@ namespace Craquez.Sim
             }
         }
 
-        void OutGoalLine(float side)
+        void OutGoalLine(float side, bool afterRunOut = false)
         {
             int defending = TeamDir(0) * side < 0f ? 0 : 1;
-            Emit("out");
+            if (!afterRunOut) Emit("out");
+            if (!afterRunOut && (mode.id == GameModes.Field || mode.id == GameModes.Society) && !training)
+            {
+                // a bola não para na linha: segue rolando/voando lá fora (quica, perde força, bate na placa)
+                // e só então o juiz apita o reinício; o goleiro busca onde ela parou de verdade
+                runOut = true;
+                _runOutT = 0f;
+                _runOutSide = side;
+                ball.owner = -1;
+                state = MatchState.Restart;
+                stateTimer = 9f;
+                return;
+            }
             if (ball.lastTouchTeam == defending)
             {
                 float cy = Mathf.Abs(ball.pos.y) > 0.01f ? Mathf.Sign(ball.pos.y) * (halfW - 0.3f) : halfW - 0.3f;

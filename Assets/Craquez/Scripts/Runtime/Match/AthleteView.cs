@@ -1785,8 +1785,11 @@ namespace Craquez
             // (0,88 ainda deixava o ombro para fora da linha do tronco, como uma ombreira)
             // (o corpo já vem com os ombros na largura certa do Blender: aqui só um ajuste leve — apertar
             // demais empurrava a malha do ombro para o peito e o peito parecia estufado)
-            if (_uaL != null) _uaL.localPosition = _uaLBase * 0.93f;
-            if (_uaR != null) _uaR.localPosition = _uaRBase * 0.93f;
+            // (com a captura do Mixamo o ombro fica onde o corpo foi feito: apertar puxava o braço para
+            // dentro da camisa e a manga parecia solta do tronco)
+            float sh = AthleteAnimator.Mocap ? 1f : 0.93f;
+            if (_uaL != null) _uaL.localPosition = _uaLBase * sh;
+            if (_uaR != null) _uaR.localPosition = _uaRBase * sh;
             // quadril um pouco mais estreito: pernas mais juntas (as coxas saíam muito afastadas)
             if (_thL == null && rig.bones.TryGetValue("thigh_l", out _thL)) _thLBase = _thL.localPosition;
             if (_thR == null && rig.bones.TryGetValue("thigh_r", out _thR)) _thRBase = _thR.localPosition;
@@ -1860,7 +1863,7 @@ namespace Craquez
             var right = transform.right;
             // nos braços para cima (comemoração, salto do goleiro) desce menos, para o braço não "quebrar"
             float k = (_celebrate > 0f && _armsUp > 0.3f) || (p.isKeeper && p.saveKind > 0) ? 0.45f : 1f;
-            if (AthleteAnimator.Mocap) k *= 0.45f;   // a captura do Mixamo já traz os ombros relaxados
+            if (AthleteAnimator.Mocap) return;   // a captura do Mixamo já traz os ombros relaxados (baixar mais soltava a manga do tronco)
             foreach (var cn in Clavicles)
             {
                 if (!rig.bones.TryGetValue(cn, out var clv) || clv.childCount == 0) continue;

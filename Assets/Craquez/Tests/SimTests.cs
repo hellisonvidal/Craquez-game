@@ -872,6 +872,83 @@ namespace Craquez.Tests
             Assert.Greater(shots, 3);
         }
 
+        /// <summary>
+        /// Chute forte para fora pela linha de fundo: a bola segue lá fora (não congela na linha) e só
+        /// depois vem o apito do tiro de meta, com o goleiro indo buscar onde ela parou.
+        /// </summary>
+        [Test] public void WideShotRunsOut()
+        {
+            var sim = new MatchSim();
+            sim.Setup(GameModes.Field, new TeamSetup { data = Teams.Get(0) }, new TeamSetup { data = Teams.Get(1) }, 3, 120f);
+            for (int i = 0; i < 60 * 4; i++) sim.Step(null);
+            sim.state = MatchState.Playing;
+            float gx = sim.halfLen;
+            int att = -1;
+            foreach (var p in sim.players) if (!p.isKeeper && sim.TeamDir(p.team) > 0f) { att = p.id; break; }
+            sim.ball.owner = -1;
+            sim.ball.pos = new Vector2(gx - 14f, 12f);
+            sim.ball.vel = new Vector2(22f, 1.5f);
+            sim.ball.z = 0.2f; sim.ball.vz = 2f;
+            sim.ball.lastTouchTeam = sim.players[att].team; sim.ball.lastTouchId = att;
+            int crossTick = -1, whistleTick = -1;
+            float maxBeyond = 0f;
+            for (int i = 0; i < 60 * 6 && whistleTick < 0; i++)
+            {
+                sim.Step(null);
+                if (crossTick < 0 && sim.runOut) crossTick = i;
+                if (sim.runOut) maxBeyond = Mathf.Max(maxBeyond, sim.ball.pos.x - gx);
+                foreach (var e in sim.events) if (e.type == "whistle" && e.kind == "goalkick") whistleTick = i;
+            }
+            System.Console.WriteLine($"[bola fora] cruzou no passo {crossTick}, apito no {whistleTick}, correu até {maxBeyond:F1} m além da linha");
+            Assert.GreaterOrEqual(crossTick, 0, "a bola saiu");
+            Assert.Greater(maxBeyond, 2f, "a bola segue além da linha");
+            Assert.Greater(whistleTick - crossTick, 50, "o apito vem depois da bola parar");
+        }
+
+        /// <summary>
+        /// Defesas do goleiro em chutes de verdade: depois do toque dele (espalmada ou ponta dos dedos) a
+        /// bola nunca entra devagarinho no gol — ou sai forte para o lado/para fora, ou entra com força.
+        /// </summary>
+        [Test] public void KeeperTouchNeverCreepsIn()
+        {
+            int touched = 0, goals = 0, creep = 0, saves = 0;
+            for (int seed = 1; seed <= 80; seed++)
+            {
+                var sim = new MatchSim();
+                sim.Setup(GameModes.Field, new TeamSetup { data = Teams.Get(0) }, new TeamSetup { data = Teams.Get(1) }, (uint)seed, 120f);
+                for (int i = 0; i < 30; i++) sim.Step(null);
+                sim.state = MatchState.Playing;
+                float gx = sim.halfLen;
+                SimPlayer gk = null, att = null;
+                foreach (var q in sim.players) if (q.isKeeper && -sim.halfLen * sim.TeamDir(q.team) > 0f) gk = q;
+                foreach (var q in sim.players) if (gk != null && q.team != gk.team && !q.isKeeper) { att = q; break; }
+                foreach (var q in sim.players) if (q != gk && q != att) q.position = new Vector2(-gx * 0.4f, q.position.y * 0.5f);
+                gk.position = new Vector2(gx - 1.2f, 0f); gk.vel = Vector2.zero;
+                att.position = new Vector2(gx - 17f, -4f + (seed % 3) * 4f); att.vel = new Vector2(3f, 0f); att.facing = new Vector2(1f, 0f);
+                sim.ball.owner = att.id; sim.ball.pos = att.position + att.facing * 0.45f; sim.ball.vel = att.vel; sim.ball.z = 0f;
+                float aimY = ((seed * 7) % 9 - 4) * 0.09f;
+                sim.TourShoot(att, new Vector2(1f, aimY - att.position.y / 17f).normalized, 0.65f + (seed % 4) * 0.1f);
+                bool gkTouch = false;
+                float afterTouch = 99f;
+                for (int i = 0; i < 60 * 4 && (sim.state == MatchState.Playing); i++)
+                {
+                    sim.Step(null);
+                    foreach (var e in sim.events)
+                        if (e.id == gk.id && (e.type == "save" || (e.type == "touch" && e.kind == "fingertip"))) { gkTouch = true; if (e.type == "save") saves++; }
+                    if (gkTouch && sim.ball.owner < 0) afterTouch = Mathf.Min(afterTouch, sim.ball.Speed);
+                }
+                if (gkTouch) touched++;
+                if (sim.state == MatchState.Goal)
+                {
+                    goals++;
+                    if (gkTouch && afterTouch < 5f) creep++;
+                }
+            }
+            System.Console.WriteLine($"[defesas] 80 chutes: goleiro tocou em {touched} ({saves} defesas), {goals} gols, {creep} entrando devagar depois do toque");
+            Assert.Greater(touched, 10, "o goleiro participa");
+            Assert.AreEqual(0, creep, "gol com a bola quase parada depois do toque do goleiro");
+        }
+
         [Test] public void JsonRoundTrip()
         {
             var o = MiniJson.Parse("{\"a\": [1, 2.5, \"x\\n\"], \"b\": {\"c\": true, \"d\": null}}");
