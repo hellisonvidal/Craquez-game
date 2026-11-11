@@ -82,6 +82,7 @@ namespace Craquez
 
         public static Venue Stadium(MatchSim sim, TeamData home, TeamData away, Kit homeKit, Kit awayKit, bool night, int quality, Transform parent, int model = 0)
         {
+            PropKit.Setup(quality, night);
             var v = new Venue { root = new GameObject("Estadio").transform };
             v.root.SetParent(parent, false);
             float hl = sim.halfLen, hw = sim.halfW;
@@ -1153,6 +1154,7 @@ namespace Craquez
         /// </summary>
         public static Venue Society(MatchSim sim, TeamData home, TeamData away, Kit homeKit, Kit awayKit, int variant, bool night, int quality, Transform parent)
         {
+            PropKit.Setup(quality, night);
             variant = Mathf.Abs(variant) % SocietyNames.Length;
             float hl = sim.halfLen, hw = sim.halfW;
             bool naturalT = variant == 9;
@@ -1326,6 +1328,7 @@ namespace Craquez
         // ------------------------------------------------------------------ futsal
         public static Venue Futsal(MatchSim sim, TeamData home, TeamData away, Kit homeKit, Kit awayKit, int variant, bool night, int quality, Transform parent)
         {
+            PropKit.Setup(quality, night);
             variant = Mathf.Abs(variant) % FutsalNames.Length;
             var v = new Venue { root = new GameObject("Quadra").transform, name = FutsalNames[variant] };
             v.root.SetParent(parent, false);
@@ -1842,6 +1845,7 @@ namespace Craquez
         // ------------------------------------------------------------------ rua
         public static Venue Street(MatchSim sim, TeamData home, TeamData away, Kit homeKit, Kit awayKit, int variant, bool night, int quality, Transform parent)
         {
+            PropKit.Setup(quality, night);
             variant = Mathf.Abs(variant) % StreetNames.Length;
             var v = new Venue { root = new GameObject("Rua").transform, name = StreetNames[variant] };
             // ruas com gol grande e goleiro: o cenário segue uma rua parecida (quadra do conjunto, campinho
@@ -1983,6 +1987,7 @@ namespace Craquez
                 int n = variant == 1 ? 40 : variant == 13 ? 30 : variant == 9 ? 12 : 18;
                 var bk = new MeshKit[4];
                 var roofK = new MeshKit();
+                var vilaHouses = PropKit.UseModels && (variant == 1 || variant == 13) ? new PropBatch() : null;
                 for (int i = 0; i < 4; i++) bk[i] = new MeshKit();
                 for (int i = 0; i < n; i++)
                 {
@@ -1995,10 +2000,21 @@ namespace Craquez
                         : variant == 8 ? 14f + (float)rng.NextDouble() * 14f
                         : 8f + (float)rng.NextDouble() * 22f;
                     float by = variant == 1 ? Mathf.Max(0, -c.z - 10f) * 0.5f : 0f;
+                    // morro e vila: casinhas de verdade (modelos), de frente para a quadra
+                    if (vilaHouses != null && bh < 9f)
+                    {
+                        House(vilaHouses, rng, c + Vector3.up * by, YawFacing(-c), i % 6, variant == 1 ? 2 : 3, 2.4f, true);
+                        if (by > 0.5f) roofK.Box(c + Vector3.up * (by * 0.5f - 0.1f), new Vector3(6.5f, by, 6.5f));   // base da casa no morro
+                        continue;
+                    }
                     Building(bk[i % 4], roofK, c + Vector3.up * by, new Vector3(6f + (float)rng.NextDouble() * 6f, bh, 6f + (float)rng.NextDouble() * 4f), (float)rng.Next(4) * 0.25f);
                 }
-                for (int i = 0; i < 4; i++) bk[i].Object("Prédios " + i, bmat[i], v.root, quality >= 1);
-                roofK.Object("Lajes", Gfx.Lit(new Color(0.45f, 0.44f, 0.43f), null, 0.1f), v.root, false);
+                if (vilaHouses != null && !vilaHouses.Empty)
+                    vilaHouses.Emit(v.root, quality >= 1, Color.white, night, variant == 13
+                        ? new[] { new Color(0.92f, 0.55f, 0.5f), new Color(0.5f, 0.72f, 0.88f), new Color(0.96f, 0.8f, 0.4f), new Color(0.6f, 0.8f, 0.55f), new Color(0.95f, 0.65f, 0.3f), new Color(0.78f, 0.6f, 0.85f) }
+                        : new[] { new Color(0.72f, 0.48f, 0.38f), new Color(0.82f, 0.76f, 0.66f), new Color(0.66f, 0.64f, 0.6f), new Color(0.86f, 0.7f, 0.5f), new Color(0.62f, 0.4f, 0.32f), new Color(0.9f, 0.88f, 0.82f) });
+                for (int i = 0; i < 4; i++) if (bk[i].Count > 0) bk[i].Object("Prédios " + i, bmat[i], v.root, quality >= 1);
+                if (roofK.Count > 0) roofK.Object("Lajes", Gfx.Lit(new Color(0.45f, 0.44f, 0.43f), null, 0.1f), v.root, false);
             }
             if (variant == 13)
             {

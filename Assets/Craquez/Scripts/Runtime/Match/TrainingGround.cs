@@ -11,6 +11,7 @@ namespace Craquez
         /// </summary>
         public static Venue TrainingGround(MatchSim sim, TeamData home, Kit homeKit, bool night, int quality, Transform parent)
         {
+            PropKit.Setup(quality, night);
             var v = new Venue { root = new GameObject("Centro de treinamento").transform };
             v.root.SetParent(parent, false);
             float hl = sim.halfLen, hw = sim.halfW;

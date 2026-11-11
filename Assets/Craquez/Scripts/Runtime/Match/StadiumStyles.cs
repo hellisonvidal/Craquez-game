@@ -394,7 +394,7 @@ namespace Craquez
             }
             switch (st.scene)
             {
-                case 1: Ring(40, p => k.Tree(p, 9f + k.R() * 6f)); break;
+                case 1: Ring(40, p => { k.Tree(p, 9f + k.R() * 6f); k.Garden(p, 3.5f, 2); }); break;
                 case 2:
                 {
                     var sea = new MeshKit();
@@ -419,7 +419,7 @@ namespace Craquez
                     }
                     mnt.Object("Montanhas", Gfx.Lit(night ? new Color(0.06f, 0.08f, 0.1f) : st.scene == 6 ? new Color(0.45f, 0.5f, 0.58f) : new Color(0.32f, 0.42f, 0.34f), null, 0.05f), v.root, false);
                     snow.Object("Neve", Gfx.Lit(new Color(0.95f, 0.96f, 1f), null, 0.3f), v.root, false);
-                    Ring(46, p => k.Pine(p, 11f + k.R() * 6f));
+                    Ring(46, p => { k.Pine(p, 11f + k.R() * 6f); if (k.R() < 0.4f) k.Rock(p + new Vector3(3f, 0f, 2f), 0.8f + k.R()); });
                     break;
                 }
                 case 4:

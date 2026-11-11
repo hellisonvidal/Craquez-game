@@ -23,6 +23,31 @@ namespace Craquez
             new Color(0.8f, 0.66f, 0.58f),  // terracota clara
         };
 
+        /// <summary>
+        /// Casa/sobrado de verdade (modelos do Quaternius) com a fachada virada para yaw (0 = para -z).
+        /// maxStory limita a altura (1, 2, 3, 4 ou 6 andares). Devolve a largura ocupada (m).
+        /// </summary>
+        public static float House(PropBatch b, System.Random rng, Vector3 center, float yaw, int paint, int maxStory, float scale = 2.4f, bool narrow = false)
+        {
+            var name = HousePick(rng, maxStory, scale, out float w, narrow);
+            if (name == null) return 0f;
+            b.Add(name, center, yaw, scale, paint);
+            return w;
+        }
+
+        /// <summary>Sorteia um modelo de casa com até maxStory andares e diz a largura dele na escala.</summary>
+        public static string HousePick(System.Random rng, int maxStory, float scale, out float width, bool narrow = false)
+        {
+            width = 0f;
+            var ok = PropLib.Names("House_").FindAll(n => n.Length > 6 && n[6] - '0' <= maxStory && !(narrow && (n.Contains("Wide") || n.Contains("Sidehouse"))));
+            if (ok.Count == 0) return null;
+            var name = ok[rng.Next(ok.Count)];
+            width = PropLib.Get(name).Size.x * scale;
+            return name;
+        }
+
+        static float YawFacing(Vector3 dir) => Mathf.Atan2(-dir.x, -dir.z) * Mathf.Rad2Deg;
+
         /// <summary>Prédio: quatro paredes com vãos de janela em escala (u = largura/3,2 m, v = altura/3 m) e laje no topo.</summary>
         static void Building(MeshKit wall, MeshKit roof, Vector3 baseC, Vector3 size, float bayOffset = 0f)
         {
@@ -143,6 +168,9 @@ namespace Craquez
             var walls = new MeshKit[FacadeColors.Length];
             for (int i = 0; i < walls.Length; i++) walls[i] = new MeshKit();
             var roofs = new MeshKit();
+            // casas de verdade nas ruas mais baixas (e no térreo das outras, aqui e ali)
+            var houses = new PropBatch();
+            bool useHouses = PropKit.UseModels;
             float minH = variant == 10 ? 6f : variant == 9 ? 15f : 9f, maxH = variant == 10 ? 15f : variant == 9 ? 15f : variant == 0 ? 42f : 26f;
             bool viaduct = variant == 6;
             float vz0 = hw + 2.5f, vz1 = rz1 + 1.5f;   // faixa ocupada pelo viaduto (lado do fundo)
@@ -155,6 +183,20 @@ namespace Craquez
                     w = Mathf.Min(w, to - p);
                     float d = variant == 9 ? 12f : 9f + R() * 6f;
                     float hgt = variant == 9 ? 15f : Mathf.Lerp(minH, maxH, R() * R() + 0.15f * R());
+                    if (useHouses && variant != 9 && hgt < 14f && !(viaduct && !alongX))
+                    {
+                        // sobrado: fachada para a rua (para dentro do quarteirão)
+                        float yaw = alongX ? (sgn > 0f ? 0f : 180f) : (sgn > 0f ? 90f : -90f);
+                        var hn = HousePick(rng, hgt < 9f ? 2 : 4, 2.4f, out float hwid);
+                        if (hn != null && p + hwid < to)
+                        {
+                            float dd = 6.2f;
+                            var hc = alongX ? new Vector3(p + hwid * 0.5f, 0, sgn * (inner + dd * 0.5f)) : new Vector3(sgn * (inner + dd * 0.5f), 0, p + hwid * 0.5f);
+                            houses.Add(hn, hc, yaw, 2.4f, rng.Next(FacadeColors.Length));
+                            p += hwid + 0.3f;
+                            continue;
+                        }
+                    }
                     var c = alongX ? new Vector3(p + w * 0.5f, 0, sgn * (inner + d * 0.5f)) : new Vector3(sgn * (inner + d * 0.5f), 0, p + w * 0.5f);
                     bool skip = viaduct && !alongX && c.z + w * 0.5f > vz0 - 1f && c.z - w * 0.5f < vz1 + 1f;
                     if (!skip)
@@ -173,6 +215,7 @@ namespace Craquez
             for (int i = 0; i < walls.Length; i++)
                 walls[i].Object("Prédios " + i, Gfx.Lit(FacadeColors[i], FacadeTex(variant * 31 + i, night), 0.18f), v.root, quality >= 1);
             roofs.Object("Lajes", Gfx.Lit(new Color(0.42f, 0.42f, 0.43f), Gfx.Concrete(128, variant + 3), 0.1f), v.root, false);
+            if (!houses.Empty) houses.Emit(v.root, quality >= 1, Color.white, night, FacadeColors);
             if (viaduct)
             {
                 // viaduto ao lado da quadra: tabuleiro sobre a rua do fundo, pilares nas calçadas, guarda-corpo

@@ -162,6 +162,20 @@ namespace Craquez
             }
         }
 
+        /// <summary>Acrescenta uma malha pronta (modelo de cenário) girada, escalada e posta em pos.</summary>
+        public void Append(Vector3[] v, Vector3[] n, Vector2[] uv, int[] tri, Vector3 pos, Quaternion rot, float scale)
+        {
+            int b = _v.Count;
+            for (int k = 0; k < v.Length; k++)
+            {
+                _v.Add(pos + rot * (v[k] * scale));
+                _n.Add(rot * n[k]);
+                _uv.Add(uv[k]);
+                _c.Add(color);
+            }
+            for (int k = 0; k < tri.Length; k++) _t.Add(b + tri[k]);
+        }
+
         public Mesh Build(string name = "mesh")
         {
             var m = new Mesh { name = name };
