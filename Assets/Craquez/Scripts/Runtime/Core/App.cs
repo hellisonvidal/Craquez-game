@@ -430,9 +430,15 @@ namespace Craquez
         void PlayIntroVideo(RectTransform full)
         {
             _introPlayed = true;
-            var clip = Resources.Load<VideoClip>("UI/abertura");
-            if (clip == null || ShotTour.Requested()) return;
-            _videoRt = new RenderTexture((int)clip.width, (int)clip.height, 0, RenderTextureFormat.ARGB32);
+            // o vídeo fica em StreamingAssets e é tocado direto pelo decodificador do aparelho: importado como
+            // VideoClip, o Unity do CI (Linux) não lia o H.264 e o vídeo nem entrava no APK
+            if (ShotTour.Requested()) return;
+#if UNITY_STANDALONE_LINUX && !UNITY_EDITOR
+            return;   // o player de Linux não decodifica H.264
+#else
+            string url = System.IO.Path.Combine(Application.streamingAssetsPath, "abertura.mp4");
+            if (!url.Contains("://")) url = "file://" + url;
+            _videoRt = new RenderTexture(2160, 1080, 0, RenderTextureFormat.ARGB32);
             var holder = UiKit.Rect(full, "vídeo de abertura").Place(0, 0, 1, 1);
             _videoImg = holder.gameObject.AddComponent<RawImage>();
             _videoImg.texture = _videoRt;
@@ -440,11 +446,11 @@ namespace Craquez
             _videoImg.raycastTarget = false;
             var fit = holder.gameObject.AddComponent<AspectRatioFitter>();
             fit.aspectMode = AspectRatioFitter.AspectMode.EnvelopeParent;
-            fit.aspectRatio = clip.width / (float)clip.height;
+            fit.aspectRatio = 2f;
             _video = holder.gameObject.AddComponent<VideoPlayer>();
             _video.playOnAwake = false;
-            _video.source = VideoSource.VideoClip;
-            _video.clip = clip;
+            _video.source = VideoSource.Url;
+            _video.url = url;
             _video.renderMode = VideoRenderMode.RenderTexture;
             _video.targetTexture = _videoRt;
             _video.audioOutputMode = VideoAudioOutputMode.None;
@@ -455,7 +461,11 @@ namespace Craquez
             _video.errorReceived += (v, msg) => { Debug.LogWarning("[abertura] " + msg); EndIntroVideo(); };
             _video.Prepare();
             if (_pressText != null) _pressText.enabled = false;
+            _videoStart = Time.unscaledTime;
+#endif
         }
+
+        float _videoStart;
 
         void EndIntroVideo()
         {
@@ -478,6 +488,8 @@ namespace Craquez
                 return false;
             }
             if (_video == null) return false;
+            // aparelho que não consegue abrir o vídeo: não fica na tela preta, vai para a capa
+            if (!_video.isPrepared && Time.unscaledTime - _videoStart > 6f) { EndIntroVideo(); return false; }
             if (InputRouter.AnyPressedThisFrame()) { EndIntroVideo(); return true; }
             return true;
         }

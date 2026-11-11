@@ -1,3 +1,29 @@
+## Craquez 2.14.0
+
+Jogo de futebol feito 100% com inteligência artificial, **gratuito**.
+
+### Download
+- **Celular Android**: `Craquez-v2.14.0.apk`
+- **TV (Google TV / Android TV, ex.: TCL C6K)**: `Craquez-TV-v2.14.0.apk` — use este na TV (32 e 64 bits).
+
+### Novidades
+- **Placas do Craquez**: nos ginásios de futsal e nos estádios, as placas de publicidade agora mostram o
+  nome do jogo, intercaladas com placas azuis, vermelhas e brancas (as cores das telas do jogo).
+
+### Correções
+- **Ginásio sem parede e sem teto**: as paredes, o teto e a estrutura do ginásio sumiam (o sistema que
+  esconde o que tapa a câmera achava que eles estavam na frente, porque a câmera fica dentro do ginásio) e
+  aparecia o chão de fora com a torcida dos fundos solta. Agora o ginásio fica inteiro.
+- **Placas "arco-íris"**: a grade fina das placas de LED, vista de lado e de longe, virava faixas coloridas.
+  As placas novas não têm a grade.
+- **Vídeo de abertura** no celular: o vídeo não entrava no APK (o Unity do servidor de build não lia o
+  formato). Agora ele é tocado direto pelo aparelho; se algum aparelho não conseguir abrir, o jogo vai
+  para a capa em vez de ficar na tela preta.
+- **Goleiro defendendo de longe com os pés**: o bloqueio com o pé e com o corpo (pernas na frente) agora
+  é só reflexo em chute de perto; chute de longe ele se abaixa e encaixa com as mãos.
+
+Inclui tudo da 2.13.0 abaixo (replay salvo em vídeo, controles menores, clima aleatório, telas de nylon).
+
 ## Craquez 2.13.0
 
 Jogo de futebol feito 100% com inteligência artificial, **gratuito**.

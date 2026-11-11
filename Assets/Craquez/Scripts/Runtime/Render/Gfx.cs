@@ -751,6 +751,52 @@ namespace Craquez
             return t;
         }
 
+        /// <summary>
+        /// Placas de publicidade do jogo: "CRAQUEZ" (branco no azul-marinho das telas) intercalado com placas
+        /// lisas azuis, vermelhas e brancas, nas cores da interface. Sem a grade de LED (de longe, a grade fina
+        /// virava faixas de arco-íris nas placas vistas de lado).
+        /// </summary>
+        public static Texture2D BrandBoards(int w = 2048, int h = 64)
+        {
+            var navy = new Color(0.03f, 0.07f, 0.22f);
+            var blue = new Color(0.16f, 0.5f, 0.95f);
+            var red = new Color(0.9f, 0.14f, 0.18f);
+            var white = new Color(0.95f, 0.96f, 0.98f);
+            var plates = new[] { navy, blue, navy, red, navy, white };
+            var t = Tex(w, h, true, TextureWrapMode.Repeat);
+            var px = new Color32[w * h];
+            int seg = w / plates.Length;
+            var glyphs = Glyphs.Render("CRAQUEZ", h - 22);
+            int gw = glyphs.GetLength(0), gh = glyphs.GetLength(1);
+            for (int i = 0; i < plates.Length; i++)
+            {
+                var bg = plates[i];
+                bool brand = i % 2 == 0;
+                int gx0 = i * seg + (seg - gw) / 2, gy0 = (h - gh) / 2;
+                for (int y = 0; y < h; y++)
+                    for (int x = 0; x < seg; x++)
+                    {
+                        int X = i * seg + x;
+                        Color c = bg;
+                        if (brand)
+                        {
+                            int lx = X - gx0, ly = y - gy0;
+                            if (lx >= 0 && ly >= 0 && lx < gw && ly < gh && glyphs[lx, ly]) c = Color.white;
+                            else if (y < 4) c = (i / 2) % 2 == 0 ? red : blue;   // faixa de cor embaixo do nome
+                        }
+                        // emenda escura entre uma placa e outra e borda de cima mais clara
+                        if (x < 2 || x >= seg - 2) c *= 0.55f;
+                        else if (y >= h - 2) c = Color.Lerp(c, Color.white, 0.25f);
+                        c.a = 1f;
+                        px[y * w + X] = c;
+                    }
+            }
+            t.SetPixels32(px);
+            t.Apply(true);
+            t.anisoLevel = 4;
+            return t;
+        }
+
         /// <summary>Gradiente radial (brilho de refletor, sombra de contato).</summary>
         public static Texture2D Radial(int size, Color center, Color edge, float power = 2f)
         {

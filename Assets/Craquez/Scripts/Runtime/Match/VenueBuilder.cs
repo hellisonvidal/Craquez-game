@@ -553,17 +553,18 @@ namespace Craquez
             }
         }
 
+        static Texture2D _brandTex;
+        static Texture2D BrandTex => _brandTex != null ? _brandTex : (_brandTex = Gfx.BrandBoards());
+
         static void Boards(Venue v, float hl, float hw, TeamData home, TeamData away)
         {
-            string[] txt = { "CRAQUEZ", home.shortName, "FUTEBOL", "GOL", away.shortName, "CRAQUEZ", "JOGO LIMPO", "GRATIS" };
-            Color[] cols = { new Color(0.0f, 0.75f, 0.5f), home.c1, new Color(0.1f, 0.2f, 0.6f), new Color(0.9f, 0.6f, 0.1f), away.c1, new Color(0.05f, 0.05f, 0.1f), new Color(0.75f, 0.1f, 0.2f), new Color(0.2f, 0.2f, 0.25f) };
-            var tex = Gfx.Led(txt, cols, 2048, 64);
-            var mat = Gfx.Emissive(Color.white, new Color(0.9f, 0.9f, 0.9f), tex);
+            // placas do Craquez (nome do jogo intercalado com azul, vermelho e branco)
+            var mat = Gfx.Emissive(Color.white, new Color(0.75f, 0.75f, 0.75f), BrandTex);
             v.ledMats.Add(mat);
             float h = 0.95f, d = 5.2f, dz = 4.2f;
             float x0 = -(hl + d), x1 = hl + d, z0 = -(hw + dz), z1 = hw + dz;
-            float L = (x1 - x0) / 12f;
-            float Lz = (z1 - z0) / 12f;
+            float L = (x1 - x0) / 30f;   // (6 placas de 5 m por volta da textura: proporção da placa)
+            float Lz = (z1 - z0) / 30f;
             // um objeto por lado: a placa do lado da câmera some sozinha quando tapa a visão
             var k = new MeshKit();
             k.Quad(new Vector3(x0, 0, z1), new Vector3(x0, h, z1), new Vector3(x1, h, z1), new Vector3(x1, 0, z1), new Vector2(0, 0), new Vector2(L, 1));
@@ -1553,19 +1554,18 @@ namespace Craquez
             Lines(v, sim, hl, hw);
             Goals(v, sim, hl, true);
             // placas de publicidade na beira da quadra (três lados; o da câmera fica livre)
-            string[] txt = { "CRAQUEZ", home.shortName, "FUTSAL", "GOL", away.shortName, "JOGO LIMPO" };
-            Color[] cols = { new Color(0.0f, 0.75f, 0.5f), home.c1, new Color(0.1f, 0.2f, 0.6f), new Color(0.9f, 0.6f, 0.1f), away.c1, new Color(0.75f, 0.1f, 0.2f) };
-            var led = Gfx.Emissive(Color.white, new Color(0.8f, 0.8f, 0.8f), Gfx.Led(txt, cols, 2048, 64));
+            // placas do Craquez (nome do jogo intercalado com azul, vermelho e branco)
+            var led = Gfx.Emissive(Color.white, new Color(0.7f, 0.7f, 0.7f), BrandTex);
             v.ledMats.Add(led);
             float bx = hl + 2.2f, bz = hw + 2.2f, bh = 0.8f;
             var bd = new MeshKit();
-            bd.Quad(new Vector3(-bx, 0, bz), new Vector3(-bx, bh, bz), new Vector3(bx, bh, bz), new Vector3(bx, 0, bz), new Vector2(0, 0), new Vector2(bx / 6f, 1));
+            bd.Quad(new Vector3(-bx, 0, bz), new Vector3(-bx, bh, bz), new Vector3(bx, bh, bz), new Vector3(bx, 0, bz), new Vector2(0, 0), new Vector2(bx * 2f / 25.6f, 1));
             bd.Object("Placas (fundo)", led, v.root, false);
             bd = new MeshKit();
-            bd.Quad(new Vector3(bx, 0, bz), new Vector3(bx, bh, bz), new Vector3(bx, bh, -bz), new Vector3(bx, 0, -bz), new Vector2(0, 0), new Vector2(bz / 6f, 1));
+            bd.Quad(new Vector3(bx, 0, bz), new Vector3(bx, bh, bz), new Vector3(bx, bh, -bz), new Vector3(bx, 0, -bz), new Vector2(0, 0), new Vector2(bz * 2f / 25.6f, 1));
             bd.Object("Placas (direita)", led, v.root, false);
             bd = new MeshKit();
-            bd.Quad(new Vector3(-bx, 0, -bz), new Vector3(-bx, bh, -bz), new Vector3(-bx, bh, bz), new Vector3(-bx, 0, bz), new Vector2(0, 0), new Vector2(bz / 6f, 1));
+            bd.Quad(new Vector3(-bx, 0, -bz), new Vector3(-bx, bh, -bz), new Vector3(-bx, bh, bz), new Vector3(-bx, 0, bz), new Vector2(0, 0), new Vector2(bz * 2f / 25.6f, 1));
             bd.Object("Placas (esquerda)", led, v.root, false);
             // ginásio
             float W = hl + 18f, D = hw + 17f, H = 17f;

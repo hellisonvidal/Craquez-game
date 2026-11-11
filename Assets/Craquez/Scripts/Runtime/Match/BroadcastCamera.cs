@@ -186,6 +186,14 @@ namespace Craquez
                 var r = _occ[i];
                 if (r == null) continue;
                 var b = r.bounds;
+                // casca que envolve o campo inteiro com a câmera dentro (paredes, teto e treliças do ginásio):
+                // pela caixa ela "contém" a câmera e sumia toda — o ginásio ficava sem parede e sem teto
+                bool shell = b.Contains(c) && b.min.x < -hl && b.max.x > hl && b.min.z < -hw && b.max.z > hw;
+                if (shell && !(sideView && _occNear[i]))
+                {
+                    if (_occHidden[i]) { _occHidden[i] = false; if (_occMode[i] == UnityEngine.Rendering.ShadowCastingMode.Off) r.forceRenderingOff = false; else r.shadowCastingMode = _occMode[i]; }
+                    continue;
+                }
                 bool block = !showAll && InFrontOfField(b, c, fwd, dmin, sx0, sy0, sx1, sy1);
                 if (!block && !showAll) foreach (var t in _tList)
                 {
