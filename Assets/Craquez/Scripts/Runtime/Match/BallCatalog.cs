@@ -490,6 +490,10 @@ namespace Craquez
             c = Color.Lerp(c, seamCol, Smooth(0.007f + aa, 0.007f - aa * 0.5f, seam) * 0.85f);
             // textura fina do material (micro-relevo do PU)
             float grain = (Gfx.VNoise(p.x * 160 + 3, p.y * 160 + p.z * 140 + 3, 256, 11) - 0.5f) * 0.05f;
+            // cada gomo com um tom levemente diferente e marcas de uso (bola de jogo, não de vitrine)
+            grain += ((idx * 37 % 7) / 6f - 0.5f) * 0.035f;
+            float wear = Smooth(0.62f, 0.8f, Gfx.VNoise(p.x * 5 + 40, p.y * 5 + p.z * 4 + 40, 32, 7)) * Smooth(0.3f, 0.7f, Gfx.VNoise(p.x * 40 + 9, p.y * 40 + p.z * 35 + 9, 128, 5));
+            c = Color.Lerp(c, new Color(0.62f, 0.6f, 0.55f), wear * (lum > 0.45f ? 0.18f : 0.1f));
             return new Color(c.r * (1f + grain), c.g * (1f + grain), c.b * (1f + grain), 1f);
         }
 

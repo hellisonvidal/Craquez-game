@@ -691,6 +691,31 @@ namespace Craquez
             return t;
         }
 
+        /// <summary>
+        /// Rede de gol em losango (malha de nó, como as redes de verdade): fios na diagonal, nós mais
+        /// grossos e um leve volume no fio. cell precisa dividir size (a textura repete sem emenda).
+        /// </summary>
+        public static Texture2D NetDiamond(int size, float cell = 32f, float thick = 3f)
+        {
+            var t = Tex(size, size);
+            var px = new Color32[size * size];
+            for (int y = 0; y < size; y++)
+                for (int x = 0; x < size; x++)
+                {
+                    float a = Mathf.Repeat(x + y, cell), b = Mathf.Repeat(x - y, cell);
+                    float da = Mathf.Min(a, cell - a), db = Mathf.Min(b, cell - b);
+                    // (distância na diagonal: o fio fica com a mesma espessura da malha quadrada)
+                    float dd = Mathf.Min(da, db) * 0.7071f;
+                    float cov = Mathf.Clamp01(thick * 0.5f + 0.5f - dd);
+                    if (da * 0.7071f < thick * 0.9f && db * 0.7071f < thick * 0.9f) cov = 1f;   // nó
+                    byte shade = (byte)(232 + 18 * Mathf.Clamp01(1f - dd / Mathf.Max(0.5f, thick * 0.5f)));
+                    px[y * size + x] = new Color32(shade, shade, shade, (byte)(cov * 255));
+                }
+            t.SetPixels32(px);
+            t.Apply(true);
+            return t;
+        }
+
         /// <summary>Painel de LED com texto repetido (placas de publicidade fictícias).</summary>
         public static Texture2D Led(string[] texts, Color[] colors, int w = 1024, int h = 64)
         {

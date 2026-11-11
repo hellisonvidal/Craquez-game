@@ -451,7 +451,8 @@ namespace Craquez
             var postMat = Gfx.Character(street ? new Color(0.98f, 0.78f, 0.12f) : Color.white, null, street ? 0.35f : 0.55f);
             var stripeMat = Gfx.Character(new Color(0.85f, 0.1f, 0.12f), null, 0.5f);
             // rua e quadras pequenas: fio mais grosso (o gol é pequeno e o fio fino some sobre o chão claro)
-            var netTex = street ? Gfx.Net(256, 26f, 5f) : futsal ? Gfx.Net(256, 28f, 4f) : Gfx.Net(256, 32f, 3.2f);
+            // malha em losango (nó de rede de verdade)
+            var netTex = street ? Gfx.NetDiamond(256, 32f, 5f) : futsal ? Gfx.NetDiamond(256, 32f, 4f) : Gfx.NetDiamond(256, 32f, 3.2f);
             foreach (float s in new[] { -1f, 1f })
             {
                 var k = new MeshKit();
@@ -2226,19 +2227,38 @@ namespace Craquez
                     k.Quad(new Vector3(bx0 + side * sg0, y0, z0), new Vector3(bx1 + side * sg01, y1, z0), new Vector3(bx1 + side * sg1, y1, z1), new Vector3(bx0 + side * sg10, y0, z1),
                         new Vector2(z0, y0) / 0.9f, new Vector2(z1, y1) / 0.9f);
                 }
+            // teto: cede no meio (caimento da rede entre o travessão e o fundo), em 4 faixas
+            const int nd = 4;
+            float Sag(float zf, float df) => 0.11f * Mathf.Sin(Mathf.PI * zf) * Mathf.Sin(Mathf.PI * df);
             for (int i = 0; i < nx; i++)
-            {
-                float z0 = -gw + 2 * gw * i / nx, z1 = -gw + 2 * gw * (i + 1) / nx;
-                k.Quad(new Vector3(x0, gh, z0), new Vector3(x0 + side * topD, gh, z0), new Vector3(x0 + side * topD, gh, z1), new Vector3(x0, gh, z1),
-                    new Vector2(0, z0) / 0.9f, new Vector2(topD, z1) / 0.9f);
-            }
+                for (int d = 0; d < nd; d++)
+                {
+                    float z0 = -gw + 2 * gw * i / nx, z1 = -gw + 2 * gw * (i + 1) / nx;
+                    float f0 = d / (float)nd, f1 = (d + 1) / (float)nd;
+                    float zf0 = i / (float)nx, zf1 = (i + 1) / (float)nx;
+                    k.Quad(new Vector3(x0 + side * topD * f0, gh - Sag(zf0, f0), z0), new Vector3(x0 + side * topD * f1, gh - Sag(zf0, f1), z0),
+                        new Vector3(x0 + side * topD * f1, gh - Sag(zf1, f1), z1), new Vector3(x0 + side * topD * f0, gh - Sag(zf1, f0), z1),
+                        new Vector2(topD * f0, z0) / 0.9f, new Vector2(topD * f1, z1) / 0.9f);
+                }
+            // a sobra da rede no pé do fundo fica deitada na grama (como nos estádios)
+            if (curveH > 0f)
+                for (int i = 0; i < nx; i++)
+                {
+                    float z0 = -gw + 2 * gw * i / nx, z1 = -gw + 2 * gw * (i + 1) / nx;
+                    float bx = BackX(0f);
+                    k.Quad(new Vector3(bx, 0.015f, z0), new Vector3(bx + side * 0.28f, 0.012f, z0), new Vector3(bx + side * 0.28f, 0.012f, z1), new Vector3(bx, 0.015f, z1),
+                        new Vector2(0, z0) / 0.9f, new Vector2(0.28f, z1) / 0.9f);
+                }
             foreach (float zs in new[] { -gw, gw })
                 for (int j = 0; j < ny; j++)
                 {
                     float y0 = gh * j / ny, y1 = gh * (j + 1) / ny;
                     float bx0 = BackX(y0), bx1 = BackX(y1);
-                    k.Quad(new Vector3(x0, y0, zs), new Vector3(x0, y1, zs), new Vector3(bx1, y1, zs), new Vector3(bx0, y0, zs),
-                        new Vector2(0, y0) / 0.9f, new Vector2(gd, y1) / 0.9f);
+                    // a lateral cai solta: barriga para fora na parte de baixo, no meio da profundidade
+                    float out0 = Mathf.Sign(zs) * 0.07f * (1f - y0 / gh), out1 = Mathf.Sign(zs) * 0.07f * (1f - y1 / gh);
+                    var mA = new Vector3((x0 + bx0) * 0.5f, y0, zs + out0); var mB = new Vector3((x0 + bx1) * 0.5f, y1, zs + out1);
+                    k.Quad(new Vector3(x0, y0, zs), new Vector3(x0, y1, zs), mB, mA, new Vector2(0, y0) / 0.9f, new Vector2(gd * 0.5f, y1) / 0.9f);
+                    k.Quad(mA, mB, new Vector3(bx1, y1, zs), new Vector3(bx0, y0, zs), new Vector2(gd * 0.5f, y0) / 0.9f, new Vector2(gd, y1) / 0.9f);
                 }
             n._mesh = k.Build("rede");
             n._mesh.MarkDynamic();

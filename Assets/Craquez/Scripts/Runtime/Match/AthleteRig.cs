@@ -144,6 +144,26 @@ namespace Craquez
                     c.localScale = Vector3.Scale(c.localScale, inv);
                 }
             }
+            Proportions();
+        }
+
+        /// <summary>
+        /// Proporções de atleta (medidas num jogador de referência): tronco um pouco mais curto (a altura
+        /// final é a mesma, então as pernas ficam proporcionalmente mais longas, sem afundar os pés), braço
+        /// mais comprido e quadril um pouco mais largo. Só move as articulações (sem escala nos ossos que
+        /// dobram: com escala, joelho e cotovelo entortavam).
+        /// </summary>
+        void Proportions()
+        {
+            void Move(string n, float k) { if (bones.TryGetValue(n, out var t)) t.localPosition *= k; }
+            Move("spine_02", 0.95f); Move("spine_03", 0.95f); Move("neck_01", 0.97f);
+            Move("lowerarm_l", 1.08f); Move("lowerarm_r", 1.08f);
+            if (bones.TryGetValue("thigh_l", out var tl) && bones.TryGetValue("thigh_r", out var tr) && tl.parent == tr.parent)
+            {
+                var half = (tl.localPosition - tr.localPosition) * 0.5f;
+                tl.localPosition += half * 0.06f;
+                tr.localPosition -= half * 0.06f;
+            }
         }
     }
 }
