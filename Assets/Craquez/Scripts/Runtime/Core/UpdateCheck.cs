@@ -92,10 +92,10 @@ namespace Craquez
         {
             if (!CanInstallInGame) { Application.OpenURL(Url); return; }
             if (Progress >= 0f) return;   // já baixando
-            host.StartCoroutine(Download(changed));
+            host.StartCoroutine(Download(host, changed));
         }
 
-        static IEnumerator Download(System.Action changed)
+        static IEnumerator Download(MonoBehaviour host, System.Action changed)
         {
             Progress = 0f;
             InstallMsg = "Baixando a versão " + Latest + "…";
@@ -118,8 +118,18 @@ namespace Craquez
                 }
                 if (rq.result != UnityWebRequest.Result.Success) { Fail("O download falhou (" + rq.error + "). Tente de novo.", changed); yield break; }
             }
+            // download cortado no meio (rede caiu) vira "app não instalado" no Android: confere o tamanho
+            long got = 0;
+            try { got = new System.IO.FileInfo(path).Length; } catch { got = 0; }
+            if (ApkSize > 0 && got != ApkSize)
+            {
+                try { System.IO.File.Delete(path); } catch { }
+                Fail("O download veio incompleto (" + got / 1048576 + " de " + ApkSize / 1048576 + " MB). Toque em ATUALIZAR de novo.", changed);
+                yield break;
+            }
             Progress = 1f;
-            Install(changed);
+            _ready = true;
+            Install(host, changed);
         }
 
         static void Fail(string msg, System.Action changed)
@@ -144,9 +154,10 @@ namespace Craquez
             return null;
         }
 
-        /// <summary>Abre o instalador do Android com o APK baixado (a primeira vez o Android pede para
-        /// permitir "instalar apps desconhecidos" do Craquez).</summary>
-        public static void Install(System.Action changed)
+        /// <summary>Instala o APK baixado pelo instalador de sessões do Android (CraquezInstaller.java): confere
+        /// antes pacote, versão e assinatura e acompanha o resultado, com o motivo exato se falhar. A primeira vez
+        /// o Android pede para permitir "instalar apps desconhecidos" do Craquez.</summary>
+        public static void Install(MonoBehaviour host, System.Action changed)
         {
 #if UNITY_ANDROID && !UNITY_EDITOR
             try
@@ -154,6 +165,7 @@ namespace Craquez
                 using (var player = new AndroidJavaClass("com.unity3d.player.UnityPlayer"))
                 using (var act = player.GetStatic<AndroidJavaObject>("currentActivity"))
                 using (var uriC = new AndroidJavaClass("android.net.Uri"))
+                using (var inst = new AndroidJavaClass("com.hellisonvidal.craquez.CraquezInstaller"))
                 {
                     string pkg = act.Call<string>("getPackageName");
                     using (var pm = act.Call<AndroidJavaObject>("getPackageManager"))
@@ -165,26 +177,71 @@ namespace Craquez
                                 act.Call("startActivity", it);
                             Progress = -1f;
                             InstallMsg = "Permita \"instalar apps desconhecidos\" para o Craquez, volte e toque em ATUALIZAR de novo (o download já está feito).";
-                            _ready = true;
                             changed?.Invoke();
                             return;
                         }
                     }
-                    using (var uri = uriC.CallStatic<AndroidJavaObject>("parse", "content://" + pkg + ".update/craquez.apk"))
-                    using (var it = new AndroidJavaObject("android.content.Intent", "android.intent.action.VIEW"))
+                    string path = CacheApkPath();
+                    string bad = inst.CallStatic<string>("check", act, path);
+                    if (!string.IsNullOrEmpty(bad))
                     {
-                        it.Call<AndroidJavaObject>("setDataAndType", uri, "application/vnd.android.package-archive");
-                        it.Call<AndroidJavaObject>("addFlags", 0x00000001 | 0x10000000);   // ler a URI + nova tarefa
-                        act.Call("startActivity", it);
+                        Progress = -1f;
+                        if (bad.StartsWith("arquivo:")) { _ready = false; InstallMsg = "O arquivo baixado está com defeito (" + bad.Substring(8) + "). Toque em ATUALIZAR para baixar de novo."; }
+                        else if (bad.StartsWith("assinatura:")) InstallMsg = "A versão instalada foi assinada com outra chave e o Android não deixa trocar por cima. Desinstale o Craquez e instale a " + Latest + " uma vez pela página de versões; depois as atualizações seguem pelo jogo.";
+                        else InstallMsg = "Não dá para instalar este arquivo: " + bad.Substring(bad.IndexOf(':') + 1) + ".";
+                        changed?.Invoke();
+                        return;
                     }
+                    string err = inst.CallStatic<string>("install", act, path);
+                    Progress = -1f;
+                    if (!string.IsNullOrEmpty(err)) { InstallMsg = "Não foi possível abrir o instalador (" + err + ")."; changed?.Invoke(); return; }
                 }
-                Progress = -1f;
-                _ready = true;
-                InstallMsg = "Confirme a instalação na tela do Android. Se ele disser que o app não pôde ser instalado, a versão instalada foi assinada com outra chave: desinstale e instale a nova uma vez (depois as atualizações seguem pelo jogo).";
+                InstallMsg = "Instalando a versão " + Latest + "… confirme na tela do Android.";
+                if (host != null) host.StartCoroutine(Watch(changed));
             }
             catch (System.Exception e) { Progress = -1f; InstallMsg = "Não foi possível abrir o instalador (" + e.Message + ")."; }
 #endif
             changed?.Invoke();
+        }
+
+#if UNITY_ANDROID && !UNITY_EDITOR
+        /// <summary>Acompanha o resultado da sessão de instalação e traduz o motivo das falhas.</summary>
+        static IEnumerator Watch(System.Action changed)
+        {
+            float t = 0f;
+            while (t < 600f)
+            {
+                yield return new WaitForSecondsRealtime(0.5f);
+                t += 0.5f;
+                string st;
+                using (var inst = new AndroidJavaClass("com.hellisonvidal.craquez.CraquezInstaller"))
+                    st = inst.CallStatic<string>("status");
+                if (st == "ok") { InstallMsg = "Versão " + Latest + " instalada. Abra o Craquez de novo."; changed?.Invoke(); yield break; }
+                if (!st.StartsWith("erro:")) continue;
+                var p = st.Split(new[] { ':' }, 3);
+                int code = 0;
+                int.TryParse(p.Length > 1 ? p[1] : "0", out code);
+                string det = p.Length > 2 ? p[2] : "";
+                InstallMsg = FailText(code, det);
+                changed?.Invoke();
+                yield break;
+            }
+        }
+#endif
+
+        /// <summary>Códigos de PackageInstaller.STATUS_FAILURE_* em português.</summary>
+        public static string FailText(int code, string detail)
+        {
+            switch (code)
+            {
+                case 3: return "Instalação cancelada. Toque em ATUALIZAR para tentar de novo (o download já está feito).";   // ABORTED
+                case 4: _ready = false; return "O Android achou o arquivo inválido. Toque em ATUALIZAR para baixar de novo.";   // INVALID
+                case 5: return "A versão instalada foi assinada com outra chave. Desinstale o Craquez e instale a " + Latest + " uma vez pela página de versões; depois as atualizações seguem pelo jogo.";   // CONFLICT
+                case 6: return "Sem espaço no aparelho para instalar (precisa de uns 300 MB livres). Libere espaço e toque em ATUALIZAR.";   // STORAGE
+                case 7: return "Esta versão não é compatível com o aparelho.";   // INCOMPATIBLE
+                case 2: return "O Android bloqueou a instalação" + (string.IsNullOrEmpty(detail) ? "" : " (" + detail + ")") + ". Se o Play Protect avisar, toque em \"instalar mesmo assim\".";   // BLOCKED
+                default: return "O Android não instalou" + (string.IsNullOrEmpty(detail) ? "" : " (" + detail + ")") + ". Toque em ATUALIZAR para tentar de novo.";
+            }
         }
 
         static bool _ready;
@@ -192,7 +249,7 @@ namespace Craquez
         /// <summary>Toque em ATUALIZAR: instala o que já foi baixado ou baixa.</summary>
         public static void Update(MonoBehaviour host, System.Action changed)
         {
-            if (_ready && Progress < 0f) { Install(changed); return; }
+            if (_ready && Progress < 0f) { Install(host, changed); return; }
             DownloadAndInstall(host, changed);
         }
 

@@ -1,3 +1,42 @@
+## Craquez 2.12.1
+
+Jogo de futebol feito 100% com inteligência artificial, **gratuito**.
+
+### Download
+- **Celular Android**: `Craquez-v2.12.1.apk`
+- **TV (Google TV / Android TV, ex.: TCL C6K)**: `Craquez-TV-v2.12.1.apk` — use este na TV (32 e 64 bits).
+
+### Correções
+- **Atualização por dentro do jogo**: a instalação agora usa o instalador oficial do Android (sessões
+  do PackageInstaller) no lugar de abrir o APK, que no Android 14+/Samsung falhava com "app não
+  instalado". Antes de instalar o jogo confere se o download veio inteiro e se pacote, versão e assinatura
+  batem com o app instalado; se o Android recusar, aparece o motivo exato (cancelado, sem espaço, outra
+  assinatura, bloqueado pelo Play Protect...).
+- **Importante**: esta versão precisa ser instalada **uma vez pela página de versões** (baixe o APK e
+  abra), porque quem faz a instalação é a versão já instalada; da próxima em diante o botão ATUALIZAR
+  do jogo usa o instalador novo.
+
+Inclui tudo da 2.12.0 abaixo.
+
+## Craquez 2.12.0
+
+Jogo de futebol feito 100% com inteligência artificial, **gratuito**.
+
+### Download
+- **Celular Android**: `Craquez-v2.12.0.apk`
+- **TV (Google TV / Android TV, ex.: TCL C6K)**: `Craquez-TV-v2.12.0.apk` — use este na TV (32 e 64 bits).
+
+### Novidades
+- **Uniformes em 3D de verdade**: camisa com gola redonda, mangas com volume e caimento solto, e calção
+  com barra, feitos das roupas do MakeHuman (gratuitas) e encaixados em cada biotipo — antes o uniforme
+  era o próprio corpo pintado.
+- **Lateral**: a bola fica entre as mãos do cobrador e o adversário respeita 2 m de distância.
+- **Bola saindo pela lateral**: segue rolando para fora (bate na placa) e um gandula a devolve ao
+  cobrador; nada de bola parada em cima da linha.
+- **Marcadores de treino** (os "chapéus chineses") no lugar dos cones altos das bolas de reposição.
+- **Futsal com piso duro**: a madeira da quadra virou réguas envernizadas retas (antes parecia areia) e a
+  sombra da bola ficou pequena e nítida.
+
 ## Craquez 2.11.0
 
 Jogo de futebol feito 100% com inteligência artificial, **gratuito**.

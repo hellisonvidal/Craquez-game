@@ -304,6 +304,46 @@ namespace Craquez
                             yield return new WaitForSecondsRealtime(1.5f);
                         }
                     }
+                    // queda: falta por trás no meio-campo (tropeço, chão, ajuda e levantar), quadro a quadro
+                    for (int qk = 0; qk < 2; qk++)
+                    {
+                        SimPlayer vic = null, off = null;
+                        foreach (var q in sim.players) if (!q.isKeeper && q.team == 0 && vic == null) vic = q;
+                        foreach (var q in sim.players) if (!q.isKeeper && q.team == 1 && off == null) off = q;
+                        if (vic == null || off == null) break;
+                        sim.state = MatchState.Playing;
+                        foreach (var q in sim.players) if (q != vic && q != off && !q.isKeeper) q.position = new Vector2(q.position.x * 0.3f + (q.team == 0 ? -12f : 12f), q.position.y * 0.6f);
+                        var vp = new Vector2(qk == 0 ? -6f : 6f, 4f);
+                        vic.position = vp; vic.facing = new Vector2(1f, 0f); vic.vel = new Vector2(qk == 0 ? 5f : 1.5f, 0f); vic.down = 0f; vic.stun = 0f;
+                        // qk 0: por trás, em velocidade; qk 1: de frente (cai de costas)
+                        off.position = qk == 0 ? vp - new Vector2(0.55f, 0.1f) : vp + new Vector2(0.6f, 0.05f);
+                        off.vel = qk == 0 ? new Vector2(6.5f, 0f) : new Vector2(-5f, 0f); off.facing = off.vel.Norm();
+                        sim.ball.owner = vic.id; sim.ball.pos = vp + new Vector2(0.4f, 0f); sim.ball.vel = vic.vel;
+                        sim.Foul(off, vic);
+                        Time.captureFramerate = 30;
+                        bcK.cinematic = true;
+                        var w = new Vector3(vp.x, 0f, vp.y);
+                        bcK.cam.transform.position = bcK.cinePos = w + new Vector3(1.2f, 1.6f, -6.5f);
+                        bcK.cineLook = w + new Vector3(1.2f, 0.5f, 0f);
+                        bcK.cam.transform.LookAt(bcK.cineLook);
+                        bcK.cam.fieldOfView = bcK.cineFov = 42f;
+                        for (int f = 0; f < 150; f++)
+                        {
+                            bcK.cineLook = new Vector3(vic.position.x, 0.5f, vic.position.y);
+                            bcK.cinePos = bcK.cineLook + new Vector3(0f, 1.1f, -6.5f);
+                            yield return new WaitForEndOfFrame();
+                            if (f % 5 == 0)
+                            {
+                                var tex = ScreenCapture.CaptureScreenshotAsTexture();
+                                File.WriteAllBytes(Path.Combine(Dir, $"queda{qk}_{f / 5:00}.png"), tex.EncodeToPNG());
+                                Destroy(tex);
+                            }
+                            yield return null;
+                        }
+                        Time.captureFramerate = 0;
+                        bcK.cinematic = false;
+                        yield return new WaitForSecondsRealtime(1f);
+                    }
                     // gol forçado: bola entrando no canto (rede balançando) e a comemoração sem corte
                     sim.ball.owner = -1;
                     sim.ball.pos = new Vector2(sim.halfLen - 1.2f, 1.5f);

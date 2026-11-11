@@ -992,6 +992,13 @@ namespace Craquez.Sim
                     for (int t = 0; t < 2; t++) ctrl[t].prev = frames != null && t < frames.Length ? frames[t].buttons : 0;
                     AiAll(true);
                     foreach (var p in players) if (p.id != walkUpTaker && p.id != gkFetch) p.intent *= 0.3f;
+                    if (ballToss)
+                    {
+                        _tossT -= DT;
+                        ball.Step(DT, mode);
+                        if (_tossT <= 0f && ball.owner < 0 && walkUpTaker < 0 && _tossTo >= 0) ball.owner = _tossTo;   // (o cobrador já parado na linha apanha a bola)
+                        if (_tossT <= 0f || ball.owner >= 0) ballToss = false;
+                    }
                     if (walkUpTaker >= 0) StepWalkUp();
                     if (gkFetch >= 0) StepGkFetch();
                     foreach (var p in players) MovePlayer(p);
@@ -1124,6 +1131,25 @@ namespace Craquez.Sim
             AiAll(false);
             foreach (var p in players) MovePlayer(p);
             ResolveCollisions();
+            // lateral: o adversário fica a pelo menos 2 m do cobrador (regra 15) — antes chegava colado,
+            // como se fosse cabecear a bola das mãos dele
+            if (throwIn && ball.owner == throwInTaker)
+            {
+                var tk = players[throwInTaker];
+                foreach (var o in players)
+                {
+                    if (o.team == tk.team || o.sentOff) continue;
+                    var d = o.position - tk.position;
+                    float dm = d.magnitude;
+                    if (dm < 2.1f)
+                    {
+                        var n = dm > 0.01f ? d / dm : new Vector2(0f, -Mathf.Sign(tk.position.y));
+                        o.position = tk.position + n * 2.1f;
+                        float vin = Vector2.Dot(o.vel, -n);
+                        if (vin > 0f) o.vel += n * vin;
+                    }
+                }
+            }
             ClampKeepers();
             Slides();
             Pulls();
@@ -4835,8 +4861,67 @@ namespace Craquez.Sim
         /// <summary>Até onde a bola corre além da linha de fundo (placas de publicidade / grade).</summary>
         float RunOutLimit => mode.id == GameModes.Field ? 5.5f : 2.6f;
 
+        bool _runOutTouch;
+        int _touchTeam;
+        /// <summary>Bola devolvida pelo gandula ao cobrador do lateral (no ar até chegar às mãos/pé dele).</summary>
+        public bool ballToss;
+        float _tossT;
+        int _tossTo = -1;
+
+        void StepRunOutTouch()
+        {
+            _runOutT += DT;
+            AiAll(true);
+            foreach (var p in players) { p.intent *= 0.35f; p.wantSprint = false; MovePlayer(p); }
+            ClampKeepers();
+            float side = _runOutSide, line = halfW * side;
+            ball.Step(DT, mode);
+            float beyond = (ball.pos.y - line) * side;
+            float lim = mode.id == GameModes.Field ? 3.4f : 1.5f;
+            if (beyond > lim)
+            {
+                ball.pos.y = line + side * lim;
+                if (ball.vel.y * side > 0f) { ball.vel.y *= -0.15f; ball.vel.x *= 0.6f; Emit("wall"); }
+                if (ball.z > 1.1f) { ball.z = 1.1f; ball.vz = Mathf.Min(ball.vz, 0f); }
+            }
+            if (beyond < 0.25f) { ball.pos.y = line + side * 0.25f; ball.vel.y = 0f; }
+            ball.pos.x = Mathf.Clamp(ball.pos.x, -halfLen - 1.5f, halfLen + 1.5f);
+            bool still = ball.Speed < 0.8f && ball.z < 0.05f;
+            if ((_runOutT > 0.9f && still) || _runOutT > 2.4f)
+            {
+                runOut = false;
+                _runOutTouch = false;
+                var outP = ball.pos;
+                ball.vel = Vector2.zero; ball.vz = 0f; ball.z = 0f;
+                var spot = new Vector2(Mathf.Clamp(outP.x, -halfLen + 1f, halfLen - 1f), side * (halfW - 0.05f));
+                SetupRestart(_touchTeam, spot, "throwin");
+                // a bola que saiu volta: perto, o cobrador a apanha no caminho; longe, o gandula a joga
+                // (chega no ar às mãos do cobrador no campo, quicando no pé dele no society)
+                int tkId = walkUpTaker >= 0 ? walkUpTaker : throwIn ? throwInTaker : setPiece ? setPieceTaker : -1;
+                if (state == MatchState.Restart && tkId >= 0 && outP.Dist(spot) > 1.0f)
+                {
+                    var tk = players[tkId];
+                    float T = walkUpTaker >= 0 ? Mathf.Clamp(walkUpTo.Dist(tk.position) / 4.5f + 0.2f, 0.75f, 1.8f) : 1.0f;
+                    _tossTo = tkId;
+                    stateTimer = Mathf.Max(stateTimer, T + 0.25f);
+                    var from = new Vector2(outP.x, line + side * Mathf.Max(1.2f, (outP.y - line) * side));
+                    ball.owner = -1;
+                    ball.pos = from;
+                    ball.z = 0.9f;
+                    float zEnd = throwIn ? 1.5f : 0.15f;
+                    ball.vel = (spot - from) / T;
+                    ball.vz = (zEnd - ball.z + 0.5f * SimBall.G * T * T) / T;
+                    ball.spin = 0f;
+                    ballToss = true;
+                    _tossT = T;
+                    Emit("balltoss", _touchTeam, tkId);
+                }
+            }
+        }
+
         void StepRunOut()
         {
+            if (_runOutTouch) { StepRunOutTouch(); return; }
             _runOutT += DT;
             AiAll(true);
             // todos desaceleram (o lance acabou), ninguém corre atrás da bola fora
@@ -4910,6 +4995,20 @@ namespace Craquez.Sim
                 {
                     int t = ball.lastTouchTeam >= 0 ? 1 - ball.lastTouchTeam : 0;
                     Emit("out");
+                    if ((mode.id == GameModes.Field || mode.id == GameModes.Society) && !training)
+                    {
+                        // a bola não para na linha: segue para fora (rola, quica, bate na placa) e só então o
+                        // juiz marca o lateral; um gandula devolve a bola ao cobrador
+                        runOut = true;
+                        _runOutTouch = true;
+                        _touchTeam = t;
+                        _runOutT = 0f;
+                        _runOutSide = Mathf.Sign(ball.pos.y);
+                        ball.owner = -1;
+                        state = MatchState.Restart;
+                        stateTimer = 9f;
+                        return;
+                    }
                     SetupRestart(t, new Vector2(ball.pos.x, Mathf.Sign(ball.pos.y) * (halfW - 0.05f)), "throwin");
                 }
             }

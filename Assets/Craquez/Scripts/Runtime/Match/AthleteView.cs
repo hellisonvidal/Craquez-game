@@ -2163,6 +2163,14 @@ namespace Craquez
                     _pose.Rotate(la, Quaternion.Slerp(Quaternion.identity, Quaternion.FromToRotation(curF, wantF), w));
                 }
             }
+            // segurando o lateral: a bola fica entre as mãos (antes flutuava acima da cabeça, longe delas)
+            if (holding && _throwT <= 0f && view.BallTransform != null && rig.bones.TryGetValue("hand_l", out var hl) && rig.bones.TryGetValue("hand_r", out var hr))
+            {
+                var mid = (hl.position + hr.position) * 0.5f;
+                float r = view.sim.ball.radius;
+                var ballAt = mid + Vector3.up * r * 0.55f + fwd * r * 0.2f;
+                view.BallTransform.position = Vector3.Lerp(view.BallTransform.position, ballAt, _throwHoldW);
+            }
         }
 
         // ---------------------------------------------------------------- tecido solto
