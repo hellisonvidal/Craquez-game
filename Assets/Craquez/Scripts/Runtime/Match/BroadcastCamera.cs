@@ -119,7 +119,9 @@ namespace Craquez
                 if (floor || Mathf.Max(b.size.x, b.size.y, b.size.z) < 1.2f) continue;
                 // gols, redes e o que fica inteiramente dentro do campo nunca somem (antes bastava o
                 // centro estar dentro: guarda-corpos e placas que dão a volta no campo nunca sumiam)
-                if (sim != null && Mathf.Abs(b.min.x) < sim.halfLen + 3.5f && Mathf.Abs(b.max.x) < sim.halfLen + 3.5f
+                // peças marcadas "(câmera)" (tela, alambrado e placas do lado de cá) somem mesmo encostadas na lateral
+                bool camSide = r.gameObject.name.Contains("(câmera)");
+                if (!camSide && sim != null && Mathf.Abs(b.min.x) < sim.halfLen + 3.5f && Mathf.Abs(b.max.x) < sim.halfLen + 3.5f
                     && Mathf.Abs(b.min.z) < sim.halfW + 1.2f && Mathf.Abs(b.max.z) < sim.halfW + 1.2f && b.max.y < 6f) continue;
                 _occ.Add(r);
                 _occMode.Add(r.shadowCastingMode);
@@ -128,7 +130,7 @@ namespace Craquez
                 // a partida toda (antes sumia e voltava a cada movimento da câmera: arquibancada e
                 // torcedores "piscando", trocando de camada)
                 // (pelo centro: cantos, coberturas e refletores que passam um pouco da lateral também contam)
-                _occNear.Add(sim != null && (b.max.z < -(sim.halfW + 0.6f) || (b.center.z < -(sim.halfW + 1.5f) && b.min.z < -(sim.halfW + 2f))));
+                _occNear.Add(camSide || sim != null && (b.max.z < -(sim.halfW + 0.6f) || (b.center.z < -(sim.halfW + 1.5f) && b.min.z < -(sim.halfW + 2f))));
                 _occClear.Add(0f);
             }
         }

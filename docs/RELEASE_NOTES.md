@@ -1,3 +1,27 @@
+## Craquez 2.13.0
+
+Jogo de futebol feito 100% com inteligência artificial, **gratuito**.
+
+### Download
+- **Celular Android**: `Craquez-v2.13.0.apk`
+- **TV (Google TV / Android TV, ex.: TCL C6K)**: `Craquez-TV-v2.13.0.apk` — use este na TV (32 e 64 bits).
+
+### Novidades
+- **Salvar o replay em vídeo** (celular e TV): botão "⬇ Salvar vídeo" no replay grava os últimos 30 s
+  em MP4, na câmera e velocidade escolhidas, sem os botões na imagem, e salva na galeria
+  (Filmes/Craquez). Toque na tela para cancelar a gravação.
+- **Controles do replay menores** e centralizados, longe dos cantos de baixo, onde ficam os botões do
+  Android (voltar/início), que antes cobriam um deles.
+- **Tela de nylon nas quadras de rua**: laterais e fundos cercados para a galera não levar bolada (a
+  Gaiola continua com o alambrado de ferro).
+
+### Correções
+- **Clima aleatório**: o sorteio só podia dar nublado, tempestade ou nevasca (a semente da partida era
+  sempre ímpar). Agora os seis climas saem com a mesma chance.
+- **Pilares na frente da câmera**: a tela alta acima das placas (Quadra do Conjunto e Gaiola) era uma
+  peça só nos dois lados e nunca sumia; de perto virava faixas cinzas na frente do jogo. Agora tudo o que
+  fica do lado da câmera some nas câmeras de lado, em todos os locais.
+
 ## Craquez 2.12.1
 
 Jogo de futebol feito 100% com inteligência artificial, **gratuito**.

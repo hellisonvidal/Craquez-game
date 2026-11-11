@@ -1690,7 +1690,7 @@ namespace Craquez
             if (_cfg.tacticsA.lineup == null) _cfg.tacticsA = new Tactics();
             var balls = BallCatalog.ForMode(_cfg.mode);
             if (!balls.Contains(_cfg.ball)) _cfg.ball = balls[0];
-            _cfg.seed = (uint)System.DateTime.Now.Ticks | 1u;
+            { long tk = System.DateTime.Now.Ticks; _cfg.seed = MatchConfig.Mix((uint)tk ^ (uint)(tk >> 32) ^ (uint)UnityEngine.Random.Range(0, int.MaxValue)) | 1u; }
             var go = new GameObject("Partida");
             go.transform.SetParent(transform, false);
             _match = go.AddComponent<MatchController>();

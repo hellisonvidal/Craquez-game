@@ -1,3 +1,4 @@
+using System.Collections;
 using System.Collections.Generic;
 using Craquez.Sim;
 using Craquez.UI;
@@ -102,7 +103,7 @@ namespace Craquez
         int _applied = -1;
         GameObject _ui;
         RectTransform _bar, _fill, _knob;
-        Text _playLabel, _camLabel, _focusLabel, _speedLabel, _timeLabel;
+        Text _playLabel, _camLabel, _focusLabel, _speedLabel, _timeLabel, _msg;
         int _camMode;   // 0 TV, 1 livre, 2 atrás do gol, 3 aérea
         int _focus = -1; // -1 bola, senão id do atleta
         float _yaw = -30f, _pitch = 18f, _dist = 14f, _fov = 40f;
@@ -178,7 +179,7 @@ namespace Craquez
                 if (_pos >= _count - 1) { _playing = false; RefreshLabels(); }
             }
             else Time.timeScale = 0f;
-            UpdateBar();
+            if (!_recording) UpdateBar();
             UpdateCamera(rdt);
         }
 
@@ -297,6 +298,12 @@ namespace Craquez
         {
             var k = Keyboard.current;
             var g = Gamepad.current;
+            if (_recording)
+            {
+                bool tap = Touchscreen.current != null && Touchscreen.current.primaryTouch.press.wasPressedThisFrame;
+                if (tap || (k != null && k.escapeKey.wasPressedThisFrame) || (g != null && g.buttonEast.wasPressedThisFrame)) _cancelRec = true;
+                return;
+            }
             if ((k != null && (k.escapeKey.wasPressedThisFrame || k.backspaceKey.wasPressedThisFrame)) || (g != null && g.buttonEast.wasPressedThisFrame)) { Close(); return; }
             if ((k != null && k.spaceKey.wasPressedThisFrame) || (g != null && g.buttonSouth.wasPressedThisFrame)) TogglePlay();
             if ((k != null && k.cKey.wasPressedThisFrame) || (g != null && g.buttonNorth.wasPressedThisFrame)) NextCam();
@@ -340,6 +347,93 @@ namespace Craquez
             return best;
         }
 
+        // ---------------------------------------------------------------- salvar em vídeo
+        bool _recording, _cancelRec;
+        const int VidW = 1024, VidH = 576, VidFps = 30;
+
+        /// <summary>Gravar o replay em MP4 na galeria: celular e TV (Android).</summary>
+        static bool CanSaveVideo =>
+#if UNITY_ANDROID && !UNITY_EDITOR
+            true;
+#else
+            false;
+#endif
+
+        /// <summary>Toca o replay do começo ao fim (na velocidade e câmera escolhidas) com passo de tempo fixo
+        /// e grava cada quadro da câmera (sem os botões) num vídeo MP4 salvo em Filmes/Craquez.</summary>
+        IEnumerator SaveVideo()
+        {
+            if (_recording) yield break;
+#if UNITY_ANDROID && !UNITY_EDITOR
+            var cam = _view.bcam.cam;
+            var player = new AndroidJavaClass("com.unity3d.player.UnityPlayer");
+            var act = player.GetStatic<AndroidJavaObject>("currentActivity");
+            var vid = new AndroidJavaClass("com.hellisonvidal.craquez.CraquezVideo");
+            string err = vid.CallStatic<string>("start", act, VidW, VidH, VidFps);
+            if (!string.IsNullOrEmpty(err)) { Say("Não deu para gravar neste aparelho (" + err + ")."); yield break; }
+            _recording = true;
+            _cancelRec = false;
+            var rtex = new RenderTexture(VidW, VidH, 24, RenderTextureFormat.ARGB32) { antiAliasing = 2 };
+            var tex = new Texture2D(VidW, VidH, TextureFormat.RGBA32, false);
+            var buf = new byte[VidW * VidH * 4];
+            // na tela: o que está sendo gravado (sem os controles) e o andamento
+            var dockUi = _ui;
+            var shade = UiKit.Image(_hud.Overlay, Color.black, null, "gravando");
+            shade.rectTransform.Place(0, 0, 1, 1);
+            var view = new GameObject("vídeo", typeof(RectTransform), typeof(RawImage), typeof(AspectRatioFitter));
+            view.transform.SetParent(shade.transform, false);
+            view.GetComponent<RawImage>().texture = rtex;
+            var fit = view.GetComponent<AspectRatioFitter>();
+            fit.aspectMode = AspectRatioFitter.AspectMode.FitInParent;
+            fit.aspectRatio = (float)VidW / VidH;
+            var rec = UiKit.Label(shade.transform, "", 24, Theme.BodyBold, Color.white, TextAnchor.MiddleCenter);
+            rec.rectTransform.Place(0, 0, 1, 0, 0, 30, 0, -80);
+            dockUi.SetActive(false);
+            cam.targetTexture = rtex;
+            SeekTo(0f);
+            _playing = true;
+            Time.captureDeltaTime = 1f / VidFps;
+            long pts = 0;
+            int n = 0;
+            string fail = null;
+            while (_open && !_cancelRec)
+            {
+                yield return new WaitForEndOfFrame();
+                var prev = RenderTexture.active;
+                RenderTexture.active = rtex;
+                tex.ReadPixels(new Rect(0, 0, VidW, VidH), 0, 0, false);
+                RenderTexture.active = prev;
+                tex.GetRawTextureData<byte>().CopyTo(buf);
+                pts = (long)(n * 1000000L / VidFps);
+                string e = vid.CallStatic<string>("frame", buf, pts);
+                if (!string.IsNullOrEmpty(e)) { fail = e; break; }
+                n++;
+                float k = _count > 1 ? _pos / (_count - 1) : 1f;
+                rec.text = "● Gravando o replay…  " + Mathf.RoundToInt(k * 100f) + "%   (toque para cancelar)";
+                if (!_playing || _pos >= _count - 1) break;
+            }
+            Time.captureDeltaTime = 0f;
+            cam.targetTexture = null;
+            _recording = false;
+            Destroy(shade.gameObject);
+            if (dockUi != null) dockUi.SetActive(true);
+            string res;
+            if (fail != null || _cancelRec || n < 2) { vid.CallStatic("cancel"); res = fail != null ? "erro:" + fail : "cancelado"; }
+            else res = vid.CallStatic<string>("finish", act, "Craquez-replay-" + System.DateTime.Now.ToString("yyyyMMdd-HHmmss"), pts);
+            rtex.Release(); Destroy(rtex); Destroy(tex);
+            act.Dispose(); player.Dispose(); vid.Dispose();
+            _playing = false;
+            RefreshLabels();
+            if (res.StartsWith("ok:")) Say("Vídeo salvo na galeria: " + res.Substring(3));
+            else if (res == "cancelado") Say("Gravação cancelada.");
+            else Say("Não deu para salvar o vídeo (" + res.Substring(res.IndexOf(':') + 1) + ").");
+#else
+            yield break;
+#endif
+        }
+
+        void Say(string m) { if (_msg != null) _msg.text = m; }
+
         // ---------------------------------------------------------------- interface
         void BuildUi()
         {
@@ -354,38 +448,45 @@ namespace Craquez
             var tag = UiKit.Image(rt, new Color(0.85f, 0.1f, 0.12f, 0.92f), Theme.RoundSmall, "selo").rectTransform.At(0.5f, 1f, 220, 54, 0, -128);   // (abaixo do placar)
             UiKit.Label(tag, "REPLAY", 30, Theme.HeadItalic, Color.white, TextAnchor.MiddleCenter).rectTransform.Place(0, 0, 1, 1);
             // sair também no alto (fácil de achar no celular)
-            var x = UiKit.Button(rt, "✕  Sair do replay", Close, 26, new Color(0.7f, 0.1f, 0.14f, 0.95f));
-            ((RectTransform)x.transform).At(1f, 1f, 260, 64, -150, -40);
-            // barra inferior: linha do tempo + duas fileiras de botões (reprodução / câmera)
-            var dock = UiKit.Image(rt, new Color(0.02f, 0.04f, 0.1f, 0.82f), null, "controles").rectTransform.Place(0, 0, 1, 0, 0, 0, 0, -236);   // (t negativo = altura acima da borda de baixo)
-            _bar = UiKit.Image(dock, new Color(1f, 1f, 1f, 0.2f), Theme.RoundSmall, "linha do tempo").rectTransform.Place(0, 1, 1, 1, 150, -40, 150, 18);
+            var x = UiKit.Button(rt, "✕  Sair do replay", Close, 22, new Color(0.7f, 0.1f, 0.14f, 0.95f));
+            ((RectTransform)x.transform).At(1f, 1f, 230, 56, -170, -44);
+            // barra inferior compacta: linha do tempo + duas fileiras de botões pequenos e centralizados, longe
+            // das bordas (no celular os botões do Android — voltar, início — ficam por cima dos cantos de baixo)
+            var dock = UiKit.Image(rt, new Color(0.02f, 0.04f, 0.1f, 0.78f), Theme.RoundSmall, "controles").rectTransform.Place(0, 0, 1, 0, 200, 70, 200, -230);   // (t negativo = topo acima da borda de baixo)
+            _bar = UiKit.Image(dock, new Color(1f, 1f, 1f, 0.2f), Theme.RoundSmall, "linha do tempo").rectTransform.Place(0, 1, 1, 1, 130, -34, 40, 20);
             _fill = UiKit.Image(_bar, new Color(0.95f, 0.2f, 0.25f, 0.95f), Theme.RoundSmall, "andamento").rectTransform.Place(0, 0, 0, 1);
-            _knob = UiKit.Image(_bar, Color.white, Theme.Circle, "cursor").rectTransform.At(0, 0.5f, 34, 34);
-            _timeLabel = UiKit.Label(dock, "", 22, Theme.Body, Theme.TextDim, TextAnchor.MiddleLeft);
-            _timeLabel.rectTransform.Place(0, 1, 0, 1, 20, -48, -140, 10);
-            var row1 = UiKit.Rect(dock, "reprodução").Place(0, 0, 1, 0, 20, 92, 20, -162);
-            var row2 = UiKit.Rect(dock, "câmera").Place(0, 0, 1, 0, 20, 12, 20, -82);
-            UiKit.HList(row1, 12);
-            UiKit.HList(row2, 12);
-            Button B(RectTransform row, string t, System.Action a, out Text label, Color? c = null)
+            _knob = UiKit.Image(_bar, Color.white, Theme.Circle, "cursor").rectTransform.At(0, 0.5f, 28, 28);
+            _timeLabel = UiKit.Label(dock, "", 20, Theme.Body, Theme.TextDim, TextAnchor.MiddleLeft);
+            _timeLabel.rectTransform.Place(0, 1, 0, 1, 18, -40, -120, 12);
+            var row1 = UiKit.Rect(dock, "reprodução").Place(0, 0, 1, 0, 12, 68, 12, -118);
+            var row2 = UiKit.Rect(dock, "câmera").Place(0, 0, 1, 0, 12, 10, 12, -60);
+            foreach (var row in new[] { row1, row2 })
             {
-                var b = UiKit.Button(row, t, a, 26, c ?? new Color(0.1f, 0.14f, 0.24f, 0.95f));
-                UiKit.Size(b, 68, 68, 1f);
+                var h = UiKit.HList(row, 10);
+                h.childForceExpandWidth = false;
+            }
+            Button B(RectTransform row, string t, System.Action a, out Text label, Color? c = null, float wdt = 150f)
+            {
+                var b = UiKit.Button(row, t, a, 19, c ?? new Color(0.1f, 0.14f, 0.24f, 0.95f));
+                UiKit.Size(b, 50, 50, 0f, wdt);
                 label = b.GetComponentInChildren<Text>();
                 return b;
             }
-            B(row1, "|◀  Início", () => { SeekTo(0f); RefreshLabels(); }, out _);
-            B(row1, "◀◀  5 s", () => { _playing = false; SeekTo(_pos - 300f); RefreshLabels(); }, out _);
-            B(row1, "", TogglePlay, out _playLabel, new Color(0.12f, 0.45f, 0.25f, 0.95f));
-            B(row1, "5 s  ▶▶", () => { _playing = false; SeekTo(_pos + 300f); RefreshLabels(); }, out _);
-            B(row1, "", () => { int i = System.Array.IndexOf(Speeds, _speed); _speed = Speeds[(i + 1) % Speeds.Length]; RefreshLabels(); }, out _speedLabel);
-            B(row2, "", NextCam, out _camLabel);
-            B(row2, "", NextFocus, out _focusLabel);
-            B(row2, "Zoom  −", () => { if (_camMode == 0) { _camMode = 1; _pivot = Vector3.zero; } Zoom(4f); RefreshLabels(); }, out _);
-            B(row2, "Zoom  +", () => { if (_camMode == 0) { _camMode = 1; _pivot = Vector3.zero; } Zoom(-4f); RefreshLabels(); }, out _);
-            B(row2, "Sair", Close, out _, new Color(0.7f, 0.1f, 0.14f, 0.95f));
-            var hint = UiKit.Label(rt, "arraste para girar a câmera  •  pinça / roda do mouse: zoom  •  espaço: pausar  •  ← →: avançar/voltar", 22, Theme.Body, new Color(1, 1, 1, 0.7f), TextAnchor.MiddleCenter);
-            hint.rectTransform.Place(0, 0, 1, 0, 0, 242, 0, -276);
+            B(row1, "|◀ Início", () => { SeekTo(0f); RefreshLabels(); }, out _, null, 130);
+            B(row1, "◀◀ 5 s", () => { _playing = false; SeekTo(_pos - 300f); RefreshLabels(); }, out _, null, 120);
+            B(row1, "", TogglePlay, out _playLabel, new Color(0.12f, 0.45f, 0.25f, 0.95f), 170);
+            B(row1, "5 s ▶▶", () => { _playing = false; SeekTo(_pos + 300f); RefreshLabels(); }, out _, null, 120);
+            B(row1, "", () => { int i = System.Array.IndexOf(Speeds, _speed); _speed = Speeds[(i + 1) % Speeds.Length]; RefreshLabels(); }, out _speedLabel, null, 170);
+            if (CanSaveVideo) B(row1, "⬇ Salvar vídeo", () => StartCoroutine(SaveVideo()), out _, new Color(0.15f, 0.35f, 0.62f, 0.95f), 190);
+            B(row2, "", NextCam, out _camLabel, null, 230);
+            B(row2, "", NextFocus, out _focusLabel, null, 200);
+            B(row2, "Zoom −", () => { if (_camMode == 0) { _camMode = 1; _pivot = Vector3.zero; } Zoom(4f); RefreshLabels(); }, out _, null, 110);
+            B(row2, "Zoom +", () => { if (_camMode == 0) { _camMode = 1; _pivot = Vector3.zero; } Zoom(-4f); RefreshLabels(); }, out _, null, 110);
+            _msg = UiKit.Label(rt, "", 22, Theme.BodyBold, Color.white, TextAnchor.MiddleCenter);
+            _msg.rectTransform.Place(0, 0, 1, 0, 200, 274, 200, -308);
+            _msg.raycastTarget = false;
+            var hint = UiKit.Label(rt, "arraste para girar a câmera  •  pinça / roda do mouse: zoom  •  espaço: pausar  •  ← →: avançar/voltar", 18, Theme.Body, new Color(1, 1, 1, 0.7f), TextAnchor.MiddleCenter);
+            hint.rectTransform.Place(0, 0, 1, 0, 200, 238, 200, -268);
             hint.raycastTarget = false;
             _hud.ShowPauseButton(false);
             RefreshLabels();

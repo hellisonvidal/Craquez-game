@@ -185,9 +185,10 @@ jobs:
           ls -la "$GITHUB_WORKSPACE/shots"
           grep -E "Exception|Error|\[shots\]" "$GITHUB_WORKSPACE"/shots/player-*.log | head -80 || true
       # fotografa todos os locais (montagem 3D de verdade, vista de fora) para o seletor de locais:
-      # as imagens são copiadas para Assets/Craquez/Resources/Locais
+      # as imagens são copiadas para Assets/Craquez/Resources/Locais. Só quando pedido ("[locais]" no
+      # commit): as miniaturas já estão no jogo e não precisam ser refeitas a cada envio
       - name: Imagens dos locais
-        if: matrix.targetPlatform == 'StandaloneLinux64'
+        if: matrix.targetPlatform == 'StandaloneLinux64' && contains(github.event.head_commit.message, '[locais]')
         run: |
           cd build/StandaloneLinux64
           mkdir -p "$GITHUB_WORKSPACE/locais"
@@ -196,17 +197,18 @@ jobs:
           ls "$GITHUB_WORKSPACE/locais" | head -100
           grep -E "Exception|\[locais\]" "$GITHUB_WORKSPACE/locais/player.log" | tail -20 || true
       - uses: actions/upload-artifact@v4
-        if: matrix.targetPlatform == 'StandaloneLinux64'
+        if: matrix.targetPlatform == 'StandaloneLinux64' && contains(github.event.head_commit.message, '[locais]')
         with:
           name: Craquez-locais
           path: locais
-          retention-days: 14
+          retention-days: 1
+      # fotos de conferência automática (telas e lances): só para revisar o envio, apagadas em 1 dia
       - uses: actions/upload-artifact@v4
         if: matrix.targetPlatform == 'StandaloneLinux64'
         with:
           name: Craquez-screenshots
           path: shots
-          retention-days: 14
+          retention-days: 1
 
   # versão: com "[publicar]" na mensagem do commit (ou uma tag v*), cria a tag v<versão do projeto>
   # e publica a Release só com o APK do Android (Windows/Linux suspensos até a aprovação)
