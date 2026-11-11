@@ -1,7 +1,11 @@
 """Transfere a captura CMU para o esqueleto game_engine dos atletas e exporta
 as animações (FBX, só o esqueleto) para o Unity.
 
-Uso: python tools/blender/retarget.py <athlete.blend> <mocap_dir> <saida_dir> [--preview]
+Uso: python tools/blender/retarget.py <athlete.blend> <mocap_dir> <saida_dir> [--mixamo=DIR] [--preview] [--sheet]
+
+Fontes: captura do Mixamo (pacotes "Soccer Game Pack" e "Locomotion Pack", FBX sem pele, 30 fps,
+T-pose, descompactados em DIR/soccer e DIR/loco — não vão para o repositório) e, para o que o
+Mixamo não tem (fintas, giros), a captura CMU (ASF/AMC).
 
 Cada clipe sai "no lugar" (sem deslocamento horizontal e sem girar o corpo
 como um todo): a simulação do jogo move e orienta o atleta; a animação só
@@ -19,10 +23,14 @@ from mathutils import Matrix, Vector
 
 sys.path.insert(0, os.path.dirname(__file__))
 import cmu_mocap as cmu  # noqa: E402
+import mixamo  # noqa: E402
 
-BLEND, MOCAP, OUT = sys.argv[1:4] if "--" not in sys.argv else sys.argv[sys.argv.index("--") + 1:][:3]
+_pos = [a for a in sys.argv[1:] if not a.startswith("--")]
+BLEND, MOCAP, OUT = (_pos + [None] * 3)[:3]
 PREVIEW = "--preview" in sys.argv
+SHEET = "--sheet" in sys.argv
 ONLY = [a.split("=", 1)[1] for a in sys.argv if a.startswith("--only=")]
+MIXAMO = next((a.split("=", 1)[1] for a in sys.argv if a.startswith("--mixamo=")), None)
 FPS = 30
 
 # osso alvo -> segmento CMU
@@ -62,6 +70,31 @@ CLIPS = [
     ("ShotLeft", "10_06", 0.0, 99.0, False, False),
     ("Volley", "11_01", 0.0, 99.0, False, False),
     ("Walk", "35_01", 0.5, 2.5, True, False),
+]
+
+# Mixamo: nome, arquivo (pasta/arquivo sem .fbx), cíclico, espelhar, início (s), fim (s), contato
+# (contato = parte do corpo que toca a bola: o instante dele vai para o json e o jogo casa o gesto
+#  com a saída da bola). Substitui o clipe CMU de mesmo nome.
+MIXAMO_CLIPS = [
+    ("Idle", "loco/idle", True, False, 0.0, 99.0, None),
+    ("Walk", "loco/walking", True, False, 0.0, 99.0, None),
+    ("Jog", "soccer/jog forward", True, False, 0.0, 99.0, None),
+    ("Run", "loco/running", True, False, 0.0, 99.0, None),
+    ("Sprint", "loco/running", True, False, 0.0, 99.0, None),
+    ("Backpedal", "soccer/jog backward", True, False, 0.0, 99.0, None),
+    ("Jockey", "loco/left strafe walking", True, False, 0.0, 99.0, None),
+    ("JockeyR", "loco/right strafe walking", True, False, 0.0, 99.0, None),
+    ("GkReady", "soccer/goalkeeper idle (2)", True, False, 0.0, 99.0, None),
+    ("GkSideL", "soccer/goalkeeper sidestep (2)", True, True, 0.0, 99.0, None),
+    ("GkSideR", "soccer/goalkeeper sidestep (2)", True, False, 0.0, 99.0, None),
+    ("Pass", "soccer/kick soccerball (2)", False, False, 0.0, 99.0, "foot"),
+    ("Shot", "soccer/strike foward jog", False, False, 0.0, 99.0, "foot"),
+    ("KickPower", "soccer/soccer penalty kick", False, False, 0.0, 99.0, "foot"),
+    ("ShotLeft", "soccer/soccer penalty kick", False, True, 0.0, 99.0, "foot"),
+    ("Kick", "soccer/kick soccerball", False, False, 0.0, 99.0, "foot"),
+    ("Header", "soccer/header soccerball", False, False, 0.0, 99.0, "head"),
+    ("GkThrow", "soccer/goalkeeper overhand throw", False, False, 0.0, 99.0, "hand"),
+    ("GkPunt", "soccer/goalkeeper drop kick", False, False, 0.0, 99.0, "foot"),
 ]
 
 
@@ -166,6 +199,78 @@ def retarget_clip(tgt, skel, frames_src, src_fps=120):
     return out, float(np.mean(speeds)) if len(speeds) else 0.0
 
 
+
+def retarget_mixamo(tgt, clip, loop=False, keep_yaw=False, t0=0.0, t1=99.0):
+    """Mesmo resultado de retarget_clip, a partir de um clipe do Mixamo (mixamo.load)."""
+    a = int(round(t0 * clip.fps))
+    b = min(len(clip.G), int(round(t1 * clip.fps)) + 1)
+    G, hips = clip.G[a:b], clip.hips[a:b]
+    if abs(clip.fps - FPS) > 0.5:
+        idx = [int(round(i * clip.fps / FPS)) for i in range(int(len(G) * FPS / clip.fps))]
+        G, hips = [G[i] for i in idx], hips[idx]
+    scale = tgt.pelvis_h / max(clip.hip_h, 1e-6)
+    # braços e pernas: o repouso do Mixamo é em T (braços abertos) e o nosso em A, então a direção de
+    # cada osso é casada. Tronco, pescoço, clavículas e pés: só o giro desde o repouso (o boneco do
+    # Mixamo tem a coluna ~8° inclinada para trás em repouso; copiar a direção empinava o peito)
+    align = {tb: np.eye(3) if tb in mixamo.KEEP_REST else rot_between(tgt.dir[tb], clip.rest_dir[tb]) for tb in mixamo.MAP}
+    n = len(G)
+    if keep_yaw:
+        unrot = [np.eye(3)] * n
+    else:
+        fw = np.array([g["pelvis"] @ np.array([0, -1.0, 0]) for g in G])
+        yaw = np.unwrap(np.arctan2(fw[:, 0], -fw[:, 1]))
+        ys = smooth(yaw, FPS * 0.25)
+        unrot = [rz(-y) for y in ys]
+    root_l = np.array([unrot[i] @ hips[i] for i in range(n)])
+    if loop and n > 2:
+        # ciclo: tira a deriva linear (o ciclo emenda no mesmo lugar)
+        k = np.linspace(0.0, 1.0, n)[:, None]
+        traj = root_l[0] + (root_l[-1] - root_l[0]) * k
+    else:
+        traj = smooth(root_l, FPS * 0.4)
+    speeds = np.linalg.norm(np.diff(hips[:, :2], axis=0), axis=1) * FPS * scale
+    out = []
+    for i in range(n):
+        U = unrot[i]
+        world = {tb: U @ G[i][tb] @ align[tb] @ tgt.rest_rot[tb] for tb in mixamo.MAP}
+        hip = root_l[i] - np.array([traj[i][0], traj[i][1], 0])
+        hip = np.array([hip[0], hip[1], root_l[i][2]]) * scale
+        out.append((world, hip))
+    return out, float(np.mean(speeds)) if len(speeds) else 0.0
+
+
+SHEET_BONES = ["pelvis", "spine_01", "spine_02", "spine_03", "neck_01", "head", "clavicle_l", "upperarm_l",
+               "lowerarm_l", "hand_l", "clavicle_r", "upperarm_r", "lowerarm_r", "hand_r", "thigh_l", "calf_l",
+               "foot_l", "ball_l", "thigh_r", "calf_r", "foot_r", "ball_r"]
+
+
+def sheet(rig, nframes, path, cols=8):
+    """Folha de conferência: bonecos de palito de lado e de frente (rápido, sem renderizar)."""
+    from PIL import Image, ImageDraw
+    W, H = 170, 230
+    frames = sorted({1 + round(i * (nframes - 1) / max(1, cols - 1)) for i in range(cols)})
+    img = Image.new("RGB", (W * len(frames), H * 2), (250, 250, 248))
+    d = ImageDraw.Draw(img)
+    sc = bpy.context.scene
+    for c, f in enumerate(frames):
+        sc.frame_set(f)
+        for row, (ax, sgn) in enumerate(((1, -1), (0, 1))):   # lado (Y) e frente (X)
+            ox, oy = c * W + W / 2, row * H + H - 20
+            d.line([(c * W + 8, oy), (c * W + W - 8, oy)], fill=(160, 160, 160))
+            pel = rig.pose.bones["pelvis"].head
+            for n in SHEET_BONES:
+                pb = rig.pose.bones[n]
+                h, t = pb.head, pb.tail
+                col = (200, 40, 40) if n.endswith("_l") else (40, 70, 200) if n.endswith("_r") else (30, 30, 30)
+                p = [(ox + sgn * (v[ax] - pel[ax]) * 100, oy - v[2] * 100) for v in (h, t)]
+                d.line(p, fill=col, width=3)
+            hd = rig.pose.bones["head"].tail
+            hx, hy = ox + sgn * (hd[ax] - pel[ax]) * 100, oy - hd[2] * 100
+            d.ellipse([hx - 7, hy - 7, hx + 7, hy + 7], outline=(30, 30, 30), width=2)
+        d.text((c * W + 4, 2), str(f), fill=(0, 0, 0))
+    img.save(path)
+
+
 def build_action(tgt, name, poses):
     rig = tgt.rig
     act = bpy.data.actions.new(name)
@@ -239,6 +344,43 @@ def best_loop(poses, lo, hi):
     return best
 
 
+def finish(rig, act, name, n):
+    if SHEET:
+        rig.animation_data.action = act
+        sheet(rig, n, os.path.join(OUT, f"sheet_{name}.png"))
+    if PREVIEW:
+        import preview_render
+        rig.animation_data.action = act
+        sc = bpy.context.scene
+        sc.frame_start, sc.frame_end = 1, n
+        frames = sorted({1, max(1, n // 4), max(1, n // 2), max(1, 3 * n // 4), n})
+        preview_render.kit_colors()
+        preview_render.show_hair(rig, "Hair_short02")
+        preview_render.render_frames(rig, os.path.join(OUT, f"anim_{name}_%03d.png"), frames)
+        for o in list(bpy.data.objects):
+            if o.type in ("CAMERA", "LIGHT"):
+                bpy.data.objects.remove(o)
+
+
+def contact_time(rig, n, kind):
+    """Instante (s) do toque na bola: pico de velocidade do pé (perto do chão), da cabeça ou da mão,
+    em relação ao quadril."""
+    bones = {"foot": ["foot_l", "foot_r"], "head": ["head"], "hand": ["hand_l", "hand_r"]}[kind]
+    sc = bpy.context.scene
+    prev, best, bt = None, 0.0, 0.0
+    for f in range(1, n + 1):
+        sc.frame_set(f)
+        pel = rig.pose.bones["pelvis"].head
+        cur = [(rig.pose.bones[b].tail if kind == "head" else rig.pose.bones[b].head) - pel for b in bones]
+        low = min(rig.pose.bones[b].head.z for b in bones)
+        if prev is not None and 0.1 * n < f < 0.92 * n:
+            v = max((c - q).length for c, q in zip(cur, prev)) * FPS
+            if (kind != "foot" or low < 0.45) and v > best:
+                best, bt = v, (f - 1) / FPS
+        prev = cur
+    return round(bt, 3), round(best, 2)
+
+
 def main():
     bpy.ops.wm.open_mainfile(filepath=BLEND)
     rig = bpy.data.objects["Armature"]
@@ -246,8 +388,9 @@ def main():
     meta = {}
     os.makedirs(OUT, exist_ok=True)
     skels = {}
+    mx_names = {c[0] for c in MIXAMO_CLIPS} if MIXAMO else set()
     for name, f, t0, t1, loop, mirror in CLIPS:
-        if ONLY and name not in ONLY:
+        if (ONLY and name not in ONLY) or name in mx_names:
             continue
         subj = f.split("_")[0]
         if subj not in skels:
@@ -265,19 +408,25 @@ def main():
         act = build_action(tgt, name, poses)
         meta[name] = {"frames": len(poses), "fps": FPS, "loop": loop, "speed": round(speed, 3), "source": f}
         log(name, len(poses), "quadros", "vel", round(speed, 2), "m/s")
-        if PREVIEW:
-            import preview_render
+        finish(rig, act, name, len(poses))
+    cache = {}
+    for name, f, loop, mirror, t0, t1, ck in (MIXAMO_CLIPS if MIXAMO else []):
+        if ONLY and name not in ONLY:
+            continue
+        if f not in cache:
+            cache[f] = mixamo.load(os.path.join(MIXAMO, f + ".fbx"))
+        clip = cache[f].mirrored() if mirror else cache[f]
+        poses, speed = retarget_mixamo(tgt, clip, loop=loop, keep_yaw=not loop, t0=t0, t1=t1)
+        act = build_action(tgt, name, poses)
+        meta[name] = {"frames": len(poses), "fps": FPS, "loop": loop, "speed": round(speed, 3),
+                      "source": "mixamo:" + f + (" (espelhado)" if mirror else "")}
+        if ck:
             rig.animation_data.action = act
-            sc = bpy.context.scene
-            sc.frame_start, sc.frame_end = 1, len(poses)
-            n = len(poses)
-            frames = sorted({1, max(1, n // 4), max(1, n // 2), max(1, 3 * n // 4), n})
-            preview_render.kit_colors()
-            preview_render.show_hair(rig, "Hair_short02")
-            preview_render.render_frames(rig, os.path.join(OUT, f"anim_{name}_%03d.png"), frames)
-            for o in list(bpy.data.objects):
-                if o.type in ("CAMERA", "LIGHT"):
-                    bpy.data.objects.remove(o)
+            ct, v = contact_time(rig, len(poses), ck)
+            meta[name]["contact"] = ct
+            log(name, "toque em", ct, "s (", v, "m/s)")
+        log(name, len(poses), "quadros", "vel", round(speed, 2), "m/s")
+        finish(rig, act, name, len(poses))
     json.dump(meta, open(os.path.join(OUT, "anims.json"), "w"), indent=1)
     # exporta só o esqueleto com todas as ações
     bpy.ops.object.select_all(action="DESELECT")
@@ -296,4 +445,5 @@ def main():
     log("FBX de animações exportado")
 
 
-main()
+if __name__ == "__main__":
+    main()

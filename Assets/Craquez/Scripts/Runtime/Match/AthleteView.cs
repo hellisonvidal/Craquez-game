@@ -218,15 +218,24 @@ namespace Craquez
                     if (e.kind == "gkthrow")
                     {
                         // goleiro: um braço só — por cima do ombro, ou rolando rente ao chão
-                        _throwT = 0.32f; _oneArm = true; _throwLow = view.sim.ball.z < 0.5f;
+                        _throwLow = view.sim.ball.z < 0.5f;
+                        if (!_throwLow && AthleteAnimator.Has("GkThrow"))
+                        {
+                            // arremesso por cima do ombro (captura): a mão solta a bola no instante da saída
+                            float tc = AthleteAnimator.KickContact("GkThrow");
+                            anim.Play("GkThrow", Mathf.Max(0f, tc - 0.3f), 0.8f, 1.2f, 0.05f);
+                            break;
+                        }
+                        _throwT = 0.32f; _oneArm = true;
                         if (_throwLow) _pitch = 22f;
                         break;
                     }
                     if (e.kind == "punt")
                     {
                         // chutão de bate-pronto: chute forte começando um pouco antes do contato
-                        float pc = AthleteAnimator.KickContact("KickPower");
-                        anim.Play("KickPower", pc - 0.12f, 0.7f, 1.3f, 0.04f);
+                        string pk = AthleteAnimator.Has("GkPunt") ? "GkPunt" : "KickPower";
+                        float pc = AthleteAnimator.KickContact(pk);
+                        anim.Play(pk, Mathf.Max(0f, pc - 0.25f), 0.8f, 1.25f, 0.04f);
                         break;
                     }
                     if (anim.CurrentAction == null || anim.ActionWeight < 0.3f)
@@ -280,6 +289,12 @@ namespace Craquez
                     break;
                 case "header":
                     _hopT = 0.55f;
+                    if (AthleteAnimator.Has("Header"))
+                    {
+                        // a cabeça vai na bola: o golpe de pescoço da captura cai no instante do toque
+                        float hc = AthleteAnimator.KickContact("Header");
+                        anim.Play("Header", Mathf.Max(0f, hc - 0.12f), 0.62f, 1.15f, 0.04f);
+                    }
                     break;
                 case "receive":
                 {
@@ -664,7 +679,7 @@ namespace Craquez
             _pitch = Mathf.Lerp(_pitch, 0f, 1f - Mathf.Exp(-dt * 5f));
             // aceleração inclina o tronco (na coluna, em LateUpdate), não o corpo inteiro: pés firmes
             // tronco: inclina na arrancada e, em velocidade, fica um pouco à frente (como corredor de verdade)
-            _accLean = Mathf.Lerp(_accLean, Mathf.Clamp(local.z * 0.5f, -3f, 4f) + Mathf.Clamp01((spd - 3f) / 5f) * 4f, 1f - Mathf.Exp(-dt * 9f));
+            _accLean = Mathf.Lerp(_accLean, Mathf.Clamp(local.z * 0.5f, -3f, 4f) + (AthleteAnimator.Mocap ? 0f : Mathf.Clamp01((spd - 3f) / 5f) * 4f), 1f - Mathf.Exp(-dt * 9f));
             float lift = 0f, roll = _lean, pitch = _pitch;
             if (_celebrate > 0f && p.vel.magnitude < 3f)
             {
@@ -776,7 +791,7 @@ namespace Craquez
                 bool idle = rawSpd < 0.3f && !hasBall && p.down <= 0f && !p.isKeeper && _celebrate <= 0f;
                 _idleT = idle ? _idleT + dt : 0f;
             }
-            anim?.Tick(dt, animSpeed, animFwd, rawSpd > 0.01f ? lv.x * (_animSpd / rawSpd) : 0f, guard);
+            anim?.Tick(dt, animSpeed, animFwd, rawSpd > 0.01f ? lv.x * (_animSpd / rawSpd) : 0f, guard, p.isKeeper);
             if (!_diag && rig.head != null && p.id == 3)
             {
                 _diag = true;
@@ -1066,7 +1081,8 @@ namespace Craquez
             var ax = transform.right;
             // tronco: sobre a bola no rasteiro, inclinado para trás na bola alta
             _pose.Rotate(rig.spine, Quaternion.AngleAxis(Mathf.Lerp(9f, -10f, _kickLoft) * w, ax));
-            // braços: o esquerdo abre (chute de direita), o direito recua
+            // braços: o esquerdo abre (chute de direita), o direito recua (a captura do Mixamo já tem)
+            if (!AthleteAnimator.Mocap)
             foreach (var (sfx, abd, back) in new[] { ("_l", 1f, 0f), ("_r", 0.3f, 1f) })
             {
                 if (!rig.bones.TryGetValue("upperarm" + sfx, out var up)) continue;
@@ -1176,6 +1192,7 @@ namespace Craquez
         void Gait()
         {
             if (rig.spine == null || p.down > 0f || p.slide > 0f || (p.isKeeper && (p.saveKind > 0 || p.InHands)) || _celebrate > 0f) return;
+            if (AthleteAnimator.Mocap) { RestPose(); return; }   // braços e tronco da captura, como estão
             float act = anim != null ? anim.ActionWeight : 0f;
             float w = (1f - act) * (1f - _procW);   // a passada desenhada (ProcGait) já cuida de braços e pernas
             if (w <= 0.05f) return;
@@ -1269,7 +1286,8 @@ namespace Craquez
         {
             float dt = Time.deltaTime;
             var sim = view.sim;
-            bool can = p.isKeeper && rig.pelvis != null && rig.spine != null && p.saveKind == 0 && _saveRec <= 0f && !p.InHands && p.down <= 0f;
+            // (com a captura do Mixamo a espera e os passos de lado do goleiro são clipes: GkReady/GkSide)
+            bool can = !(AthleteAnimator.Mocap && AthleteAnimator.Has("GkReady")) && p.isKeeper && rig.pelvis != null && rig.spine != null && p.saveKind == 0 && _saveRec <= 0f && !p.InHands && p.down <= 0f;
             float threat = 0f;
             if (can)
             {
@@ -1390,7 +1408,8 @@ namespace Craquez
         void ProcGait()
         {
             float dt = Time.deltaTime;
-            bool skip = rig.spine == null || rig.pelvis == null || p.down > 0f || p.slide > 0f || _bikeT > 0f || (p.isKeeper && (p.saveKind > 0 || p.InHands || _saveRec > 0f)) || _celebrate > 0f;
+            // (com a captura do Mixamo a passada é a da captura: nada desenhado por cima)
+            bool skip = AthleteAnimator.Mocap || rig.spine == null || rig.pelvis == null || p.down > 0f || p.slide > 0f || _bikeT > 0f || (p.isKeeper && (p.saveKind > 0 || p.InHands || _saveRec > 0f)) || _celebrate > 0f;
             float spd = _animSpd;
             var right = transform.right; var up = transform.up; var fwd = transform.forward;
             var lv = transform.InverseTransformDirection(new Vector3(p.vel.x, 0f, p.vel.y));
@@ -1585,7 +1604,7 @@ namespace Craquez
         /// </summary>
         void Posture()
         {
-            if (rig.pelvis == null || rig.neck == null || rig.spine == null) return;
+            if (AthleteAnimator.Mocap || rig.pelvis == null || rig.neck == null || rig.spine == null) return;
             if (p.down > 0f || p.slide > 0f || _bikeT > 0f || (p.isKeeper && (p.saveKind > 0 || _saveRec > 0f)) || _celebrate > 0f) return;
             float act = anim != null ? anim.ActionWeight : 0f;
             float w = 1f - act * 0.7f;   // chutes e fintas mantêm o gesto
@@ -1667,7 +1686,7 @@ namespace Craquez
         /// </summary>
         void StillArms()
         {
-            if (rig.spine == null || p.down > 0f || p.slide > 0f || _celebrate > 0f || seat > 0.3f || _restPose > 0.05f) return;
+            if (AthleteAnimator.Mocap || rig.spine == null || p.down > 0f || p.slide > 0f || _celebrate > 0f || seat > 0.3f || _restPose > 0.05f) return;
             if (p.isKeeper && (p.saveKind > 0 || p.InHands || _gkReady > 0.05f)) return;
             float act = anim != null ? anim.ActionWeight : 0f;
             float w = (1f - Mathf.Clamp01((_animSpd - 0.5f) / 0.9f)) * (1f - act) * (1f - _procW);
@@ -1695,13 +1714,13 @@ namespace Craquez
 
         void FeetFirm()
         {
-            if (p.slide > 0f || _bikeT > 0f || (p.isKeeper && (p.dive > 0f || p.Diving || _saveRec > 0f)) || p.down > 0f) return;   // (na bicicleta os pés "achatados no chão" entortavam no ar)
+            if (AthleteAnimator.Mocap || p.slide > 0f || _bikeT > 0f || (p.isKeeper && (p.dive > 0f || p.Diving || _saveRec > 0f)) || p.down > 0f) return;   // (na bicicleta os pés "achatados no chão" entortavam no ar)
             PoseFix.Feet(rig, transform, _pose, anim != null ? anim.ActionWeight : 0f);
         }
 
         void ArmsDown()
         {
-            if (_celebrate > 0f || (p.isKeeper && (p.dive > 0f || p.InHands)) || p.down > 0f) return;
+            if (AthleteAnimator.Mocap || _celebrate > 0f || (p.isKeeper && (p.dive > 0f || p.InHands)) || p.down > 0f) return;
             PoseFix.Arms(rig, transform, _pose, 1f - (anim != null ? anim.ActionWeight * 0.5f : 0f), p.vel.magnitude);
         }
 
@@ -1766,8 +1785,11 @@ namespace Craquez
             // (0,88 ainda deixava o ombro para fora da linha do tronco, como uma ombreira)
             // (o corpo já vem com os ombros na largura certa do Blender: aqui só um ajuste leve — apertar
             // demais empurrava a malha do ombro para o peito e o peito parecia estufado)
-            if (_uaL != null) _uaL.localPosition = _uaLBase * 0.93f;
-            if (_uaR != null) _uaR.localPosition = _uaRBase * 0.93f;
+            // (com a captura do Mixamo o ombro fica onde o corpo foi feito: apertar puxava o braço para
+            // dentro da camisa e a manga parecia solta do tronco)
+            float sh = AthleteAnimator.Mocap ? 1f : 0.93f;
+            if (_uaL != null) _uaL.localPosition = _uaLBase * sh;
+            if (_uaR != null) _uaR.localPosition = _uaRBase * sh;
             // quadril um pouco mais estreito: pernas mais juntas (as coxas saíam muito afastadas)
             if (_thL == null && rig.bones.TryGetValue("thigh_l", out _thL)) _thLBase = _thL.localPosition;
             if (_thR == null && rig.bones.TryGetValue("thigh_r", out _thR)) _thRBase = _thR.localPosition;
@@ -1784,7 +1806,7 @@ namespace Craquez
         /// </summary>
         void KneeGuard()
         {
-            if (rig.pelvis == null || p.down > 0f || p.slide > 0f || _bikeT > 0f || seat > 0.3f) return;
+            if (AthleteAnimator.Mocap || rig.pelvis == null || p.down > 0f || p.slide > 0f || _bikeT > 0f || seat > 0.3f) return;
             if (p.isKeeper && (p.saveKind > 0 || _saveRec > 0f || p.dive > 0f)) return;
             float act = anim != null ? anim.ActionWeight : 0f;
             var right = transform.right; var fwd = transform.forward; var up = Vector3.up;
@@ -1841,6 +1863,7 @@ namespace Craquez
             var right = transform.right;
             // nos braços para cima (comemoração, salto do goleiro) desce menos, para o braço não "quebrar"
             float k = (_celebrate > 0f && _armsUp > 0.3f) || (p.isKeeper && p.saveKind > 0) ? 0.45f : 1f;
+            if (AthleteAnimator.Mocap) return;   // a captura do Mixamo já traz os ombros relaxados (baixar mais soltava a manga do tronco)
             foreach (var cn in Clavicles)
             {
                 if (!rig.bones.TryGetValue(cn, out var clv) || clv.childCount == 0) continue;
@@ -1858,7 +1881,7 @@ namespace Craquez
         /// </summary>
         void Stance()
         {
-            if (rig.pelvis == null || p.down > 0f || p.slide > 0f || (p.isKeeper && (p.saveKind > 0 || _saveRec > 0f)) || seat > 0.5f || _bikeT > 0f) return;
+            if (AthleteAnimator.Mocap || rig.pelvis == null || p.down > 0f || p.slide > 0f || (p.isKeeper && (p.saveKind > 0 || _saveRec > 0f)) || seat > 0.5f || _bikeT > 0f) return;
             float slow = 1f - Mathf.Clamp01((_animSpd - 0.6f) / 1.6f);
             if (slow <= 0.01f) return;
             var fwd = transform.forward;

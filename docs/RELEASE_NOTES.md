@@ -1,3 +1,39 @@
+## Craquez 2.9.1
+
+Jogo de futebol feito 100% com inteligência artificial, **gratuito**.
+
+### Download
+- **Celular Android**: `Craquez-v2.9.1.apk`
+- **TV (Google TV / Android TV, ex.: TCL C6K)**: `Craquez-TV-v2.9.1.apk` — use este na TV (32 e 64 bits).
+
+### Novidades
+- **Braços ligados ao tronco**: saíram os ajustes antigos que baixavam e apertavam os ombros (a manga
+  parecia solta do corpo com os movimentos novos).
+- **Mãos menores**, na proporção do corpo.
+- **Defesas do goleiro**: a bola tocada na ponta dos dedos mantém a força (sai rente à trave ou entra
+  forte, nunca "devagarinho" no gol); a tirada por cima do travessão passa mesmo por cima.
+- **Bola saindo pela linha de fundo**: segue rolando/voando lá fora, quica, bate na placa e para; só
+  então o juiz apita o tiro de meta ou o escanteio, e o goleiro busca a bola onde ela parou.
+
+## Craquez 2.9.0
+
+Jogo de futebol feito 100% com inteligência artificial, **gratuito**.
+
+### Download
+- **Celular Android**: `Craquez-v2.9.0.apk`
+- **TV (Google TV / Android TV, ex.: TCL C6K)**: `Craquez-TV-v2.9.0.apk` — use este na TV (32 e 64 bits).
+
+### Novidades
+- **Movimentos novos, de captura profissional (Mixamo)**: andar, trotar, correr, correr de costas e
+  passo lateral na marcação refeitos; o corpo se move como gente de verdade, sem o peito empinado.
+- **Chutes e passes novos**: passe de chapa, chute com corrida, chute forte com a perna de apoio
+  plantada e cavadinha; o toque na bola cai no instante certo do movimento.
+- **Cabeceio** com o golpe de pescoço na bola.
+- **Goleiro**: posição de espera com base larga, passos laterais acompanhando o lance, arremesso por
+  cima do ombro e chutão de bate-pronto.
+- Saem as correções desenhadas por cima da animação antiga (passada, braços, postura e joelhos), que
+  deixavam o movimento cada vez mais estranho.
+
 ## Craquez 2.8.0
 
 Jogo de futebol feito 100% com inteligência artificial, **gratuito**.

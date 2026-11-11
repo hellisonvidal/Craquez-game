@@ -1,37 +1,9 @@
 {
- "Idle": {
-  "frames": 34,
-  "fps": 30,
-  "loop": true,
-  "speed": 0.835,
-  "source": "141_20"
- },
- "Jog": {
-  "frames": 24,
-  "fps": 30,
-  "loop": true,
-  "speed": 3.363,
-  "source": "35_17"
- },
- "Run": {
-  "frames": 19,
-  "fps": 30,
-  "loop": true,
-  "speed": 5.288,
-  "source": "102_05"
- },
- "Sprint": {
-  "frames": 23,
-  "fps": 30,
-  "loop": true,
-  "speed": 3.933,
-  "source": "09_01"
- },
  "RunTurnL": {
   "frames": 28,
   "fps": 30,
   "loop": false,
-  "speed": 3.89,
+  "speed": 3.889,
   "source": "102_02"
  },
  "RunTurnR": {
@@ -45,14 +17,14 @@
   "frames": 29,
   "fps": 30,
   "loop": false,
-  "speed": 3.013,
+  "speed": 3.012,
   "source": "102_03"
  },
  "CutR": {
   "frames": 32,
   "fps": 30,
   "loop": false,
-  "speed": 2.801,
+  "speed": 2.8,
   "source": "102_04"
  },
  "SideStepL": {
@@ -66,35 +38,21 @@
   "frames": 28,
   "fps": 30,
   "loop": false,
-  "speed": 4.02,
+  "speed": 4.019,
   "source": "127_14"
- },
- "Backpedal": {
-  "frames": 17,
-  "fps": 30,
-  "loop": true,
-  "speed": 1.838,
-  "source": "141_31"
- },
- "Jockey": {
-  "frames": 27,
-  "fps": 30,
-  "loop": false,
-  "speed": 3.203,
-  "source": "102_27"
  },
  "FeintL": {
   "frames": 47,
   "fps": 30,
   "loop": false,
-  "speed": 3.329,
+  "speed": 3.328,
   "source": "102_19"
  },
  "FeintR": {
   "frames": 48,
   "fps": 30,
   "loop": false,
-  "speed": 3.237,
+  "speed": 3.236,
   "source": "102_18"
  },
  "Spin": {
@@ -111,41 +69,6 @@
   "speed": 1.15,
   "source": "127_05"
  },
- "Kick": {
-  "frames": 60,
-  "fps": 30,
-  "loop": false,
-  "speed": 0.894,
-  "source": "10_02"
- },
- "KickPower": {
-  "frames": 60,
-  "fps": 30,
-  "loop": false,
-  "speed": 0.816,
-  "source": "10_01"
- },
- "Pass": {
-  "frames": 60,
-  "fps": 30,
-  "loop": false,
-  "speed": 1.628,
-  "source": "10_03"
- },
- "Shot": {
-  "frames": 60,
-  "fps": 30,
-  "loop": false,
-  "speed": 1.633,
-  "source": "10_05"
- },
- "ShotLeft": {
-  "frames": 60,
-  "fps": 30,
-  "loop": false,
-  "speed": 1.625,
-  "source": "10_06"
- },
  "Volley": {
   "frames": 60,
   "fps": 30,
@@ -153,11 +76,145 @@
   "speed": 1.394,
   "source": "11_01"
  },
- "Walk": {
-  "frames": 35,
+ "Idle": {
+  "frames": 250,
   "fps": 30,
   "loop": true,
-  "speed": 1.386,
-  "source": "35_01"
+  "speed": 0.005,
+  "source": "mixamo:loco/idle"
+ },
+ "Walk": {
+  "frames": 32,
+  "fps": 30,
+  "loop": true,
+  "speed": 1.663,
+  "source": "mixamo:loco/walking"
+ },
+ "Jog": {
+  "frames": 26,
+  "fps": 30,
+  "loop": true,
+  "speed": 2.569,
+  "source": "mixamo:soccer/jog forward"
+ },
+ "Run": {
+  "frames": 22,
+  "fps": 30,
+  "loop": true,
+  "speed": 4.349,
+  "source": "mixamo:loco/running"
+ },
+ "Sprint": {
+  "frames": 22,
+  "fps": 30,
+  "loop": true,
+  "speed": 4.349,
+  "source": "mixamo:loco/running"
+ },
+ "Backpedal": {
+  "frames": 25,
+  "fps": 30,
+  "loop": true,
+  "speed": 2.366,
+  "source": "mixamo:soccer/jog backward"
+ },
+ "Jockey": {
+  "frames": 32,
+  "fps": 30,
+  "loop": true,
+  "speed": 1.721,
+  "source": "mixamo:loco/left strafe walking"
+ },
+ "JockeyR": {
+  "frames": 32,
+  "fps": 30,
+  "loop": true,
+  "speed": 1.721,
+  "source": "mixamo:loco/right strafe walking"
+ },
+ "GkReady": {
+  "frames": 101,
+  "fps": 30,
+  "loop": true,
+  "speed": 0.022,
+  "source": "mixamo:soccer/goalkeeper idle (2)"
+ },
+ "GkSideL": {
+  "frames": 16,
+  "fps": 30,
+  "loop": true,
+  "speed": 3.12,
+  "source": "mixamo:soccer/goalkeeper sidestep (2) (espelhado)"
+ },
+ "GkSideR": {
+  "frames": 16,
+  "fps": 30,
+  "loop": true,
+  "speed": 3.12,
+  "source": "mixamo:soccer/goalkeeper sidestep (2)"
+ },
+ "Pass": {
+  "frames": 16,
+  "fps": 30,
+  "loop": false,
+  "speed": 0.34,
+  "source": "mixamo:soccer/kick soccerball (2)",
+  "contact": 0.433
+ },
+ "Shot": {
+  "frames": 39,
+  "fps": 30,
+  "loop": false,
+  "speed": 2.42,
+  "source": "mixamo:soccer/strike foward jog",
+  "contact": 0.467
+ },
+ "KickPower": {
+  "frames": 46,
+  "fps": 30,
+  "loop": false,
+  "speed": 2.08,
+  "source": "mixamo:soccer/soccer penalty kick",
+  "contact": 0.733
+ },
+ "ShotLeft": {
+  "frames": 46,
+  "fps": 30,
+  "loop": false,
+  "speed": 2.08,
+  "source": "mixamo:soccer/soccer penalty kick (espelhado)",
+  "contact": 0.733
+ },
+ "Kick": {
+  "frames": 18,
+  "fps": 30,
+  "loop": false,
+  "speed": 0.172,
+  "source": "mixamo:soccer/kick soccerball",
+  "contact": 0.233
+ },
+ "Header": {
+  "frames": 58,
+  "fps": 30,
+  "loop": false,
+  "speed": 0.161,
+  "source": "mixamo:soccer/header soccerball",
+  "contact": 0.967
+ },
+ "GkThrow": {
+  "frames": 86,
+  "fps": 30,
+  "loop": false,
+  "speed": 1.394,
+  "source": "mixamo:soccer/goalkeeper overhand throw",
+  "contact": 1.6
+ },
+ "GkPunt": {
+  "frames": 118,
+  "fps": 30,
+  "loop": false,
+  "speed": 0.981,
+  "source": "mixamo:soccer/goalkeeper drop kick",
+  "contact": 2.133
  }
 }
