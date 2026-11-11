@@ -430,9 +430,15 @@ namespace Craquez
         void PlayIntroVideo(RectTransform full)
         {
             _introPlayed = true;
-            var clip = Resources.Load<VideoClip>("UI/abertura");
-            if (clip == null || ShotTour.Requested()) return;
-            _videoRt = new RenderTexture((int)clip.width, (int)clip.height, 0, RenderTextureFormat.ARGB32);
+            // o vídeo fica em StreamingAssets e é tocado direto pelo decodificador do aparelho: importado como
+            // VideoClip, o Unity do CI (Linux) não lia o H.264 e o vídeo nem entrava no APK
+            if (ShotTour.Requested()) return;
+#if UNITY_STANDALONE_LINUX && !UNITY_EDITOR
+            return;   // o player de Linux não decodifica H.264
+#else
+            string url = System.IO.Path.Combine(Application.streamingAssetsPath, "abertura.mp4");
+            if (!url.Contains("://")) url = "file://" + url;
+            _videoRt = new RenderTexture(2160, 1080, 0, RenderTextureFormat.ARGB32);
             var holder = UiKit.Rect(full, "vídeo de abertura").Place(0, 0, 1, 1);
             _videoImg = holder.gameObject.AddComponent<RawImage>();
             _videoImg.texture = _videoRt;
@@ -440,11 +446,11 @@ namespace Craquez
             _videoImg.raycastTarget = false;
             var fit = holder.gameObject.AddComponent<AspectRatioFitter>();
             fit.aspectMode = AspectRatioFitter.AspectMode.EnvelopeParent;
-            fit.aspectRatio = clip.width / (float)clip.height;
+            fit.aspectRatio = 2f;
             _video = holder.gameObject.AddComponent<VideoPlayer>();
             _video.playOnAwake = false;
-            _video.source = VideoSource.VideoClip;
-            _video.clip = clip;
+            _video.source = VideoSource.Url;
+            _video.url = url;
             _video.renderMode = VideoRenderMode.RenderTexture;
             _video.targetTexture = _videoRt;
             _video.audioOutputMode = VideoAudioOutputMode.None;
@@ -455,7 +461,11 @@ namespace Craquez
             _video.errorReceived += (v, msg) => { Debug.LogWarning("[abertura] " + msg); EndIntroVideo(); };
             _video.Prepare();
             if (_pressText != null) _pressText.enabled = false;
+            _videoStart = Time.unscaledTime;
+#endif
         }
+
+        float _videoStart;
 
         void EndIntroVideo()
         {
@@ -478,6 +488,8 @@ namespace Craquez
                 return false;
             }
             if (_video == null) return false;
+            // aparelho que não consegue abrir o vídeo: não fica na tela preta, vai para a capa
+            if (!_video.isPrepared && Time.unscaledTime - _videoStart > 6f) { EndIntroVideo(); return false; }
             if (InputRouter.AnyPressedThisFrame()) { EndIntroVideo(); return true; }
             return true;
         }
@@ -647,7 +659,14 @@ namespace Craquez
         void ShowOnline()
         {
             var root = Page("ON-LINE");
-            _back = ShowModes;
+            _back = () => { OnlineHooks.Leave?.Invoke(); ShowModes(); };
+            if (Craquez.Sim.Net.Online.Enabled && OnlineHooks.BuildPage != null)
+            {
+                Title(root, "ON-LINE", "Partidas pela internet, cada um no seu aparelho");
+                var area = UiKit.Rect(root, "on-line").Place(0.1f, 0, 0.9f, 1, 0, 120, 0, 280);
+                OnlineHooks.BuildPage(this, area);
+                return;
+            }
             Title(root, "ON-LINE", Craquez.Sim.Net.Online.Enabled ? "Partidas pela internet" : "Em preparação");
             var card = UiKit.Panel(root).rectTransform.Place(0.12f, 0, 0.88f, 1, 0, 190, 0, 300);
             var txt = UiKit.Label(card,
@@ -655,7 +674,7 @@ namespace Craquez
                 "•  Partida rápida: o jogo encontra um adversário do seu nível.\n" +
                 "•  Sala com código: crie uma sala e passe o código para o amigo.\n" +
                 "•  Mesmo jogo nos dois aparelhos: só os comandos viajam pela rede, então a partida é leve e fiel.\n\n" +
-                (Craquez.Sim.Net.Online.Enabled ? "" : "O motor da partida on-line já está pronto e testado; falta ligar o servidor. Em breve!"),
+                (Craquez.Sim.Net.Online.Enabled ? "" : string.IsNullOrEmpty(Craquez.Sim.Net.Online.DisabledReason) ? "O motor da partida on-line já está pronto e testado; falta ligar o servidor. Em breve!" : Craquez.Sim.Net.Online.DisabledReason),
                 30, Theme.Body, Theme.Text, TextAnchor.UpperLeft);
             txt.rectTransform.Place(0, 0, 1, 1, 40, 40, 40, 40);
             var back = UiKit.Button(root, "‹  Voltar", ShowModes, 30);
@@ -1690,13 +1709,38 @@ namespace Craquez
             if (_cfg.tacticsA.lineup == null) _cfg.tacticsA = new Tactics();
             var balls = BallCatalog.ForMode(_cfg.mode);
             if (!balls.Contains(_cfg.ball)) _cfg.ball = balls[0];
-            _cfg.seed = (uint)System.DateTime.Now.Ticks | 1u;
+            { long tk = System.DateTime.Now.Ticks; _cfg.seed = MatchConfig.Mix((uint)tk ^ (uint)(tk >> 32) ^ (uint)UnityEngine.Random.Range(0, int.MaxValue)) | 1u; }
             var go = new GameObject("Partida");
             go.transform.SetParent(transform, false);
             _match = go.AddComponent<MatchController>();
             _match.onExit = () => { EndMatch(); EndTraining(); ShowPlay(); };
             _match.onRestart = c => { EndMatch(); StartMatch(); };
             _match.Begin(_cfg, cam);
+        }
+
+        // ------------------------------------------------------------ on-line (usado por Craquez.Online)
+        /// <summary>Times da modalidade (clubes e seleções) para a escolha na tela on-line.</summary>
+        public static List<League> OnlineLeagues(string mode) => AllFor(mode);
+        /// <summary>Volta para a tela ON-LINE (recria a página).</summary>
+        public void OnlineRefresh() => ShowOnline();
+        public void OnlineBack() { OnlineHooks.Leave?.Invoke(); ShowModes(); }
+
+        /// <summary>Começa a partida on-line: os dois aparelhos com a mesma configuração e semente.</summary>
+        public void StartOnlineMatch(MatchConfig c, Craquez.Sim.Net.LockstepSession session)
+        {
+            Sfx.MenuMusic(false);
+            StopAttract();
+            UiKit.Clear(_root);
+            _bg.color = new Color(0, 0, 0, 0);
+            _backdrop.gameObject.SetActive(false);
+            _wasMenu = false;
+            _back = null;
+            var go = new GameObject("Partida on-line");
+            go.transform.SetParent(transform, false);
+            _match = go.AddComponent<MatchController>();
+            _match.net = session;
+            _match.onExit = () => { EndMatch(); OnlineHooks.Leave?.Invoke(); ShowModes(); };
+            _match.Begin(c, cam);
         }
 
         // ------------------------------------------------------------ roteiro de screenshots (CI)

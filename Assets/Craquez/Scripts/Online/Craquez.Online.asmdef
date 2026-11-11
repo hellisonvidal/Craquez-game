@@ -1,0 +1,23 @@
+{
+    "name": "Craquez.Online",
+    "rootNamespace": "Craquez.Online",
+    "references": [
+        "Craquez.Sim",
+        "Craquez.Runtime",
+        "Unity.Services.Core",
+        "Unity.Services.Authentication",
+        "Unity.Services.Multiplayer",
+        "Unity.Networking.Transport",
+        "Unity.Collections",
+        "UnityEngine.UI"
+    ],
+    "includePlatforms": [],
+    "excludePlatforms": [],
+    "allowUnsafeCode": false,
+    "overrideReferences": false,
+    "precompiledReferences": [],
+    "autoReferenced": true,
+    "defineConstraints": [],
+    "versionDefines": [],
+    "noEngineReferences": false
+}

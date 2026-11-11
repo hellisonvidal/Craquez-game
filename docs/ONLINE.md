@@ -1,51 +1,44 @@
-# Modo on-line: o que falta e o que você precisa fazer
+# Modo on-line
 
-## O que já está pronto (no jogo)
+## Como funciona
 
-- **Partida em lockstep**: cada aparelho roda a mesma simulação (ela é determinística, a 60 passos por segundo) e só os comandos dos controles viajam pela rede — 6 bytes por passo, com alguns passos de atraso para esconder a latência. A cada segundo os dois lados comparam um resumo do estado da partida e, se divergirem, o jogo percebe.
-- **Teste automático**: no CI, duas partidas ligadas por uma rede simulada rodam 40 s e terminam idênticas.
-- **Menu**: o cartão **ON-LINE** está no menu principal (por enquanto mostra "em breve").
+- **Partida em lockstep**: cada aparelho roda a mesma simulação (determinística, 60 passos por segundo) e só
+  os comandos dos controles viajam pela rede, alguns passos à frente para esconder a demora da internet. A
+  cada segundo os dois lados comparam um resumo do estado; se divergirem, o jogo avisa.
+- **Unity Gaming Services** (plano gratuito):
+  - *Authentication*: login anônimo, sem cadastro;
+  - *Sessions/Lobby*: sala de dois com código ou partida rápida (junta quem escolheu a mesma modalidade e
+    tem a mesma versão do jogo);
+  - *Relay*: o servidor que repassa os comandos entre os aparelhos (celular/TV não se conectam direto).
+- **Aperto de mão**: os dois aparelhos conferem a versão do jogo e os dados dos dois times (se um tiver um
+  option file diferente, a partida não começa e o jogo explica). Quem criou a sala sorteia local, horário,
+  bola e semente, e os dois começam a mesma partida.
+- **Durante a partida on-line**: sem pausa, sem replay e sem mexer no time no intervalo (o 2º tempo começa
+  sozinho); clima seco (sol ou nublado), porque a água no campo depende do relógio de cada aparelho.
+- **Convite**: na sala criada, "Convidar" abre o compartilhar do Android (WhatsApp, Telegram...) com o
+  código e o link `https://hellisonvidal.github.io/Craquez-game/sala/?c=CODIGO`. A página tenta abrir o jogo
+  na sala (`craquez://sala/CODIGO`) e tem o botão para baixar o jogo. Quem recebe também pode digitar o
+  código ou tocar em "Colar".
 
-## O que falta
+Código: `Assets/Craquez/Scripts/Online` (módulo `Craquez.Online`), `Sim/Net/Lockstep.cs` (lockstep) e o modo
+de rede em `MatchController` (`net`).
 
-Um **serviço que coloque os dois aparelhos em contato** pela internet (celulares não conseguem se conectar direto um ao outro: estão atrás do roteador/operadora). Esse serviço tem duas partes:
+## O que falta (só você pode fazer — exige a sua conta)
 
-1. **Encontro (lobby)**: um jogador cria a sala (com um código) ou entra na fila da partida rápida; o outro entra.
-2. **Retransmissão (relay)**: um servidor que repassa os pacotes de um aparelho para o outro.
+1. Entre em **https://cloud.unity.com** com a mesma conta Unity do CI.
+2. Crie o projeto **Craquez** e ative **Authentication**, **Lobby** e **Relay** (plano gratuito; a Unity
+   pode pedir um cartão, mas só cobra acima da cota).
+3. Me mande o **Project ID** (Project settings) e o **Organization ID** (Organization settings). Não são
+   senhas: só identificam o projeto. Eu coloco no `ProjectSettings` e o cartão ON-LINE passa a funcionar.
+4. (Para o link do convite abrir uma página) autorizar o **GitHub Pages** do repositório, servindo a pasta
+   `docs` da branch `main` — eu ligo com um comando.
 
-## Caminho recomendado: Unity Gaming Services (grátis no começo)
+Enquanto o Project ID não estiver no projeto, o cartão ON-LINE mostra "em breve" e explica o motivo.
 
-A própria Unity oferece os dois serviços (**Lobby** e **Relay**) com cota gratuita mensal que cobre muitos jogos de teste. É o caminho com menos trabalho para você — o código eu faço.
+## Como testar
 
-### Passo a passo (só você pode fazer — exige a sua conta)
-
-1. Entre em **https://cloud.unity.com** com a mesma conta Unity usada na licença do CI.
-2. **Create project** (ou "Projects › New"), nome **Craquez**.
-3. No projeto, abra **Products** (ou "Explore services") e ative:
-   - **Authentication** (login anônimo dos jogadores — sem cadastro),
-   - **Lobby**,
-   - **Relay**.
-   (Os três têm plano gratuito; a Unity pode pedir um cartão para cobrança só acima da cota.)
-4. Em **Project settings**, copie o **Project ID** (um código como `a1b2c3d4-...`).
-5. Me mande esse **Project ID** (não é segredo — é só o identificador do projeto).
-
-### O que eu faço depois
-
-- Instalo os pacotes `com.unity.services.authentication`, `com.unity.services.lobby` e `com.unity.services.relay`.
-- Ligo o transporte do Relay na sessão lockstep que já existe.
-- Faço as telas: **Partida rápida**, **Criar sala** (mostra o código), **Entrar com código**, e a sala de espera com os dois times.
-- Ativo o cartão ON-LINE (`Online.Enabled = true`) quando o teste entre dois aparelhos de verdade estiver perfeito.
-
-### Como vamos testar
-
-1. Eu publico uma versão de teste.
-2. Você instala em **dois aparelhos** (pode ser celular + TV, ou dois celulares).
-3. Um cria a sala, o outro entra com o código, e vocês jogam alguns minutos.
-4. Se aparecer qualquer diferença entre as duas telas (bola em lugares diferentes), o jogo registra o momento — e eu corrijo.
-
-> Ponto de atenção: processadores diferentes podem fazer contas com casas decimais levemente
-> diferentes. O teste entre aparelhos reais é o que confirma que a partida fica idêntica nos dois.
-
-## Alternativa (mais trabalho, sem depender da Unity)
-
-Um pequeno servidor próprio (WebSocket) num serviço de hospedagem (ex.: Fly.io ou Render, com plano gratuito). Você precisaria criar a conta nesse serviço e me passar o acesso para eu publicar o servidor. Só vale a pena se a Unity não for uma opção.
+1. Instale a versão nova em **dois aparelhos** (dois celulares, ou celular e TV).
+2. Os dois escolhem a mesma modalidade em ON-LINE. Um toca em **Criar sala** e manda o convite; o outro
+   abre o link ou digita o código. Ou os dois tocam em **Partida rápida**.
+3. Joguem alguns minutos. Se aparecer "As partidas dos dois aparelhos ficaram diferentes", me avise com o
+   número do passo que aparece na mensagem.

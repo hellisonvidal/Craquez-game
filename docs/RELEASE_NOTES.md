@@ -1,3 +1,69 @@
+## Craquez 2.15.0
+
+Jogo de futebol feito 100% com inteligência artificial, **gratuito**.
+
+### Download
+- **Celular Android**: `Craquez-v2.15.0.apk`
+- **TV (Google TV / Android TV, ex.: TCL C6K)**: `Craquez-TV-v2.15.0.apk` — use este na TV (32 e 64 bits).
+
+### Novidades
+- **Modo on-line (preparado)**: partida rápida, sala com código e convite pelo WhatsApp, com a partida
+  rodando igual nos dois aparelhos (só os comandos viajam pela internet, pelo Relay da Unity). O cartão
+  ON-LINE liga assim que o projeto do jogo na Unity Cloud estiver configurado (ver docs/ONLINE.md).
+- **Link do convite**: `craquez://sala/CODIGO` abre o jogo direto na sala.
+
+Inclui tudo da 2.14.0 abaixo.
+
+## Craquez 2.14.0
+
+Jogo de futebol feito 100% com inteligência artificial, **gratuito**.
+
+### Download
+- **Celular Android**: `Craquez-v2.14.0.apk`
+- **TV (Google TV / Android TV, ex.: TCL C6K)**: `Craquez-TV-v2.14.0.apk` — use este na TV (32 e 64 bits).
+
+### Novidades
+- **Placas do Craquez**: nos ginásios de futsal e nos estádios, as placas de publicidade agora mostram o
+  nome do jogo, intercaladas com placas azuis, vermelhas e brancas (as cores das telas do jogo).
+
+### Correções
+- **Ginásio sem parede e sem teto**: as paredes, o teto e a estrutura do ginásio sumiam (o sistema que
+  esconde o que tapa a câmera achava que eles estavam na frente, porque a câmera fica dentro do ginásio) e
+  aparecia o chão de fora com a torcida dos fundos solta. Agora o ginásio fica inteiro.
+- **Placas "arco-íris"**: a grade fina das placas de LED, vista de lado e de longe, virava faixas coloridas.
+  As placas novas não têm a grade.
+- **Vídeo de abertura** no celular: o vídeo não entrava no APK (o Unity do servidor de build não lia o
+  formato). Agora ele é tocado direto pelo aparelho; se algum aparelho não conseguir abrir, o jogo vai
+  para a capa em vez de ficar na tela preta.
+- **Goleiro defendendo de longe com os pés**: o bloqueio com o pé e com o corpo (pernas na frente) agora
+  é só reflexo em chute de perto; chute de longe ele se abaixa e encaixa com as mãos.
+
+Inclui tudo da 2.13.0 abaixo (replay salvo em vídeo, controles menores, clima aleatório, telas de nylon).
+
+## Craquez 2.13.0
+
+Jogo de futebol feito 100% com inteligência artificial, **gratuito**.
+
+### Download
+- **Celular Android**: `Craquez-v2.13.0.apk`
+- **TV (Google TV / Android TV, ex.: TCL C6K)**: `Craquez-TV-v2.13.0.apk` — use este na TV (32 e 64 bits).
+
+### Novidades
+- **Salvar o replay em vídeo** (celular e TV): botão "⬇ Salvar vídeo" no replay grava os últimos 30 s
+  em MP4, na câmera e velocidade escolhidas, sem os botões na imagem, e salva na galeria
+  (Filmes/Craquez). Toque na tela para cancelar a gravação.
+- **Controles do replay menores** e centralizados, longe dos cantos de baixo, onde ficam os botões do
+  Android (voltar/início), que antes cobriam um deles.
+- **Tela de nylon nas quadras de rua**: laterais e fundos cercados para a galera não levar bolada (a
+  Gaiola continua com o alambrado de ferro).
+
+### Correções
+- **Clima aleatório**: o sorteio só podia dar nublado, tempestade ou nevasca (a semente da partida era
+  sempre ímpar). Agora os seis climas saem com a mesma chance.
+- **Pilares na frente da câmera**: a tela alta acima das placas (Quadra do Conjunto e Gaiola) era uma
+  peça só nos dois lados e nunca sumia; de perto virava faixas cinzas na frente do jogo. Agora tudo o que
+  fica do lado da câmera some nas câmeras de lado, em todos os locais.
+
 ## Craquez 2.12.1
 
 Jogo de futebol feito 100% com inteligência artificial, **gratuito**.

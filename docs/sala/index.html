@@ -1,0 +1,44 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Convite Craquez</title>
+<meta property="og:title" content="Bora jogar Craquez?">
+<meta property="og:description" content="Toque para entrar na sala do seu amigo.">
+<style>
+  :root { --bg:#050a1f; --panel:#0b1740; --accent:#2a9eff; --hot:#f2293a; --text:#f2f6ff; --dim:#a6b8d1; }
+  * { box-sizing:border-box; }
+  body { margin:0; min-height:100vh; display:flex; align-items:center; justify-content:center; padding:16px;
+         background:radial-gradient(circle at 50% 0%, #12306e 0%, var(--bg) 60%); color:var(--text);
+         font-family:system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
+  .card { width:100%; max-width:440px; background:var(--panel); border-radius:20px; padding:28px 22px; text-align:center;
+          box-shadow:0 20px 60px rgba(0,0,0,.5); }
+  h1 { margin:0 0 4px; font-size:34px; font-style:italic; letter-spacing:1px; }
+  h1 span { color:var(--accent); }
+  p { color:var(--dim); margin:8px 0 18px; line-height:1.4; }
+  .code { font-size:44px; font-weight:800; letter-spacing:6px; margin:6px 0 20px; }
+  a.btn { display:block; padding:16px; border-radius:14px; font-weight:700; font-size:18px; text-decoration:none; margin:10px 0; }
+  .go { background:#1a8c47; color:#fff; }
+  .dl { background:transparent; color:var(--text); border:2px solid var(--accent); }
+  small { color:var(--dim); display:block; margin-top:14px; }
+</style>
+</head>
+<body>
+  <div class="card">
+    <h1>CRA<span>QUEZ</span></h1>
+    <p>Seu amigo te chamou para uma partida on-line.</p>
+    <div class="code" id="code">——</div>
+    <a class="btn go" id="open" href="#">Abrir no Craquez</a>
+    <a class="btn dl" href="https://github.com/hellisonvidal/Craquez-game/releases/latest">Ainda não tenho: baixar o jogo</a>
+    <small>Se o jogo não abrir sozinho, abra o Craquez, toque em ON-LINE e digite o código acima.</small>
+  </div>
+<script>
+  var c = (new URLSearchParams(location.search).get('c') || '').toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 12);
+  document.getElementById('code').textContent = c || '——';
+  var link = 'craquez://sala/' + c;
+  document.getElementById('open').href = link;
+  if (c) setTimeout(function () { location.href = link; }, 400);
+</script>
+</body>
+</html>

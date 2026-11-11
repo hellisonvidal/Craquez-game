@@ -24,6 +24,14 @@ namespace Craquez
         /// <summary>Competições: placar final (mandante, visitante) — troca os botões do fim de jogo por "Continuar".</summary>
         public System.Action<int, int> onResult;
         public System.Action<MatchConfig> onRestart;
+        /// <summary>Partida on-line (lockstep): cada aparelho roda a simulação e só os comandos viajam.
+        /// Sem pausa, replay, táticas no intervalo nem clima que muda — os dois lados ficam idênticos.</summary>
+        public Craquez.Sim.Net.LockstepSession net;
+        /// <summary>On-line: mensagem quando a conexão cai ou as partidas divergem.</summary>
+        public string netProblem;
+        float _netWait;
+        bool _netWarned;
+        object _goalSnap;
         /// <summary>Partida CPU x CPU de fundo nos menus (sem interface, câmera cinematográfica).</summary>
         public bool attract;
         float _orbit;
@@ -107,8 +115,17 @@ namespace Craquez
                 Sfx.Crowd(0.25f, 0.12f);
                 return;
             }
+            if (net != null)
+            {
+                // on-line: o time do outro aparelho não lê controle aqui (os comandos chegam pela rede)
+                int remote = 1 - net.localTeam;
+                _dev[net.localTeam] = p1;
+                hud.devices[net.localTeam] = p1;
+                _dev[remote] = p1;   // (não é lido: os comandos do outro time chegam pela rede)
+            }
             if ((sides[0] != Side.Cpu && _dev[0] == DeviceKind.Touch) || (sides[1] != Side.Cpu && _dev[1] == DeviceKind.Touch))
                 _touch = TouchControls.Create(transform);
+            if (net != null) { hud.ShowPauseButton(false); c.ceremony = false; }
             view.SnapAll();
             if (c.ceremony) StartCeremony();
             else
@@ -410,6 +427,8 @@ namespace Craquez
                 case Phase.Goal:
                     if (!_show.Update(dt, AnyPress()))
                     {
+                        // on-line: volta exatamente ao estado do gol (o replay da comemoração mexe na simulação)
+                        if (net != null && _goalSnap != null) { InstantReplay.Restore(sim, _goalSnap); _goalSnap = null; }
                         _phase = Phase.Playing;
                         _acc = 0f;
                         sim.stateTimer = Mathf.Min(sim.stateTimer, 1.2f);
@@ -425,6 +444,7 @@ namespace Craquez
                 view.bcam.cineLook = b + Vector3.up * 1f;
                 view.bcam.cineFov = 38f;
             }
+            if (net != null) { UpdateNet(dt); return; }
             var frames = new InputFrame[2];
             for (int t = 0; t < 2; t++)
             {
@@ -435,40 +455,92 @@ namespace Craquez
                 if ((pressed & InputFrame.Pause) != 0) { Pause(); return; }
             }
             _acc += dt;
-            if (view != null && view.weather != null) sim.SetPitch(view.weather.Water, view.weather.SnowCover);
+            if (view != null && view.weather != null) sim.SetPitch(view.weather.Water, view.weather.SnowCover);   // (on-line: clima seco e fixo)
             while (_acc >= MatchSim.DT)
             {
                 _acc -= MatchSim.DT;
                 for (int t = 0; t < 2; t++)
                     if (_cpu[t] != null) frames[t] = _cpu[t].MakeInput(sim);
                 sim.Step(frames);
-                view.OnTick();
-                if (!attract) { _show.Record(sim); _replay.Record(sim); }
-                HandleEvents();
-                if (_showTeam >= 0)
-                {
-                    // gol: comemoração + replay antes do reinício
-                    _show.Begin(sim, view, hud, _showTeam, _showScorer);
-                    _showTeam = -1;
-                    _phase = Phase.Goal;
-                    _acc = 0f;
-                    if (_touch) _touch.gameObject.SetActive(false);
-                    return;
-                }
-                if (sim.state == MatchState.Halftime && !attract && !_halfShown)
-                {
-                    BeginHalftime();
-                    return;
-                }
-                if (sim.state == MatchState.Fulltime)
-                {
-                    if (attract) { sim.half = 1; sim.clock = 0; sim.state = MatchState.Kickoff; sim.stateTimer = 1f; break; }
-                    ShowEnd();
-                    break;
-                }
+                if (AfterStep()) break;
             }
-            view.Alpha = _acc / MatchSim.DT;
+            if (_phase == Phase.Playing) view.Alpha = _acc / MatchSim.DT;
         }
+
+        /// <summary>Depois de cada passo: desenho, gravação, eventos, gol, intervalo e fim. true = parar o laço.</summary>
+        bool AfterStep()
+        {
+            view.OnTick();
+            if (!attract) { _show.Record(sim); _replay.Record(sim); }
+            HandleEvents();
+            if (_showTeam >= 0)
+            {
+                // gol: comemoração + replay antes do reinício
+                if (net != null) _goalSnap = InstantReplay.Snapshot(sim);
+                _show.Begin(sim, view, hud, _showTeam, _showScorer);
+                _showTeam = -1;
+                _phase = Phase.Goal;
+                _acc = 0f;
+                if (_touch) _touch.gameObject.SetActive(false);
+                return true;
+            }
+            if (sim.state == MatchState.Halftime && !attract && !_halfShown)
+            {
+                BeginHalftime();
+                return true;
+            }
+            if (sim.state == MatchState.Fulltime)
+            {
+                if (attract) { sim.half = 1; sim.clock = 0; sim.state = MatchState.Kickoff; sim.stateTimer = 1f; return true; }
+                ShowEnd();
+                return true;
+            }
+            return false;
+        }
+
+        /// <summary>
+        /// Partida on-line: o comando deste aparelho vai para a rede alguns passos à frente e a simulação só
+        /// anda quando os comandos dos dois lados daquele passo chegaram (se a rede atrasa, a partida espera).
+        /// </summary>
+        void UpdateNet(float dt)
+        {
+            int me = net.localTeam;
+            var f = InputRouter.Read(_dev[me]).Quantized();
+            f.buttons &= ~InputFrame.Pause;   // sem pausa on-line
+            _acc += dt;
+            bool stalled = false;
+            int guard = 0;
+            while (_acc >= MatchSim.DT && guard++ < 10)
+            {
+                if (net.Ahead <= net.delay) net.PushLocal(f);
+                if (!net.Step(sim)) { stalled = true; break; }
+                _acc -= MatchSim.DT;
+                if (AfterStep()) { _acc = 0f; break; }
+            }
+            if (stalled)
+            {
+                _acc = Mathf.Min(_acc, MatchSim.DT * 2f);
+                _netWait += dt;
+                if (_netWait > 1.5f) hud.Toast("Esperando o outro aparelho…", 0.6f);
+            }
+            else _netWait = 0f;
+            if (net.Desynced && !_netWarned)
+            {
+                _netWarned = true;
+                Debug.LogWarning("[on-line] partidas diferentes no passo " + net.DesyncTick);
+                hud.Toast("As partidas dos dois aparelhos ficaram diferentes (passo " + net.DesyncTick + ")", 5f);
+            }
+            if ((!net.Connected || _netWait > 20f) && _phase != Phase.Ended)
+            {
+                netProblem = !net.Connected ? "O outro jogador saiu da partida." : "A conexão com o outro jogador caiu.";
+                ShowEnd();
+                return;
+            }
+            if (_phase == Phase.Playing) view.Alpha = Mathf.Clamp01(_acc / MatchSim.DT);
+        }
+
+        /// <summary>Time controlado por quem está neste aparelho (vibração só para ele).</summary>
+        bool Local(int t) => _cpu[t] == null && (net == null || t == net.localTeam);
 
         static bool AnyPress()
         {
@@ -495,7 +567,7 @@ namespace Craquez
                         if (e.kind == "own") scorer += " (contra)";
                         hud.Goal(td.name, scorer, view.kits[e.team].c1);
                         if (!attract && !cfg.training) { _showTeam = e.team; _showScorer = e.id; }
-                        for (int t = 0; t < 2; t++) if (_cpu[t] == null) InputRouter.Rumble(_dev[t], 0.8f, 0.9f, 0.6f, this);
+                        for (int t = 0; t < 2; t++) if (Local(t)) InputRouter.Rumble(_dev[t], 0.8f, 0.9f, 0.6f, this);
                         break;
                     }
                     case "card":
@@ -513,10 +585,10 @@ namespace Craquez
                         break;
                     // (sem outros avisos de texto durante o jogo: apito, juiz, torcida e câmera contam o lance)
                     case "tackle":
-                        if (e.ok && _cpu[e.team] == null) InputRouter.Rumble(_dev[e.team], 0.4f, 0.2f, 0.15f, this);
+                        if (e.ok && Local(e.team)) InputRouter.Rumble(_dev[e.team], 0.4f, 0.2f, 0.15f, this);
                         break;
                     case "kick":
-                        if (e.kind == "shot" && _cpu[e.team] == null) InputRouter.Rumble(_dev[e.team], 0.2f, 0.6f, 0.12f, this);
+                        if (e.kind == "shot" && Local(e.team)) InputRouter.Rumble(_dev[e.team], 0.2f, 0.6f, 0.12f, this);
                         break;
                 }
             }
@@ -686,6 +758,7 @@ namespace Craquez
                 HalftimeMenu();
                 foreach (Transform c in hud.Overlay) if (c.name == "transição") c.SetAsLastSibling();   // a varredura termina por cima do menu
             }
+            else if (net != null && _htStage == 2 && _htT > 6f) StartSecondHalf();   // on-line: o 2º tempo começa sozinho
             else if (_htStage == 3 && _htT > 0.25f)
             {
                 // volta para o jogo: o apito do 2º tempo sai logo
@@ -695,7 +768,7 @@ namespace Craquez
                 _phase = Phase.Playing;
                 _acc = 0f;
                 if (_touch) _touch.gameObject.SetActive(true);
-                hud.ShowPauseButton(true);
+                hud.ShowPauseButton(net == null);
                 for (int t = 0; t < 2; t++) _prevPause[t] = InputFrame.Pause;
             }
         }
@@ -733,6 +806,12 @@ namespace Craquez
                 28, Theme.BodyBold, Theme.Text, TextAnchor.MiddleCenter);
             stats.rectTransform.Place(0, 0.6f, 1, 0.68f);
             UiKit.Shadow(stats, 2);
+            if (net != null)
+            {
+                // on-line: sem mexer no time (os dois aparelhos precisam continuar idênticos)
+                UiKit.Label(dim.transform, "O 2º tempo começa em instantes…", 30, Theme.BodyBold, Theme.Text, TextAnchor.MiddleCenter).rectTransform.Place(0, 0.3f, 1, 0.4f);
+                return;
+            }
             var panel = UiKit.Panel(dim.transform).rectTransform.At(0.5f, 0.04f, 760, 560);
             panel.pivot = new Vector2(0.5f, 0f);
             var list = UiKit.Rect(panel, "lista").Place(0, 0, 1, 1, 40, 30, 40, 30);
@@ -851,11 +930,16 @@ namespace Craquez
             UiKit.Label(panel, "FIM DE JOGO", 54, Theme.HeadItalic, Theme.Accent, TextAnchor.MiddleCenter).rectTransform.Place(0, 1, 1, 1, 0, -100, 0, 20);
             UiKit.Label(panel, ta.name + "   " + sim.score[0] + "  x  " + sim.score[1] + "   " + tb.name, 46, Theme.Head, Theme.Text, TextAnchor.MiddleCenter)
                 .rectTransform.Place(0, 1, 1, 1, 20, -200, 20, 110);
-            UiKit.Label(panel, "Finalizações: " + sim.statsShots[0] + "  x  " + sim.statsShots[1], 28, Theme.Body, Theme.TextDim, TextAnchor.MiddleCenter)
+            UiKit.Label(panel, netProblem ?? ("Finalizações: " + sim.statsShots[0] + "  x  " + sim.statsShots[1]), 28, Theme.Body, netProblem != null ? Theme.Hot : Theme.TextDim, TextAnchor.MiddleCenter)
                 .rectTransform.Place(0, 1, 1, 1, 20, -260, 20, 210);
             var row = UiKit.Rect(panel, "botoes").Place(0, 0, 1, 0, 80, 60, 80, -140);
             UiKit.HList(row, 30);
-            if (onResult != null)
+            if (net != null)
+            {
+                var menu = UiKit.Button(row, "Menu principal", () => onExit?.Invoke());
+                UiKit.Select(menu);
+            }
+            else if (onResult != null)
             {
                 int ga = sim.score[0], gb = sim.score[1];
                 var cont = UiKit.Button(row, "Continuar  ›", () => onResult?.Invoke(ga, gb));

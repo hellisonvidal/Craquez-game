@@ -25,9 +25,18 @@ namespace Craquez
         /// <summary>Clima efetivo da partida: sorteia o aleatório e tira chuva/neve dos locais cobertos.</summary>
         public string WeatherKind()
         {
-            string w = weather == "aleatorio" ? WeatherFx.Kinds[(int)(seed % (uint)WeatherFx.Kinds.Length)] : weather;
+            string w = weather == "aleatorio" ? WeatherFx.Kinds[(int)(Mix(seed ^ 0x9E3779B9u) % (uint)WeatherFx.Kinds.Length)] : weather;
             if (Indoor(mode, venue) && (w == "chuva" || w == "tempestade" || w == "neve" || w == "nevasca")) w = "nublado";
             return w;
+        }
+        /// <summary>Embaralha a semente (a semente da partida é sempre ímpar: o resto direto por 6 só dava
+        /// nublado, tempestade ou nevasca).</summary>
+        public static uint Mix(uint x)
+        {
+            x ^= x >> 16; x *= 0x7FEB352Du;
+            x ^= x >> 15; x *= 0x846CA68Bu;
+            x ^= x >> 16;
+            return x;
         }
         public string timeOfDay = "noite";  // dia, tarde, noite
         public bool dynamicWeather = true;

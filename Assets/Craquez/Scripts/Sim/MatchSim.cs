@@ -3038,9 +3038,13 @@ namespace Craquez.Sim
                                 // (bola no corpo: arma as mãos em cima da hora; salto só se passar da cabeça)
                                 if (tK < Mathf.Lerp(0.26f, 0.42f, Mathf.Clamp01(side / Mathf.Max(0.1f, armReach * 1.25f))))
                                 {
-                                    // rasteiro no canto curto, em cima da hora: bloqueio com o pé (a perna estica de lado)
-                                    bool foot = zK < 0.3f && side > armReach * 0.55f && tK < 0.3f && rng.Chance(0.6f);
-                                    StartSave(p, foot ? 7 : zK < 0.45f ? 2 : zK > 2.0f ? 6 : 1, Mathf.Sign(lat), zK, side, Mathf.Max(0.35f, tK + 0.25f), tK);
+                                    // chute de perto (pouco tempo desde o chute): reflexo — bloqueio com o pé (a perna estica de
+                                    // lado) ou com o corpo. Chute de longe dá tempo de se abaixar e encaixar com as mãos (antes
+                                    // ele defendia os chutes de longe com as pernas)
+                                    bool quick = (tick - lastShotTick) * DT < (mode.id == GameModes.Field ? 0.55f : 0.42f);
+                                    bool foot = quick && zK < 0.3f && side > armReach * 0.55f && tK < 0.3f && rng.Chance(0.6f);
+                                    int kind = foot ? 7 : zK < 0.45f ? (quick ? 2 : 1) : zK > 2.0f ? 6 : 1;
+                                    StartSave(p, kind, Mathf.Sign(lat), zK, side, Mathf.Max(0.35f, tK + 0.25f), tK);
                                 }
                             }
                             else if (tK < Mathf.Lerp(0.4f, 0.5f, p.defense) * Mathf.Clamp(0.55f + side * 0.2f, 0.7f, 1f))   // mergulho na hora: mais perto do corpo, mais em cima da hora
