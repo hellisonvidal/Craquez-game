@@ -351,20 +351,20 @@ namespace Craquez
             var rt = (RectTransform)go.transform;
             rt.Place(0, 0, 1, 1);
             // selo "REPLAY" no alto
-            var tag = UiKit.Image(rt, new Color(0.85f, 0.1f, 0.12f, 0.92f), Theme.RoundSmall, "selo").rectTransform.At(0.5f, 1f, 220, 54, 0, -40);
+            var tag = UiKit.Image(rt, new Color(0.85f, 0.1f, 0.12f, 0.92f), Theme.RoundSmall, "selo").rectTransform.At(0.5f, 1f, 220, 54, 0, -128);   // (abaixo do placar)
             UiKit.Label(tag, "REPLAY", 30, Theme.HeadItalic, Color.white, TextAnchor.MiddleCenter).rectTransform.Place(0, 0, 1, 1);
             // sair também no alto (fácil de achar no celular)
             var x = UiKit.Button(rt, "✕  Sair do replay", Close, 26, new Color(0.7f, 0.1f, 0.14f, 0.95f));
             ((RectTransform)x.transform).At(1f, 1f, 260, 64, -150, -40);
             // barra inferior: linha do tempo + duas fileiras de botões (reprodução / câmera)
-            var dock = UiKit.Image(rt, new Color(0.02f, 0.04f, 0.1f, 0.82f), null, "controles").rectTransform.Place(0, 0, 1, 0, 0, 0, 0, 236);
-            _bar = UiKit.Image(dock, new Color(1f, 1f, 1f, 0.2f), Theme.RoundSmall, "linha do tempo").rectTransform.Place(0, 1, 1, 1, 150, -40, 150, -18);
+            var dock = UiKit.Image(rt, new Color(0.02f, 0.04f, 0.1f, 0.82f), null, "controles").rectTransform.Place(0, 0, 1, 0, 0, 0, 0, -236);   // (t negativo = altura acima da borda de baixo)
+            _bar = UiKit.Image(dock, new Color(1f, 1f, 1f, 0.2f), Theme.RoundSmall, "linha do tempo").rectTransform.Place(0, 1, 1, 1, 150, -40, 150, 18);
             _fill = UiKit.Image(_bar, new Color(0.95f, 0.2f, 0.25f, 0.95f), Theme.RoundSmall, "andamento").rectTransform.Place(0, 0, 0, 1);
             _knob = UiKit.Image(_bar, Color.white, Theme.Circle, "cursor").rectTransform.At(0, 0.5f, 34, 34);
             _timeLabel = UiKit.Label(dock, "", 22, Theme.Body, Theme.TextDim, TextAnchor.MiddleLeft);
-            _timeLabel.rectTransform.Place(0, 1, 0, 1, 20, -48, -140, -10);
-            var row1 = UiKit.Rect(dock, "reprodução").Place(0, 0, 1, 0, 20, 92, 20, 162);
-            var row2 = UiKit.Rect(dock, "câmera").Place(0, 0, 1, 0, 20, 12, 20, 82);
+            _timeLabel.rectTransform.Place(0, 1, 0, 1, 20, -48, -140, 10);
+            var row1 = UiKit.Rect(dock, "reprodução").Place(0, 0, 1, 0, 20, 92, 20, -162);
+            var row2 = UiKit.Rect(dock, "câmera").Place(0, 0, 1, 0, 20, 12, 20, -82);
             UiKit.HList(row1, 12);
             UiKit.HList(row2, 12);
             Button B(RectTransform row, string t, System.Action a, out Text label, Color? c = null)
@@ -385,7 +385,7 @@ namespace Craquez
             B(row2, "Zoom  +", () => { if (_camMode == 0) { _camMode = 1; _pivot = Vector3.zero; } Zoom(-4f); RefreshLabels(); }, out _);
             B(row2, "Sair", Close, out _, new Color(0.7f, 0.1f, 0.14f, 0.95f));
             var hint = UiKit.Label(rt, "arraste para girar a câmera  •  pinça / roda do mouse: zoom  •  espaço: pausar  •  ← →: avançar/voltar", 22, Theme.Body, new Color(1, 1, 1, 0.7f), TextAnchor.MiddleCenter);
-            hint.rectTransform.Place(0, 0, 1, 0, 0, 242, 0, 276);
+            hint.rectTransform.Place(0, 0, 1, 0, 0, 242, 0, -276);
             hint.raycastTarget = false;
             _hud.ShowPauseButton(false);
             RefreshLabels();

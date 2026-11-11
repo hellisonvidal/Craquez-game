@@ -1,3 +1,24 @@
+## Craquez 2.11.0
+
+Jogo de futebol feito 100% com inteligência artificial, **gratuito**.
+
+### Download
+- **Celular Android**: `Craquez-v2.11.0.apk`
+- **TV (Google TV / Android TV, ex.: TCL C6K)**: `Craquez-TV-v2.11.0.apk` — use este na TV (32 e 64 bits).
+
+### Novidades
+- **Nova abertura em vídeo**: o cinematográfico do Craquez abre o jogo e termina na logo, que vira a
+  tela de "toque para iniciar" (preenche telas largas sem faixas pretas).
+- **Replay com controles de verdade**: a barra de controles (linha do tempo, voltar/avançar 5 s,
+  pausar, velocidade, câmeras, foco e zoom) aparecia fora da tela; agora aparece embaixo. O menu
+  passou a se chamar só "Replay" e o selo REPLAY não cobre mais o placar.
+- **Escolha de times unificada**: depois da modalidade, uma tela só para clubes e seleções; na lista
+  de ligas há a aba das seleções (todas pelo ranking e por continente).
+- **211 seleções**: o quadro completo da FIFA, com bandeiras, cores, uniformes e elencos.
+- **Quedas e levantar com captura de movimento**: tropeço e queda, caído segurando a perna e levantar
+  do chão; quem faz a falta estica a perna no adversário (a pancada aparece) e o contato precisa ser
+  de verdade. Quase sempre um companheiro (ou o próprio adversário) vem dar a mão.
+
 ## Craquez 2.10.1
 
 Jogo de futebol feito 100% com inteligência artificial, **gratuito**.

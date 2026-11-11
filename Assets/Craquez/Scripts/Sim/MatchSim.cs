@@ -2029,7 +2029,7 @@ namespace Craquez.Sim
             // caía "sozinha", fora do lance
             // (corpo ~0,3 m de raio: só há encontro de verdade abaixo de ~0,8 m; no carrinho a perna alcança ~1,2 m)
             float contact = offender.position.Dist(victim.position);
-            if (contact > (holding ? 1.0f : 0.9f) + (offender.slide > 0f ? 0.5f : 0f)) return;
+            if (contact > (holding ? 1.0f : 0.8f) + (offender.slide > 0f ? 0.6f : 0f)) return;
             offender.stun = Mathf.Max(offender.stun, 0.8f);
             offender.slide = Mathf.Min(offender.slide, 0.15f);
             // a vítima vai ao chão: tropeça, cai, rola e levanta (o tempo no chão varia com a pancada)
@@ -2104,10 +2104,11 @@ namespace Craquez.Sim
                 victim.downTotal = victim.down;
                 victim.stun = victim.down + 0.15f;
             }
-            else if (!quickRestarts && mode.id != GameModes.Street && rng.Chance(0.55f))
+            else if (!quickRestarts && mode.id != GameModes.Street && rng.Chance(0.85f))
             {
+                // (quase sempre alguém vem dar a mão: um companheiro ou, às vezes, quem fez a falta)
                 bool rival = rng.Chance(0.3f) && !offender.sentOff;
-                SimPlayer h = null; float hd = 8f;
+                SimPlayer h = null; float hd = 13f;
                 foreach (var q in players)
                 {
                     if (q == victim || q.isKeeper || q.sentOff || q.down > 0f) continue;

@@ -632,9 +632,9 @@ namespace Craquez
             var grid = UiKit.Rect(root, "modalidades").Place(0, 0, 1, 1, 90, 186, 90, 272);
             UiKit.HList(grid, 30).childForceExpandHeight = true;
             _modeButtons.Clear();
-            var first = _modeButtons[GameModes.Field] = BigCard(grid, "FUTEBOL", "11 x 11", "Campo  •  22 ligas e 40 seleções", ModeArt(MenuArt.Kind.Field), 512f / 560f, new Color(0.13f, 0.77f, 0.37f), () => ShowKind(GameModes.Field));
-            _modeButtons[GameModes.Futsal] = BigCard(grid, "FUTSAL", "5 x 5", "Quadra  •  " + VenueBuilder.FutsalNames.Length + " ginásios", ModeArt(MenuArt.Kind.Futsal), 512f / 560f, new Color(0.96f, 0.62f, 0.04f), () => ShowKind(GameModes.Futsal));
-            _modeButtons[GameModes.Society] = BigCard(grid, "SOCIETY", "7 x 7", "Grama sintética  •  " + VenueBuilder.SocietyNames.Length + " campos", ModeArt(MenuArt.Kind.Society), 512f / 560f, new Color(0.02f, 0.71f, 0.83f), () => ShowKind(GameModes.Society));
+            var first = _modeButtons[GameModes.Field] = BigCard(grid, "FUTEBOL", "11 x 11", "Campo  •  clubes de " + LeaguesFor(GameModes.Field, false).Count + " ligas e " + CountTeams(LeaguesFor(GameModes.Field, true)) + " seleções", ModeArt(MenuArt.Kind.Field), 512f / 560f, new Color(0.13f, 0.77f, 0.37f), () => { _lastMode = GameModes.Field; Choose(GameModes.Field, false); });
+            _modeButtons[GameModes.Futsal] = BigCard(grid, "FUTSAL", "5 x 5", "Quadra  •  " + VenueBuilder.FutsalNames.Length + " ginásios", ModeArt(MenuArt.Kind.Futsal), 512f / 560f, new Color(0.96f, 0.62f, 0.04f), () => { _lastMode = GameModes.Futsal; Choose(GameModes.Futsal, false); });
+            _modeButtons[GameModes.Society] = BigCard(grid, "SOCIETY", "7 x 7", "Grama sintética  •  " + VenueBuilder.SocietyNames.Length + " campos", ModeArt(MenuArt.Kind.Society), 512f / 560f, new Color(0.02f, 0.71f, 0.83f), () => { _lastMode = GameModes.Society; Choose(GameModes.Society, false); });
             _modeButtons[GameModes.Street] = BigCard(grid, "RUA", "3 A 5 POR LADO", "Times de rua  •  " + VenueBuilder.StreetNames.Length + " ruas", ModeArt(MenuArt.Kind.Street), 512f / 560f, new Color(0.93f, 0.28f, 0.6f), () => { _lastMode = GameModes.Street; Choose(GameModes.Street, false); });
             _modeButtons["treino"] = BigCard(grid, "TREINO", "ARENA", "Você contra o goleiro  •  chute à vontade", ModeArt(MenuArt.Kind.Field), 512f / 560f, new Color(0.55f, 0.42f, 0.95f), () => { _lastMode = "treino"; ShowTrainingPicker(); });
             UiKit.Select(_lastMode != null && _modeButtons.TryGetValue(_lastMode, out var lb) && lb != null ? lb : first);
@@ -724,20 +724,30 @@ namespace Craquez
             ShowSetup();
         }
 
+        static int CountTeams(List<League> ls) { int n = 0; foreach (var l in ls) n += l.count; return n; }
+
         string Crumb(string tail = null)
         {
             string m = GameModes.DisplayName(_cfg.mode).ToUpperInvariant();
-            string k = _cfg.mode == GameModes.Street ? "" : "  ›  " + (_cfg.national ? "SELEÇÕES" : "CLUBES");
-            return "JOGAR  ›  " + m + k + (tail != null ? "  ›  " + tail : "");
+            return "JOGAR  ›  " + m + (tail != null ? "  ›  " + tail : "");
+        }
+
+        /// <summary>Clubes e seleções da modalidade juntos (escolha unificada, com a aba das seleções).</summary>
+        static List<League> AllFor(string mode)
+        {
+            var l = LeaguesFor(mode, false);
+            if (mode != GameModes.Street) foreach (var n in LeaguesFor(mode, true)) if (!l.Contains(n)) l.Add(n);
+            return l;
         }
 
         void FixTeamsForMode()
         {
-            var lgs = LeaguesFor(_cfg.mode, _cfg.national);
+            var lgs = AllFor(_cfg.mode);
             if (lgs.Count == 0) return;
             bool ok(int t) => lgs.Contains(Teams.Leagues[Teams.LeagueOf(t)]);
             if (!ok(_cfg.teamA)) _cfg.teamA = lgs[0].first;
             if (!ok(_cfg.teamB)) _cfg.teamB = lgs[0].first + 1;
+            _cfg.national = Teams.Get(_cfg.teamA).IsNational && Teams.Get(_cfg.teamB).IsNational;
             _cfg.tacticsA = new Tactics();
             _cfg.tacticsB = new Tactics();
             _cfg.kitA = 0;
@@ -773,8 +783,8 @@ namespace Craquez
         void ShowSetup()
         {
             var root = Page(Crumb());
-            _back = () => { if (_cfg.mode == GameModes.Street) ShowPlay(); else ShowKind(_cfg.mode); };
-            Title(root, (_cfg.mode == GameModes.Street ? "RUA" : (_cfg.national ? "SELEÇÕES" : "CLUBES")) + "  •  " + GameModes.DisplayName(_cfg.mode).ToUpperInvariant(), "Ajuste a partida e escolha os times");
+            _back = ShowPlay;
+            Title(root, GameModes.DisplayName(_cfg.mode).ToUpperInvariant(), "Ajuste a partida e escolha os times");
             var listBg = UiKit.Panel(root).rectTransform.Place(0, 0, 0.55f, 1, 74, 140, 0, 262);
             UiKit.Label(listBg, "PARTIDA", 24, Theme.Head, Theme.Accent).rectTransform.Place(0, 1, 1, 1, 24, -40, 24, 8);
             var list = UiKit.Rect(listBg, "lista").Place(0, 0, 1, 1, 14, 12, 14, 44);
@@ -905,31 +915,35 @@ namespace Craquez
         {
             var root = Page(Crumb("TIMES"));
             _back = ShowSetup;
-            Title(root, _cfg.national ? "ESCOLHA DAS SELEÇÕES" : "ESCOLHA DOS TIMES", null);
+            Title(root, "ESCOLHA DOS TIMES", null);
             bool futsal = _cfg.mode == GameModes.Futsal;
-            var lgs = LeaguesFor(_cfg.mode, _cfg.national);
-            // grupos para escolher: as ligas (clubes) ou os continentes (seleções, com "Todas" pelo ranking)
+            var lgs = AllFor(_cfg.mode);
+            // grupos para escolher: as ligas dos clubes e, na mesma lista, a aba das seleções (todas pelo
+            // ranking e por continente)
             var groups = new List<(string name, List<int> ids)>();
-            if (_cfg.national)
+            foreach (var l in LeaguesFor(_cfg.mode, false))
+            {
+                if (l.IsNational && _cfg.mode != GameModes.Street) continue;
+                var ids = new List<int>();
+                for (int i = 0; i < l.count; i++) ids.Add(l.first + i);
+                Teams.SortByName(ids);   // ordem alfabética dentro da liga
+                groups.Add((l.name, ids));
+            }
+            if (_cfg.mode != GameModes.Street)
             {
                 var all = new List<int>();
-                foreach (var l in lgs) for (int i = 0; i < l.count; i++) all.Add(l.first + i);
+                foreach (var l in LeaguesFor(_cfg.mode, true)) if (l.IsNational) for (int i = 0; i < l.count; i++) all.Add(l.first + i);
                 all.Sort((x, y) => Teams.Get(x).rank.CompareTo(Teams.Get(y).rank));
-                groups.Add(("Todas (ranking)", all));
-                foreach (var c in Teams.Continents)
+                if (all.Count > 0)
                 {
-                    var ids = all.FindAll(i => Teams.Continent(Teams.Get(i).iso) == c);
-                    if (ids.Count > 0) groups.Add((c, ids));
+                    groups.Add(("Seleções  •  Todas (ranking)", all));
+                    foreach (var c in Teams.Continents)
+                    {
+                        var ids = all.FindAll(i => Teams.Continent(Teams.Get(i).iso) == c);
+                        if (ids.Count > 0) groups.Add(("Seleções  •  " + c, ids));
+                    }
                 }
             }
-            else
-                foreach (var l in lgs)
-                {
-                    var ids = new List<int>();
-                    for (int i = 0; i < l.count; i++) ids.Add(l.first + i);
-                    Teams.SortByName(ids);   // ordem alfabética dentro da liga
-                    groups.Add((l.name, ids));
-                }
             Selectable first = null;
             for (int side = 0; side < 2; side++)
             {
@@ -958,7 +972,11 @@ namespace Craquez
                 var list = UiKit.Rect(col, "lista").Place(0, 0, 1, 1, 24, 130, 24, 320);
                 UiKit.VList(list, 10, 0, false);
                 int Team() => s == 0 ? _cfg.teamA : _cfg.teamB;
-                void SetTeam(int t) { if (s == 0) { _cfg.teamA = t; _cfg.tacticsA = new Tactics(); } else { _cfg.teamB = t; _cfg.tacticsB = new Tactics(); } }
+                void SetTeam(int t)
+                {
+                    if (s == 0) { _cfg.teamA = t; _cfg.tacticsA = new Tactics(); } else { _cfg.teamB = t; _cfg.tacticsB = new Tactics(); }
+                    _cfg.national = Teams.Get(_cfg.teamA).IsNational && Teams.Get(_cfg.teamB).IsNational;
+                }
                 Cycler teamC = null, kitC = null;
                 void Refresh()
                 {
@@ -989,14 +1007,13 @@ namespace Craquez
                 var gNames = new List<string>();
                 foreach (var g in groups) gNames.Add(g.name);
                 int gIdx = Mathf.Max(0, groups.FindIndex(g => g.ids.Contains(Team())));
-                if (_cfg.national) gIdx = 0;
                 List<string> TeamNames(List<int> ids)
                 {
                     var n = new List<string>();
                     foreach (var id in ids) n.Add(Teams.Get(id).name);
                     return n;
                 }
-                var lgC = UiKit.Cycler(list, _cfg.national ? "Continente" : "Liga", gNames, gIdx, i =>
+                var lgC = UiKit.Cycler(list, "Liga / Seleções", gNames, gIdx, i =>
                 {
                     var ids = groups[i].ids;
                     if (!ids.Contains(Team())) SetTeam(ids[s == 1 && ids.Count > 1 ? 1 : 0]);
@@ -1005,7 +1022,7 @@ namespace Craquez
                 });
                 UiKit.Size(lgC, 70, 70);
                 if (groups.Count == 1) lgC.gameObject.SetActive(false);
-                teamC = UiKit.Cycler(list, _cfg.national ? "Seleção" : "Time", TeamNames(groups[gIdx].ids), Mathf.Max(0, groups[gIdx].ids.IndexOf(Team())), i =>
+                teamC = UiKit.Cycler(list, "Time", TeamNames(groups[gIdx].ids), Mathf.Max(0, groups[gIdx].ids.IndexOf(Team())), i =>
                 {
                     SetTeam(groups[lgC.Index].ids[i]);
                     Refresh();
@@ -1685,10 +1702,17 @@ namespace Craquez
         // ------------------------------------------------------------ roteiro de screenshots (CI)
         public void Tour_Modes() => ShowPlay();
         public void Tour_Options() => ShowOptions();
+        /// <summary>(fotos do CI) times de clubes ou duas seleções da modalidade.</summary>
+        void TourTeams(string mode, bool national)
+        {
+            var lgs = LeaguesFor(mode, national);
+            if (lgs.Count > 0 && Teams.Get(_cfg.teamA).IsNational != national) { _cfg.teamA = lgs[0].first; _cfg.teamB = lgs[0].first + 1; }
+        }
+
         public void Tour_Setup(string mode, bool national)
         {
             _cfg.mode = mode;
-            _cfg.national = national;
+            TourTeams(mode, national);
             FixTeamsForMode();
             ShowSetup();
         }
@@ -1698,7 +1722,7 @@ namespace Craquez
         {
             _cfg.stadium = stadium;
             _cfg.mode = mode;
-            _cfg.national = national;
+            TourTeams(mode, national);
             FixTeamsForMode();
             _cfg.timeOfDay = tod;
             _cfg.weather = weather;

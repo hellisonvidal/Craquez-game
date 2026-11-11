@@ -317,6 +317,9 @@ namespace Craquez.Sim
             };
             foreach (var fo in MiniJson.L(to, "flag") ?? new List<object>()) t.flag.Add(fo as string);
             t.iso = MiniJson.S(to, "iso");
+            // confederação vinda dos dados (seleções novas do quadro da FIFA)
+            var conf = MiniJson.S(to, "conf");
+            if (!string.IsNullOrEmpty(conf) && !string.IsNullOrEmpty(t.iso)) _continent[t.iso.ToUpperInvariant()] = conf;
             t.kits = ParseKits(MiniJson.L(to, "kits"), t.c1, t.c2);
             var st = MiniJson.D(to, "stadium");
             if (st != null) t.stadium = new Stadium { name = MiniJson.S(st, "name"), tier = MiniJson.I(st, "tier", 1), cap = MiniJson.I(st, "cap") };

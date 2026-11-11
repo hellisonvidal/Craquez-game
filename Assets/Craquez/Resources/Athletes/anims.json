@@ -344,5 +344,50 @@
   "loop": true,
   "speed": 0.008,
   "source": "mixamo:ual/Idle_FoldArms_Loop"
+ },
+ "Trip": {
+  "frames": 47,
+  "fps": 30,
+  "loop": false,
+  "speed": 2.77,
+  "source": "mixamo:soccer/soccer trip"
+ },
+ "FallenIdle": {
+  "frames": 40,
+  "fps": 30,
+  "loop": true,
+  "speed": 0.016,
+  "source": "mixamo:soccer/fallen idle"
+ },
+ "StandUp": {
+  "frames": 51,
+  "fps": 30,
+  "loop": false,
+  "speed": 0.716,
+  "source": "mixamo:soccer/standing up"
+ },
+ "Tackle1": {
+  "frames": 83,
+  "fps": 30,
+  "loop": false,
+  "speed": 1.755,
+  "source": "mixamo:soccer/soccer tackle",
+  "contact": 0.633
+ },
+ "Tackle2": {
+  "frames": 54,
+  "fps": 30,
+  "loop": false,
+  "speed": 2.674,
+  "source": "mixamo:soccer/soccer tackle (2)",
+  "contact": 0.167
+ },
+ "Tackle3": {
+  "frames": 70,
+  "fps": 30,
+  "loop": false,
+  "speed": 0.69,
+  "source": "mixamo:soccer/soccer tackle (3)",
+  "contact": 0.333
  }
 }

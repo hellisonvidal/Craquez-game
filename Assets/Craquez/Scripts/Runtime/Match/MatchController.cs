@@ -568,7 +568,7 @@ namespace Craquez
                 first = UiKit.Button(list, "Continuar", Resume);
                 UiKit.Size(first, 76, 76);
                 if (_replay != null && _replay.HasFootage && _beforePause == Phase.Playing)
-                    UiKit.Size(UiKit.Button(list, "Replay  (últimos 30 s)", OpenReplay), 76, 76);
+                    UiKit.Size(UiKit.Button(list, "Replay", OpenReplay), 76, 76);
                 UiKit.Size(UiKit.Button(list, "Configurações", () => PausePage(1)), 76, 76);
                 UiKit.Size(UiKit.Button(list, "Equipes e táticas", () => PausePage(2)), 76, 76);
                 UiKit.Size(UiKit.Button(list, "Substituições", () => SubsPage(-1)), 76, 76);

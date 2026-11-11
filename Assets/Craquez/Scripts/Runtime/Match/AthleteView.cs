@@ -320,6 +320,14 @@ namespace Craquez
                     _recvTotal = _recvT;
                     break;
                 }
+                case "foul":
+                    // quem fez a falta: a perna vai no adversário (a pancada aparece; não parece queda sozinha)
+                    if (p.slide <= 0f && AthleteAnimator.Mocap && anim != null && anim.CurrentAction == null)
+                    {
+                        float fc = AthleteAnimator.KickContact("Pass");
+                        anim.Play("Pass", Mathf.Max(0f, fc - 0.12f), 0.45f, 1.3f, 0.04f);
+                    }
+                    break;
                 case "tackle_try":
                     _pitch = 18f;
                     break;
@@ -420,11 +428,53 @@ namespace Craquez
             return new Vector3(pitch, roll, lift);
         }
 
+        int _fallStage;   // 0 em pé, 1 caindo (captura), 2 no chão, 3 levantando
+
+        /// <summary>
+        /// Queda com as capturas do Mixamo: tropeça e cai (de lado/por trás; a pancada de frente cai de
+        /// costas pelo corpo), fica no chão segurando a perna e levanta no tempo que a simulação dá.
+        /// Enquanto a captura manda, o giro procedural do corpo inteiro sai na mesma medida.
+        /// </summary>
+        void FallClips(ref float pitch, ref float roll, ref float lift)
+        {
+            if (anim == null || !AthleteAnimator.Mocap || p.isKeeper || _bikeT > 0f || !AthleteAnimator.Has("FallenIdle") || !AthleteAnimator.Has("StandUp")) return;
+            _getUp = true;   // (pernas procedurais da queda desligadas)
+            float rise = Mathf.Min(FallRise, p.downTotal * 0.35f);
+            switch (_fallPhase)
+            {
+                case 1:
+                case 2:
+                    if (_fallStage == 0)
+                    {
+                        _fallStage = 1;
+                        if (p.fallKind != 0 && AthleteAnimator.Has("Trip")) anim.Play("Trip", 0.2f, 1.05f, 1.6f, 0.06f);
+                    }
+                    break;
+                case 3:
+                    if (_fallStage < 2 && (anim.CurrentAction != "Trip" || anim.ActionWeight < 0.6f || p.downTotal - p.down > 0.9f)) _fallStage = 2;
+                    if (_fallStage == 2 && anim.CurrentAction != "FallenIdle") anim.Play("FallenIdle", (p.id * 0.31f) % 1f, -1f, 1f, 0.3f);
+                    break;
+                case 4:
+                    if (_fallStage < 3)
+                    {
+                        _fallStage = 3;
+                        float len = AthleteAnimator.ClipLength("StandUp");
+                        anim.Play("StandUp", 0.05f, -1f, Mathf.Clamp((len - 0.05f) / Mathf.Max(0.35f, p.down), 0.9f, 2.4f), 0.15f);
+                    }
+                    break;
+            }
+            string ca = anim.CurrentAction;
+            bool clip = ca == "FallenIdle" || ca == "StandUp" || ca == "Trip";
+            float w = clip ? anim.ActionWeight : 0f;
+            // (de costas no tropeço procedural: a captura do chão entra suave por cima)
+            pitch = Mathf.Lerp(pitch, 0f, w); roll = Mathf.Lerp(roll, _lean, w); lift = Mathf.Lerp(lift, 0f, w);
+        }
+
         /// <summary>Pernas e braços na queda (por cima da animação).</summary>
         void FallLimbs()
         {
             if (_bikeT > 0f) return;   // (na bicicleta as pernas são dela)
-            if (_getUp) { _fallW = 0f; return; }   // (levantando com a captura)
+            if (_getUp && anim != null && (anim.CurrentAction == "FallenIdle" || anim.CurrentAction == "StandUp" || anim.CurrentAction == "Trip")) { _fallW = 0f; return; }   // (a captura manda)
             if (_fallPhase == 0) { _fallW = Mathf.MoveTowards(_fallW, 0f, Time.deltaTime * 4f); if (_fallW <= 0f) return; }
             else _fallW = Mathf.MoveTowards(_fallW, 1f, Time.deltaTime * 8f);
             float u = FallState(out int ph);
@@ -764,21 +814,9 @@ namespace Craquez
             {
                 var fb = FallBody(pitch, roll, lift);
                 pitch = fb.x; roll = fb.y; lift = fb.z;
-                if (_fallPhase == 4 && p.fallKind == 0 && !p.fallRoll && AthleteAnimator.Mocap && AthleteAnimator.Has("GetUp") && anim != null)
-                {
-                    // de costas no chão: senta, apoia a mão e levanta (captura); o corpo deixa de girar
-                    if (!_getUp)
-                    {
-                        _getUp = true;
-                        float rise = Mathf.Min(FallRise, p.downTotal * 0.35f);
-                        float len = AthleteAnimator.ClipLength("GetUp");
-                        anim.Play("GetUp", 0.15f, -1f, Mathf.Clamp((len - 0.15f) / Mathf.Max(0.3f, p.down), 0.8f, 2.2f), 0.12f);
-                    }
-                    float w = anim.CurrentAction == "GetUp" ? anim.ActionWeight : 0f;
-                    pitch = Mathf.Lerp(pitch, 0f, w); roll = Mathf.Lerp(roll, _lean, w); lift = Mathf.Lerp(lift, 0f, w);
-                }
+                FallClips(ref pitch, ref roll, ref lift);
             }
-            if (p.down <= 0f) _getUp = false;
+            if (p.down <= 0f) { _getUp = false; _fallStage = 0; }
             if (_bikeT > 0f)
             {
                 _bikeT -= Time.deltaTime;

@@ -114,6 +114,13 @@ MIXAMO_CLIPS = [
     ("Knockback", "ual/Hit_Knockback", False, False, 0.0, 99.0, None, True),
     ("Protest", "ual/Idle_No_Loop", True, False, 0.0, 99.0, None, True),
     ("ArmsFolded", "ual/Idle_FoldArms_Loop", True, False, 0.0, 99.0, None, True),
+    # quedas, levantar e desarmes (Soccer Game Pack)
+    ("Trip", "soccer/soccer trip", False, False, 0.0, 99.0, None, True),
+    ("FallenIdle", "soccer/fallen idle", True, False, 0.0, 99.0, None, True),
+    ("StandUp", "soccer/standing up", False, False, 0.0, 99.0, None, True),
+    ("Tackle1", "soccer/soccer tackle", False, False, 0.0, 99.0, "foot", True),
+    ("Tackle2", "soccer/soccer tackle (2)", False, False, 0.0, 99.0, "foot", True),
+    ("Tackle3", "soccer/soccer tackle (3)", False, False, 0.0, 99.0, "foot", True),
 ]
 
 
