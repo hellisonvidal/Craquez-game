@@ -13,6 +13,7 @@ namespace Craquez
     /// ação à direita no layout dos jogos de futebol mobile, e "deslizar" numa
     /// área livre para os dribles.
     /// </summary>
+    [DefaultExecutionOrder(-200)]   // (lê os dedos antes da partida avançar: um quadro a menos de atraso)
     public class TouchControls : MonoBehaviour
     {
         public static TouchControls Create(Transform parent)
@@ -25,32 +26,101 @@ namespace Craquez
         }
 
         readonly List<TouchButton> _btns = new List<TouchButton>();
-        RectTransform _stickArea;
+        RectTransform _stickArea, _swipeArea;
+        TouchStick _stick;
+
+        // dedo do analógico: id, origem (pixels) e se é o mouse (editor)
+        int _stickId = int.MinValue;
+        Vector2 _origin;
+        // botões "segurados" um pouco além do toque: um toque curto (que começa e termina entre dois quadros
+        // na tela de 120/240 Hz do celular) sempre chega à simulação
+        readonly float[] _hold = new float[32];
+        const float MinPress = 0.075f;
+        // deslizes (dribles) por dedo
+        readonly Dictionary<int, (Vector2 p, float t, bool done)> _swipes = new Dictionary<int, (Vector2, float, bool)>();
+
+        void OnEnable() { UnityEngine.InputSystem.EnhancedTouch.EnhancedTouchSupport.Enable(); }
+
+        /// <summary>Pixels por centímetro (o dpi do Android às vezes vem 0 ou errado).</summary>
+        static float PxPerCm => Screen.dpi > 80f && Screen.dpi < 1000f ? Screen.dpi / 2.54f : Mathf.Max(Screen.width, Screen.height) / 14f;
 
         /// <summary>
-        /// Botões lidos direto dos toques a cada quadro (multitoque de verdade): o dedo pode escorregar
-        /// um pouco para fora do botão sem soltar (antes o CORRER "caía" assim que o polegar rolava), e
-        /// um dedo que começou no analógico nunca aciona botão.
+        /// Lê cada dedo direto da tela a cada quadro (multitoque de verdade), inclusive os que começaram e
+        /// terminaram no mesmo quadro. Analógico flutuante: nasce onde o polegar encosta e acompanha o dedo
+        /// quando ele passa do raio (sem "travar" na borda); a direção é a exata do dedo.
         /// </summary>
         void Update()
         {
             int mask = 0;
-            var ts = Touchscreen.current;
-            if (ts != null)
+            float now = Time.unscaledTime;
+            bool stickSeen = false;
+            Vector2 move = Vector2.zero;
+            float R = PxPerCm * 1.15f;   // raio do analógico: ~1,2 cm, igual em qualquer tela
+            void Pointer(int id, Vector2 pos, Vector2 start, bool began, bool ended)
             {
-                foreach (var t in ts.touches)
+                bool inStick = _stickArea != null && RectTransformUtility.RectangleContainsScreenPoint(_stickArea, start, null);
+                if (inStick && (began || _stickId == int.MinValue) && !ended && _stickId == int.MinValue) { _stickId = id; _origin = start; }
+                if (id == _stickId)
                 {
-                    if (!t.press.isPressed) continue;
-                    if (_stickArea != null && RectTransformUtility.RectangleContainsScreenPoint(_stickArea, t.startPosition.ReadValue(), null)) continue;
-                    mask |= Hit(t.position.ReadValue(), t.startPosition.ReadValue());
+                    stickSeen = !ended;
+                    if (ended) { _stickId = int.MinValue; return; }
+                    var d = pos - _origin;
+                    if (d.magnitude > R) { _origin = pos - d.normalized * R; d = pos - _origin; }   // a base segue o dedo
+                    float m = d.magnitude / R;
+                    // zona morta pequena e reescalada (sem pulo no começo), resposta um pouco mais firme no meio
+                    const float dead = 0.08f;
+                    float k = m < dead ? 0f : Mathf.Pow((m - dead) / (1f - dead), 0.85f);
+                    move = m > 1e-4f ? d / d.magnitude * Mathf.Min(1f, k) : Vector2.zero;
+                    _stick?.Show(_origin, d, R);
+                    return;
+                }
+                if (inStick) return;   // (dedo que começou no analógico nunca aciona botão)
+                int hit = Hit(pos, start);
+                if (hit != 0)
+                {
+                    mask |= hit;
+                    for (int b = 0; b < 32; b++) if ((hit & (1 << b)) != 0) _hold[b] = now + MinPress;
+                    return;
+                }
+                // deslize rápido na área livre = drible (direção do deslize)
+                if (_swipeArea != null && RectTransformUtility.RectangleContainsScreenPoint(_swipeArea, start, null))
+                {
+                    if (began || !_swipes.TryGetValue(id, out var sw)) sw = (start, now, false);
+                    var dd = pos - sw.p;
+                    if (!sw.done && dd.magnitude > PxPerCm * 0.55f && now - sw.t < 0.4f)
+                    {
+                        TouchState.rstick = dd.normalized;
+                        _rstickUntil = now + 0.12f;
+                        sw.done = true;
+                    }
+                    if (ended) _swipes.Remove(id); else _swipes[id] = sw;
                 }
             }
+            foreach (var t in UnityEngine.InputSystem.EnhancedTouch.Touch.activeTouches)
+            {
+                var ph = t.phase;
+                bool ended = ph == UnityEngine.InputSystem.TouchPhase.Ended || ph == UnityEngine.InputSystem.TouchPhase.Canceled;
+                Pointer(t.touchId, t.screenPosition, t.startScreenPosition, ph == UnityEngine.InputSystem.TouchPhase.Began, ended);
+            }
             var mouse = Mouse.current;
-            if (mouse != null && mouse.leftButton.isPressed && (ts == null || !ts.press.isPressed))
-                mask |= Hit(mouse.position.ReadValue(), mouse.position.ReadValue());
+            if (mouse != null && (mouse.leftButton.isPressed || mouse.leftButton.wasReleasedThisFrame) && UnityEngine.InputSystem.EnhancedTouch.Touch.activeTouches.Count == 0)
+            {
+                var mp = mouse.position.ReadValue();
+                if (mouse.leftButton.wasPressedThisFrame) _mouseStart = mp;
+                Pointer(-7, mp, _mouseStart, mouse.leftButton.wasPressedThisFrame, !mouse.leftButton.isPressed);
+            }
+            if (!stickSeen && _stickId != int.MinValue && UnityEngine.InputSystem.EnhancedTouch.Touch.activeTouches.Count == 0 && (mouse == null || !mouse.leftButton.isPressed)) _stickId = int.MinValue;
+            if (_stickId == int.MinValue) _stick?.Hide();
+            TouchState.move = move;
+            if (now > _rstickUntil) TouchState.rstick = Vector2.zero;
+            for (int b = 0; b < 32; b++) if (_hold[b] > now) mask |= 1 << b;
+            mask &= ~InputFrame.Pause;
             TouchState.buttons = (TouchState.buttons & InputFrame.Pause) | mask;
             foreach (var b in _btns) b.Show((mask & b.bit) != 0);
         }
+
+        Vector2 _mouseStart;
+        float _rstickUntil;
 
         int Hit(Vector2 pos, Vector2 start)
         {
@@ -77,13 +147,16 @@ namespace Craquez
         void Build(RectTransform root)
         {
             // analógico (metade esquerda)
-            var stickArea = UiKit.Image(root, new Color(0, 0, 0, 0.001f), null, "area analogico").rectTransform.Place(0, 0, 0.42f, 0.72f);
+            var stickImg = UiKit.Image(root, new Color(0, 0, 0, 0f), null, "area analogico");
+            stickImg.raycastTarget = false;   // (lido em Update, dedo a dedo)
+            var stickArea = stickImg.rectTransform.Place(0, 0, 0.45f, 0.78f);
             _stickArea = stickArea;
-            var stick = stickArea.gameObject.AddComponent<TouchStick>();
-            stick.Build(stickArea);
+            _stick = stickArea.gameObject.AddComponent<TouchStick>();
+            _stick.Build(stickArea);
             // área de dribles (faixa central/direita superior)
-            var swipe = UiKit.Image(root, new Color(0, 0, 0, 0.001f), null, "area dribles").rectTransform.Place(0.42f, 0.45f, 0.78f, 0.85f);
-            swipe.gameObject.AddComponent<TouchSwipe>();
+            var swipeImg = UiKit.Image(root, new Color(0, 0, 0, 0f), null, "area dribles");
+            swipeImg.raycastTarget = false;
+            _swipeArea = swipeImg.rectTransform.Place(0.45f, 0.45f, 0.8f, 0.88f);
             // botões principais (losango)
             // losango de ação (centro a 250 da direita, 230 de baixo) + correr/proteger à esquerda dele
             float cx = -250, cy = 230;
@@ -144,63 +217,40 @@ namespace Craquez
         }
     }
 
-    public class TouchStick : MonoBehaviour, IPointerDownHandler, IDragHandler, IPointerUpHandler
+    /// <summary>Desenho do analógico flutuante (a leitura é em TouchControls.Update).</summary>
+    public class TouchStick : MonoBehaviour
     {
         RectTransform _area, _base, _knob;
-        const float Radius = 110f;
+        Vector2 _rest = new Vector2(230, 220);
 
         public void Build(RectTransform area)
         {
             _area = area;
             _base = UiKit.Image(area, new Color(1, 1, 1, 0.12f), Theme.Circle, "base").rectTransform;
-            _base.sizeDelta = new Vector2(Radius * 2, Radius * 2);
+            _base.sizeDelta = new Vector2(220, 220);
             _knob = UiKit.Image(_base, new Color(1, 1, 1, 0.45f), Theme.Circle, "knob").rectTransform;
             _knob.sizeDelta = new Vector2(100, 100);
             _base.anchorMin = _base.anchorMax = new Vector2(0, 0);
-            _base.anchoredPosition = new Vector2(230, 220);
+            _base.anchoredPosition = _rest;
+            foreach (var g in _base.GetComponentsInChildren<Graphic>(true)) g.raycastTarget = false;
         }
 
-        public void OnPointerDown(PointerEventData e)
+        /// <summary>origin e d em pixels da tela; R = raio em pixels.</summary>
+        public void Show(Vector2 origin, Vector2 d, float R)
         {
-            RectTransformUtility.ScreenPointToLocalPointInRectangle(_area, e.position, e.pressEventCamera, out var lp);
-            _base.anchoredPosition = lp - _area.rect.min;
-            OnDrag(e);
+            RectTransformUtility.ScreenPointToLocalPointInRectangle(_area, origin, null, out var lo);
+            RectTransformUtility.ScreenPointToLocalPointInRectangle(_area, origin + d, null, out var lk);
+            RectTransformUtility.ScreenPointToLocalPointInRectangle(_area, origin + Vector2.right * R, null, out var lr);
+            float rl = Mathf.Max(20f, (lr - lo).magnitude);
+            _base.sizeDelta = new Vector2(rl * 2f, rl * 2f);
+            _base.anchoredPosition = lo - _area.rect.min;
+            _knob.anchoredPosition = lk - lo;
         }
 
-        public void OnDrag(PointerEventData e)
+        public void Hide()
         {
-            RectTransformUtility.ScreenPointToLocalPointInRectangle(_base, e.position, e.pressEventCamera, out var lp);
-            var v = Vector2.ClampMagnitude(lp, Radius);
-            _knob.anchoredPosition = v;
-            var m = v / Radius;
-            TouchState.move = m.magnitude < 0.15f ? Vector2.zero : m;
-        }
-
-        public void OnPointerUp(PointerEventData e)
-        {
+            _base.anchoredPosition = _rest;
             _knob.anchoredPosition = Vector2.zero;
-            TouchState.move = Vector2.zero;
         }
-    }
-
-    /// <summary>Deslize rápido = "flick" do analógico direito (dribles).</summary>
-    public class TouchSwipe : MonoBehaviour, IPointerDownHandler, IDragHandler, IPointerUpHandler
-    {
-        Vector2 _start;
-        float _t;
-        public void OnPointerDown(PointerEventData e) { _start = e.position; _t = Time.unscaledTime; }
-        public void OnDrag(PointerEventData e)
-        {
-            var d = e.position - _start;
-            if (d.magnitude > Screen.dpi * 0.25f + 40f && Time.unscaledTime - _t < 0.5f)
-            {
-                TouchState.rstick = d.normalized;
-                _start = e.position + d * 100f;
-                CancelInvoke(nameof(Clear));
-                Invoke(nameof(Clear), 0.1f);
-            }
-        }
-        public void OnPointerUp(PointerEventData e) { }
-        void Clear() => TouchState.rstick = Vector2.zero;
     }
 }

@@ -3974,7 +3974,7 @@ namespace Craquez.Sim
                 return;
             }
             float spd = o.vel.magnitude;
-            float lose = spd > 5f ? 2.4f : 1.7f;
+            float lose = spd > 5f ? 2.4f : 1.9f;
             if (o.windup > 0f) lose = 2.8f;   // preparando o chute: a bola é trazida ao pé, não se perde por distância
             if (o.stun > 0f || o.slide > 0f || o.position.Dist(ball.pos) > lose)
             {
@@ -4044,7 +4044,24 @@ namespace Craquez.Sim
                 float sideErr = Mathf.Clamp(side - foot, -0.3f, 0.3f);
                 // mudança brusca de direção com a bola perto: toque de corte na hora (responde ao comando)
                 float turn = ball.vel.sqrMagnitude > 1f ? Vector2.Angle(ball.vel, fwd) : 0f;
-                bool cut = turn > 50f && rel.magnitude < 1.1f && o.touchT <= 0f;
+                // (compara com o comando do analógico, não só com o rumo do corpo, que vira devagar: antes a
+                // bola seguia reto no pique enquanto o jogador virava e escapava)
+                bool wants = o.intent.sqrMagnitude > 0.09f;
+                float turnI = wants && ball.vel.sqrMagnitude > 1f ? Vector2.Angle(ball.vel, o.intent) : 0f;
+                bool cut = (turn > 50f || turnI > 38f) && rel.magnitude < 1.45f && o.touchT <= 0f;
+                // saiu do pique (soltou o CORRER): segura a bola com a sola em vez de deixá-la ir embora
+                if (!o.sprinting && ball.vel.magnitude > spd + 1.5f && rel.magnitude < 1.5f && along > 0.3f && o.touchT <= 0f) cut = true;
+                if (cut && wants)
+                {
+                    // o toque de corte vai para onde o analógico manda; se a bola ficou um pouco à frente, o
+                    // atleta estica a perna e a traz (ela não muda de rumo lá longe, sozinha)
+                    fwd = (o.facing * 0.3f + o.intent.normalized * 0.7f).Norm();
+                    perp = new Vector2(-fwd.y, fwd.x);
+                    if (rel.magnitude > 0.7f) ball.pos = Vector2.Lerp(ball.pos, o.position + rel.normalized * 0.7f, 0.5f);
+                    rel = ball.pos - o.position;
+                    along = Vector2.Dot(rel, fwd); side = Vector2.Dot(rel, perp);
+                    sideErr = Mathf.Clamp(side - foot, -0.3f, 0.3f);
+                }
                 if (along < 0.26f + spd * 0.012f || cut)
                 {
                     // toque: a bola sai um pouco à frente (mais no pique e para quem tem menos controle;
@@ -4070,7 +4087,10 @@ namespace Craquez.Sim
                     if (cut) lead *= 0.6f;   // corte: toque curto, a bola fica perto
                     float decel = mode.rollDecel + mode.groundDrag * spd * spd;
                     float extra = Mathf.Sqrt(2f * decel * lead);
-                    ball.vel = fwd * (spd * (cut ? 0.85f : 1f) + extra) - perp * sideErr * 4f;
+                    // (velocidade do atleta NA DIREÇÃO do toque: virando, ele ainda vai para o lado antigo e a bola
+                    // tocada com a velocidade cheia disparava à frente e escapava logo depois de cada curva)
+                    float vAlong = Mathf.Max(Vector2.Dot(o.vel, fwd), spd * 0.35f);
+                    ball.vel = fwd * (vAlong * (cut ? 0.85f : 1f) + extra) - perp * sideErr * 4f;
                     // o atleta passou da bola (arrancada): ela é puxada para o pé em vez de atravessar o corpo
                     if (along < 0.05f) ball.pos = Vector2.Lerp(ball.pos, o.position + fwd * 0.2f + perp * foot, 0.5f);
                     ball.z = 0f;
