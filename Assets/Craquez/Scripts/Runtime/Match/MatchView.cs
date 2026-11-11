@@ -669,6 +669,8 @@ namespace Craquez
                     }
                 }
                 if (_coachPointT[t] > 0f) { _coachPointT[t] -= dt; if (_coachPointT[t] <= 0f) av.point = Vector3.zero; }
+                // parado olhando o jogo: braços cruzados (solta para apontar, comemorar ou andar)
+                av.ArmsFolded(_coachPointT[t] <= 0f && !av.Celebrating && p.vel.magnitude < 0.5f);
                 // lance de perigo do time dele: aplaude / vibra na beira do campo
                 if (sim.tick - sim.lastShotTick < 4 && sim.ball.lastTouchTeam == t && !av.Celebrating) av.Celebrate(1.4f);
                 av.OnTick();

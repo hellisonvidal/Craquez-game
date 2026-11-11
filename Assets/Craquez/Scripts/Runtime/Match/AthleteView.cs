@@ -325,6 +325,12 @@ namespace Craquez
                     break;
                 case "slide":
                     _slideT = 0f;
+                    // carrinho da captura (UAL): entra deslizando, segue no chão e levanta no fim
+                    if (AthleteAnimator.Mocap && AthleteAnimator.Has("SlideIn") && anim != null)
+                    {
+                        anim.Play("SlideIn", 0.12f, -1f, 1.8f, 0.05f);
+                        _slideClip = true;
+                    }
                     break;
                 case "dive":
                     _diveSide = Vector3.Dot(W(view.sim.ball.vel), transform.right) >= 0 ? -1f : 1f;
@@ -418,6 +424,7 @@ namespace Craquez
         void FallLimbs()
         {
             if (_bikeT > 0f) return;   // (na bicicleta as pernas são dela)
+            if (_getUp) { _fallW = 0f; return; }   // (levantando com a captura)
             if (_fallPhase == 0) { _fallW = Mathf.MoveTowards(_fallW, 0f, Time.deltaTime * 4f); if (_fallW <= 0f) return; }
             else _fallW = Mathf.MoveTowards(_fallW, 1f, Time.deltaTime * 8f);
             float u = FallState(out int ph);
@@ -528,6 +535,7 @@ namespace Craquez
         }
 
         float _protest, _help;
+        bool _slideClip, _getUp;
         Vector3 _bump, _bumpVel;   // inclinação do choque (graus, no plano do chão: x/z do mundo)
 
         /// <summary>Ombro a ombro: correndo lado a lado com um adversário, inclina contra ele (graus, mundo).</summary>
@@ -579,6 +587,13 @@ namespace Craquez
             var sim = view.sim;
             bool want = sim.state == MatchState.Foul && sim.foulOffender == p.id && p.down <= 0f && p.slide <= 0f;
             _protest = Mathf.MoveTowards(_protest, want ? 1f : 0f, Time.deltaTime * 3f);
+            if (AthleteAnimator.Mocap && AthleteAnimator.Has("Protest") && anim != null)
+            {
+                // balança a cabeça e abre os braços ("não fiz nada!"), da captura
+                if (want && anim.CurrentAction == null && p.vel.magnitude < 2.5f) anim.Play("Protest", (p.id * 0.37f) % 1.2f, 2.2f, 1f, 0.25f);
+                else if (!want && anim.CurrentAction == "Protest") anim.Stop(0.3f);
+                return;
+            }
             if (_protest <= 0.001f) return;
             for (int side = -1; side <= 1; side += 2)
             {
@@ -601,6 +616,14 @@ namespace Craquez
         {
             if (anim == null || !p.isKeeper || !AthleteAnimator.Has("GkDirect") || anim.CurrentAction != null) return;
             anim.Play("GkDirect", (p.id * 1.3f) % 3f, 2.6f, 1f, 0.25f);
+        }
+
+        /// <summary>Técnico/reserva parado: braços cruzados (captura) enquanto on; solta quando off.</summary>
+        public void ArmsFolded(bool on)
+        {
+            if (anim == null || !AthleteAnimator.Has("ArmsFolded")) return;
+            if (on && anim.CurrentAction == null) anim.Play("ArmsFolded", (p.number * 0.9f) % 2f, -1f, 1f, 0.4f);
+            else if (!on && anim.CurrentAction == "ArmsFolded") anim.Stop(0.35f);
         }
 
         public void Bicycle(float seconds) { _bikeT = _bikeTotal = seconds; }
@@ -719,8 +742,11 @@ namespace Craquez
             {
                 _slideT += dt;
                 float k = Mathf.Clamp01(_slideT / 0.12f);
-                pitch = Mathf.Lerp(pitch, -62f, k);
-                lift = Mathf.Lerp(lift, 0.12f, k);
+                if (!_slideClip)
+                {
+                    pitch = Mathf.Lerp(pitch, -62f, k);
+                    lift = Mathf.Lerp(lift, 0.12f, k);
+                }
             }
             else if (p.isKeeper && (p.saveKind > 0 || _saveRec > 0f))
             {
@@ -738,7 +764,21 @@ namespace Craquez
             {
                 var fb = FallBody(pitch, roll, lift);
                 pitch = fb.x; roll = fb.y; lift = fb.z;
+                if (_fallPhase == 4 && p.fallKind == 0 && !p.fallRoll && AthleteAnimator.Mocap && AthleteAnimator.Has("GetUp") && anim != null)
+                {
+                    // de costas no chão: senta, apoia a mão e levanta (captura); o corpo deixa de girar
+                    if (!_getUp)
+                    {
+                        _getUp = true;
+                        float rise = Mathf.Min(FallRise, p.downTotal * 0.35f);
+                        float len = AthleteAnimator.ClipLength("GetUp");
+                        anim.Play("GetUp", 0.15f, -1f, Mathf.Clamp((len - 0.15f) / Mathf.Max(0.3f, p.down), 0.8f, 2.2f), 0.12f);
+                    }
+                    float w = anim.CurrentAction == "GetUp" ? anim.ActionWeight : 0f;
+                    pitch = Mathf.Lerp(pitch, 0f, w); roll = Mathf.Lerp(roll, _lean, w); lift = Mathf.Lerp(lift, 0f, w);
+                }
             }
+            if (p.down <= 0f) _getUp = false;
             if (_bikeT > 0f)
             {
                 _bikeT -= Time.deltaTime;
@@ -814,6 +854,12 @@ namespace Craquez
                 _idleT = idle ? _idleT + dt : 0f;
             }
             anim?.Tick(dt, animSpeed, animFwd, rawSpd > 0.01f ? lv.x * (_animSpd / rawSpd) : 0f, guard, p.isKeeper);
+            if (_slideClip && anim != null)
+            {
+                if (p.down > 0f) _slideClip = false;   // (caiu: a queda assume)
+                else if (p.slide > 0f) { if (anim.CurrentAction != "SlideIn" && anim.CurrentAction != "SlideLoop") anim.Play("SlideLoop", 0f, -1f, 1f, 0.1f); }
+                else { anim.Play("SlideOut", 0f, -1f, 1.25f, 0.1f); _slideClip = false; }
+            }
             if (_saveClip && anim != null)
             {
                 // fim do clipe da defesa, ou o goleiro já de pé e correndo: volta para a passada

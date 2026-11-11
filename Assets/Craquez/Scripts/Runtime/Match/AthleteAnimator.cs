@@ -361,6 +361,9 @@ namespace Craquez
 
         public static bool Has(string clip) => Clips.ContainsKey(clip);
 
+        /// <summary>Duração do clipe (s); 0 se não existe.</summary>
+        public static float ClipLength(string clip) => Clips.TryGetValue(clip, out var ci) && ci.clip != null ? ci.clip.length : 0f;
+
         public string CurrentAction { get; private set; }
         public float ActionWeight => _actionW;
 

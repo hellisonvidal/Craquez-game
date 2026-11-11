@@ -106,6 +106,14 @@ MIXAMO_CLIPS = [
     ("GkRoll", "soccer/goalkeeper pass", False, False, 0.0, 99.0, "handlow", True),
     ("GkPlace", "soccer/goalkeeper placing ball", False, False, 0.0, 99.0, "handlow", True),
     ("GkDirect", "soccer/goalkeeper directing", False, False, 0.0, 99.0, None, True),
+    # Universal Animation Library (Quaternius, CC0): "ual/<ação>" lê a ação do UAL2_Standard.fbx
+    ("SlideIn", "ual/Slide_Start", False, False, 0.0, 99.0, None, True),
+    ("SlideLoop", "ual/Slide_Loop", True, False, 0.0, 99.0, None, True),
+    ("SlideOut", "ual/Slide_Exit", False, False, 0.0, 99.0, None, True),
+    ("GetUp", "ual/LayToIdle", False, False, 0.0, 99.0, None, True),
+    ("Knockback", "ual/Hit_Knockback", False, False, 0.0, 99.0, None, True),
+    ("Protest", "ual/Idle_No_Loop", True, False, 0.0, 99.0, None, True),
+    ("ArmsFolded", "ual/Idle_FoldArms_Loop", True, False, 0.0, 99.0, None, True),
 ]
 
 
@@ -449,7 +457,10 @@ def main():
         if ONLY and name not in ONLY:
             continue
         if f not in cache:
-            cache[f] = mixamo.load(os.path.join(MIXAMO, f + ".fbx"))
+            if f.startswith("ual/"):
+                cache[f] = mixamo.load(os.path.join(MIXAMO, "ual", "UAL2_Standard.fbx"), action=f[4:])
+            else:
+                cache[f] = mixamo.load(os.path.join(MIXAMO, f + ".fbx"))
         clip = cache[f].mirrored() if mirror else cache[f]
         poses, speed = retarget_mixamo(tgt, clip, loop=loop, keep_yaw=not loop, t0=t0, t1=t1, inplace=inplace)
         act = build_action(tgt, name, poses)
