@@ -97,6 +97,26 @@ namespace Craquez
             new StadiumStyle(44, true, true, 2, new Color(0.9f, 0.75f, 0.1f), new Color(0.26f, 0.26f, 0.28f), new Color(0.15f, 0.15f, 0.16f), 1, 5, new Color(1f, 0.8f, 0.1f), false, true, 0.95f),
             // 30 Colina: encosta nas montanhas, cadeiras lilás e brancas, cobertura com arco, LED lilás
             new StadiumStyle(32, true, false, 3, new Color(0.55f, 0.35f, 0.75f), new Color(0.86f, 0.84f, 0.88f), new Color(0.92f, 0.9f, 0.95f), 0, 3, new Color(0.7f, 0.45f, 0.95f), true, false, 0.88f),
+            // 31 Vulcão: bacia de pedra preta, cadeiras vermelhas, LED laranja, montanhas
+            new StadiumStyle(42, true, true, 2, new Color(0.72f, 0.12f, 0.08f), new Color(0.18f, 0.17f, 0.18f), new Color(0.25f, 0.22f, 0.22f), 1, 3, new Color(1f, 0.4f, 0.05f), true, false, 0.94f),
+            // 32 Lagoa: médio, cadeiras turquesa, cobertura nos lados, rio
+            new StadiumStyle(26, true, false, 1, new Color(0.1f, 0.6f, 0.6f), new Color(0.7f, 0.74f, 0.72f), new Color(0.85f, 0.9f, 0.88f), 0, 5, None, false, false, 0.8f),
+            // 33 Aurora: anel branco na neve, cadeiras verdes, LED verde, arco
+            new StadiumStyle(34, true, true, 3, new Color(0.12f, 0.55f, 0.3f), new Color(0.88f, 0.9f, 0.92f), RoofWhite, 1, 6, new Color(0.2f, 1f, 0.55f), true, false, 0.88f),
+            // 34 Pampas: só as laterais, baixo, madeira, campo aberto, postes baixos
+            new StadiumStyle(12, false, false, 1, new Color(0.62f, 0.45f, 0.28f), new Color(0.6f, 0.5f, 0.38f), new Color(0.5f, 0.38f, 0.26f), 2, 1, None, false, true, 0.7f),
+            // 35 Oceânica: anel azul-petróleo à beira-mar, faixa branca
+            new StadiumStyle(40, true, true, 2, new Color(0.05f, 0.3f, 0.4f), new Color(0.75f, 0.82f, 0.86f), new Color(0.9f, 0.95f, 0.97f), 1, 2, new Color(0.95f, 0.95f, 0.98f), false, false, 0.92f),
+            // 36 Ferroviário: tijolo vermelho com pista, cadeiras vinho, torres, cidade
+            new StadiumStyle(30, true, false, 1, new Color(0.45f, 0.1f, 0.15f), new Color(0.58f, 0.28f, 0.2f), new Color(0.3f, 0.3f, 0.32f), 0, 0, None, false, true, 0.85f),
+            // 37 Esmeralda: bacia verde e branca com LED verde, cidade
+            new StadiumStyle(44, true, true, 2, new Color(0.05f, 0.45f, 0.22f), new Color(0.92f, 0.94f, 0.93f), RoofWhite, 1, 0, new Color(0.1f, 0.9f, 0.4f), true, false, 0.96f),
+            // 38 Cerrado: ocre, sem cantos, cobertura nos lados, árvores retorcidas (deserto)
+            new StadiumStyle(28, true, false, 1, new Color(0.75f, 0.55f, 0.15f), new Color(0.7f, 0.55f, 0.35f), new Color(0.55f, 0.42f, 0.25f), 0, 4, None, false, false, 0.82f),
+            // 39 Tempestade: concreto cinza-chumbo, anel com arco, LED azul elétrico
+            new StadiumStyle(46, true, true, 3, new Color(0.2f, 0.22f, 0.3f), new Color(0.38f, 0.4f, 0.44f), new Color(0.5f, 0.52f, 0.56f), 1, 0, new Color(0.2f, 0.5f, 1f), true, false, 0.95f),
+            // 40 Real: anel roxo e dourado, faixa dourada, cidade
+            new StadiumStyle(42, true, true, 2, new Color(0.35f, 0.12f, 0.5f), new Color(0.85f, 0.82f, 0.75f), new Color(0.92f, 0.88f, 0.7f), 1, 0, new Color(0.95f, 0.75f, 0.2f), false, false, 0.95f),
         };
 
         public static StadiumStyle StyleOf(int model, int homeTier)
@@ -213,7 +233,9 @@ namespace Craquez
             var k = new MeshKit();
             var accent = new MeshKit();
             Material mat = Gfx.Lit(new Color(0.9f, 0.9f, 0.92f), null, 0.4f, 0.4f), accentMat = null;
-            switch (model)
+            // estádios 31-40: a marca de um dos clássicos (bandeirões, marquise, pira, velas, coroa, torre, treliça, LED, neve)
+            int sig = model > 30 ? new[] { 6, 2, 14, 5, 7, 10, 13, 11, 1, 9 }[Mathf.Clamp(model - 31, 0, 9)] : model;
+            switch (sig)
             {
                 case 1:   // Metropolitana: anel de LED branco na beirada e mastros com bandeiras do clube
                 case 5:   // Caldeirão: bandeirões no alto da arquibancada

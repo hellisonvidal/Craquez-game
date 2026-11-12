@@ -61,6 +61,16 @@ namespace Craquez
             new ExtLook(9, new Color(0.9f, 0.45f, 0.1f), true, false, false, new Color(0.85f, 0.7f, 0.5f)),    // 28 Arena do Sertão
             new ExtLook(6, new Color(0.2f, 0.2f, 0.22f), true, true, true, new Color(0.4f, 0.4f, 0.42f)),      // 29 Estádio da Usina
             new ExtLook(5, new Color(0.55f, 0.3f, 0.8f), false, true, true, new Color(0.7f, 0.72f, 0.66f)),     // 30 Arena da Colina
+            new ExtLook(7, new Color(1f, 0.4f, 0.05f), true, false, true, new Color(0.3f, 0.28f, 0.28f)),      // 31 Arena Vulcão: pedra escura
+            new ExtLook(8, new Color(0.1f, 0.6f, 0.6f), false, false, false, new Color(0.6f, 0.66f, 0.6f)),    // 32 Lagoa: madeira
+            new ExtLook(3, new Color(0.2f, 0.9f, 0.5f), false, true, true, new Color(0.85f, 0.88f, 0.9f)),     // 33 Aurora: vidro
+            new ExtLook(1, new Color(0.55f, 0.4f, 0.25f), false, false, false, new Color(0.5f, 0.58f, 0.38f)), // 34 Pampas: tijolo
+            new ExtLook(5, new Color(0.05f, 0.35f, 0.45f), false, true, true, new Color(0.88f, 0.85f, 0.72f)), // 35 Oceânica: brises
+            new ExtLook(1, new Color(0.5f, 0.12f, 0.15f), true, false, false, new Color(0.55f, 0.45f, 0.4f)),  // 36 Ferroviário: tijolo
+            new ExtLook(4, new Color(0.1f, 0.85f, 0.4f), false, false, true, Club),                            // 37 Esmeralda: almofadas
+            new ExtLook(9, new Color(0.8f, 0.55f, 0.15f), false, true, false, new Color(0.8f, 0.66f, 0.45f)),  // 38 Cerrado: mosaico
+            new ExtLook(6, new Color(0.2f, 0.5f, 1f), true, true, true, new Color(0.42f, 0.44f, 0.48f)),       // 39 Tempestade: aço
+            new ExtLook(2, new Color(0.95f, 0.75f, 0.2f), true, false, true, new Color(0.75f, 0.7f, 0.6f)),    // 40 Real: aletas douradas
         };
 
         public static ExtLook LookOf(int model, uint seed)

@@ -60,7 +60,7 @@ namespace Craquez
             // TV (Google TV 4K, ex.: TCL C6K): desenha em 1080p e o FSR amplia para o 4K do painel; o
             // processador da TV é de celular intermediário — mais que isso derruba o quadro
             if (IsTv || TvBuild) return quality >= 2 ? 1440 : quality == 1 ? 1080 : 720;
-            return quality >= 3 ? 1440 : quality == 2 ? 1080 : quality == 1 ? 900 : 720;   // (celular: menos pixels = menos calor; o FSR amplia)
+            return quality >= 3 ? 1440 : quality == 2 ? 1080 : quality == 1 ? 810 : 720;   // (celular: menos pixels = menos calor; o FSR amplia)
         }
     }
 }

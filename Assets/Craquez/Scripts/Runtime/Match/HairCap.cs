@@ -37,7 +37,7 @@ namespace Craquez
             smr.localBounds = body.localBounds;
             smr.updateWhenOffscreen = false;
             smr.quality = quality >= 2 ? SkinQuality.Bone4 : SkinQuality.Bone2;
-            smr.sharedMaterial = Gfx.Character(color, Tex(style), style == 0 ? 0.05f : 0.22f);
+            smr.sharedMaterial = Gfx.Character(color, Tex(style), 0.02f);   // (fosco: com brilho, o refletor fazia uma mancha clara "loira" no alto da cabeça)
             return smr;
         }
 
@@ -109,8 +109,9 @@ namespace Craquez
                 outV.Add(v[i] + nn.normalized * th * k);
                 outN.Add(nn);
                 // UV: em volta da cabeça (ângulo) e altura, em metros
-                float ang = Mathf.Atan2(dx, dz);
-                outUV.Add(new Vector2(ang * 0.09f / 0.02f, dy / 0.02f));
+                // (sem ângulo em volta da cabeça: ele dava a volta de +180° a -180° bem na nuca e o triângulo da
+                // emenda pegava a textura inteira espremida — uma mancha na parte de trás)
+                outUV.Add(new Vector2(dx / 0.02f, (dy - dz * 0.6f) / 0.02f));
                 outBW.Add(bw.Length > i ? bw[i] : new BoneWeight());
                 return j;
             }

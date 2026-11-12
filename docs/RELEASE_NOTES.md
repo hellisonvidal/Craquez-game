@@ -1,3 +1,32 @@
+## Craquez 2.21.0
+
+Jogo de futebol feito 100% com inteligência artificial, **gratuito**.
+
+### Download
+- **Celular Android**: `Craquez-v2.21.0.apk`
+- **TV (Google TV / Android TV, ex.: TCL C6K)**: `Craquez-TV-v2.21.0.apk` — use este na TV (32 e 64 bits).
+
+### Novidades
+- **40 estádios de campo**: 10 novos (Arena Vulcão, Estádio da Lagoa, Arena Aurora, Estádio dos Pampas, Arena
+  Oceânica, Estádio Ferroviário, Arena Esmeralda, Estádio do Cerrado, Arena Tempestade e Estádio Real), cada um
+  com arquibancada, cobertura, cores, fachada e entorno próprios.
+- **Society diferentes entre si**: cada campo tem a sua montagem — gramado (faixas e tom), altura e cor do
+  alambrado, iluminação (torres, postes nas laterais ou postes baixos), arquibancada (comprida, curta, atrás do
+  gol ou nenhuma, coberta ou não) e o clube.
+- **Ruas diferentes entre si**: cada rua com a sua cor de quadra, pintura e chão; a Várzea de Terra tem gramado em
+  volta, o Quadrão do Conjunto e a Arena da Vila têm gaiola.
+- **Mais rostos**: 23 traços de rosto (antes 10), em pares (nariz largo/fino, queixo longo/curto, olhos
+  grandes/pequenos...) e cinco formatos de cabeça; cada jogador com o seu.
+- **Menos cabelo comprido**: longo, rabo de cavalo, chanel e tranças agora são raros (cerca de 8%).
+- **Rede de verdade**: tecido com fios que não esticam — forma o bolsão em volta da bola, balança e assenta.
+
+### Correções
+- **Mancha loira atrás da cabeça**: o cabelo refletia a luz dos refletores; agora é fosco, e a emenda da textura na
+  nuca foi corrigida.
+- **Goleiro voando na comemoração** (society e outros): o mergulho termina e ele cai no chão.
+- **Menos aquecimento**: 45 quadros no celular na qualidade média (antes 60), 3D um pouco menor, menos sombras,
+  menos torcedores 3D e a rede parada não é mais simulada.
+
 ## Craquez 2.20.0
 
 Jogo de futebol feito 100% com inteligência artificial, **gratuito**.

@@ -220,6 +220,15 @@ namespace Craquez
                 p.slide = 0f;
                 p.dive = 0f;
                 p.stun = 0f;
+                // goleiro que mergulhou no gol: o voo termina e ele cai no chão (antes o tempo da defesa ficava
+                // parado na comemoração e ele seguia "voando" no ar até o reinício)
+                if (p.saveT > 0f)
+                {
+                    p.saveT -= dt;
+                    if (p.saveT <= 0f) { p.saveT = 0f; p.saveKind = 0; p.offBalance = Mathf.Max(p.offBalance, 0.5f); }
+                }
+                else if (p.saveKind != 0) p.saveKind = 0;
+                if (p.offBalance > 0f) p.offBalance = Mathf.Max(0f, p.offBalance - dt);
             }
         }
 
