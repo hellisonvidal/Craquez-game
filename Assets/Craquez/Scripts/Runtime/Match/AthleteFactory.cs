@@ -27,7 +27,7 @@ namespace Craquez
         {
             ["afro"] = "eyebrow001", ["latino"] = "eyebrow006", ["europeu"] = "eyebrow003", ["asiatico"] = "eyebrow009",
         };
-        public static readonly string[] Hairs = { "short02", "short01", "short03", "short04", "afro01" };
+        public static readonly string[] Hairs = { "short02", "short01", "short03", "short04", "afro01", "long01", "ponytail01", "braid01", "bob02" };
         static readonly Color[] HairColors =
         {
             new Color(0.05f, 0.04f, 0.035f), new Color(0.16f, 0.1f, 0.06f), new Color(0.3f, 0.19f, 0.1f),
@@ -75,6 +75,21 @@ namespace Craquez
         }
 
         /// <summary>Estilo de cabelo (curto 30%, médio 20%, topete 15%, undercut 20%, cacheado 5%, mais longo 10%).</summary>
+        /// <summary>
+        /// Cabelo do modelo (sempre um de verdade, menos nos raspados — antes undercut e cacheado ficavam só com
+        /// a touca procedural e, no corpo novo, pareciam carecas): afro com black power, tranças ou curto; os
+        /// outros, os curtos na maioria e às vezes longo, rabo de cavalo, chanel ou tranças.
+        /// </summary>
+        static int PickHair(string b, int shortIdx, float r, float r2)
+        {
+            if (b == "afro") return r < 0.45f ? 4 : r < 0.7f ? 7 : 0;
+            if (r2 < 0.1f) return 5;       // longo
+            if (r2 < 0.19f) return 6;      // rabo de cavalo
+            if (r2 < 0.26f) return 8;      // chanel
+            if (r2 < 0.31f) return 7;      // tranças
+            return Mathf.Clamp(shortIdx, 0, 3);
+        }
+
         static int PickStyle(float r) => r < 0.3f ? 1 : r < 0.5f ? 2 : r < 0.65f ? 3 : r < 0.85f ? 4 : r < 0.9f ? 5 : 7;
 
         /// <summary>face = [pele 0-5, cor do cabelo, estilo, barba, olhos, porte] (leagues.json).</summary>
@@ -103,9 +118,10 @@ namespace Craquez
             bool shaved = R(14) < 0.08f;
             return new Look
             {
-                baseName = b, hair = shaved ? -1 : Mathf.Clamp(hair, 0, Hairs.Length - 1), hairColor = HairColors[Mathf.Clamp(hc, 0, HairColors.Length - 1)],
+                baseName = b, hair = shaved ? -1 : PickHair(b, hair, R(7), R(17)), hairColor = HairColors[Mathf.Clamp(hc, 0, HairColors.Length - 1)],
                 tape = R(15) < 0.3f ? (R(16) < 0.5f ? 1 : 2) : 0,
-                hairStyle = shaved ? 0 : b == "afro" ? (R(7) < 0.45f ? 6 : R(7) < 0.75f ? 5 : 1) : PickStyle(R(7)),
+                // touca de volume só por baixo dos cabelos curtos (nos longos ela atravessava); raspado = só a sombra
+                hairStyle = shaved ? 0 : PickHair(b, hair, R(7), R(17)) <= 3 ? 1 : -1,
                 // camisa por dentro do calção em 90% dos atletas, por fora em 10%
                 untucked = ((h >> 21) & 1023u) % 10u == 0u,
                 // altura: do baixinho (1,68 m) ao grandalhão (1,93 m), mais gente perto da média
@@ -310,7 +326,7 @@ namespace Craquez
                             string hn = n.Substring(5);
                             // a malha de cabelo do modelo fica por cima do cabelo procedural nos estilos com fios
                             // (raspado, undercut e cacheado ficam só com o procedural)
-                            bool on = look.hair >= 0 && hn == Hairs[look.hair] && look.hairStyle != 0 && look.hairStyle != 4 && look.hairStyle != 5;
+                            bool on = look.hair >= 0 && hn == Hairs[look.hair];
                             smr.gameObject.SetActive(on);
                             if (on)
                                 smr.sharedMaterial = Shared("hair:" + hn + Teams.Hex(look.hairColor), () =>
@@ -340,7 +356,7 @@ namespace Craquez
             foreach (var r in smrs) { if (r.name == "Eyes") eyesR = r; else if (r.name == "Eyebrows") browR = r; else if (r.name == "Eyelashes") lashR = r; }
             if (rig.body != null && eyesR != null && bodyMesh != null) FaceRig.Build(rig.body, eyesR, axes, browR, lashR);
             // cabelo com volume e estilo (antes muitos pareciam carecas)
-            if (rig.body != null && eyesR != null && bodyMesh != null) HairCap.Build(rig.body, eyesR, axes, look.hairStyle, look.hairColor * (look.hairStyle == 0 ? 0.8f : 1.15f), quality);
+            if (rig.body != null && eyesR != null && bodyMesh != null && look.hairStyle >= 0) HairCap.Build(rig.body, eyesR, axes, look.hairStyle, look.hairColor * (look.hairStyle == 0 ? 0.8f : 1.15f), quality);
             rig.untucked = look.untucked;
             // (o número agora vem pintado na camisa)
         }

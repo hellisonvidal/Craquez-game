@@ -20,14 +20,15 @@ namespace Craquez.Online
     /// </summary>
     public class OnlineManager : MonoBehaviour
     {
-        const byte MsgHello = 10, MsgStart = 11, MsgBye = 12, MsgReady = 13;
-        const int Protocol = 1;
+        const byte MsgHello = 10, MsgStart = 11, MsgBye = 12, MsgReady = 13, MsgPing = 14, MsgPong = 15, MsgSetup = 17, MsgLineup = 18;
+        const float SetupSeconds = 45f;
+        const int Protocol = 2;
         const int NetDelay = 6;   // passos de atraso dos comandos (~80 ms): cobre a ida e volta pelo Relay
         /// <summary>Página do convite (abre o jogo na sala, ou leva para baixar).</summary>
         public const string InviteUrl = "https://hellisonvidal.github.io/Craquez-game/sala/?c=";
 
         static OnlineManager _i;
-        enum St { Idle, Busy, Waiting, Handshake, Playing, Room, Error }
+        enum St { Idle, Busy, Waiting, Handshake, Setup, Playing, Room, Error }
         St _st = St.Idle;
         string _msg = "";
         ISession _session;
@@ -107,6 +108,11 @@ namespace Craquez.Online
             if (_st == St.Room && _last != null)
             {
                 BuildRoom(list);
+                return;
+            }
+            if (_st == St.Setup && _pending != null)
+            {
+                BuildSetup(list);
                 return;
             }
             // modalidade, time e duração
@@ -250,6 +256,7 @@ namespace Craquez.Online
                     minutes = _last.minutes, weather = _last.weather, dynamicWeather = false, timeOfDay = _last.timeOfDay,
                     ceremony = false, toss = true, streetPlayers = _last.streetPlayers, venue = _last.venue, stadium = _last.stadium,
                     ball = _last.ball, national = _last.national,
+                    tacticsA = _last.tacticsA, tacticsB = _last.tacticsB, kitA = _last.kitA, kitB = _last.kitB,   // (revanche: mesmas táticas e uniformes)
                     seed = (uint)new System.Random(Environment.TickCount).Next(1, int.MaxValue) | 1u,
                 };
                 SendStart(c);
@@ -420,6 +427,7 @@ namespace Craquez.Online
             if (_link == null) return;
             _link.Pump();
             if (_st == St.Room) { UpdateRoom(); return; }
+            if (_st == St.Setup) { UpdateSetup(); return; }
             if (_st != St.Handshake) return;
             _handshakeT += Time.unscaledDeltaTime;
             if (_handshakeT > 25f) { Leave(); Say("Não deu para conectar ao adversário. Tente de novo.", true); if (_area != null) BuildPage(_app, _area); return; }
@@ -447,11 +455,11 @@ namespace Craquez.Online
                     StartAsHost(myTeam, team);
                     return;
                 }
-                if (type == MsgStart && !_link.IsHost)
+                if (type == MsgSetup && !_link.IsHost)
                 {
                     var cfg = ReadConfig(r, out int hashA, out int hashB);
                     if (cfg == null || TeamHash(cfg.teamA) != hashA || TeamHash(cfg.teamB) != hashB) { Bye("Os dados dos times são diferentes nos dois aparelhos (option file). Usem os dados padrão."); return; }
-                    Begin(cfg, 1);
+                    EnterSetup(cfg);
                     return;
                 }
             }
@@ -477,7 +485,15 @@ namespace Craquez.Online
                 {
                     var cfg = ReadConfig(r, out int hashA, out int hashB);
                     if (cfg == null || TeamHash(cfg.teamA) != hashA || TeamHash(cfg.teamB) != hashB) { Bye("Os dados dos times são diferentes nos dois aparelhos (option file). Usem os dados padrão."); return; }
-                    Begin(cfg, 1);
+                    ReadFinal(r, cfg, out int dl);
+                    Begin(cfg, 1, dl);
+                    return;
+                }
+                else if (type == MsgSetup && !_link.IsHost)
+                {
+                    var cfg = ReadConfig(r, out int hashA, out int hashB);
+                    if (cfg == null || TeamHash(cfg.teamA) != hashA || TeamHash(cfg.teamB) != hashB) { Bye("Os dados dos times são diferentes nos dois aparelhos (option file). Usem os dados padrão."); return; }
+                    EnterSetup(cfg);
                     return;
                 }
                 // (1/2: comandos e resumos que sobraram da partida que acabou — descartados)
@@ -526,17 +542,169 @@ namespace Craquez.Online
             var balls = BallCatalog.ForMode(c.mode);
             c.ball = balls.Count > 0 ? balls[rnd.Next(balls.Count)] : 0;
             c.national = Teams.Get(c.teamA).IsNational && Teams.Get(c.teamB).IsNational;
-            SendStart(c);
-        }
-
-        void SendStart(MatchConfig c)
-        {
-            var w = new Writer(MsgStart);
-            w.Str(c.mode); w.Int(c.teamA); w.Int(c.teamB); w.Int(TeamHash(c.teamA)); w.Int(TeamHash(c.teamB));
-            w.Int(c.minutes); w.Int((int)c.seed); w.Str(c.weather); w.Str(c.timeOfDay); w.Int(c.venue); w.Int(c.stadium); w.Int(c.ball); w.Int(c.streetPlayers);
+            // antes de começar: 45 s para os dois configurarem o time (formação, postura, marcação, uniforme)
+            var w = new Writer(MsgSetup);
+            WriteBase(w, c);
             _link.Send(w.Bytes());
             _link.Pump();
-            Begin(c, 0);
+            EnterSetup(c);
+        }
+
+        static void WriteBase(Writer w, MatchConfig c)
+        {
+            w.Str(c.mode); w.Int(c.teamA); w.Int(c.teamB); w.Int(TeamHash(c.teamA)); w.Int(TeamHash(c.teamB));
+            w.Int(c.minutes); w.Int((int)c.seed); w.Str(c.weather); w.Str(c.timeOfDay); w.Int(c.venue); w.Int(c.stadium); w.Int(c.ball); w.Int(c.streetPlayers);
+        }
+
+        /// <summary>Partida definitiva: a base + uniformes e táticas dos dois e o atraso dos comandos.</summary>
+        void SendStart(MatchConfig c, int delay = -1)
+        {
+            if (delay < 0) delay = DelayFromRtt();
+            var w = new Writer(MsgStart);
+            WriteBase(w, c);
+            w.Int(c.kitA); w.Int(c.kitB);
+            foreach (var t in new[] { c.tacticsA ?? new Tactics(), c.tacticsB ?? new Tactics() }) { w.Str(t.formation ?? ""); w.Int(t.mentality); w.Int(t.press); }
+            w.Int(delay);
+            _link.Send(w.Bytes());
+            _link.Pump();
+            Begin(c, 0, delay);
+        }
+
+        static void ReadFinal(Reader r, MatchConfig c, out int delay)
+        {
+            c.kitA = r.Int(); c.kitB = r.Int();
+            c.tacticsA = new Tactics { formation = r.Str(), mentality = r.Int(), press = r.Int() };
+            c.tacticsB = new Tactics { formation = r.Str(), mentality = r.Int(), press = r.Int() };
+            delay = Mathf.Clamp(r.Int(), 3, 16);
+        }
+
+        // ------------------------------------------------------------ configuração dos times (45 s)
+        MatchConfig _pending;
+        float _setupT, _pingT;
+        bool _mySent, _peerSent;
+        Tactics _myTac = new Tactics(), _peerTac = new Tactics();
+        int _myKit, _peerKit = -1;
+        readonly List<float> _rtts = new List<float>();
+        Text _setupClock;
+
+        void EnterSetup(MatchConfig c)
+        {
+            _pending = c;
+            _st = St.Setup;
+            _setupT = SetupSeconds;
+            _mySent = _peerSent = false;
+            bool host = _link.IsHost;
+            int myTeam = host ? c.teamA : c.teamB;
+            _myTac = new Tactics();
+            _myKit = host ? 0 : -1;
+            _peerTac = new Tactics();
+            _peerKit = host ? -1 : 0;
+            _rtts.Clear();
+            if (_app != null && _area != null) BuildPage(_app, _area);
+        }
+
+        void BuildSetup(RectTransform list)
+        {
+            bool host = _link != null && _link.IsHost;
+            int myTeam = host ? _pending.teamA : _pending.teamB;
+            var t = Teams.Get(myTeam);
+            UiKit.Size(UiKit.Label(list, Teams.Get(_pending.teamA).name + "  x  " + Teams.Get(_pending.teamB).name, 34, Theme.HeadItalic, Theme.Accent, TextAnchor.MiddleCenter), 52, 52);
+            _setupClock = UiKit.Label(list, "", 26, Theme.BodyBold, Theme.Text, TextAnchor.MiddleCenter);
+            UiKit.Size(_setupClock, 40, 40);
+            var forms = new List<string>(GameModes.Formations(_pending.mode).Keys);
+            int fi = Mathf.Max(0, forms.IndexOf(_myTac.formation));
+            UiKit.Size(UiKit.Cycler(list, "Formação", forms, fi, i => _myTac.formation = forms[i]), 56, 56);
+            UiKit.Size(UiKit.Cycler(list, "Postura", new[] { "Defensiva", "Equilibrada", "Ofensiva" }, _myTac.mentality, i => _myTac.mentality = i), 56, 56);
+            UiKit.Size(UiKit.Cycler(list, "Marcação", new[] { "Baixa", "Média", "Alta" }, _myTac.press, i => _myTac.press = i), 56, 56);
+            var kits = new List<string>();
+            if (!host) kits.Add("Automático");
+            for (int k = 0; k < Mathf.Min(t.kits.Count, Teams.KitNames.Length); k++) kits.Add(Teams.KitNames[k]);
+            int ki = host ? Mathf.Max(0, _myKit) : _myKit + 1;
+            UiKit.Size(UiKit.Cycler(list, "Uniforme", kits, Mathf.Clamp(ki, 0, kits.Count - 1), i => _myKit = host ? i : i - 1), 56, 56);
+            var ready = UiKit.Button(list, _mySent ? "Pronto ✓" : "Pronto  ›", SendLineup, 32, new Color(0.1f, 0.55f, 0.28f));
+            UiKit.Size(ready, 72, 72);
+            _status = UiKit.Label(list, SetupText(), 24, Theme.Body, Theme.TextDim, TextAnchor.MiddleCenter);
+            UiKit.Size(_status, 44, 44);
+            UiKit.Select(ready);
+        }
+
+        string SetupText() => (_mySent ? "Você está pronto. " : "") + (_peerSent ? "O adversário está pronto." : "O adversário está configurando o time…");
+
+        void SendLineup()
+        {
+            if (_mySent || _link == null) return;
+            _mySent = true;
+            var w = new Writer(MsgLineup);
+            w.Str(_myTac.formation ?? ""); w.Int(_myTac.mentality); w.Int(_myTac.press); w.Int(_myKit);
+            _link.Send(w.Bytes());
+            _link.Pump();
+            if (_status != null) _status.text = SetupText();
+            if (_app != null && _area != null) BuildPage(_app, _area);
+        }
+
+        void UpdateSetup()
+        {
+            if (!_link.Connected) { Fail("O adversário saiu da sala."); return; }
+            _setupT -= Time.unscaledDeltaTime;
+            if (_setupClock != null) _setupClock.text = "A partida começa em " + Mathf.Max(0, Mathf.CeilToInt(_setupT)) + " s (ou quando os dois estiverem prontos)";
+            if (_setupT <= 0f && !_mySent) SendLineup();
+            // mede a ida e volta da conexão (o anfitrião escolhe o atraso dos comandos com isso)
+            if (_link.IsHost)
+            {
+                _pingT -= Time.unscaledDeltaTime;
+                if (_pingT <= 0f)
+                {
+                    _pingT = 0.5f;
+                    var w = new Writer(MsgPing);
+                    w.Int((int)(Time.realtimeSinceStartup * 1000f));
+                    _link.Send(w.Bytes());
+                }
+            }
+            while (_link.TryReceive(out var m))
+            {
+                if (m == null || m.Length == 0) continue;
+                var r = new Reader(m);
+                byte type = r.Byte();
+                if (type == MsgBye) { Fail(r.Str()); return; }
+                if (type == MsgPing) { var w = new Writer(MsgPong); w.Int(r.Int()); _link.Send(w.Bytes()); }
+                else if (type == MsgPong) _rtts.Add(Time.realtimeSinceStartup * 1000f - r.Int());
+                else if (type == MsgLineup)
+                {
+                    _peerTac = new Tactics { formation = r.Str(), mentality = r.Int(), press = r.Int() };
+                    _peerKit = r.Int();
+                    _peerSent = true;
+                    if (_status != null) _status.text = SetupText();
+                }
+                else if (type == MsgStart && !_link.IsHost)
+                {
+                    var cfg = ReadConfig(r, out int hashA, out int hashB);
+                    if (cfg == null) { Bye("Configuração da partida inválida."); return; }
+                    ReadFinal(r, cfg, out int dl);
+                    Begin(cfg, 1, dl);
+                    return;
+                }
+            }
+            _link.Pump();
+            // anfitrião: os dois prontos (ou acabou o tempo, com 3 s de folga para chegar a escolha do outro)
+            if (_link.IsHost && _mySent && (_peerSent || _setupT < -3f))
+            {
+                var c = _pending;
+                c.tacticsA = _myTac; c.kitA = Mathf.Max(0, _myKit);
+                c.tacticsB = _peerSent ? _peerTac : new Tactics(); c.kitB = _peerSent ? _peerKit : -1;
+                SendStart(c);
+            }
+        }
+
+        /// <summary>Atraso dos comandos pela ida e volta medida: metade da ida e volta em passos da partida,
+        /// mais uma folga (entre 4 e 14 passos). Sem medida, 6.</summary>
+        int DelayFromRtt()
+        {
+            if (_rtts.Count == 0) return NetDelay;
+            var l = new List<float>(_rtts);
+            l.Sort();
+            float rtt = l[Mathf.Min(l.Count - 1, (int)(l.Count * 0.75f))];   // (percentil 75: aguenta as oscilações)
+            float stepsPerSec = 60f * MatchController.GameSpeed;
+            return Mathf.Clamp(Mathf.CeilToInt(rtt / 1000f * 0.5f * stepsPerSec) + 3, 4, 14);
         }
 
         static MatchConfig ReadConfig(Reader r, out int hashA, out int hashB)
@@ -553,12 +721,13 @@ namespace Craquez.Online
             mode == GameModes.Futsal ? VenueBuilder.FutsalNames.Length : mode == GameModes.Street ? VenueBuilder.StreetNames.Length
             : mode == GameModes.Society ? VenueBuilder.SocietyNames.Length : 1;
 
-        void Begin(MatchConfig c, int localTeam)
+        void Begin(MatchConfig c, int localTeam, int delay = NetDelay)
         {
             _st = St.Playing;
             _last = c;
+            _pending = null;
             _myReady = 0; _peerReady = 0;
-            var session = new LockstepSession(_link, localTeam, NetDelay);
+            var session = new LockstepSession(_link, localTeam, delay);
             _app.StartOnlineMatch(c, session);
         }
 

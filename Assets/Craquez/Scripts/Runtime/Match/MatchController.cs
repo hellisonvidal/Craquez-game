@@ -129,7 +129,7 @@ namespace Craquez
             }
             if ((sides[0] != Side.Cpu && _dev[0] == DeviceKind.Touch) || (sides[1] != Side.Cpu && _dev[1] == DeviceKind.Touch))
                 _touch = TouchControls.Create(transform);
-            if (net != null) { hud.ShowPauseButton(false); c.ceremony = false; }
+            if (net != null) c.ceremony = false;   // (on-line também tem pausa: os dois param juntos)
             view.SnapAll();
             if (c.ceremony) StartCeremony();
             else
@@ -424,6 +424,8 @@ namespace Craquez
                     UpdateCeremony(dt);
                     return;
                 case Phase.Paused:
+                    if (net != null) NetPausedTick();
+                    return;
                 case Phase.Ended:
                     return;
                 case Phase.Halftime:
@@ -511,18 +513,29 @@ namespace Craquez
         void UpdateNet(float dt)
         {
             int me = net.localTeam;
+            net.Pump();
+            if (NetExtras()) return;   // o outro pausou
             var f = LocalInput(me);
-            f.buttons &= ~InputFrame.Pause;   // sem pausa on-line
-            _acc += dt;
+            int pausePressed = f.buttons & InputFrame.Pause & ~_prevPause[me];
+            _prevPause[me] = f.buttons & InputFrame.Pause;
+            f.buttons &= ~InputFrame.Pause;
+            if (pausePressed != 0) { NetPause(true); return; }
+            // ritmo: com pouca folga de comandos do outro lado, anda um pouco mais devagar (em vez de travar
+            // de vez esperando a rede); com folga de sobra, recupera um pouco mais rápido
+            int lead = net.RemoteAhead;
+            float rate = lead < 2 ? 0.9f : lead > net.delay + 3 ? 1.08f : 1f;
+            _acc += dt * rate;
             bool stalled = false;
             int guard = 0;
             while (_acc >= MatchSim.DT && guard++ < 10)
             {
                 if (net.Ahead <= net.delay) net.PushLocal(f);
+                net.Pump();   // envia já (antes o comando esperava o próximo quadro para sair)
                 if (!net.Step(sim)) { stalled = true; break; }
                 _acc -= MatchSim.DT;
                 if (AfterStep()) { _acc = 0f; break; }
             }
+            net.Pump();
             if (stalled)
             {
                 _acc = Mathf.Min(_acc, MatchSim.DT * 2f);
@@ -563,6 +576,88 @@ namespace Craquez
             f.move = right * f.move.x + b * f.move.y;
             if (f.rstick.sqrMagnitude > 1e-4f) f.rstick = right * f.rstick.x + b * f.rstick.y;
             return f.Quantized();
+        }
+
+        // ------------------------------------------------------------- pausa on-line
+        const byte MsgPause = 20, MsgResume = 21;
+        bool _netPausedByMe;
+        float _netPauseT;
+
+        /// <summary>Lê pausa/continuar vindos do outro aparelho. true = a partida entrou em pausa agora.</summary>
+        bool NetExtras()
+        {
+            while (net.Extra.Count > 0)
+            {
+                var m = net.Extra.Dequeue();
+                if (m[0] == MsgPause && _phase != Phase.Paused) { NetPause(false); return true; }
+                if (m[0] == MsgResume && _phase == Phase.Paused) NetResume(false);
+            }
+            return false;
+        }
+
+        void NetSend(byte type)
+        {
+            var b = new byte[5];
+            b[0] = type;
+            int t = net.Tick;
+            b[1] = (byte)t; b[2] = (byte)(t >> 8); b[3] = (byte)(t >> 16); b[4] = (byte)(t >> 24);
+            net.SendRaw(b);
+            net.Pump();
+        }
+
+        /// <summary>Pausa on-line: os dois aparelhos param (quem pausou ou o outro pode continuar).</summary>
+        void NetPause(bool byMe)
+        {
+            if (_phase == Phase.Paused || _phase == Phase.Ended || _phase == Phase.Halftime) return;
+            if (byMe) NetSend(MsgPause);
+            _netPausedByMe = byMe;
+            _netPauseT = 0f;
+            _beforePause = _phase == Phase.Goal ? Phase.Goal : Phase.Playing;
+            _phase = Phase.Paused;
+            Time.timeScale = 0f;
+            view.Freeze(true);
+            if (_touch) _touch.gameObject.SetActive(false);
+            hud.ShowPauseButton(false);
+            if (_pauseMenu != null) Destroy(_pauseMenu);
+            var dim = UiKit.Image(hud.Overlay, new Color(0, 0, 0, 0.6f), null, "pausa on-line");
+            dim.rectTransform.Place(0, 0, 1, 1);
+            _pauseMenu = dim.gameObject;
+            var panel = UiKit.Panel(dim.transform).rectTransform.At(0.5f, 0.5f, 860, 560);
+            UiKit.Label(panel, byMe ? "PAUSA" : "PAUSADO PELO ADVERSÁRIO", 52, Theme.HeadItalic, Theme.Accent, TextAnchor.MiddleCenter).rectTransform.Place(0, 1, 1, 1, 0, -110, 0, 20);
+            var list = UiKit.Rect(panel, "lista").Place(0, 0, 1, 1, 50, 50, 50, 130);
+            UiKit.VList(list, 12, 0, false);
+            var go = UiKit.Button(list, "Continuar", () => NetResume(true), 34, new Color(0.1f, 0.55f, 0.28f));
+            UiKit.Size(go, 76, 76);
+            UiKit.Size(UiKit.Label(list, "A partida volta sozinha em 90 s.", 24, Theme.Body, Theme.TextDim, TextAnchor.MiddleCenter), 40, 40);
+            UiKit.Size(UiKit.Button(list, "Sair da partida", () => { netProblem = "Você saiu da partida."; _phase = Phase.Playing; Time.timeScale = GameSpeed; ShowEnd(); }, 30, new Color(0.7f, 0.1f, 0.14f)), 70, 70);
+            UiKit.Select(go);
+        }
+
+        void NetResume(bool send)
+        {
+            if (_phase != Phase.Paused) return;
+            if (send) NetSend(MsgResume);
+            if (_pauseMenu != null) Destroy(_pauseMenu);
+            Time.timeScale = GameSpeed;
+            view.Freeze(false);
+            _phase = _beforePause;
+            _acc = 0f;
+            _netWait = 0f;
+            if (_touch) _touch.gameObject.SetActive(true);
+            hud.ShowPauseButton(true);
+            for (int t = 0; t < 2; t++) _prevPause[t] = InputFrame.Pause;
+        }
+
+        /// <summary>Durante a pausa on-line: continua lendo a rede (o outro pode continuar) e volta sozinha.</summary>
+        void NetPausedTick()
+        {
+            net.Pump();
+            net.Poll();
+            NetExtras();
+            if (_phase != Phase.Paused) return;
+            _netPauseT += Time.unscaledDeltaTime;
+            if (_netPauseT > 90f) NetResume(true);
+            if (!net.Connected) { netProblem = "O outro jogador saiu da partida."; _phase = Phase.Playing; Time.timeScale = GameSpeed; ShowEnd(); }
         }
 
         /// <summary>Time controlado por quem está neste aparelho (vibração só para ele).</summary>
@@ -637,6 +732,7 @@ namespace Craquez
 
         void Pause()
         {
+            if (net != null) { NetPause(true); return; }
             _beforePause = _phase == Phase.Goal ? Phase.Goal : Phase.Playing;
             _phase = Phase.Paused;
             Time.timeScale = 0f;
@@ -794,7 +890,7 @@ namespace Craquez
                 _phase = Phase.Playing;
                 _acc = 0f;
                 if (_touch) _touch.gameObject.SetActive(true);
-                hud.ShowPauseButton(net == null);
+                hud.ShowPauseButton(true);
                 for (int t = 0; t < 2; t++) _prevPause[t] = InputFrame.Pause;
             }
         }

@@ -44,7 +44,8 @@ VARIANTS = {
     "europeu": (0.0, 0.0, 1.0, "young_caucasian_male.mhmat", "eyebrow003.mhclo", 0.60, 0.46),
     "asiatico": (0.0, 0.90, 0.10, "young_asian_male.mhmat", "eyebrow009.mhclo", 0.45, 0.45),
 }
-HAIRS = ["short02.mhclo", "short01.mhclo", "short03.mhclo", "short04.mhclo", "afro01.mhclo"]
+HAIRS = ["short02.mhclo", "short01.mhclo", "short03.mhclo", "short04.mhclo", "afro01.mhclo",
+         "long01.mhclo", "ponytail01.mhclo", "braid01.mhclo", "bob02.mhclo"]   # (mais estilos: longo, rabo de cavalo, tranças, chanel)
 
 # Shape keys de variação (nome no FBX -> lista de (alvo MakeHuman, peso))
 FACE_KEYS = {

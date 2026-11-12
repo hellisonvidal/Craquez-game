@@ -556,6 +556,17 @@ namespace Craquez
         static Texture2D _brandTex;
         static Texture2D BrandTex => _brandTex != null ? _brandTex : (_brandTex = Gfx.BrandBoards());
 
+        /// <summary>
+        /// Placa de publicidade vista do campo: <paramref name="left"/>/<paramref name="right"/> são os pés da
+        /// placa à esquerda e à direita de quem olha do campo. A textura corre ao longo da placa (antes corria
+        /// na vertical: as placas viravam faixas horizontais coloridas) e a logo fica de pé, sem espelhar.
+        /// </summary>
+        static void BoardFace(MeshKit k, Vector3 left, Vector3 right, float h, float uLen)
+        {
+            var up = Vector3.up * h;
+            k.Quad(left + up, right + up, right, left, new Vector2(0f, 1f), new Vector2(uLen, 0f));
+        }
+
         static void Boards(Venue v, float hl, float hw, TeamData home, TeamData away, bool interactive)
         {
             // placas do Craquez (logo do jogo intercalada com placas lisas azul, vermelha e branca); nos
@@ -568,16 +579,16 @@ namespace Craquez
             float Lz = (z1 - z0) / 15.2f;
             // um objeto por lado: a placa do lado da câmera some sozinha quando tapa a visão
             var k = new MeshKit();
-            k.Quad(new Vector3(x0, 0, z1), new Vector3(x0, h, z1), new Vector3(x1, h, z1), new Vector3(x1, 0, z1), new Vector2(0, 0), new Vector2(L, 1));
+            BoardFace(k, new Vector3(x0, 0, z1), new Vector3(x1, 0, z1), h, L);     // fundo: olhando para +z, a direita é +x
             k.Object("Placas LED (fundo)", mat, v.root, false);
             k = new MeshKit();
-            k.Quad(new Vector3(x1, 0, z0), new Vector3(x1, h, z0), new Vector3(x0, h, z0), new Vector3(x0, 0, z0), new Vector2(0, 0), new Vector2(L, 1));
+            BoardFace(k, new Vector3(x1, 0, z0), new Vector3(x0, 0, z0), h, L);     // lado da câmera: olhando para -z
             k.Object("Placas LED (câmera)", mat, v.root, false);
             k = new MeshKit();
-            k.Quad(new Vector3(x1, 0, z1), new Vector3(x1, h, z1), new Vector3(x1, h, z0), new Vector3(x1, 0, z0), new Vector2(0, 0), new Vector2(Lz, 1));
+            BoardFace(k, new Vector3(x1, 0, z1), new Vector3(x1, 0, z0), h, Lz);    // direita: olhando para +x
             k.Object("Placas LED (direita)", mat, v.root, false);
             k = new MeshKit();
-            k.Quad(new Vector3(x0, 0, z0), new Vector3(x0, h, z0), new Vector3(x0, h, z1), new Vector3(x0, 0, z1), new Vector2(0, 0), new Vector2(Lz, 1));
+            BoardFace(k, new Vector3(x0, 0, z0), new Vector3(x0, 0, z1), h, Lz);    // esquerda: olhando para -x
             k.Object("Placas LED (esquerda)", mat, v.root, false);
         }
 
@@ -1461,53 +1472,102 @@ namespace Craquez
         /// com faixa na cor do clube e janelas altas, telhado em arco, marquise da entrada, calçada,
         /// estacionamento e postes. Tudo virado para fora: de dentro não aparece.
         /// </summary>
+        // aparência de cada ginásio por fora: telhado (0 arco, 1 plano com mureta, 2 duas águas, 3 cúpula, 4 uma
+        // água), parede (0 concreto, 1 tijolo, 2 chapa metálica, 3 pintada), cor e se tem fachada de vidro
+        static readonly int[] HallRoof = { 0, 3, 2, 1, 1, 2, 3, 2, 4, 0, 1, 4, 3, 0, 1 };
+        static readonly int[] HallWall = { 0, 2, 1, 1, 2, 3, 0, 1, 3, 2, 2, 2, 2, 0, 2 };
+        static readonly bool[] HallGlass = { false, false, false, true, false, false, true, false, false, false, true, false, false, true, false };
+        static readonly Color[] HallColor =
+        {
+            new Color(0.78f, 0.76f, 0.7f), new Color(0.72f, 0.75f, 0.8f), new Color(0.62f, 0.3f, 0.22f), new Color(0.45f, 0.24f, 0.2f),
+            new Color(0.12f, 0.12f, 0.16f), new Color(0.95f, 0.85f, 0.45f), new Color(0.92f, 0.93f, 0.95f), new Color(0.5f, 0.32f, 0.22f),
+            new Color(0.62f, 0.8f, 0.6f), new Color(0.95f, 0.5f, 0.12f), new Color(0.2f, 0.4f, 0.8f), new Color(0.55f, 0.57f, 0.6f),
+            new Color(0.78f, 0.12f, 0.15f), new Color(0.8f, 0.8f, 0.78f), new Color(0.42f, 0.2f, 0.62f),
+        };
+
         static void HallExterior(Venue v, float W, float D, float H, Kit homeKit, int variant, bool night)
         {
+            int vi = Mathf.Abs(variant) % HallRoof.Length;
+            int roofType = HallRoof[vi], wallKind = HallWall[vi];
+            bool glassFront = HallGlass[vi];
+            Color baseCol = HallColor[vi];
             float X = W + 0.35f, Z = D + 0.35f, top = H + 0.4f;
             var wall = new MeshKit();
             var band = new MeshKit();
             var glass = new MeshKit();
             var roof = new MeshKit();
-            // paredes (normais para fora)
+            var trim = new MeshKit();
+            // altura do telhado em cada ponto (as paredes de ponta acompanham sozinhas)
+            float rise = Z * 0.22f;
+            float Hf(float x, float z)
+            {
+                switch (roofType)
+                {
+                    case 0: return top + rise * (1f - (z / Z) * (z / Z));                                   // arco ao longo do comprimento
+                    case 1: return top;                                                                   // plano (com mureta)
+                    case 2: return top + Z * 0.32f * (1f - Mathf.Abs(z) / Z);                             // duas águas, cumeeira no meio
+                    case 3: return top + Z * 0.3f * (1f - (x / X) * (x / X)) * (1f - (z / Z) * (z / Z));   // cúpula
+                    default: return top + Z * 0.18f * (z + Z) / (2f * Z);                                  // uma água
+                }
+            }
+            // paredes (normais para fora) + o pedaço entre o alto da parede e o telhado
             void Face(Vector3 a, Vector3 b)
             {
                 float len = (b - a).magnitude;
                 // (ordem b, a: a normal fica para fora do ginásio)
                 wall.Quad(b, a, a + Vector3.up * top, b + Vector3.up * top, Vector2.zero, new Vector2(len / 8f, top / 8f));
+                int n = 16;
+                for (int i = 0; i < n; i++)
+                {
+                    var e0 = Vector3.Lerp(a, b, i / (float)n); var e1 = Vector3.Lerp(a, b, (i + 1) / (float)n);
+                    float h0 = Hf(e0.x, e0.z), h1 = Hf(e1.x, e1.z);
+                    if (h0 < top + 0.01f && h1 < top + 0.01f) continue;
+                    wall.Quad(new Vector3(e1.x, top, e1.z), new Vector3(e0.x, top, e0.z), new Vector3(e0.x, h0, e0.z), new Vector3(e1.x, h1, e1.z));
+                }
                 var outN = Vector3.Cross(b - a, Vector3.up).normalized * -0.06f;
-                // faixa do clube a 2/3 da altura e janelas altas logo abaixo do telhado
+                // faixa a 2/3 da altura; janelas altas (ou fachada de vidro do chão quase ao teto)
                 var y0b = Vector3.up * (top * 0.62f) + outN; var y1b = Vector3.up * (top * 0.62f + 1.4f) + outN;
                 band.Quad(b + y0b, a + y0b, a + y1b, b + y1b);
-                for (float t = 2f; t < len - 3f; t += 5f)
+                float gy0 = glassFront ? 1.2f : top - 3.4f, gy1 = glassFront ? top * 0.6f : top - 1.2f;
+                for (float t = 2f; t < len - 3f; t += glassFront ? 4f : 5f)
                 {
                     var p0 = Vector3.Lerp(a, b, t / len) + outN;
-                    var p1 = Vector3.Lerp(a, b, (t + 3.2f) / len) + outN;
-                    glass.Quad(p1 + Vector3.up * (top - 3.4f), p0 + Vector3.up * (top - 3.4f), p0 + Vector3.up * (top - 1.2f), p1 + Vector3.up * (top - 1.2f));
+                    var p1 = Vector3.Lerp(a, b, (t + (glassFront ? 3.6f : 3.2f)) / len) + outN;
+                    glass.Quad(p1 + Vector3.up * gy0, p0 + Vector3.up * gy0, p0 + Vector3.up * gy1, p1 + Vector3.up * gy1);
+                    if (wallKind == 2) trim.Box((p0 + p1) * 0.5f + Vector3.up * top * 0.5f + outN * 2f, new Vector3(0.12f, top, 0.12f));   // nervuras da chapa
                 }
             }
             Face(new Vector3(-X, 0, -Z), new Vector3(X, 0, -Z));
             Face(new Vector3(X, 0, Z), new Vector3(-X, 0, Z));
             Face(new Vector3(X, 0, -Z), new Vector3(X, 0, Z));
             Face(new Vector3(-X, 0, Z), new Vector3(-X, 0, -Z));
-            // telhado em arco ao longo do comprimento (de uma lateral à outra), visto de cima
-            int seg = 12;
-            float rise = Z * 0.22f;
-            for (int i = 0; i < seg; i++)
-            {
-                float z0 = -Z - 0.6f + (2f * Z + 1.2f) * i / seg, z1 = -Z - 0.6f + (2f * Z + 1.2f) * (i + 1) / seg;
-                float y0 = top + rise * (1f - Mathf.Pow(z0 / (Z + 0.6f), 2f)), y1 = top + rise * (1f - Mathf.Pow(z1 / (Z + 0.6f), 2f));
-                roof.Quad(new Vector3(-X - 0.6f, y0, z0), new Vector3(-X - 0.6f, y1, z1), new Vector3(X + 0.6f, y1, z1), new Vector3(X + 0.6f, y0, z0), new Vector2(0, i / (float)seg), new Vector2(X / 4f, (i + 1f) / seg));
-            }
-            // empenas (as pontas do arco) nas duas cabeceiras
-            foreach (float sx in new[] { -1f, 1f })
-                for (int i = 0; i < seg; i++)
+            // telhado em grade (visto de cima: normal para cima)
+            int nx = 16, nz = 12;
+            for (int i = 0; i < nx; i++)
+                for (int j = 0; j < nz; j++)
                 {
-                    float z0 = -Z + 2f * Z * i / seg, z1 = -Z + 2f * Z * (i + 1) / seg;
-                    float y0 = top + rise * (1f - Mathf.Pow(z0 / (Z + 0.6f), 2f)), y1 = top + rise * (1f - Mathf.Pow(z1 / (Z + 0.6f), 2f));
-                    var a0 = new Vector3(sx * X, top, z0); var a1 = new Vector3(sx * X, top, z1);
-                    if (sx < 0) wall.Quad(a0, a1, new Vector3(sx * X, y1, z1), new Vector3(sx * X, y0, z0));
-                    else wall.Quad(a1, a0, new Vector3(sx * X, y0, z0), new Vector3(sx * X, y1, z1));
+                    float x0 = -X + 2f * X * i / nx, x1 = -X + 2f * X * (i + 1) / nx, z0 = -Z + 2f * Z * j / nz, z1 = -Z + 2f * Z * (j + 1) / nz;
+                    roof.Quad(new Vector3(x0, Hf(x0, z0), z0), new Vector3(x0, Hf(x0, z1), z1), new Vector3(x1, Hf(x1, z1), z1), new Vector3(x1, Hf(x1, z0), z0),
+                        new Vector2(i / 4f, j / 4f), new Vector2((i + 1) / 4f, (j + 1) / 4f));
                 }
+            if (roofType == 1)
+            {
+                // mureta em volta do telhado plano
+                trim.Box(new Vector3(0f, top + 0.5f, Z), new Vector3(2f * X + 0.4f, 1f, 0.4f));
+                trim.Box(new Vector3(0f, top + 0.5f, -Z), new Vector3(2f * X + 0.4f, 1f, 0.4f));
+                trim.Box(new Vector3(X, top + 0.5f, 0f), new Vector3(0.4f, 1f, 2f * Z));
+                trim.Box(new Vector3(-X, top + 0.5f, 0f), new Vector3(0.4f, 1f, 2f * Z));
+            }
+            // letreiro com o nome do ginásio sobre a entrada (aceso à noite)
+            string sign = v.name ?? "GINASIO";
+            sign = sign.ToUpperInvariant().Normalize(System.Text.NormalizationForm.FormD);
+            var sb = new System.Text.StringBuilder();
+            foreach (char ch in sign) if (System.Globalization.CharUnicodeInfo.GetUnicodeCategory(ch) != System.Globalization.UnicodeCategory.NonSpacingMark) sb.Append(ch);
+            var signTex = Gfx.Led(new[] { sb.ToString() }, new[] { Color.Lerp(baseCol, Color.black, 0.55f) }, 1024, 64);
+            // (visto de fora do ginásio: olhando para -z, a direita é -x)
+            var signK = new MeshKit();
+            BoardFace(signK, new Vector3(9f, 6.2f, Z + 0.45f), new Vector3(-9f, 6.2f, Z + 0.45f), 1.8f, 1f);
+            signK.Object("Letreiro do ginásio", Gfx.Emissive(Color.white, night ? new Color(1.2f, 1.2f, 1.2f) : new Color(0.5f, 0.5f, 0.5f), signTex), v.root, false);
             // marquise da entrada (lado de lá) e calçada + estacionamento em volta
             var canopy = new MeshKit();
             canopy.Box(new Vector3(0f, 4.2f, Z + 3f), new Vector3(16f, 0.4f, 6f));
@@ -1527,11 +1587,15 @@ namespace Craquez
                     poles.Cylinder(b, b + Vector3.up * 7f, 0.1f, 6);
                     lamps.Box(b + Vector3.up * 7f, new Vector3(0.8f, 0.16f, 0.8f));
                 }
-            var structure = Color.Lerp(homeKit.c1, new Color(0.82f, 0.82f, 0.8f), 0.82f);
-            wall.Object("Ginásio (fora)", Gfx.Lit(structure, Gfx.Concrete(256, 41 + variant), 0.2f), v.root, false);
-            band.Object("Faixa do ginásio", night ? Gfx.Emissive(homeKit.c1 * 0.7f, homeKit.c1 * 1.2f) : Gfx.Lit(homeKit.c1, null, 0.35f), v.root, false);
+            var wallTex = wallKind == 1 ? BrickTex(baseCol, 41 + vi) : wallKind == 2 ? Gfx.MetalSheet(256, 41 + vi) : Gfx.Concrete(256, 41 + vi);
+            wall.Object("Ginásio (fora)", Gfx.Lit(wallKind == 1 ? Color.white : baseCol, wallTex, wallKind == 2 ? 0.45f : 0.2f, wallKind == 2 ? 0.5f : 0f), v.root, false);
+            trim.Object("Acabamento do ginásio", Gfx.Lit(Color.Lerp(baseCol, Color.white, 0.35f), null, 0.4f, 0.3f), v.root, false);
+            // faixa: cor do clube; na Arena Neon, néon aceso sempre
+            var bandC = vi == 4 ? new Color(1f, 0.2f, 0.85f) : homeKit.c1;
+            band.Object("Faixa do ginásio", night || vi == 4 ? Gfx.Emissive(bandC * 0.7f, bandC * (vi == 4 ? 2.5f : 1.2f)) : Gfx.Lit(bandC, null, 0.35f), v.root, false);
             glass.Object("Janelas altas", Gfx.Emissive(new Color(0.1f, 0.14f, 0.2f), night ? new Color(1f, 0.92f, 0.75f) * 0.8f : new Color(0.05f, 0.08f, 0.12f)), v.root, false);
-            roof.Object("Telhado", Gfx.Lit(new Color(0.62f, 0.64f, 0.68f), HallPanels(variant), 0.45f, 0.4f), v.root, false);
+            var roofC = roofType == 2 ? new Color(0.55f, 0.25f, 0.18f) : roofType == 3 ? Color.Lerp(baseCol, Color.white, 0.5f) : new Color(0.62f, 0.64f, 0.68f);
+            roof.Object("Telhado", Gfx.Lit(roofC, HallPanels(variant), 0.45f, 0.4f), v.root, false);
             canopy.Object("Marquise", Gfx.Lit(Color.Lerp(homeKit.c1, Color.black, 0.2f), null, 0.3f), v.root, false);
             ground.Object("Calçada do ginásio", Gfx.Lit(new Color(0.72f, 0.7f, 0.66f), PaverTex(variant), 0.12f), v.root, false);
             lot.Object("Estacionamento do ginásio", Gfx.Lit(new Color(0.27f, 0.27f, 0.29f), Gfx.Asphalt(256, Color.white, 61, 0.3f), 0.25f), v.root, false);
@@ -1559,13 +1623,13 @@ namespace Craquez
             var led = Gfx.Emissive(Color.white, new Color(0.7f, 0.7f, 0.7f), BrandTex);   // (paradas no ginásio)
             float bx = hl + 2.2f, bz = hw + 2.2f, bh = 0.8f;
             var bd = new MeshKit();
-            bd.Quad(new Vector3(-bx, 0, bz), new Vector3(-bx, bh, bz), new Vector3(bx, bh, bz), new Vector3(bx, 0, bz), new Vector2(0, 0), new Vector2(bx * 2f / 12.8f, 1));
+            BoardFace(bd, new Vector3(-bx, 0, bz), new Vector3(bx, 0, bz), bh, bx * 2f / 12.8f);
             bd.Object("Placas (fundo)", led, v.root, false);
             bd = new MeshKit();
-            bd.Quad(new Vector3(bx, 0, bz), new Vector3(bx, bh, bz), new Vector3(bx, bh, -bz), new Vector3(bx, 0, -bz), new Vector2(0, 0), new Vector2(bz * 2f / 12.8f, 1));
+            BoardFace(bd, new Vector3(bx, 0, bz), new Vector3(bx, 0, -bz), bh, bz * 2f / 12.8f);
             bd.Object("Placas (direita)", led, v.root, false);
             bd = new MeshKit();
-            bd.Quad(new Vector3(-bx, 0, -bz), new Vector3(-bx, bh, -bz), new Vector3(-bx, bh, bz), new Vector3(-bx, 0, bz), new Vector2(0, 0), new Vector2(bz * 2f / 12.8f, 1));
+            BoardFace(bd, new Vector3(-bx, 0, -bz), new Vector3(-bx, 0, bz), bh, bz * 2f / 12.8f);
             bd.Object("Placas (esquerda)", led, v.root, false);
             // ginásio
             float W = hl + 18f, D = hw + 17f, H = 17f;

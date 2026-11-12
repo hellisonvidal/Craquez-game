@@ -1667,6 +1667,9 @@ namespace Craquez
             _trMode = GameModes.Field; _trTeam = -1; _trGkTeam = -1; _trGk = -1; _trVenue = 0;
             if (Teams.Get(_cfg.teamA) == null || Teams.Get(_cfg.teamA).IsNational) _cfg.teamA = 0;
             _cfg.tutorial = true;
+            // só na primeira vez que o jogo é aberto (mesmo que feche no meio); depois, em Configurações › Controles
+            PlayerPrefs.SetInt(TutorialCoach.DoneKey, 1);
+            PlayerPrefs.Save();
             StartTraining();
         }
 
@@ -1720,7 +1723,8 @@ namespace Craquez
             var go = new GameObject("Partida");
             go.transform.SetParent(transform, false);
             _match = go.AddComponent<MatchController>();
-            _match.onExit = () => { EndMatch(); EndTraining(); ShowPlay(); };
+            // tutorial: termina na tela principal (Jogar, Competições, Troféus, On-line, Configurações)
+            _match.onExit = () => { bool tut = _cfg.tutorial; EndMatch(); EndTraining(); if (tut) { _wasMenu = true; ShowModes(); } else ShowPlay(); };
             _match.onRestart = c => { EndMatch(); StartMatch(); };
             _match.Begin(_cfg, cam);
         }
