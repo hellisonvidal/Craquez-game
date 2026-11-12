@@ -64,6 +64,8 @@ namespace Craquez.Sim
         public int firstKickoff;
         /// <summary>Arena de treino: um atacante (time 0) contra o goleiro; a bola volta ao pé dele depois de cada lance.</summary>
         public bool training;
+        /// <summary>Treino com dois companheiros (tutorial: passe, tabela e cruzamento).</summary>
+        public bool trainingMates;
         /// <summary>Treino: atleta escolhido pelo jogador (índice no elenco; -1 = o melhor finalizador).</summary>
         public int trainingRoster = -1;
         public int trainingKeeper = -1;
@@ -72,6 +74,10 @@ namespace Craquez.Sim
         public float protectT;
         public int passReceiver = -1;
         int takeTick, passTick = -999;
+        /// <summary>Quem fez o último passe, quando, e quando o dono atual dominou (tabela da CPU).</summary>
+        public int LastPasser => lastPasser;
+        public int PassTick => passTick;
+        public int TakeTick => takeTick;
         Vector2 passFrom;
         /// <summary>Saída de bola: o batedor só pode tocar para o companheiro ao lado (nada de sair conduzindo ou chutar).</summary>
         public bool kickoffPass;
@@ -750,7 +756,7 @@ namespace Craquez.Sim
                     // a bola foi longe: o gandula (ou um torcedor) devolve com as mãos, por cima, e o goleiro
                     // apanha no ar; a bola que saiu é essa mesma (sai de onde ela parou, lá fora)
                     gkToss = true;
-                    gkTossFrom = new Vector2(gxL + Mathf.Sign(gxL) * Mathf.Clamp(far + 1.5f, 3f, mode.id == GameModes.Field ? 7f : 3.5f),
+                    gkTossFrom = new Vector2(gxL + Mathf.Sign(gxL) * (mode.id == GameModes.Field ? 5.9f : Mathf.Clamp(far + 1.5f, 3f, 3.5f)),   // (campo: de trás das placas do fundo)
                         Mathf.Clamp(outPos.y, -halfW - 2f, halfW + 2f));
                     gkFetchBall = gkTossFrom;
                 }
@@ -2712,6 +2718,13 @@ namespace Craquez.Sim
         Vector2 SupportRun(SimPlayer p, Vector2 target, bool attacking)
         {
             float dir = TeamDir(p.team);
+            // tabela: quem acabou de passar não fica parado — arranca para o espaço à frente, para receber de volta
+            if (attacking && p.id == lastPasser && tick - passTick < 110 && !p.isKeeper && ball.owner >= 0 && ball.owner != p.id
+                && players[ball.owner].team == p.team)
+            {
+                var run = GiveGoRun(p);
+                if (run.HasValue) return run.Value;
+            }
             if (attacking && ball.owner >= 0 && ball.owner != p.id)
             {
                 var carrier = players[ball.owner];
@@ -2768,6 +2781,35 @@ namespace Craquez.Sim
         }
 
         /// <summary>x do penúltimo defensor adversário (linha do impedimento) para o time t que ataca.</summary>
+        /// <summary>
+        /// Corrida da tabela: para frente e para o lado com menos marcadores, até a linha do impedimento.
+        /// null quando não há espaço (zagueiro colado à frente) ou já está no fundo.
+        /// </summary>
+        Vector2? GiveGoRun(SimPlayer p)
+        {
+            float dir = TeamDir(p.team);
+            bool fieldM = mode.id == GameModes.Field;
+            float ahead = fieldM ? 11f : Mathf.Min(7f, halfLen * 0.35f);
+            if ((halfLen * dir - p.position.x) * dir < ahead * 0.6f) return null;
+            Vector2 best = Vector2.zero; float bestS = float.MinValue;
+            foreach (float side in new[] { -1f, 0f, 1f })
+            {
+                var t = p.position + new Vector2(dir * ahead, side * ahead * 0.45f);
+                t.y = Mathf.Clamp(t.y, -halfW + 1.5f, halfW - 1.5f);
+                float free = 99f;
+                foreach (var o in players) if (o.team != p.team && !o.sentOff) free = Mathf.Min(free, o.position.Dist(t));
+                float sc = Mathf.Min(free, 8f) - Mathf.Abs(side) * 0.5f;
+                if (sc > bestS) { bestS = sc; best = t; }
+            }
+            if (bestS < (fieldM ? 2.5f : 1.6f)) return null;
+            if (mode.offside)
+            {
+                float line = OffsideLineX(p.team);
+                if ((best.x - line) * dir > -0.4f) best.x = line - dir * 0.6f;
+            }
+            return best;
+        }
+
         float OffsideLineX(int t)
         {
             float dir = TeamDir(t);
@@ -4918,10 +4960,12 @@ namespace Craquez.Sim
                     float T = walkUpTaker >= 0 ? Mathf.Clamp(walkUpTo.Dist(tk.position) / 4.5f + 0.2f, 0.75f, 1.8f) : 1.0f;
                     _tossTo = tkId;
                     stateTimer = Mathf.Max(stateTimer, T + 0.25f);
-                    var from = new Vector2(outP.x, line + side * Mathf.Max(1.2f, (outP.y - line) * side));
+                    // no campo o gandula fica atrás das placas de publicidade (4,2 m da linha): joga de lá, por cima
+                    bool fieldT = mode.id == GameModes.Field;
+                    var from = new Vector2(outP.x, line + side * (fieldT ? 4.6f : Mathf.Max(1.2f, (outP.y - line) * side)));
                     ball.owner = -1;
                     ball.pos = from;
-                    ball.z = 0.9f;
+                    ball.z = fieldT ? 1.3f : 0.9f;
                     float zEnd = throwIn ? 1.5f : 0.15f;
                     ball.vel = (spot - from) / T;
                     ball.vz = (zEnd - ball.z + 0.5f * SimBall.G * T * T) / T;
@@ -5069,9 +5113,24 @@ namespace Craquez.Sim
                 if (chosen != null && !chosen.isKeeper) striker = chosen;
                 else if (striker != null && Substitute(striker.id, trainingRoster)) striker.signature = Signature(striker, teams[0].data);
             }
+            // tutorial: ficam também dois companheiros (um meia atrás e um ponta), para passe, tabela e cruzamento
+            SimPlayer mate1 = null, mate2 = null;
+            if (trainingMates && striker != null)
+            {
+                foreach (var p in players)
+                {
+                    if (p.team != 0 || p.isKeeper || p == striker) continue;
+                    if (mate1 == null || p.passing > mate1.passing) mate1 = p;
+                }
+                foreach (var p in players)
+                {
+                    if (p.team != 0 || p.isKeeper || p == striker || p == mate1) continue;
+                    if (mate2 == null || Mathf.Abs(p.basePos.y) > Mathf.Abs(mate2.basePos.y)) mate2 = p;
+                }
+            }
             foreach (var p in players)
             {
-                if (p == striker || (p.team == 1 && p.isKeeper)) continue;
+                if (p == striker || p == mate1 || p == mate2 || (p.team == 1 && p.isKeeper)) continue;
                 p.sentOff = true;
                 p.sentOffT = -1f;   // fora para sempre (some da tela)
                 ParkSentOff(p);

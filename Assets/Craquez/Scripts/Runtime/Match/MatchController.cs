@@ -32,6 +32,7 @@ namespace Craquez
         /// <summary>On-line: botão Revanche no fim do jogo.</summary>
         public System.Action onNetRematch;
         float _netWait;
+        TutorialCoach _coach;
         bool _netWarned;
         object _goalSnap;
         /// <summary>Partida CPU x CPU de fundo nos menus (sem interface, câmera cinematográfica).</summary>
@@ -66,6 +67,7 @@ namespace Craquez
             sim.rollScale = RollFor(c.mode, w);
             sim.startSwapped = c.swapSides;
             sim.training = c.training;
+            sim.trainingMates = c.tutorial;
             sim.trainingRoster = c.trainingRoster;
             sim.trainingKeeper = c.trainingKeeper;
             if (c.toss && !c.training)
@@ -90,7 +92,7 @@ namespace Craquez
             view.weather.onChange = msg =>
             {
                 hud?.SetWeather(view.venue.name + "  •  " + view.weather.Label);
-                sim.SetRollScale(RollFor(cfg.mode, view.weather.kind));
+                if (net == null) sim.SetRollScale(RollFor(cfg.mode, view.weather.kind));   // (on-line: o desenho não mexe na simulação)
             };
             view.bcam.followTeam = c.sideA == Side.Cpu && c.sideB != Side.Cpu ? 1 : 0;
             hud = new GameObject("HUD").AddComponent<Hud>();
@@ -133,7 +135,8 @@ namespace Craquez
             else
             {
                 _phase = Phase.Playing; Sfx.Whistle();
-                if (c.training) hud.Toast("TREINO  •  chute ao gol: a cada lance a bola volta ao seu pé", 4f);
+                if (c.tutorial) { _coach = gameObject.AddComponent<TutorialCoach>(); _coach.Setup(this); }
+                else if (c.training) hud.Toast("TREINO  •  chute ao gol: a cada lance a bola volta ao seu pé", 4f);
                 if (tossWinner >= 0)
                 {
                     var tw = Teams.Get(tossWinner == 0 ? c.teamA : c.teamB);
@@ -451,7 +454,7 @@ namespace Craquez
             for (int t = 0; t < 2; t++)
             {
                 if (_cpu[t] != null) continue;
-                frames[t] = InputRouter.Read(_dev[t]).Quantized();
+                frames[t] = LocalInput(t);
                 int pressed = frames[t].buttons & ~_prevPause[t];
                 _prevPause[t] = frames[t].buttons;
                 if ((pressed & InputFrame.Pause) != 0) { Pause(); return; }
@@ -464,6 +467,7 @@ namespace Craquez
                 for (int t = 0; t < 2; t++)
                     if (_cpu[t] != null) frames[t] = _cpu[t].MakeInput(sim);
                 sim.Step(frames);
+                if (_coach != null) _coach.OnTick(sim, frames[0]);
                 if (AfterStep()) break;
             }
             if (_phase == Phase.Playing) view.Alpha = _acc / MatchSim.DT;
@@ -507,7 +511,7 @@ namespace Craquez
         void UpdateNet(float dt)
         {
             int me = net.localTeam;
-            var f = InputRouter.Read(_dev[me]).Quantized();
+            var f = LocalInput(me);
             f.buttons &= ~InputFrame.Pause;   // sem pausa on-line
             _acc += dt;
             bool stalled = false;
@@ -539,6 +543,26 @@ namespace Craquez
                 return;
             }
             if (_phase == Phase.Playing) view.Alpha = Mathf.Clamp01(_acc / MatchSim.DT);
+        }
+
+        readonly Vector2[] _stickBasis = new Vector2[2];
+
+        /// <summary>
+        /// Comando do controle deste aparelho para o time t. Nas câmeras atrás do jogador o analógico segue a
+        /// câmera; a direção é travada enquanto o dedo/alavanca segura (a câmera girando atrás do jogador não
+        /// entorta o caminho — antes ele ia saindo de lado e se afastava da bola até sumir da tela).
+        /// </summary>
+        InputFrame LocalInput(int t)
+        {
+            var f = InputRouter.Read(_dev[t]);
+            var fw = view != null && view.bcam != null ? view.bcam.StickForward() : Vector2.zero;
+            if (fw == Vector2.zero) { _stickBasis[t] = Vector2.zero; return f.Quantized(); }
+            if (f.move.magnitude < 0.2f || _stickBasis[t] == Vector2.zero) _stickBasis[t] = fw;
+            var b = _stickBasis[t];
+            var right = new Vector2(b.y, -b.x);
+            f.move = right * f.move.x + b * f.move.y;
+            if (f.rstick.sqrMagnitude > 1e-4f) f.rstick = right * f.rstick.x + b * f.rstick.y;
+            return f.Quantized();
         }
 
         /// <summary>Time controlado por quem está neste aparelho (vibração só para ele).</summary>

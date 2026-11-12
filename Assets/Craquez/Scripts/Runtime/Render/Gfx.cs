@@ -756,7 +756,7 @@ namespace Craquez
         /// lisas azuis, vermelhas e brancas, nas cores da interface. Sem a grade de LED (de longe, a grade fina
         /// virava faixas de arco-íris nas placas vistas de lado).
         /// </summary>
-        public static Texture2D BrandBoards(int w = 2048, int h = 64)
+        public static Texture2D BrandBoards(int w = 2048, int h = 128)
         {
             var navy = new Color(0.03f, 0.07f, 0.22f);
             var blue = new Color(0.16f, 0.5f, 0.95f);
@@ -766,13 +766,25 @@ namespace Craquez
             var t = Tex(w, h, true, TextureWrapMode.Repeat);
             var px = new Color32[w * h];
             int seg = w / plates.Length;
-            var glyphs = Glyphs.Render("CRAQUEZ", h - 22);
-            int gw = glyphs.GetLength(0), gh = glyphs.GetLength(1);
+            // a logo do jogo (PNG com transparência, lido como bytes para poder misturar os pixels)
+            Color32[] logo = null;
+            int lw = 0, lh = 0;
+            var asset = Resources.Load<TextAsset>("UI/logo_placa.png");
+            if (asset != null)
+            {
+                var lt = new Texture2D(2, 2, TextureFormat.RGBA32, false);
+                if (lt.LoadImage(asset.bytes)) { logo = lt.GetPixels32(); lw = lt.width; lh = lt.height; }
+                Object.Destroy(lt);
+            }
+            bool[,] glyphs = logo == null ? Glyphs.Render("CRAQUEZ", h / 2) : null;
             for (int i = 0; i < plates.Length; i++)
             {
                 var bg = plates[i];
                 bool brand = i % 2 == 0;
-                int gx0 = i * seg + (seg - gw) / 2, gy0 = (h - gh) / 2;
+                // a logo cabe na placa (mantém a proporção) e fica centrada
+                float k = logo != null ? Mathf.Min((seg - 14f) / lw, (h - 10f) / lh) : 1f;
+                int dw = logo != null ? Mathf.RoundToInt(lw * k) : glyphs.GetLength(0), dh = logo != null ? Mathf.RoundToInt(lh * k) : glyphs.GetLength(1);
+                int ox = i * seg + (seg - dw) / 2, oy = (h - dh) / 2;
                 for (int y = 0; y < h; y++)
                     for (int x = 0; x < seg; x++)
                     {
@@ -780,13 +792,20 @@ namespace Craquez
                         Color c = bg;
                         if (brand)
                         {
-                            int lx = X - gx0, ly = y - gy0;
-                            if (lx >= 0 && ly >= 0 && lx < gw && ly < gh && glyphs[lx, ly]) c = Color.white;
-                            else if (y < 4) c = (i / 2) % 2 == 0 ? red : blue;   // faixa de cor embaixo do nome
+                            int lx = X - ox, ly = y - oy;
+                            if (lx >= 0 && ly >= 0 && lx < dw && ly < dh)
+                            {
+                                if (logo != null)
+                                {
+                                    var lc = (Color)logo[Mathf.Min(lh - 1, (int)(ly / k)) * lw + Mathf.Min(lw - 1, (int)(lx / k))];
+                                    c = Color.Lerp(c, lc, lc.a);
+                                }
+                                else if (glyphs[lx, ly]) c = Color.white;
+                            }
                         }
                         // emenda escura entre uma placa e outra e borda de cima mais clara
-                        if (x < 2 || x >= seg - 2) c *= 0.55f;
-                        else if (y >= h - 2) c = Color.Lerp(c, Color.white, 0.25f);
+                        if (x < 3 || x >= seg - 3) c *= 0.55f;
+                        else if (y >= h - 3) c = Color.Lerp(c, Color.white, 0.25f);
                         c.a = 1f;
                         px[y * w + X] = c;
                     }

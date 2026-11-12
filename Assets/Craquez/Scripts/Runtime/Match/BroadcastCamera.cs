@@ -135,6 +135,21 @@ namespace Craquez
             }
         }
 
+        /// <summary>
+        /// Câmera atrás do jogador (Atrás, Ombro, Dinâmica, Atrás do gol): o analógico segue a câmera ("para
+        /// cima" = para onde ela olha). Nas laterais, os eixos do campo de sempre. Devolve a frente da câmera
+        /// no chão (x, z) ou zero quando o analógico não deve girar.
+        /// </summary>
+        public Vector2 StickForward()
+        {
+            if (cinematic || cam == null) return Vector2.zero;
+            var k = (Kind)Mathf.Clamp(mode, 0, Modes.Length - 1);
+            if (k != Kind.Behind && k != Kind.Shoulder && k != Kind.Dynamic && k != Kind.BehindGoal) return Vector2.zero;
+            var f = cam.transform.forward;
+            var fw = new Vector2(f.x, f.z);
+            return fw.sqrMagnitude > 1e-4f ? fw.normalized : Vector2.zero;
+        }
+
         readonly Vector3[] _targets = new Vector3[7];
         readonly System.Collections.Generic.List<Vector3> _tList = new System.Collections.Generic.List<Vector3>();
 

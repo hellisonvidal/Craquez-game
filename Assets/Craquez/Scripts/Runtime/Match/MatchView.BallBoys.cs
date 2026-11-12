@@ -35,12 +35,12 @@ namespace Craquez
             var vest = new Kit { c1 = new Color(0.98f, 0.82f, 0.1f), c2 = new Color(0.1f, 0.1f, 0.12f), shorts = new Color(0.12f, 0.12f, 0.15f),
                 socks = new Color(0.1f, 0.1f, 0.12f), pattern = 0 };
             var spots = new List<Vector2>();
-            float side = hw + (field ? 3.0f : 2.0f);
+            float side = hw + (field ? 5.0f : 2.0f);   // (campo: atrás das placas de publicidade, a 4,2 m da linha)
             foreach (float sy in new[] { -1f, 1f })
                 foreach (float fx in new[] { -0.55f, 0.55f })
                     spots.Add(new Vector2(fx * hl, sy * side));
             foreach (float sx in new[] { -1f, 1f })
-                spots.Add(new Vector2(sx * (hl + (field ? 3.4f : 2.2f)), sim.goalHalf + (field ? 7f : 4f)));
+                spots.Add(new Vector2(sx * (hl + (field ? 6.0f : 2.2f)), sim.goalHalf + (field ? 7f : 4f)));   // (atrás das placas do fundo)
             int n = q >= 1 ? spots.Count : 4;
             for (int i = 0; i < n; i++)
             {
@@ -123,7 +123,8 @@ namespace Craquez
             {
                 var b = NearestBoy(sim.ball.pos, true);
                 if (b != null && b.task == 0) { b.task = 3; b.busy = 0f; }
-                if (b != null) b.target = new Vector2(sim.ball.pos.x, Mathf.Sign(sim.ball.pos.y) * Mathf.Max(Mathf.Abs(sim.ball.pos.y) + 0.4f, sim.halfW + 1.4f));
+                // (no campo corre por trás das placas; a bola que saiu ele pega no lançamento)
+                if (b != null) b.target = new Vector2(sim.ball.pos.x, Mathf.Sign(sim.ball.pos.y) * (sim.mode.id == GameModes.Field ? sim.halfW + 4.9f : Mathf.Max(Mathf.Abs(sim.ball.pos.y) + 0.4f, sim.halfW + 1.4f)));
             }
             if (sim.gkToss && !_prevGkToss)
             {

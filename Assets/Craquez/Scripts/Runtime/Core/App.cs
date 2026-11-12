@@ -175,6 +175,8 @@ namespace Craquez
                     if (tfx != null) Destroy(tfx);
                     Sfx.Ui();
                     _wasMenu = true;   // título -> modos também com a varredura
+                    // primeiro acesso: tutorial na arena de treino (ensina o básico antes dos menus)
+                    if (!TutorialCoach.Done && !ShotTour.Requested()) { StartTutorial(); return; }
                     ShowModes();
                     return;
                 }
@@ -558,6 +560,12 @@ namespace Craquez
             UiKit.Image(body.transform, accent, null, "faixa").rectTransform.At(0, 0.2f, 54, 8, 28, 110).localRotation = Quaternion.Euler(0, 0, 8f);
             var tt = UiKit.Label(body.transform, title, 64, Theme.HeadItalic, Color.white);
             tt.rectTransform.Place(0, 0.2f, 1, 0.2f, 24, 24, 12, -104);
+            // título numa linha só: palavras longas ("CONFIGURAÇÕES") diminuem até caber, em vez de quebrar
+            if (!title.Contains(" ") && title.Length > 10)
+            {
+                tt.fontSize = Mathf.RoundToInt(64f * 10.5f / title.Length);   // (cabem ~11 letras a 64 no cartão)
+                tt.horizontalOverflow = HorizontalWrapMode.Overflow;
+            }
             UiKit.Shadow(tt, 3, 0.8f);
             UiKit.Label(body.transform, sub, 22, Theme.BodyBold, Theme.TextDim).rectTransform.Place(0, 0, 1, 0.2f, 26, 64, 16, 6);
             var go2 = UiKit.Label(body.transform, "ENTRAR  ›", 26, Theme.Head, accent, TextAnchor.MiddleRight);
@@ -1471,6 +1479,9 @@ namespace Craquez
                 }
                 case 6:
                 {
+                    // rever o tutorial (o mesmo do primeiro acesso, na arena de treino)
+                    var tut = UiKit.Button(list, "Ver o tutorial de novo", () => StartTutorial(), 28, new Color(0.1f, 0.55f, 0.28f));
+                    UiKit.Size(tut, 64, 64);
                     var map = Settings.PadMap;
                     string cur = string.Concat(map[0], map[1], map[2], map[3]);
                     int preset = 3;
@@ -1636,6 +1647,15 @@ namespace Craquez
             StartMatch();
         }
 
+        /// <summary>Tutorial: arena de treino do campo com o time atual, dois companheiros e o goleiro.</summary>
+        public void StartTutorial()
+        {
+            _trMode = GameModes.Field; _trTeam = -1; _trGkTeam = -1; _trGk = -1; _trVenue = 0;
+            if (Teams.Get(_cfg.teamA) == null || Teams.Get(_cfg.teamA).IsNational) _cfg.teamA = 0;
+            _cfg.tutorial = true;
+            StartTraining();
+        }
+
         (int teamA, int venue) _trainBakA;
         (string mode, bool national, int teamB, Tactics ta, Tactics tb, string tod, string weather, bool ceremony, int minutes, Side sa, Side sb, int stadium, bool toss) _trainBak;
 
@@ -1644,6 +1664,7 @@ namespace Craquez
             var c = _cfg;
             if (!c.training) return;
             c.training = false;
+            c.tutorial = false;
             (c.mode, c.national, c.teamB, c.tacticsA, c.tacticsB, c.timeOfDay, c.weather, c.ceremony, c.minutes, c.sideA, c.sideB, c.stadium, c.toss) = _trainBak;
             (c.teamA, c.venue) = _trainBakA;
         }
