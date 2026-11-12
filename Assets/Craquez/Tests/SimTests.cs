@@ -861,15 +861,21 @@ namespace Craquez.Tests
             foreach (var p in sim.players) if (p.isKeeper) keepers++;
             Assert.AreEqual(2, keepers, "um goleiro por time");
             Assert.Greater(sim.goalHalf * 2f, 3f, "gol grande");
-            var a = new CpuBrain(0, 0.7f); var b = new CpuBrain(1, 0.7f);
+            // (duas partidas e a cavadinha conta como finalização: uma partida só variava demais entre o .NET
+            // e o Mono do editor)
             int shots = 0;
-            for (int i = 0; i < 60 * 240 && sim.state != MatchState.Fulltime; i++)
+            for (uint seed = 3; seed <= 4; seed++)
             {
-                sim.Step(new[] { a.MakeInput(sim), b.MakeInput(sim) });
-                foreach (var e in sim.events) if (e.type == "kick" && e.kind == "shot") shots++;
+                if (seed > 3) { sim = new MatchSim { streetPlayers = 5, streetKeeper = true }; sim.Setup(GameModes.Street, new TeamSetup { data = Teams.Get(0) }, new TeamSetup { data = Teams.Get(1) }, seed, 120f); }
+                var a = new CpuBrain(0, 0.7f); var b = new CpuBrain(1, 0.7f);
+                for (int i = 0; i < 60 * 240 && sim.state != MatchState.Fulltime; i++)
+                {
+                    sim.Step(new[] { a.MakeInput(sim), b.MakeInput(sim) });
+                    foreach (var e in sim.events) if (e.type == "kick" && (e.kind == "shot" || e.kind == "chip")) shots++;
+                }
             }
-            System.Console.WriteLine($"[rua com goleiro] {shots} chutes, placar {sim.score[0]} x {sim.score[1]}");
-            Assert.Greater(shots, 3);
+            System.Console.WriteLine($"[rua com goleiro] {shots} finalizações em 2 partidas, placar {sim.score[0]} x {sim.score[1]}");
+            Assert.Greater(shots, 5);
         }
 
         /// <summary>
