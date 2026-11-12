@@ -62,6 +62,20 @@ FACE_KEYS = {
                        ("forehead/forehead-temple-incr.target.gz", 0.5)],
     "Face_LipsFull": [("mouth/mouth-scale-vert-incr.target.gz", 0.8), ("mouth/mouth-upperlip-volume-incr.target.gz", 0.6),
                       ("mouth/mouth-lowerlip-volume-incr.target.gz", 0.6)],
+    # 2.21: o outro lado de cada traço (mais rostos diferentes) e formatos de cabeça
+    "Face_NoseNarrow": [("nose/nose-scale-horiz-decr.target.gz", 1.0)],
+    "Face_NoseShort": [("nose/nose-scale-vert-decr.target.gz", 1.0)],
+    "Face_JawNarrow": [("chin/chin-width-decr.target.gz", 1.0)],
+    "Face_ChinShort": [("chin/chin-height-decr.target.gz", 1.0)],
+    "Face_EyesSmall": [("eyes/l-eye-scale-decr.target.gz", 0.7), ("eyes/r-eye-scale-decr.target.gz", 0.7)],
+    "Face_LipsThin": [("mouth/mouth-scale-vert-decr.target.gz", 0.8)],
+    "Face_MouthWide": [("mouth/mouth-scale-horiz-incr.target.gz", 0.8)],
+    "Face_EarsBig": [("ears/l-ear-scale-incr.target.gz", 0.8), ("ears/r-ear-scale-incr.target.gz", 0.8)],
+    "Face_EyesSlant": [("eyes/l-eye-eyefold-angle-up.target.gz", 0.8), ("eyes/r-eye-eyefold-angle-up.target.gz", 0.8)],
+    "Face_ForeheadTall": [("forehead/forehead-scale-vert-incr.target.gz", 1.0)],
+    "Face_Oval": [("head/head-oval.target.gz", 1.0)],
+    "Face_Square": [("head/head-square.target.gz", 1.0)],
+    "Face_Triangle": [("head/head-invertedtriangular.target.gz", 1.0)],
 }
 
 KIT_SLOTS = ["Skin", "Shirt", "Shorts", "Socks", "Boots"]

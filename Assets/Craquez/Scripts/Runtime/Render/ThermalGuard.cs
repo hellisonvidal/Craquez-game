@@ -108,7 +108,7 @@ namespace Craquez
                 int fps = _baseFps;
                 if (mobile && !InMatch) fps = Mathf.Min(fps, 30);          // menus: 30 bastam
                 if (mobile && Level >= 2) fps = Mathf.Min(fps, 30);
-                else if (mobile && Level == 1) fps = Mathf.Min(fps, 45);
+                else if (mobile && Level == 1) fps = Mathf.Min(fps, 36);
                 Application.targetFrameRate = fps;
             }
         }

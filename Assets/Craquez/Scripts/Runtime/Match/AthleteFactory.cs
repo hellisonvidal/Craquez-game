@@ -72,6 +72,7 @@ namespace Craquez
             public int tape;      // fita nos punhos: 0 nenhuma, 1 um, 2 os dois
             public int hairStyle; // cabelo procedural (HairCap): 0 raspado .. 7 mais longo
             public bool untucked; // camisa por fora do calção
+            public int faceSeed;  // traços do rosto (pelo nome: dois jogadores com o mesmo "DNA" não ficam iguais)
         }
 
         /// <summary>Estilo de cabelo (curto 30%, médio 20%, topete 15%, undercut 20%, cacheado 5%, mais longo 10%).</summary>
@@ -82,11 +83,12 @@ namespace Craquez
         /// </summary>
         static int PickHair(string b, int shortIdx, float r, float r2)
         {
-            if (b == "afro") return r < 0.45f ? 4 : r < 0.7f ? 7 : 0;
-            if (r2 < 0.1f) return 5;       // longo
-            if (r2 < 0.19f) return 6;      // rabo de cavalo
-            if (r2 < 0.26f) return 8;      // chanel
-            if (r2 < 0.31f) return 7;      // tranças
+            // (2.21: poucos de cabelo comprido, como no futebol de verdade — antes ~31% tinham longo/rabo/chanel/tranças)
+            if (b == "afro") return r < 0.4f ? 4 : r < 0.5f ? 7 : 0;
+            if (r2 < 0.03f) return 5;      // longo
+            if (r2 < 0.055f) return 6;     // rabo de cavalo
+            if (r2 < 0.07f) return 8;      // chanel
+            if (r2 < 0.085f) return 7;     // tranças
             return Mathf.Clamp(shortIdx, 0, 3);
         }
 
@@ -124,6 +126,7 @@ namespace Craquez
                 hairStyle = shaved ? 0 : PickHair(b, hair, R(7), R(17)) <= 3 ? 1 : -1,
                 // camisa por dentro do calção em 90% dos atletas, por fora em 10%
                 untucked = ((h >> 21) & 1023u) % 10u == 0u,
+                faceSeed = (int)h2,
                 // altura: do baixinho (1,68 m) ao grandalhão (1,93 m), mais gente perto da média
                 skinTint = tint, scale = Mathf.Lerp(0.91f, 1.09f, Mathf.Clamp01(F(5, R(6) * 4f) / 4f * 0.5f + (R(8) + R(9)) * 0.25f)), face = f,
                 frame = Mathf.Clamp01(R(10) * 0.7f + F(5, 2f) / 4f * 0.3f),
@@ -293,7 +296,7 @@ namespace Craquez
                         var mats = new Material[Mathf.Max(1, smr.sharedMesh.subMeshCount)];
                         for (int i = 0; i < mats.Length; i++) mats[i] = skin;
                         smr.sharedMaterials = mats;
-                        ApplyFace(smr, look.face);
+                        ApplyFace(smr, look.face, look.faceSeed);
                         rig.body = smr;
                         break;
                     }
@@ -330,7 +333,7 @@ namespace Craquez
                             smr.gameObject.SetActive(on);
                             if (on)
                                 smr.sharedMaterial = Shared("hair:" + hn + Teams.Hex(look.hairColor), () =>
-                                    Gfx.Cutout(look.hairColor * 2.2f, T(hn == "afro01" ? "afro_diffuse" : hn + "_diffuse"), 0.35f, 0.25f));
+                                    Gfx.Cutout(look.hairColor * 2.2f, T(hn == "afro01" ? "afro_diffuse" : hn + "_diffuse"), 0.3f, 0.02f));   // (fosco: sem o reflexo claro do refletor no alto da cabeça)
                         }
                         else if (n == "Eyes")
                         {
@@ -449,28 +452,39 @@ namespace Craquez
             return m;
         }
 
-        static readonly string[] FaceKeys =
+        static readonly (string a, string b)[] FacePairs =
         {
-            "Face_NoseWide", "Face_NoseLong", "Face_JawWide", "Face_ChinLong", "Face_CheekBones",
-            "Face_Lean", "Face_Round", "Face_EyesBig", "Face_BrowHeavy", "Face_LipsFull",
+            ("Face_NoseWide", "Face_NoseNarrow"), ("Face_NoseLong", "Face_NoseShort"), ("Face_JawWide", "Face_JawNarrow"),
+            ("Face_ChinLong", "Face_ChinShort"), ("Face_EyesBig", "Face_EyesSmall"), ("Face_LipsFull", "Face_LipsThin"),
         };
+        static readonly string[] FaceSingles = { "Face_CheekBones", "Face_BrowHeavy", "Face_MouthWide", "Face_EarsBig", "Face_EyesSlant", "Face_ForeheadTall" };
+        static readonly string[] FaceHeads = { "Face_Lean", "Face_Round", "Face_Oval", "Face_Square", "Face_Triangle" };
 
         /// <summary>Formato do rosto: pesos das shape keys a partir do DNA do jogador.</summary>
-        static void ApplyFace(SkinnedMeshRenderer smr, float[] face)
+        static void ApplyFace(SkinnedMeshRenderer smr, float[] face, int salt)
         {
             var m = smr.sharedMesh;
             if (m == null || m.blendShapeCount == 0) return;
             uint seed = 2166136261u;
             if (face != null) foreach (var v in face) seed = (seed ^ (uint)(v * 1000)) * 16777619u;
-            for (int k = 0; k < FaceKeys.Length; k++)
+            if (salt != 0) seed = (seed ^ (uint)salt) * 16777619u;
+            float Next() { seed = seed * 1664525u + 1013904223u; return (seed >> 8) / 16777216f; }
+            void W(string key, float w) { int idx = m.GetBlendShapeIndex(key); if (idx >= 0) smr.SetBlendShapeWeight(idx, w); }
+            // traços em pares (um lado ou o outro, nunca os dois): nariz largo/fino, comprido/curto, mandíbula
+            // larga/estreita, queixo longo/curto, olhos grandes/pequenos, lábios cheios/finos
+            foreach (var pr in FacePairs)
             {
-                int idx = m.GetBlendShapeIndex(FaceKeys[k]);
-                if (idx < 0) continue;
-                seed = seed * 1664525u + 1013904223u;
-                float r = (seed >> 8) / 16777216f;
-                float w = r < 0.35f ? 0f : (r - 0.35f) / 0.65f * 85f;
-                smr.SetBlendShapeWeight(idx, w);
+                float r = Next() * 2f - 1f;   // -1..1
+                float w = Mathf.Max(0f, Mathf.Abs(r) - 0.2f) / 0.8f * 90f;
+                W(pr.a, r > 0f ? w : 0f);
+                W(pr.b, r < 0f ? w : 0f);
             }
+            // traços soltos
+            foreach (var k in FaceSingles) { float r = Next(); W(k, r < 0.45f ? 0f : (r - 0.45f) / 0.55f * 80f); }
+            // um formato de cabeça (ou nenhum)
+            float hs = Next();
+            int pick = (int)(Next() * FaceHeads.Length) % FaceHeads.Length;
+            for (int i = 0; i < FaceHeads.Length; i++) W(FaceHeads[i], i == pick && hs > 0.25f ? (hs - 0.25f) / 0.75f * 85f : 0f);
         }
     }
 }

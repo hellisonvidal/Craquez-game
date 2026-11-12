@@ -34,7 +34,7 @@ namespace Craquez
             if (sh == 0) sh = q >= 3 ? 5 : q == 2 ? 4 : q == 1 ? 3 : 2;
             if (GraphicsSettings.currentRenderPipeline is UniversalRenderPipelineAsset urp)
             {
-                urp.shadowDistance = (sh >= 5 ? 160f : sh == 4 ? 120f : sh == 3 ? 80f : sh == 2 ? 50f : 0f) * (mobile ? 0.6f : 1f);
+                urp.shadowDistance = (sh >= 5 ? 160f : sh == 4 ? 120f : sh == 3 ? 80f : sh == 2 ? 50f : 0f) * (mobile ? 0.45f : 1f);
                 urp.shadowCascadeCount = mobile ? 1 : (sh >= 4 ? 4 : sh == 3 ? 2 : 1);
                 // escala de render: automática (nativa; só o "Leve" do celular reduz) ou a escolhida
                 float rs = Settings.RenderScaleValues[Mathf.Clamp(Settings.RenderScale, 0, Settings.RenderScaleValues.Length - 1)];
@@ -63,7 +63,7 @@ namespace Craquez
             QualitySettings.vSyncCount = vsync ? 1 : 0;
             int cap = Settings.FpsValues[Mathf.Clamp(Settings.FpsCap, 0, Settings.FpsValues.Length - 1)];
             if (vsync) Application.targetFrameRate = -1;
-            else if (cap == 0) Application.targetFrameRate = mobile ? (q == 0 ? 30 : 60) : Mathf.Clamp(hz, 60, 144);
+            else if (cap == 0) Application.targetFrameRate = mobile ? (q == 0 ? 30 : q == 1 ? 45 : 60) : Mathf.Clamp(hz, 60, 144);   // (celular no "Médio": 45 quadros — esquenta bem menos)
             else Application.targetFrameRate = cap < 0 ? (mobile ? 120 : 1000) : cap;
             // controle de temperatura: parte destes valores e reduz se o aparelho esquentar (e nos menus)
             if (GraphicsSettings.currentRenderPipeline is UniversalRenderPipelineAsset u)

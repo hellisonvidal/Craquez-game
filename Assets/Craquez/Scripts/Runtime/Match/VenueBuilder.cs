@@ -80,6 +80,9 @@ namespace Craquez
             ("Estádio Operário", 1, 3, false), ("Arena Azulejo", 3, 2, false), ("Estádio Fortaleza", 3, 0, false), ("Arena Solar", 3, 3, false),
             ("Estádio Brutalista", 2, 1, true), ("Estádio do Bosque", 1, 1, false), ("Arena Prata", 3, 2, false), ("Arena Glacial", 2, 0, false),
             ("Estádio Jardim Botânico", 2, 3, true), ("Arena do Sertão", 2, 2, false), ("Estádio da Usina", 3, 1, false), ("Arena da Colina", 3, 3, false),
+            ("Arena Vulcão", 3, 2, false), ("Estádio da Lagoa", 2, 1, false), ("Arena Aurora", 2, 3, false), ("Estádio dos Pampas", 1, 0, false),
+            ("Arena Oceânica", 3, 1, false), ("Estádio Ferroviário", 2, 2, true), ("Arena Esmeralda", 3, 0, false), ("Estádio do Cerrado", 2, 3, false),
+            ("Arena Tempestade", 3, 2, false), ("Estádio Real", 3, 1, false),
         };
 
         public static Venue Stadium(MatchSim sim, TeamData home, TeamData away, Kit homeKit, Kit awayKit, bool night, int quality, Transform parent, int model = 0)
@@ -715,7 +718,7 @@ namespace Craquez
                 // fileiras da frente: torcedores em 3D (modelados, pulando e erguendo os braços por bloco);
                 // as de trás seguem com as silhuetas (economiza no celular)
                 // todas as fileiras em 3D (no celular mais fraco, até 16; o resto com silhuetas)
-                int front3d = Mathf.Min(rows, quality >= 2 ? rows : quality >= 1 ? 26 : 16);   // (32 pesava no carregamento da partida)
+                int front3d = Mathf.Min(rows, quality >= 2 ? rows : quality >= 1 ? (Application.isMobilePlatform ? 14 : 26) : 10);   // (celular: menos torcedores 3D — menos calor)   // (32 pesava no carregamento da partida)
                 {
                     var fanGroups = new List<List<FanCrowd.Spot>>();
                     var frng = new System.Random(pseed * 13 + side * 101);
@@ -1191,17 +1194,49 @@ namespace Craquez
         /// Campos de society (grama sintética): um coberto (estrutura de ginásio) e três ao ar
         /// livre com alambrado, refletores, arquibancadinha e bar do clube.
         /// </summary>
+        /// <summary>Montagem de cada society ao ar livre (antes todos tinham a mesma: só mudava o chão em volta).</summary>
+        struct SocLay
+        {
+            public int strips;      // faixas do gramado
+            public Color turf;      // cor da grama
+            public float fenceH;    // altura do alambrado
+            public Color fenceC;    // cor dos postes/tela
+            public int lights;      // 0 torres nas quinas, 1 seis postes nas laterais, 2 oito postes baixos
+            public int stand;       // 0 comprida no lado de lá, 1 atrás de um gol, 2 curta, 3 nenhuma
+            public int rows;        // degraus
+            public bool cover;
+            public Color club;      // cor do clube
+            public float clubH;     // 1 térreo, 2 sobrado
+            public SocLay(int strips, Color turf, float fenceH, Color fenceC, int lights, int stand, int rows, bool cover, Color club, float clubH)
+            { this.strips = strips; this.turf = turf; this.fenceH = fenceH; this.fenceC = fenceC; this.lights = lights; this.stand = stand; this.rows = rows; this.cover = cover; this.club = club; this.clubH = clubH; }
+        }
+
+        static readonly SocLay[] SocLayouts =
+        {
+            new SocLay(12, new Color(0.33f, 0.62f, 0.27f), 5f, new Color(0.55f, 0.58f, 0.6f), 0, 0, 4, true, new Color(0.85f, 0.75f, 0.55f), 1f),   // 0 (coberto)
+            new SocLay(16, new Color(0.3f, 0.6f, 0.3f), 6f, new Color(0.15f, 0.35f, 0.2f), 0, 0, 6, true, new Color(0.9f, 0.9f, 0.92f), 2f),        // 1 Central: grande, alambrado verde
+            new SocLay(8, new Color(0.38f, 0.6f, 0.25f), 3.5f, new Color(0.5f, 0.5f, 0.5f), 2, 2, 2, false, new Color(0.8f, 0.55f, 0.35f), 1f),     // 2 Bairro: simples, postes baixos
+            new SocLay(20, new Color(0.25f, 0.55f, 0.32f), 7f, new Color(0.12f, 0.12f, 0.14f), 1, 1, 5, true, new Color(0.15f, 0.18f, 0.25f), 2f),  // 3 Premium: preto, faixas finas
+            new SocLay(10, new Color(0.36f, 0.64f, 0.3f), 4f, new Color(0.9f, 0.9f, 0.9f), 1, 2, 3, false, new Color(0.95f, 0.85f, 0.6f), 1f),     // 4 Praia: branco
+            new SocLay(12, new Color(0.22f, 0.5f, 0.42f), 6.5f, new Color(0.3f, 0.32f, 0.36f), 2, 3, 0, false, new Color(0.6f, 0.62f, 0.65f), 1f),  // 5 Cobertura (prédio): sem arquibancada
+            new SocLay(14, new Color(0.2f, 0.5f, 0.45f), 6f, new Color(0.15f, 0.15f, 0.18f), 0, 0, 4, true, new Color(0.25f, 0.1f, 0.35f), 1f),     // 6 Neon
+            new SocLay(8, new Color(0.4f, 0.6f, 0.22f), 3f, new Color(0.5f, 0.35f, 0.2f), 2, 1, 3, true, new Color(0.7f, 0.45f, 0.25f), 1f),        // 7 Chácara: madeira
+            new SocLay(12, new Color(0.34f, 0.62f, 0.32f), 4.5f, new Color(0.7f, 0.65f, 0.55f), 1, 2, 2, true, new Color(0.9f, 0.85f, 0.78f), 2f),  // 8 Condomínio
+            new SocLay(6, new Color(0.27f, 0.52f, 0.22f), 3.5f, new Color(0.35f, 0.45f, 0.3f), 0, 1, 6, false, new Color(0.55f, 0.4f, 0.3f), 1f),   // 9 Gramado natural
+        };
+
         public static Venue Society(MatchSim sim, TeamData home, TeamData away, Kit homeKit, Kit awayKit, int variant, bool night, int quality, Transform parent)
         {
             PropKit.Setup(quality, night);
             variant = Mathf.Abs(variant) % SocietyNames.Length;
             float hl = sim.halfLen, hw = sim.halfW;
+            var lay = SocLayouts[variant];
             bool naturalT = variant == 9;
             var grassTex = naturalT ? Gfx.Grass(512, Color.white, variant + 50) : Gfx.Turf(512, variant + 50);
             // grama sintética: verde vivo, mas não "limão" (o pós-processamento ainda satura)
             bool natural = variant == 9;
-            var turf = Gfx.LitN(natural ? new Color(0.27f, 0.52f, 0.22f) : new Color(0.33f, 0.62f, 0.27f), grassTex, Gfx.GrassNormal, natural ? 0.12f : 0.25f, natural ? 0.8f : 0.5f);
-            var turf2 = Gfx.LitN(natural ? new Color(0.22f, 0.44f, 0.18f) : new Color(0.29f, 0.55f, 0.24f), grassTex, Gfx.GrassNormal, natural ? 0.12f : 0.25f, natural ? 0.8f : 0.5f);
+            var turf = Gfx.LitN(lay.turf, grassTex, Gfx.GrassNormal, natural ? 0.12f : 0.25f, natural ? 0.8f : 0.5f);
+            var turf2 = Gfx.LitN(lay.turf * 0.86f, grassTex, Gfx.GrassNormal, natural ? 0.12f : 0.25f, natural ? 0.8f : 0.5f);
             if (variant == 0)
             {
                 var vi = new Venue { root = new GameObject("Society").transform, name = SocietyNames[0] };
@@ -1218,7 +1253,7 @@ namespace Craquez
             var a = new MeshKit();
             var b = new MeshKit();
             float mx = hl + 2f, mz = hw + 2f;
-            int strips = 12;
+            int strips = lay.strips;
             float sw = mx * 2f / strips;
             for (int i = 0; i < strips; i++)
             {
@@ -1241,8 +1276,8 @@ namespace Craquez
             Goals(v, sim, hl, true);
             // alambrado: postes + tela (baixo do lado da câmera para não tapar o jogo)
             float fx = hl + 3f, fz = hw + 3f;
-            var postMat = Gfx.Lit(variant == 7 ? new Color(0.5f, 0.35f, 0.2f) : variant == 6 ? new Color(0.15f, 0.15f, 0.18f) : new Color(0.55f, 0.58f, 0.6f), null, 0.5f, variant == 7 ? 0f : 0.6f);
-            var fenceMat = Gfx.Transparent(variant == 6 ? new Color(0.3f, 0.3f, 0.36f, 0.85f) : new Color(0.75f, 0.78f, 0.8f, 0.85f), Gfx.Net(128, 18f, 1.6f));
+            var postMat = Gfx.Lit(variant == 7 ? new Color(0.5f, 0.35f, 0.2f) : lay.fenceC, null, 0.5f, variant == 7 ? 0f : 0.6f);
+            var fenceMat = Gfx.Transparent(new Color(lay.fenceC.r * 1.25f, lay.fenceC.g * 1.25f, lay.fenceC.b * 1.25f, 0.85f), Gfx.Net(128, 18f, 1.6f));
             int fenceN = 0;
             void FenceSide(Vector3 p0, Vector3 p1, float h)
             {
@@ -1257,24 +1292,33 @@ namespace Craquez
                 fence.Object("Alambrado " + fenceN, fenceMat, v.root, false);
                 fenceN++;
             }
-            FenceSide(new Vector3(-fx, 0, fz), new Vector3(fx, 0, fz), 5f);
-            FenceSide(new Vector3(fx, 0, fz), new Vector3(fx, 0, -fz), 6f);
-            FenceSide(new Vector3(-fx, 0, -fz), new Vector3(-fx, 0, fz), 6f);
+            FenceSide(new Vector3(-fx, 0, fz), new Vector3(fx, 0, fz), lay.fenceH);
+            FenceSide(new Vector3(fx, 0, fz), new Vector3(fx, 0, -fz), lay.fenceH + 1f);
+            FenceSide(new Vector3(-fx, 0, -fz), new Vector3(-fx, 0, fz), lay.fenceH + 1f);
             FenceSide(new Vector3(fx, 0, -fz), new Vector3(-fx, 0, -fz), 1.2f);
             // refletores nas quinas
             var poles = new MeshKit();
             var lampMk = new MeshKit();
-            foreach (float sx in new[] { -1f, 1f })
+            // iluminação de cada campo: 4 torres nas quinas, 6 postes nas laterais ou 8 postes baixos
+            var polePts = new List<Vector3>();
+            if (lay.lights == 0) { foreach (float sx in new[] { -1f, 1f }) foreach (float sz in new[] { -1f, 1f }) polePts.Add(new Vector3((fx + 1f) * sx, 0, (fz + 1f) * sz)); }
+            else
+            {
+                int per = lay.lights == 1 ? 3 : 4;
                 foreach (float sz in new[] { -1f, 1f })
+                    for (int i = 0; i < per; i++) polePts.Add(new Vector3(Mathf.Lerp(-fx, fx, (i + 0.5f) / per), 0, (fz + 1f) * sz));
+            }
+            float poleH = lay.lights == 0 ? 12f : lay.lights == 1 ? 10f : 7f;
+            foreach (var p in polePts)
                 {
-                    var p = new Vector3((fx + 1f) * sx, 0, (fz + 1f) * sz);
-                    poles.Cylinder(p, p + Vector3.up * 12f, 0.14f, 8);
-                    lampMk.Box(p + Vector3.up * 12.2f - new Vector3(sx, 0, sz) * 0.4f, new Vector3(1.6f, 0.7f, 0.3f));
-                    if (night)
+                    float sx = Mathf.Sign(p.x == 0f ? 1f : p.x), sz = Mathf.Sign(p.z);
+                    poles.Cylinder(p, p + Vector3.up * poleH, lay.lights == 2 ? 0.09f : 0.14f, 8);
+                    lampMk.Box(p + Vector3.up * (poleH + 0.2f) - new Vector3(lay.lights == 0 ? sx : 0f, 0, sz) * 0.4f, new Vector3(lay.lights == 2 ? 1.0f : 1.6f, 0.7f, 0.3f));
+                    if (night && (lay.lights == 0 || polePts.IndexOf(p) % 2 == 0))
                     {
                         var lgo = new GameObject("Refletor");
                         lgo.transform.SetParent(v.root, false);
-                        lgo.transform.position = p + Vector3.up * 12f;
+                        lgo.transform.position = p + Vector3.up * poleH;
                         lgo.transform.LookAt(Vector3.zero);
                         var l = lgo.AddComponent<Light>();
                         l.type = LightType.Spot;
@@ -1287,16 +1331,23 @@ namespace Craquez
                 }
             poles.Object("Postes de luz", Gfx.Lit(new Color(0.35f, 0.36f, 0.4f), null, 0.4f, 0.5f), v.root, true);
             lampMk.Object("Refletores", Gfx.Emissive(Color.white, night ? new Color(4f, 4f, 3.6f) : new Color(0.3f, 0.3f, 0.3f)), v.root, false);
+            // arquibancadinha (de cada campo: comprida no lado de lá, curta, atrás de um gol ou nenhuma)
+            float sh = lay.stand == 1 ? Mathf.Min(hl * 0.6f, hw * 0.85f) : lay.stand == 2 ? hl * 0.35f : hl * 0.6f;
+            var sr = new GameObject("Arquibancada do society").transform;
+            sr.SetParent(v.root, false);
+            if (lay.stand == 1) { sr.localRotation = Quaternion.Euler(0f, 90f, 0f); sr.localPosition = new Vector3(fx - fz, 0f, 0f); }
+            if (lay.stand != 3)
+            {
             // arquibancadinha do lado oposto à câmera, com a galera
             var steps = new MeshKit();
             var ppl = new MeshKit();
-            for (int r = 0; r < 4; r++)
+            for (int r = 0; r < lay.rows; r++)
             {
                 float z0 = fz + 1.2f + r * 0.8f, y0 = r * 0.42f;
-                steps.Box(new Vector3(0, y0 + 0.21f, z0 + 0.4f), new Vector3(hl * 1.2f, 0.42f, 0.8f), 2f);
-                ppl.Quad(new Vector3(-hl * 0.6f, y0 + 0.42f, z0 + 0.3f), new Vector3(-hl * 0.6f, y0 + 1.6f, z0 + 0.3f), new Vector3(hl * 0.6f, y0 + 1.6f, z0 + 0.3f), new Vector3(hl * 0.6f, y0 + 0.42f, z0 + 0.3f), new Vector2(0, 0), new Vector2(hl / 5f, 1));
+                steps.Box(new Vector3(0, y0 + 0.21f, z0 + 0.4f), new Vector3(sh * 2f, 0.42f, 0.8f), 2f);
+                ppl.Quad(new Vector3(-sh, y0 + 0.42f, z0 + 0.3f), new Vector3(-sh, y0 + 1.6f, z0 + 0.3f), new Vector3(sh, y0 + 1.6f, z0 + 0.3f), new Vector3(sh, y0 + 0.42f, z0 + 0.3f), new Vector2(0, 0), new Vector2(hl / 5f, 1));
             }
-            steps.Object("Arquibancada", Gfx.Lit(new Color(0.7f, 0.71f, 0.74f), Gfx.Concrete(256, 81), 0.18f), v.root, quality >= 1);
+            steps.Object("Arquibancada", Gfx.Lit(new Color(0.7f, 0.71f, 0.74f), Gfx.Concrete(256, 81), 0.18f), sr, quality >= 1);
             var crowd = Gfx.CrowdPeople(1024, 64, homeKit.c1, homeKit.c2, awayKit.c1, variant * 23 + 9, 0f, false, home.IsNational || away.IsNational ? 0.3f : 0f);
             var cm = Gfx.Cutout(Color.white, crowd, 0.5f, 0.05f);
             v.crowdMats.Add(cm);
@@ -1308,8 +1359,8 @@ namespace Craquez
                 for (int bI = 0; bI < 3; bI++)
                 {
                     var g = new List<FanCrowd.Spot>();
-                    float ga = -hl * 0.6f + hl * 1.2f * bI / 3f + 0.3f, gb = -hl * 0.6f + hl * 1.2f * (bI + 1) / 3f - 0.3f;
-                    for (int r = 0; r < 4; r++)
+                    float ga = -sh + sh * 2f * bI / 3f + 0.3f, gb = -sh + sh * 2f * (bI + 1) / 3f - 0.3f;
+                    for (int r = 0; r < lay.rows; r++)
                         for (float x = ga; x < gb; x += 0.75f + (float)frng.NextDouble() * 0.5f)
                         {
                             if (frng.NextDouble() > 0.6) continue;
@@ -1318,22 +1369,26 @@ namespace Craquez
                         }
                     groups.Add(g);
                 }
-                FanCrowd.Build(v.root, Quaternion.identity, groups, homeKit.c1, homeKit.c2, awayKit.c1, awayKit.c2, variant * 13 + 4, mixedS);
+                FanCrowd.Build(sr, Quaternion.identity, groups, homeKit.c1, homeKit.c2, awayKit.c1, awayKit.c2, variant * 13 + 4, mixedS);
             }
             // cobertura da arquibancadinha (telhas translúcidas sobre pilares) e guarda-corpo
+            if (lay.cover)
+            {
             var cover = new MeshKit();
             var cpost = new MeshKit();
-            float cz0 = fz + 1.0f, cz1 = fz + 1.2f + 4 * 0.8f + 0.4f, cy = 4.6f;
-            for (float x = -hl * 0.6f; x <= hl * 0.6f + 0.1f; x += hl * 0.3f)
+            float cz0 = fz + 1.0f, cz1 = fz + 1.2f + lay.rows * 0.8f + 0.4f, cy = 2.9f + lay.rows * 0.42f;
+            for (float x = -sh; x <= sh + 0.1f; x += sh * 0.5f)
             {
                 cpost.Cylinder(new Vector3(x, 0, cz1), new Vector3(x, cy + 0.6f, cz1), 0.09f, 6);
                 cpost.Cylinder(new Vector3(x, cy + 0.6f, cz1), new Vector3(x, cy, cz0), 0.06f, 5);
             }
-            cpost.Cylinder(new Vector3(-hl * 0.6f, 1.1f, cz0 + 0.05f), new Vector3(hl * 0.6f, 1.1f, cz0 + 0.05f), 0.035f, 5);
-            cover.Quad(new Vector3(-hl * 0.62f, cy, cz0), new Vector3(-hl * 0.62f, cy + 0.6f, cz1 + 0.3f), new Vector3(hl * 0.62f, cy + 0.6f, cz1 + 0.3f), new Vector3(hl * 0.62f, cy, cz0), new Vector2(0, 0), new Vector2(hl / 2f, 2f));
-            cover.Quad(new Vector3(hl * 0.62f, cy, cz0), new Vector3(hl * 0.62f, cy + 0.6f, cz1 + 0.3f), new Vector3(-hl * 0.62f, cy + 0.6f, cz1 + 0.3f), new Vector3(-hl * 0.62f, cy, cz0), new Vector2(0, 0), new Vector2(hl / 2f, 2f));
-            cpost.Object("Estrutura da cobertura", Gfx.Lit(new Color(0.4f, 0.42f, 0.46f), null, 0.4f, 0.6f), v.root, true);
-            cover.Object("Cobertura da arquibancada", Gfx.Transparent(new Color(0.85f, 0.9f, 0.95f, 0.55f), Gfx.Net(128, 3f, 6f)), v.root, false);
+            cpost.Cylinder(new Vector3(-sh, 1.1f, cz0 + 0.05f), new Vector3(sh, 1.1f, cz0 + 0.05f), 0.035f, 5);
+            cover.Quad(new Vector3(-(sh + 0.3f), cy, cz0), new Vector3(-(sh + 0.3f), cy + 0.6f, cz1 + 0.3f), new Vector3((sh + 0.3f), cy + 0.6f, cz1 + 0.3f), new Vector3((sh + 0.3f), cy, cz0), new Vector2(0, 0), new Vector2(hl / 2f, 2f));
+            cover.Quad(new Vector3((sh + 0.3f), cy, cz0), new Vector3((sh + 0.3f), cy + 0.6f, cz1 + 0.3f), new Vector3(-(sh + 0.3f), cy + 0.6f, cz1 + 0.3f), new Vector3(-(sh + 0.3f), cy, cz0), new Vector2(0, 0), new Vector2(hl / 2f, 2f));
+            cpost.Object("Estrutura da cobertura", Gfx.Lit(new Color(0.4f, 0.42f, 0.46f), null, 0.4f, 0.6f), sr, true);
+            cover.Object("Cobertura da arquibancada", Gfx.Transparent(new Color(0.85f, 0.9f, 0.95f, 0.55f), Gfx.Net(128, 3f, 6f)), sr, false);
+            }
+            }
             // bancos de reservas cobertos dos dois lados da porta do vestiário (atrás do alambrado baixo)
             var bench = new MeshKit();
             foreach (float bxs in new[] { -1f, 1f })
@@ -1348,9 +1403,10 @@ namespace Craquez
             bench.Object("Bancos de reservas", Gfx.Lit(Color.Lerp(homeKit.c1, new Color(0.2f, 0.22f, 0.26f), 0.55f), null, 0.4f), v.root, false);
             // bar do clube / vestiário atrás de um dos gols
             var club = new MeshKit();
-            club.Box(new Vector3(fx + 8f, 1.6f, 0), new Vector3(6f, 3.2f, 12f), 2f);
-            club.Box(new Vector3(fx + 8f, 3.35f, 0), new Vector3(7f, 0.3f, 13f));
-            club.Object("Clube", Gfx.Character(variant == 3 ? new Color(0.15f, 0.18f, 0.25f) : new Color(0.85f, 0.75f, 0.55f), null, 0.3f), v.root, true);
+            float clubX = lay.stand == 1 ? -(fx + 8f) : fx + 8f;   // (arquibancada atrás de um gol: o clube vai para o outro)
+            club.Box(new Vector3(clubX, 1.6f * lay.clubH, 0), new Vector3(6f, 3.2f * lay.clubH, 12f), 2f);
+            club.Box(new Vector3(clubX, 3.2f * lay.clubH + 0.15f, 0), new Vector3(7f, 0.3f, 13f));
+            club.Object("Clube", Gfx.Character(lay.club, null, 0.3f), v.root, true);
             SocietyScenes.Build(v, hl, hw, fx, fz, variant, night, quality, homeKit, awayKit);
             // placar eletrônico em postes, no canto do lado de lá
             v.boardPos = new Vector3(-hl * 0.72f, 3.3f, fz + 0.9f);
@@ -1933,6 +1989,32 @@ namespace Craquez
         }
 
         // ------------------------------------------------------------------ rua
+        /// <summary>Cor da quadra pintada de cada rua (todas diferentes).</summary>
+        static readonly Color[] StreetCourt =
+        {
+            new Color(0.16f, 0.4f, 0.55f), new Color(0.55f, 0.22f, 0.2f), new Color(0.2f, 0.45f, 0.3f), new Color(0.6f, 0.34f, 0.22f),
+            new Color(0.12f, 0.12f, 0.14f), new Color(0.45f, 0.45f, 0.48f), new Color(0.3f, 0.2f, 0.45f), new Color(0.2f, 0.5f, 0.25f),
+            new Color(0.62f, 0.5f, 0.18f), new Color(0.18f, 0.32f, 0.62f), new Color(0.26f, 0.27f, 0.3f), new Color(0.6f, 0.42f, 0.28f),
+            new Color(0.15f, 0.48f, 0.5f), new Color(0.65f, 0.25f, 0.35f), new Color(0.35f, 0.38f, 0.22f), new Color(0.1f, 0.55f, 0.32f),
+            new Color(0.6f, 0.42f, 0.28f), new Color(0.12f, 0.3f, 0.7f),
+        };
+        static readonly Color[] StreetLines =
+        {
+            new Color(0.92f, 0.9f, 0.82f), new Color(0.95f, 0.85f, 0.25f), new Color(0.92f, 0.9f, 0.82f), new Color(0.95f, 0.95f, 0.95f),
+            new Color(0.95f, 0.55f, 0.15f), new Color(0.95f, 0.85f, 0.25f), new Color(0.6f, 0.95f, 0.85f), new Color(0.92f, 0.9f, 0.82f),
+            new Color(0.95f, 0.4f, 0.6f), new Color(0.95f, 0.95f, 0.95f), new Color(0.95f, 0.85f, 0.25f), new Color(0.92f, 0.88f, 0.8f),
+            new Color(0.95f, 0.95f, 0.95f), new Color(0.98f, 0.9f, 0.4f), new Color(0.92f, 0.9f, 0.82f), new Color(0.98f, 0.95f, 0.3f),
+            new Color(0.92f, 0.88f, 0.8f), new Color(0.95f, 0.6f, 0.2f),
+        };
+        static readonly Color[] StreetGround =
+        {
+            new Color(0.42f, 0.42f, 0.45f), new Color(0.55f, 0.45f, 0.38f), new Color(0.6f, 0.58f, 0.52f), new Color(0.62f, 0.4f, 0.32f),
+            new Color(0.28f, 0.28f, 0.3f), new Color(0.7f, 0.68f, 0.64f), new Color(0.33f, 0.33f, 0.35f), new Color(0.42f, 0.42f, 0.45f),
+            new Color(0.48f, 0.44f, 0.42f), new Color(0.62f, 0.62f, 0.6f), new Color(0.3f, 0.3f, 0.33f), new Color(0.72f, 0.52f, 0.36f),
+            new Color(0.55f, 0.55f, 0.52f), new Color(0.52f, 0.46f, 0.4f), new Color(0.45f, 0.4f, 0.36f), new Color(0.5f, 0.52f, 0.5f),
+            new Color(0.4f, 0.55f, 0.3f), new Color(0.58f, 0.5f, 0.44f),
+        };
+
         public static Venue Street(MatchSim sim, TeamData home, TeamData away, Kit homeKit, Kit awayKit, int variant, bool night, int quality, Transform parent)
         {
             PropKit.Setup(quality, night);
@@ -1940,18 +2022,21 @@ namespace Craquez
             var v = new Venue { root = new GameObject("Rua").transform, name = StreetNames[variant] };
             // ruas com gol grande e goleiro: o cenário segue uma rua parecida (quadra do conjunto, campinho
             // de terra, vila colorida), com o gol de futsal e a área pintada
+            int orig = variant;   // (cada rua com a sua cor de quadra, pintura e chão — mesmo as que repetem o cenário)
             if (variant >= 15) variant = new[] { 9, 11, 13 }[Mathf.Clamp(variant - 15, 0, 2)];
             v.root.SetParent(parent, false);
             float hl = sim.halfLen, hw = sim.halfW;
             var rng = new System.Random(variant * 97 + 3);
             bool sand = variant == 2;
             bool grassy = variant == 7;
-            bool dirt = variant == 11;            // campinho de terra batida
+            bool dirt = variant == 11 && orig != 16;   // campinho de terra batida (a várzea tem gramado em volta)
+            bool varzea = orig == 16;
+            grassy |= varzea;
             bool concrete = variant == 9 || variant == 12;
             var groundTex = sand ? Gfx.Grass(256, new Color(0.95f, 0.85f, 0.6f), variant) : grassy ? Gfx.Grass(256, new Color(0.35f, 0.5f, 0.25f), variant)
                 : dirt ? Gfx.Grass(256, new Color(0.62f, 0.44f, 0.3f), variant) : Gfx.Asphalt(256, Color.white, variant, concrete ? 0.25f : 0.6f);
             Color gc = sand ? new Color(0.95f, 0.86f, 0.62f) : grassy ? new Color(0.55f, 0.65f, 0.45f) : dirt ? new Color(0.72f, 0.52f, 0.36f)
-                : concrete ? new Color(0.62f, 0.62f, 0.6f) : variant == 1 ? new Color(0.55f, 0.45f, 0.38f) : variant == 10 ? new Color(0.3f, 0.3f, 0.33f) : new Color(0.42f, 0.42f, 0.45f);
+                : concrete ? new Color(0.62f, 0.62f, 0.6f) : variant == 1 ? new Color(0.55f, 0.45f, 0.38f) : variant == 10 ? new Color(0.3f, 0.3f, 0.33f) : StreetGround[orig % StreetGround.Length];
             sand |= dirt;   // (relevo e brilho de chão de terra)
             var ground = Gfx.LitN(gc, groundTex, sand || grassy ? Gfx.GrassNormal : Gfx.AsphaltNormal, sand ? 0.05f : 0.2f, 1f);
             v.pitchMat = ground;
@@ -1963,10 +2048,26 @@ namespace Craquez
             // quadra pintada no chão (piso de quadra poliesportiva gasto), com áreas e marcas
             if (!sand && !grassy)
             {
-                Color[] courtC = { new Color(0.16f, 0.4f, 0.55f), new Color(0.55f, 0.22f, 0.2f), new Color(0.2f, 0.45f, 0.3f), new Color(0.32f, 0.34f, 0.5f) };
+                // uma cor de quadra para cada rua (antes 4 cores repetidas: as ruas de cidade ficavam iguais)
                 var court = new MeshKit();
                 court.Quad(new Vector3(-hl, 0.004f, -hw), new Vector3(-hl, 0.004f, hw), new Vector3(hl, 0.004f, hw), new Vector3(hl, 0.004f, -hw), new Vector2(0, 0), new Vector2(hl / 3f, hw / 3f));
-                court.Object("Quadra pintada", Gfx.LitN(courtC[variant % courtC.Length], Gfx.Asphalt(256, Color.white, variant + 300, 0.35f), Gfx.AsphaltNormal, 0.15f, 0.6f), v.root, false);
+                court.Object("Quadra pintada", Gfx.LitN(StreetCourt[orig % StreetCourt.Length], Gfx.Asphalt(256, Color.white, orig + 300, 0.35f), Gfx.AsphaltNormal, 0.15f, 0.6f), v.root, false);
+                if (orig == 0 || orig == 4 || orig == 10 || orig == 15)
+                {
+                    // faixa de cor em volta da quadra (como nas quadras poliesportivas)
+                    var ring = new MeshKit();
+                    float e = 1.1f;
+                    ring.Quad(new Vector3(-hl - e, 0.003f, -hw - e), new Vector3(-hl - e, 0.003f, hw + e), new Vector3(hl + e, 0.003f, hw + e), new Vector3(hl + e, 0.003f, -hw - e), new Vector2(0, 0), new Vector2(hl / 3f, hw / 3f));
+                    ring.Object("Faixa da quadra", Gfx.LitN(Color.Lerp(StreetCourt[(orig + 7) % StreetCourt.Length], Color.black, 0.15f), Gfx.Asphalt(256, Color.white, orig + 310, 0.35f), Gfx.AsphaltNormal, 0.15f, 0.6f), v.root, false);
+                }
+            }
+            else if (varzea)
+            {
+                // várzea: campo de terra no meio do gramado
+                var dirtK = new MeshKit();
+                float e = 1.5f;
+                dirtK.Quad(new Vector3(-hl - e, 0.004f, -hw - e), new Vector3(-hl - e, 0.004f, hw + e), new Vector3(hl + e, 0.004f, hw + e), new Vector3(hl + e, 0.004f, -hw - e), new Vector2(0, 0), new Vector2(hl / 3f, hw / 3f));
+                dirtK.Object("Terra batida", Gfx.LitN(new Color(0.66f, 0.45f, 0.3f), Gfx.Grass(256, new Color(0.62f, 0.44f, 0.3f), 77), Gfx.GrassNormal, 0.05f, 1f), v.root, false);
             }
             if (!sand && !grassy) StreetDetails(v, hl, hw, gc, variant, rng);
             var lines = new MeshKit();
@@ -2007,7 +2108,7 @@ namespace Craquez
                     lines.Strip(new Vector3(i * 2.6f, 0, -hw - 6f), new Vector3(i * 2.6f, 0, -hw - 1.2f), 0.12f);
                 }
             }
-            lines.Object("Pintura", Gfx.Lit(dirt ? new Color(0.92f, 0.88f, 0.8f) : variant == 10 ? new Color(0.95f, 0.85f, 0.25f) : new Color(0.92f, 0.9f, 0.82f), null, 0.05f), v.root, false);
+            lines.Object("Pintura", Gfx.Lit(dirt || varzea ? new Color(0.92f, 0.88f, 0.8f) : StreetLines[orig % StreetLines.Length], null, 0.05f), v.root, false);
             Goals(v, sim, hl, true);
             // laterais: placas brancas baixas e separadas (lona/chapa pintada, sem marcas) — a bola bate e volta
             var boardMat = Gfx.Lit(Color.white, WhiteBoard(variant), 0.2f);
@@ -2040,7 +2141,7 @@ namespace Craquez
             }
             boards.Object("Placas brancas", boardMat, v.root, false);
             backs.Object("Estrutura das placas", Gfx.Lit(new Color(0.78f, 0.78f, 0.76f), null, 0.3f, 0.4f), v.root, true);
-            bool cage = variant == 4;   // gaiola: alambrado alto de ferro acima das placas
+            bool cage = variant == 4 || orig == 15 || orig == 17;   // gaiola: alambrado alto de ferro acima das placas
             float wh = 4.5f;
             // as outras quadras de rua: tela de nylon em volta (laterais atrás das placas e fundos), para a
             // galera não levar bolada — a do lado da câmera some nas câmeras de lado
@@ -2460,7 +2561,7 @@ namespace Craquez
                 _vel[i] = vt + n * Mathf.Max(vn, 0f) * w;
                 any = true;
             }
-            if (any) _awake = Mathf.Max(_awake, 3f);
+            if (any) { _awake = Mathf.Max(_awake, 3f); _sleeping = false; }
         }
 
         /// <summary>Bola entrou: empurrão forte na direção do chute, que se espalha e volta balançando.</summary>
@@ -2481,6 +2582,7 @@ namespace Craquez
                 _vel[i] += (new Vector3(_side * 6.5f, 0.8f, 0f) + radial * 1.1f) * (w * k);   // (estufa mais e balança mais)
             }
             _awake = 5f;
+            _sleeping = false;
         }
 
         /// <summary>Bola encostando na rede (rolando ou parada dentro do gol): afunda o tecido em volta.</summary>
@@ -2500,41 +2602,94 @@ namespace Craquez
                 _vel[i] += (v * 0.5f + new Vector3(_side, 0, 0) * 1.5f) * (w * Time.deltaTime * 10f);
                 any = true;
             }
-            if (any) _awake = Mathf.Max(_awake, 2f);
+            if (any) { _awake = Mathf.Max(_awake, 2f); _sleeping = false; }
         }
 
+        // fios da rede (pares de nós vizinhos) e o comprimento de cada um em repouso
+        int[] _ea, _eb;
+        float[] _el;
+        Vector3[] _prev;
+        bool _sleeping;
+
+        void BuildEdges()
+        {
+            var a = new System.Collections.Generic.List<int>(); var b = new System.Collections.Generic.List<int>(); var l = new System.Collections.Generic.List<float>();
+            for (int i = 0; i < _nbr.Length; i++)
+                foreach (int j in _nbr[i])
+                    if (j > i) { a.Add(i); b.Add(j); l.Add(Vector3.Distance(_rest[i], _rest[j])); }
+            _ea = a.ToArray(); _eb = b.ToArray(); _el = l.ToArray();
+            _prev = new Vector3[_rest.Length];
+        }
+
+        /// <summary>
+        /// Tecido de verdade (2.21): cada fio tem comprimento máximo (não estica como borracha — antes a rede
+        /// era uma "gelatina" de molas), o pano forma o bolsão em volta da bola, balança algumas vezes pelo
+        /// próprio peso e assenta. Parada, a simulação dorme (antes rodava todo quadro nos dois gols).
+        /// </summary>
         void Update()
         {
             if (_node == null) { if (_hitT <= 0f) return; Weld(); }
+            if (_ea == null) BuildEdges();
             float dt = Mathf.Min(Time.deltaTime, 1f / 30f);
-            // brisa leve sempre (a rede "respira"); depois de um gol, simulação completa
-            float breeze = Mathf.Sin(Time.time * 1.3f + transform.position.x) * 0.004f;
             _awake = Mathf.Max(0f, _awake - dt);
             int N = _rest.Length;
-            // tecido de náilon: volta devagar ao lugar (mola fraca), a onda corre pela malha e o
-            // amortecimento tira o "tremido" (antes era duro e vibrava como borracha)
-            // (mola entre nós menor e menos amortecimento: o pano estufa e balança umas vezes antes de parar)
-            const float kRest = 11f, kNbr = 110f, damp = 1.9f;
-            int sub = 4;
+            if (_awake <= 0f)
+            {
+                // assentou: zera o resto do movimento e para de simular
+                if (_sleeping) return;
+                float maxD = 0f;
+                for (int i = 0; i < N; i++) maxD = Mathf.Max(maxD, _disp[i].sqrMagnitude + _vel[i].sqrMagnitude * 0.01f);
+                if (maxD > 0.0004f) _awake = 0.5f;
+                else
+                {
+                    for (int i = 0; i < N; i++) { _disp[i] = Vector3.zero; _vel[i] = Vector3.zero; }
+                    for (int v = 0; v < _cur.Length; v++) _cur[v] = _base[v];
+                    _mesh.vertices = _cur;
+                    _sleeping = true;
+                    return;
+                }
+            }
+            _sleeping = false;
+            const float kRest = 7f, damp = 1.4f;   // tensão leve do pano (volta ao formato) e atrito do ar
+            const int sub = 3, iters = 4;
             float h = dt / sub;
             for (int s = 0; s < sub; s++)
+            {
                 for (int i = 0; i < N; i++)
                 {
+                    _prev[i] = _disp[i];
                     if (_pinned[i]) { _disp[i] = Vector3.zero; _vel[i] = Vector3.zero; continue; }
-                    var avg = Vector3.zero;
-                    var nb = _nbr[i];
-                    for (int j = 0; j < nb.Length; j++) avg += _disp[nb[j]];
-                    if (nb.Length > 0) avg /= nb.Length;
-                    var acc = -_disp[i] * kRest + (avg - _disp[i]) * kNbr - _vel[i] * damp;
-                    acc.x += _side * breeze * 40f * Mathf.Clamp01(_rest[i].y);   // o vento empurra o fundo
-                    acc.y -= 0.6f + 2.5f * Mathf.Clamp01(Mathf.Abs(_disp[i].x) * 2f);   // caimento: estufado, o pano pesa
+                    var acc = -_disp[i] * kRest - _vel[i] * damp;
+                    acc.y -= 3.2f * Mathf.Clamp01(_disp[i].magnitude * 3f);   // peso do pano estufado (cai depois do gol)
                     _vel[i] += acc * h;
-                    _vel[i] *= 1f / (1f + 0.35f * h * _vel[i].magnitude);         // arrasto do ar no tecido
                     _disp[i] += _vel[i] * h;
-                    if (_disp[i].sqrMagnitude > 0.64f) { _disp[i] = _disp[i].normalized * 0.8f; _vel[i] *= 0.5f; }   // o fio não estica sem limite
-                    // a rede não atravessa para dentro do gol além do pano original
-                    if (_disp[i].x * _side < -0.25f) { _disp[i].x = -0.25f * _side; _vel[i].x = 0f; }
                 }
+                // fios: não esticam além de 4% do comprimento (encolher, o pano encolhe à vontade)
+                for (int it = 0; it < iters; it++)
+                    for (int e = 0; e < _ea.Length; e++)
+                    {
+                        int ia = _ea[e], ib = _eb[e];
+                        bool pa = _pinned[ia], pb = _pinned[ib];
+                        if (pa && pb) continue;
+                        var A = _rest[ia] + _disp[ia]; var B = _rest[ib] + _disp[ib];
+                        var d = B - A;
+                        float len = d.magnitude, max = _el[e] * 1.04f;
+                        if (len <= max || len < 1e-5f) continue;
+                        var corr = d * ((len - max) / len);
+                        if (pa) _disp[ib] -= corr;
+                        else if (pb) _disp[ia] += corr;
+                        else { _disp[ia] += corr * 0.5f; _disp[ib] -= corr * 0.5f; }
+                    }
+                for (int i = 0; i < N; i++)
+                {
+                    if (_pinned[i]) continue;
+                    // a rede não entra no gol além do pano original e não estica sem limite
+                    if (_disp[i].x * _side < -0.25f) _disp[i].x = -0.25f * _side;
+                    if (_disp[i].sqrMagnitude > 0.81f) _disp[i] = _disp[i].normalized * 0.9f;
+                    // velocidade = o que o nó andou (já com os fios puxando)
+                    _vel[i] = (_disp[i] - _prev[i]) / h;
+                }
+            }
             for (int v = 0; v < _cur.Length; v++) _cur[v] = _base[v] + _disp[_node[v]];
             _mesh.vertices = _cur;
             _mesh.RecalculateBounds();
