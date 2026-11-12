@@ -171,6 +171,13 @@ namespace Craquez.UI
         public System.Action onPause;
         GameObject _pauseBtn;
         public void ShowPauseButton(bool on) { if (_pauseBtn != null) _pauseBtn.SetActive(on); }
+        /// <summary>Esconde as faixas de baixo (atleta controlado, energia, força) — no replay elas ficavam
+        /// por cima dos controles.</summary>
+        public void ShowPlayerBoxes(bool on)
+        {
+            foreach (Transform c in transform.GetComponentsInChildren<Transform>(true))
+                if (c.name == "jogador0" || c.name == "jogador1" || c.name == "forca0" || c.name == "forca1") c.gameObject.SetActive(on);
+        }
 
         Image _cut;
         float _cutT;

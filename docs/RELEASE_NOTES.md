@@ -1,3 +1,33 @@
+## Craquez 2.16.0
+
+Jogo de futebol feito 100% com inteligência artificial, **gratuito**.
+
+### Download
+- **Celular Android**: `Craquez-v2.16.0.apk`
+- **TV (Google TV / Android TV, ex.: TCL C6K)**: `Craquez-TV-v2.16.0.apk` — use este na TV (32 e 64 bits).
+
+### Novidades
+- **On-line ligado**: o jogo está conectado ao projeto na Unity Cloud. Partida rápida, sala com código e
+  convite; celular e TV jogam juntos.
+- **Revanche e trocar os times**: no fim da partida on-line os dois continuam na sala — "Revanche" monta a
+  mesma partida (local, horário, bola, tempo) e "Trocar os times" deixa cada um escolher outro time sem sair.
+- **Gandulas de verdade**: correm até a bola que sai, devolvem com as mãos para quem vai cobrar (por baixo
+  no lateral, por cima no fundo) e repõem a bola do cone quando o goleiro pega uma de lá.
+- **Escolha dos times organizada**: clubes por país (Brasil primeiro) e liga; seleções por continente e
+  pelo ranking geral.
+- **Tela de carregamento** depois da escolha dos times: um quadro da abertura, círculo girando e barra
+  (antes o jogo ficava parado na tela de seleção).
+- **Replay na velocidade normal**: começa em 1×; os botões − e + deixam mais lento (½×, ¼×) ou mais rápido
+  (1,5×, 2×), e o do meio volta ao normal.
+
+### Correções
+- **Lateral**: a bola não gira mais nas mãos do cobrador, e o arremesso curto vai baixo, para o pé/peito do
+  companheiro (antes ia alto, na cabeça dele, que cabeceava para fora e gerava outro lateral).
+- **Replay**: as faixas do jogador controlado não ficam mais por cima dos controles.
+- **CPU x CPU sem erros bobos**: passes perdidos caíram (campo 23%→19%, futsal 26%→19%, society 23%→14%):
+  o passe considera o adversário que corre até a linha enquanto a bola viaja, não toca para quem está
+  colado no marcador, protege a bola quando não há opção segura e não mira perto da linha lateral.
+
 ## Craquez 2.15.0
 
 Jogo de futebol feito 100% com inteligência artificial, **gratuito**.

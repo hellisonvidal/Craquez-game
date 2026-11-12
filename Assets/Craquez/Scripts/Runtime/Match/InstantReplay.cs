@@ -104,7 +104,7 @@ namespace Craquez
         System.Action _onClose;
         readonly Frame _live = new Frame();
         bool _open, _playing = true;
-        float _pos, _speed = 0.5f;
+        float _pos, _speed = 1f;   // começa na velocidade normal; os botões diminuem/aumentam
         int _applied = -1;
         GameObject _ui;
         RectTransform _bar, _fill, _knob;
@@ -115,7 +115,7 @@ namespace Craquez
         Vector3 _pivot;
         bool _dragBar;
         static readonly string[] CamNames = { "TV", "Livre", "Atrás do gol", "Aérea" };
-        static readonly float[] Speeds = { 0.25f, 0.5f, 1f };
+        static readonly float[] Speeds = { 0.25f, 0.5f, 1f, 1.5f, 2f };
 
         public bool Open => _open;
 
@@ -150,6 +150,7 @@ namespace Craquez
             _view.bcam.cinematic = false;
             _view.bcam.SnapToBall();
             if (_ui != null) Destroy(_ui);
+            _hud.ShowPlayerBoxes(true);
             _onClose?.Invoke();
         }
 
@@ -481,7 +482,10 @@ namespace Craquez
             B(row1, "◀◀ 5 s", () => { _playing = false; SeekTo(_pos - 300f); RefreshLabels(); }, out _, null, 120);
             B(row1, "", TogglePlay, out _playLabel, new Color(0.12f, 0.45f, 0.25f, 0.95f), 170);
             B(row1, "5 s ▶▶", () => { _playing = false; SeekTo(_pos + 300f); RefreshLabels(); }, out _, null, 120);
-            B(row1, "", () => { int i = System.Array.IndexOf(Speeds, _speed); _speed = Speeds[(i + 1) % Speeds.Length]; RefreshLabels(); }, out _speedLabel, null, 170);
+            // velocidade: começa normal (1×); − deixa mais lento, + mais rápido, o do meio volta ao normal
+            B(row1, "−", () => { int i = System.Array.IndexOf(Speeds, _speed); _speed = Speeds[Mathf.Max(0, i - 1)]; RefreshLabels(); }, out _, null, 70);
+            B(row1, "", () => { _speed = 1f; RefreshLabels(); }, out _speedLabel, null, 150);
+            B(row1, "+", () => { int i = System.Array.IndexOf(Speeds, _speed); _speed = Speeds[Mathf.Min(Speeds.Length - 1, i + 1)]; RefreshLabels(); }, out _, null, 70);
             if (CanSaveVideo) B(row1, "⬇ Salvar vídeo", () => StartCoroutine(SaveVideo()), out _, new Color(0.15f, 0.35f, 0.62f, 0.95f), 190);
             B(row2, "", NextCam, out _camLabel, null, 230);
             B(row2, "", NextFocus, out _focusLabel, null, 200);
@@ -494,6 +498,7 @@ namespace Craquez
             hint.rectTransform.Place(0, 0, 1, 0, 200, 238, 200, -268);
             hint.raycastTarget = false;
             _hud.ShowPauseButton(false);
+            _hud.ShowPlayerBoxes(false);
             RefreshLabels();
         }
 
@@ -501,7 +506,7 @@ namespace Craquez
         {
             if (_playLabel == null) return;
             _playLabel.text = _playing ? "❚❚  Pausar" : "▶  Reproduzir";
-            _speedLabel.text = "Velocidade " + (_speed < 0.3f ? "¼" : _speed < 0.6f ? "½" : "1") + "×";
+            _speedLabel.text = "Velocidade " + (_speed < 0.3f ? "¼" : _speed < 0.6f ? "½" : _speed < 1.2f ? "1" : _speed < 1.7f ? "1,5" : "2") + "×";
             _camLabel.text = "Câmera: " + CamNames[_camMode];
             _focusLabel.text = _focus < 0 ? "Foco: bola" : "Foco: " + Short(_sim.players[_focus].name);
         }

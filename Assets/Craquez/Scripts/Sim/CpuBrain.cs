@@ -326,7 +326,7 @@ namespace Craquez.Sim
                         bool run = Vector2.Dot(option.vel, new Vector2(dir, 0f)) > 3f;
                         Press(ref f, run && Noise(sim, 16) > 0.4f ? InputFrame.Through : InputFrame.Pass, 8 + (int)(Noise(sim, 17) * 8f));
                     }
-                    else if (oppD < 2.2f && option != null && sim.LaneFree(p.team, p.position, option.position) < (sim.mode.id == GameModes.Field ? 1.1f : 0.7f))
+                    else if (oppD < 2.2f && option != null && (optScore < -0.5f || sim.LaneFree(p.team, p.position, option.position) < (sim.mode.id == GameModes.Field ? 1.1f : 0.7f)))
                     {
                         // pressionado e sem linha de passe: protege a bola e sai para o lado oposto ao marcador
                         // (antes tocava assim mesmo, por dentro do marcador, e perdia a bola)
@@ -418,7 +418,38 @@ namespace Craquez.Sim
                 float gain = (m.position.x - p.position.x) * dir;
                 float sc = Mathf.Min(free, field ? 8f : 5f) * 0.45f + Mathf.Min(lane, 4f) * 0.6f + gain * (field ? 0.09f : 0.16f) - d * 0.02f;
                 if (lane < (field ? 1.2f : 0.8f)) sc -= 3f;
+                // sem passe bobo: o adversário corre enquanto a bola viaja (num passe longo ele chega bem mais
+                // longe) e o companheiro colado no marcador perde a bola no domínio
+                float risk = InterceptMargin(sim, p, m.position, field ? 16f : 11f);
+                if (risk < 0f) sc -= 4f + Mathf.Min(3f, -risk);
+                else if (risk < 0.8f) sc -= 1.2f;
+                if (free < (field ? 1.4f : 1.0f)) sc -= 2.5f;
                 if (sc > bestS) { bestS = sc; best = m; }
+            }
+            return best;
+        }
+
+        /// <summary>
+        /// Folga do passe (m): para cada adversário perto da linha, a distância até ela menos o quanto ele anda
+        /// até a bola passar por ali. Negativo = ele chega antes (passe interceptado).
+        /// </summary>
+        static float InterceptMargin(MatchSim sim, SimPlayer p, Vector2 to, float passSpeed)
+        {
+            var dv = to - p.position;
+            float L = dv.magnitude;
+            if (L < 0.1f) return 99f;
+            var u = dv / L;
+            var nrm = new Vector2(-u.y, u.x);
+            float best = 99f;
+            foreach (var o in sim.players)
+            {
+                if (o.team == p.team || o.sentOff) continue;
+                var r = o.position - p.position;
+                float t = Vector2.Dot(r, u);
+                if (t < 0.3f || t > L + 1f) continue;
+                float side = Mathf.Abs(Vector2.Dot(r, nrm));
+                float reach = (o.isKeeper ? 1.2f : 0.7f) + 5.5f * (t / passSpeed) + Mathf.Max(0f, Vector2.Dot(o.vel, -Mathf.Sign(Vector2.Dot(r, nrm)) * nrm)) * (t / passSpeed);
+                best = Mathf.Min(best, side - reach);
             }
             return best;
         }

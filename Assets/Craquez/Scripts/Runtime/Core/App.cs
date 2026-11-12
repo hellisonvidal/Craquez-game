@@ -937,32 +937,6 @@ namespace Craquez
             Title(root, "ESCOLHA DOS TIMES", null);
             bool futsal = _cfg.mode == GameModes.Futsal;
             var lgs = AllFor(_cfg.mode);
-            // grupos para escolher: as ligas dos clubes e, na mesma lista, a aba das seleções (todas pelo
-            // ranking e por continente)
-            var groups = new List<(string name, List<int> ids)>();
-            foreach (var l in LeaguesFor(_cfg.mode, false))
-            {
-                if (l.IsNational && _cfg.mode != GameModes.Street) continue;
-                var ids = new List<int>();
-                for (int i = 0; i < l.count; i++) ids.Add(l.first + i);
-                Teams.SortByName(ids);   // ordem alfabética dentro da liga
-                groups.Add((l.name, ids));
-            }
-            if (_cfg.mode != GameModes.Street)
-            {
-                var all = new List<int>();
-                foreach (var l in LeaguesFor(_cfg.mode, true)) if (l.IsNational) for (int i = 0; i < l.count; i++) all.Add(l.first + i);
-                all.Sort((x, y) => Teams.Get(x).rank.CompareTo(Teams.Get(y).rank));
-                if (all.Count > 0)
-                {
-                    groups.Add(("Seleções (ranking)", all));
-                    foreach (var c in Teams.Continents)
-                    {
-                        var ids = all.FindAll(i => Teams.Continent(Teams.Get(i).iso) == c);
-                        if (ids.Count > 0) groups.Add(("Seleções  •  " + c, ids));
-                    }
-                }
-            }
             Selectable first = null;
             for (int side = 0; side < 2; side++)
             {
@@ -988,15 +962,15 @@ namespace Craquez
                 var pvImg = UiKit.Rect(pv, "img").Place(0, 0, 1, 1).gameObject.AddComponent<RawImage>();
                 pvImg.raycastTarget = false;
                 var preview = KitPreview.Create(pvImg);
-                var list = UiKit.Rect(col, "lista").Place(0, 0, 1, 1, 24, 130, 24, 320);
-                UiKit.VList(list, 10, 0, false);
+                var list = UiKit.Rect(col, "lista").Place(0, 0, 1, 1, 24, 118, 24, 300);
+                UiKit.VList(list, 8, 0, false);
                 int Team() => s == 0 ? _cfg.teamA : _cfg.teamB;
                 void SetTeam(int t)
                 {
                     if (s == 0) { _cfg.teamA = t; _cfg.tacticsA = new Tactics(); } else { _cfg.teamB = t; _cfg.tacticsB = new Tactics(); }
                     _cfg.national = Teams.Get(_cfg.teamA).IsNational && Teams.Get(_cfg.teamB).IsNational;
                 }
-                Cycler teamC = null, kitC = null;
+                Cycler kitC = null;
                 void Refresh()
                 {
                     var t = Teams.Get(Team());
@@ -1023,30 +997,8 @@ namespace Craquez
                         x += 56;
                     }
                 }
-                var gNames = new List<string>();
-                foreach (var g in groups) gNames.Add(g.name);
-                int gIdx = Mathf.Max(0, groups.FindIndex(g => g.ids.Contains(Team())));
-                List<string> TeamNames(List<int> ids)
-                {
-                    var n = new List<string>();
-                    foreach (var id in ids) n.Add(Teams.Get(id).name);
-                    return n;
-                }
-                var lgC = UiKit.Cycler(list, "Liga / Seleções", gNames, gIdx, i =>
-                {
-                    var ids = groups[i].ids;
-                    if (!ids.Contains(Team())) SetTeam(ids[s == 1 && ids.Count > 1 ? 1 : 0]);
-                    teamC.SetOptions(TeamNames(ids), Mathf.Max(0, ids.IndexOf(Team())));
-                    Refresh();
-                });
-                UiKit.Size(lgC, 70, 70);
-                if (groups.Count == 1) lgC.gameObject.SetActive(false);
-                teamC = UiKit.Cycler(list, "Time", TeamNames(groups[gIdx].ids), Mathf.Max(0, groups[gIdx].ids.IndexOf(Team())), i =>
-                {
-                    SetTeam(groups[lgC.Index].ids[i]);
-                    Refresh();
-                });
-                UiKit.Size(teamC, 70, 70);
+                // clubes por país e liga, seleções por continente (e o ranking geral)
+                var pick = TeamPicker(list, _cfg.mode, Team(), t => { if (t != Team()) SetTeam(t); Refresh(); }, 54f, s);
                 var kitOpts = new List<string>(Teams.KitNames);
                 if (s == 1) kitOpts.Insert(0, "Automático");
                 kitC = UiKit.Cycler(list, "Uniforme", kitOpts, s == 0 ? _cfg.kitA : _cfg.kitB + 1, i =>
@@ -1054,11 +1006,11 @@ namespace Craquez
                     if (s == 0) _cfg.kitA = i; else _cfg.kitB = i - 1;
                     Refresh();
                 });
-                UiKit.Size(kitC, 70, 70);
+                UiKit.Size(kitC, 54, 54);
                 var tac = UiKit.Button(col, "Táticas e elenco", () => ShowTactics(s), 30);
                 tac.GetComponent<RectTransform>().Place(0, 0, 1, 0, 24, 30, 24, -110);
                 Refresh();
-                if (first == null) first = groups.Count == 1 ? (Selectable)teamC : lgC;
+                if (first == null) first = pick;
             }
             var play = UiKit.Button(root, "JOGAR  ›", StartMatch, 44, new Color(0.85f, 0.14f, 0.18f));
             play.GetComponent<RectTransform>().At(1, 0, 420, 100, -90, 70);
@@ -1697,7 +1649,26 @@ namespace Craquez
         }
 
 
+        /// <summary>Mostra a tela de carregamento, deixa ela aparecer e só então monta a partida (antes o jogo
+        /// ficava parado na tela de seleção enquanto montava o estádio). Nas fotos do CI monta direto.</summary>
         void StartMatch()
+        {
+            if (ShotTour.Requested()) { StartMatchNow(); return; }
+            StartCoroutine(LoadThen(StartMatchNow, "Preparando a partida…"));
+        }
+
+        System.Collections.IEnumerator LoadThen(System.Action build, string caption)
+        {
+            var ls = LoadingScreen.Show(_fx, caption);
+            yield return null;   // desenha a tela
+            yield return null;
+            ls.Progress(0.6f);
+            yield return null;
+            try { build(); }
+            finally { ls.Progress(1f); ls.Done(); }
+        }
+
+        void StartMatchNow()
         {
             Sfx.MenuMusic(false);
             StopAttract();
@@ -1726,7 +1697,10 @@ namespace Craquez
         public void OnlineBack() { OnlineHooks.Leave?.Invoke(); ShowModes(); }
 
         /// <summary>Começa a partida on-line: os dois aparelhos com a mesma configuração e semente.</summary>
-        public void StartOnlineMatch(MatchConfig c, Craquez.Sim.Net.LockstepSession session)
+        public void StartOnlineMatch(MatchConfig c, Craquez.Sim.Net.LockstepSession session) =>
+            StartCoroutine(LoadThen(() => StartOnlineMatchNow(c, session), "Preparando a partida on-line…"));
+
+        void StartOnlineMatchNow(MatchConfig c, Craquez.Sim.Net.LockstepSession session)
         {
             Sfx.MenuMusic(false);
             StopAttract();
@@ -1739,7 +1713,9 @@ namespace Craquez
             go.transform.SetParent(transform, false);
             _match = go.AddComponent<MatchController>();
             _match.net = session;
-            _match.onExit = () => { EndMatch(); OnlineHooks.Leave?.Invoke(); ShowModes(); };
+            // fim: volta para a sala (os dois continuam conectados para a revanche ou para trocar os times)
+            _match.onExit = () => { EndMatch(); OnlineHooks.AfterMatch?.Invoke(false); ShowOnline(); };
+            _match.onNetRematch = () => { EndMatch(); OnlineHooks.AfterMatch?.Invoke(true); ShowOnline(); };
             _match.Begin(c, cam);
         }
 
