@@ -1,3 +1,17 @@
+## Craquez 2.17.1
+
+Jogo de futebol feito 100% com inteligência artificial, **gratuito**.
+
+### Download
+- **Celular Android**: `Craquez-v2.17.1.apk`
+- **TV (Google TV / Android TV, ex.: TCL C6K)**: `Craquez-TV-v2.17.1.apk` — use este na TV (32 e 64 bits).
+
+### Correção
+- **Jogo parado na capa depois de "toque para iniciar"** (e o celular esquentando): no primeiro acesso o
+  tutorial começava, mas a capa da tela inicial ficava por cima da partida, com a partida e o vídeo de
+  abertura rodando por baixo. Agora, ao começar qualquer partida, a capa, o vídeo e os efeitos da tela
+  inicial são removidos.
+
 ## Craquez 2.17.0
 
 Jogo de futebol feito 100% com inteligência artificial, **gratuito**.

@@ -371,6 +371,20 @@ namespace Craquez
             return _titleGrad;
         }
 
+        /// <summary>
+        /// Sai de vez da tela inicial: capa (fica fora da área dos menus), vídeo de abertura e efeitos. O tutorial
+        /// do primeiro acesso começa direto da capa — sem isto a capa ficava parada por cima da partida (o jogo
+        /// "não avançava") com a partida e o vídeo rodando por baixo, esquentando o celular.
+        /// </summary>
+        void LeaveTitle()
+        {
+            _pressText = null;
+            var tfx = _root != null ? _root.GetComponent<TitleFx>() : null;
+            if (tfx != null) Destroy(tfx);
+            DestroyIntroVideo();
+            ClearCover();
+        }
+
         void ShowTitle()
         {
             Sfx.MenuMusic(true);
@@ -1691,6 +1705,7 @@ namespace Craquez
 
         void StartMatchNow()
         {
+            LeaveTitle();
             Sfx.MenuMusic(false);
             StopAttract();
             UiKit.Clear(_root);
@@ -1723,6 +1738,7 @@ namespace Craquez
 
         void StartOnlineMatchNow(MatchConfig c, Craquez.Sim.Net.LockstepSession session)
         {
+            LeaveTitle();
             Sfx.MenuMusic(false);
             StopAttract();
             UiKit.Clear(_root);
