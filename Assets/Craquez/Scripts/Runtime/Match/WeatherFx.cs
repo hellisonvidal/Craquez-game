@@ -109,33 +109,45 @@ namespace Craquez
         GameObject _snowGo;
 
         /// <summary>
-        /// Camada de neve sobre o gramado (abaixo das linhas): vai preenchendo conforme a neve acumula
-        /// (recorte com ruído: cobre aos poucos, em manchas) e some quando derrete.
+        /// Camada de neve sobre o gramado (abaixo das linhas, que continuam à mostra): um manto contínuo e
+        /// macio, transparente na medida da neve acumulada — com a grama aparecendo só onde os jogadores mais
+        /// pisam (faixa central, círculo e as duas áreas). Antes era um recorte duro em manchas grandes
+        /// ("continentes" verdes sobre o branco).
         /// </summary>
         public void BuildSnowLayer(Transform parent, float hl, float hw)
         {
-            int n = 256;
-            var t = new Texture2D(n, n, TextureFormat.RGBA32, true) { wrapMode = TextureWrapMode.Repeat };
-            var px = new Color32[n * n];
-            for (int y = 0; y < n; y++)
-                for (int x = 0; x < n; x++)
+            const int nx = 384, ny = 256;
+            float ex = hl + 6f, ey = hw + 5f;
+            var t = new Texture2D(nx, ny, TextureFormat.RGBA32, true) { wrapMode = TextureWrapMode.Clamp };
+            var px = new Color32[nx * ny];
+            for (int y = 0; y < ny; y++)
+                for (int x = 0; x < nx; x++)
                 {
-                    float u = x / (float)n, v = y / (float)n;
-                    float a = Gfx.Fbm(u * 6f, v * 6f, 6, 77, 4);
-                    float b = 0.92f + Gfx.Hash(x, y, 5) * 0.08f - Mathf.Max(0f, 0.5f - a) * 0.12f;
-                    px[y * n + x] = new Color(b, b, b * 1.03f, a);
+                    float u = x / (float)(nx - 1), v = y / (float)(ny - 1);
+                    float wx = (u * 2f - 1f) * ex, wy = (v * 2f - 1f) * ey;   // metros no campo
+                    // pisoteio: faixa do meio (no sentido do jogo), círculo central e as áreas
+                    float lane = Mathf.Exp(-(wy * wy) / (2f * (hw * 0.32f) * (hw * 0.32f))) * 0.45f;
+                    float circle = Mathf.Exp(-(wx * wx + wy * wy) / (2f * 7f * 7f)) * 0.35f;
+                    float gx = hl - Mathf.Abs(wx);
+                    float box = Mathf.Exp(-(gx * gx) / (2f * 7f * 7f)) * Mathf.Exp(-(wy * wy) / (2f * 10f * 10f)) * 0.7f;
+                    float wear = Mathf.Clamp01(lane + circle + box);
+                    // grão fino (pegadas, neve irregular), sem manchas grandes
+                    float grain = (Gfx.Fbm(u * 40f, v * 26f, 40, 77, 3) - 0.5f) * 0.35f + (Gfx.Hash(x, y, 5) - 0.5f) * 0.12f;
+                    float a = Mathf.Clamp01(1f - wear * (0.75f + grain) + grain * 0.4f);
+                    float b = 0.93f + Gfx.Hash(x, y, 9) * 0.05f - wear * 0.08f;   // neve pisada: um pouco mais cinza
+                    px[y * nx + x] = new Color(b, b, b * 1.02f, a);
                 }
             t.SetPixels32(px);
             t.Apply(true);
-            _snowMat = Gfx.Cutout(new Color(0.96f, 0.97f, 1f), t, 1f, 0.35f);
-            Gfx.Tiling(_snowMat, new Vector2((hl + 6f) / 8f, (hw + 5f) / 8f));
+            _snowMat = Gfx.Transparent(new Color(0.97f, 0.98f, 1f, 1f), t);
+            _snowMat.SetFloat("_Smoothness", 0.25f);
             _snowGo = GameObject.CreatePrimitive(PrimitiveType.Quad);
             Destroy(_snowGo.GetComponent<Collider>());
             _snowGo.name = "Neve no gramado";
             _snowGo.transform.SetParent(parent, false);
             _snowGo.transform.localPosition = new Vector3(0f, 0.006f, 0f);   // abaixo das linhas (que ficam à mostra)
             _snowGo.transform.localRotation = Quaternion.Euler(90f, 0f, 0f);
-            _snowGo.transform.localScale = new Vector3((hl + 6f) * 2f, (hw + 5f) * 2f, 1f);
+            _snowGo.transform.localScale = new Vector3(ex * 2f, ey * 2f, 1f);
             var r = _snowGo.GetComponent<MeshRenderer>();
             r.sharedMaterial = _snowMat;
             r.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
@@ -148,8 +160,10 @@ namespace Craquez
             if (_snowMat == null) return;
             float cover = Mathf.Clamp01(SnowCover);
             _snowGo.SetActive(cover > 0.02f);
-            // recorte: com cobertura 1 nada é recortado (campo branco); com pouca neve, só as manchas
-            _snowMat.SetFloat("_Cutoff", Mathf.Lerp(0.98f, 0f, Mathf.Pow(cover, 0.7f)));
+            // a neve vai "engrossando" por igual (opacidade), sem recorte
+            var c = _snowMat.GetColor("_BaseColor");
+            c.a = Mathf.Clamp01(cover * 1.15f);
+            _snowMat.SetColor("_BaseColor", c);
         }
 
         ParticleSystem Particles(Camera cam, bool rain)
@@ -296,7 +310,7 @@ namespace Craquez
                 // gramado molhado acompanha a água acumulada (seca devagar depois da chuva); a neve
                 // branqueia conforme acumula (a mesma que freia a bola na simulação)
                 var c = Color.Lerp(bc, wet, Mathf.Max(_rainK, Mathf.Clamp01(Water * 1.4f)));
-                float snowW = Mathf.Max(_snowK * 0.35f, SnowCover * 0.85f);
+                float snowW = Mathf.Max(_snowK * 0.2f, SnowCover * 0.45f);   // (a camada de neve faz o resto; a grama pisada fica verde-clara, não saturada)
                 if (snowW > 0.01f) c = Color.Lerp(c, new Color(1.6f, 1.6f, 1.7f), snowW);
                 pm.SetColor("_BaseColor", c);
                 pm.SetFloat("_Smoothness", 0.15f);

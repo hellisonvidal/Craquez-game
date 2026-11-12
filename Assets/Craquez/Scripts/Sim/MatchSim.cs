@@ -1674,7 +1674,7 @@ namespace Craquez.Sim
                 {
                     if (o.team == p.team) continue;
                     // linha de passe fechada e companheiro marcado
-                    if (!lofted && V2.ClosestOnSegment(o.position, ball.pos, m.position).Dist(o.position) < lane) s -= 0.9f;
+                    if (!lofted && V2.ClosestOnSegment(o.position, ball.pos, m.position).Dist(o.position) < lane) s -= 1.5f;   // (2.20: linha fechada pesa mais na escolha)
                     if (o.position.Dist(m.position) < (mode.id == GameModes.Field ? 2.2f : 1.4f)) s -= 0.4f;
                     // marcador colado no passador: tocar "através" dele é entregar a bola (antes, pressionado,
                     // o atleta virava, tocava para trás e o marcador cortava na hora)
@@ -1699,7 +1699,7 @@ namespace Craquez.Sim
                     for (int k = 0; k < 3; k++)
                     {
                         float dd = ball.pos.Dist(target);
-                        float ve = mode.id != GameModes.Field ? 4.6f + dd * 0.2f : 6f + dd * 0.14f;
+                        float ve = mode.id != GameModes.Field ? 5.6f + dd * 0.22f : 6f + dd * 0.14f;
                         float tt = dd / Mathf.Max(3f, (PassSpeed(dd, ve) + ve) * 0.5f);   // tempo de voo de verdade
                         target = best.position + best.vel * tt * 0.85f;
                     }
@@ -1736,9 +1736,9 @@ namespace Craquez.Sim
                 bool small = mode.id != GameModes.Field;
                 // força casada com a distância: curto chega macio, longo chega firme (sem morrer no caminho)
                 // (mais tensos que antes: na quadra o passe curto saía a ~4,5 m/s e o marcador cortava)
-                float vEnd = small ? Mathf.Min(9f, 4.6f + dist * 0.2f + power * 2.2f) : Mathf.Min(13f, 6f + dist * 0.14f + power * 3.5f);
+                float vEnd = small ? Mathf.Min(10f, 5.6f + dist * 0.22f + power * 2.2f) : Mathf.Min(13f, 6f + dist * 0.14f + power * 3.5f);   // (2.20: quadra um pouco mais tensa — metade dos passes roubados na quadra saía a menos de 7 m/s)
                 vEnd *= 1f - nearLine * 0.25f;   // perto da lateral chega mais macia
-                float v0 = Mathf.Clamp(PassSpeed(dist, vEnd), small ? 6.5f : 9f, 32f);
+                float v0 = Mathf.Clamp(PassSpeed(dist, vEnd), small ? 7.6f : 9f, 32f);
                 ball.vel = dirv * v0;
                 ball.vz = v0 > 22f ? 0.6f : 0f;
                 ball.spin = 0f;
@@ -3109,7 +3109,7 @@ namespace Craquez.Sim
                                 p.dive = 0.6f;
                                 // impulso lateral: o necessário para as mãos chegarem, até o limite da impulsão
                                 float need = Mathf.Max(0f, side - DiveReach(p, kind) * 0.85f) / Mathf.Max(0.18f, tK);
-                                float push = Mathf.Clamp(need, 1.6f, Lerp01(2.8f, 3.9f, p.defense) * gs);
+                                float push = Mathf.Clamp(need, 1.6f, Lerp01(2.4f, 3.3f, p.defense) * gs);   // (2.20: impulsão menor — ia buscar tudo no ângulo)
                                 // (para a frente ou para trás só um pouco: ninguém voa de costas para dentro do gol)
                                 p.vel = new Vector2(Mathf.Clamp((planeX - p.position.x) * 2f, -1.2f, 1.5f), Mathf.Sign(lat) * push);
                                 Emit("dive", p.team, p.id);
@@ -3189,7 +3189,7 @@ namespace Craquez.Sim
         float DiveReach(SimPlayer p, int kind)
         {
             float gs = Mathf.Clamp(goalHalf / 3.66f, 0.6f, 1f);
-            float body = kind == 5 ? 1.35f : kind == 4 ? 1.4f : kind == 3 ? 1.3f : 0.7f;
+            float body = kind == 5 ? 1.22f : kind == 4 ? 1.27f : kind == 3 ? 1.18f : 0.7f;   // (2.20: um pouco menos: o goleiro pegava 83% dos chutes no gol, até no ângulo)
             return (body + 0.15f * p.defense + (p.Has(Trait.Reflexo) ? 0.1f : 0f)) * gs;
         }
 

@@ -1,3 +1,32 @@
+## Craquez 2.20.0
+
+Jogo de futebol feito 100% com inteligência artificial, **gratuito**.
+
+### Download
+- **Celular Android**: `Craquez-v2.20.0.apk`
+- **TV (Google TV / Android TV, ex.: TCL C6K)**: `Craquez-TV-v2.20.0.apk` — use este na TV (32 e 64 bits).
+
+### Novidades
+- **Menos aquecimento**: nos menus o jogo desenha a 30 quadros (antes 60 o tempo todo). Na partida, o jogo
+  lê a temperatura do Android e, se o aparelho esquenta, reduz aos poucos a resolução do 3D, as sombras e os
+  quadros; volta ao normal quando esfria.
+- **Neve refeita**: um manto de neve contínuo e macio, com a grama aparecendo só onde os jogadores mais pisam
+  (meio do campo e áreas), em vez das manchas verdes grandes.
+
+### Correções
+- **Clima aleatório**: neve e nevasca saíam em 1 de cada 3 partidas. Agora o sorteio segue um ano de futebol:
+  sol 40%, nublado 28%, chuva 18%, tempestade 7%, neve 5%, nevasca 2%.
+- **Placas de publicidade**: vão na saída do vestiário (os jogadores passavam por cima) e na frente dos
+  bancos de reservas (as placas atravessavam os bancos).
+- **Câmera padrão** um pouco mais afastada ("TV Bem Perto" com zoom "Perto").
+- **CPU x CPU**: chute mirado no canto livre do gol (antes ia num ângulo fixo, no goleiro ou para fora);
+  passe sob pressão só com a linha livre; cobranças sempre para um companheiro; passes na quadra mais tensos.
+- **Goleiro** um pouco menos "voador": não alcança mais todas as bolas no ângulo.
+- **Segurança do on-line**: tudo o que chega do outro aparelho é conferido (duração, local, número de
+  jogadores, táticas, uniforme, mensagens); filas de mensagens limitadas; limite de pausas por partida; link
+  de convite aceita só código de sala e não tira ninguém de uma partida em andamento.
+- **Atualizador**: só baixa APK do repositório oficial do jogo.
+
 ## Craquez 2.19.0
 
 Jogo de futebol feito 100% com inteligência artificial, **gratuito**.

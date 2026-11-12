@@ -195,8 +195,10 @@ namespace Craquez.Sim
                 }
                 else
                 {
-                    f.move = new Vector2(dir, (Noise(sim, 45) - 0.5f) * 1.4f).Norm();
-                    Press(ref f, InputFrame.Pass, 10);
+                    // cobrança: para o companheiro mais livre (antes, um toque "para a frente" sem destino)
+                    var mate = BestOption(sim, p, out float ms);
+                    f.move = mate != null ? (mate.position - p.position).Norm() : new Vector2(dir, (Noise(sim, 45) - 0.5f) * 1.4f).Norm();
+                    Press(ref f, InputFrame.Pass, mate != null ? 6 + (int)(Mathf.Clamp01(mate.position.Dist(p.position) / sim.halfLen) * 10f) : 10);
                 }
                 return f;
             }
@@ -349,11 +351,17 @@ namespace Craquez.Sim
                     }
                     else if (toGoal.magnitude < shootRange && Mathf.Abs(p.position.y) < sim.halfW * 0.7f)
                     {
-                        // mira o canto longe do goleiro
+                        // mira o canto longe do goleiro: um ponto de verdade dentro do gol (a ~40 cm da trave), não
+                        // um ângulo fixo — de lado, o ângulo fixo mandava a bola no goleiro ou para fora
                         float side = Noise(sim, 1) > 0.5f ? 1f : -1f;
-                        foreach (var k in sim.players)
-                            if (k.isKeeper && k.team != team) side = k.position.y > 0.2f ? -1f : k.position.y < -0.2f ? 1f : side;
-                        f.move = new Vector2(dir, side * 0.6f);
+                        if (gkO != null)
+                        {
+                            float gy = gkO.position.y - p.position.y * 0.15f;
+                            side = gy > 0.15f ? -1f : gy < -0.15f ? 1f : (p.position.y > 0f ? -1f : 1f);   // (goleiro no meio: canto oposto ao lado de onde vem)
+                        }
+                        float inside = Mathf.Max(0.25f, sim.goalHalf - (sim.mode.id == GameModes.Field ? 0.55f : 0.35f));
+                        var aimPt = new Vector2(goal.x, side * inside);
+                        f.move = (aimPt - p.position).Norm();
                         // cara a cara: finalização rápida e colocada (antes carregava o chute na cara do goleiro)
                         Press(ref f, InputFrame.Shoot, alone ? (fieldM ? 15 : 10) + (int)(Noise(sim, 12) * (fieldM ? 9f : 6f)) : (int)Mathf.Lerp(18f, 40f, toGoal.magnitude / shootRange));
                         _finesse = Noise(sim, 13) < (alone ? 0.4f : 0.25f + skill * 0.2f);
@@ -377,7 +385,8 @@ namespace Craquez.Sim
                         f.buttons |= InputFrame.Shield;
                         f.buttons &= ~InputFrame.Sprint;
                     }
-                    else if (oppD < 2.2f && option != null && Noise(sim, 2) < (0.05f + skill * 0.06f) * (1.5f - sty.dribble * 0.9f))
+                    else if (oppD < 2.2f && option != null && InterceptMargin(sim, p, option.position, sim.mode.id == GameModes.Field ? 12f : 9f) > 0.2f
+                        && Noise(sim, 2) < (0.05f + skill * 0.06f) * (1.5f - sty.dribble * 0.9f))
                     {
                         // pressionado: toca para o companheiro mais livre (não para uma direção qualquer)
                         f.move = (option.position - p.position).Norm();
@@ -460,7 +469,7 @@ namespace Craquez.Sim
                 if (lane < (field ? 1.2f : 0.8f)) sc -= 3f;
                 // sem passe bobo: o adversário corre enquanto a bola viaja (num passe longo ele chega bem mais
                 // longe) e o companheiro colado no marcador perde a bola no domínio
-                float risk = InterceptMargin(sim, p, m.position, field ? 16f : 11f);
+                float risk = InterceptMargin(sim, p, m.position, field ? 12f : 9f);   // (velocidade real do passe: ~12 m/s no campo)
                 if (risk < 0f) sc -= 4f + Mathf.Min(3f, -risk);
                 else if (risk < 0.8f) sc -= 1.2f;
                 if (free < (field ? 1.4f : 1.0f)) sc -= 2.5f;

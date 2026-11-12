@@ -75,7 +75,8 @@ namespace Craquez.Online
             if (string.IsNullOrEmpty(code)) return;
             _pendingCode = code;
             var app = FindAnyObjectByType<App>();
-            if (app != null && _st != St.Playing) app.OnlineRefresh();   // abre a tela on-line e entra na sala
+            // (numa partida em andamento — on-line ou não — só guarda o código: entra quando abrir o on-line)
+            if (app != null && _st != St.Playing && !Craquez.ThermalGuard.InMatch) app.OnlineRefresh();   // abre a tela on-line e entra na sala
         }
 
         static string ParseCode(string url)
@@ -88,6 +89,7 @@ namespace Craquez.Online
             int cut = c.IndexOfAny(new[] { '/', '?', '&', '#' });
             if (cut >= 0) c = c.Substring(0, cut);
             c = c.Trim().ToUpperInvariant();
+            foreach (char ch in c) if (!(ch >= 'A' && ch <= 'Z') && !(ch >= '0' && ch <= '9')) return null;   // (só código de sala)
             return c.Length >= 4 && c.Length <= 12 ? c : null;
         }
 
@@ -444,11 +446,11 @@ namespace Craquez.Online
             {
                 var r = new Reader(m);
                 byte type = r.Byte();
-                if (type == MsgBye) { Fail(r.Str()); return; }
+                if (type == MsgBye) { Fail("O adversário saiu: " + SafeText(r.Str())); return; }
                 if (type == MsgHello && _link.IsHost)
                 {
                     int proto = r.Int(); string ver = r.Str(); string mode = r.Str(); int team = r.Int(); int hash = r.Int();
-                    if (proto != Protocol || ver != Application.version) { Bye("Versões diferentes do jogo (" + Application.version + " e " + ver + "). Atualizem os dois aparelhos."); return; }
+                    if (proto != Protocol || ver != Application.version) { Bye("Versões diferentes do jogo (" + Application.version + " e " + SafeText(ver, 16) + "). Atualizem os dois aparelhos."); return; }
                     if (mode != Mode) { Bye("Modalidades diferentes: escolham a mesma."); return; }
                     if (team < 0 || team >= Teams.Count || TeamHash(team) != hash) { Bye("Os dados dos times são diferentes nos dois aparelhos (option file). Usem os dados padrão."); return; }
                     _peerTeam = team; _peerHash = hash;
@@ -474,7 +476,7 @@ namespace Craquez.Online
                 if (m == null || m.Length == 0) continue;
                 var r = new Reader(m);
                 byte type = r.Byte();
-                if (type == MsgBye) { Fail(r.Str()); return; }
+                if (type == MsgBye) { Fail("O adversário saiu: " + SafeText(r.Str())); return; }
                 if (type == MsgReady)
                 {
                     _peerReady = r.Int(); _peerReadyTeam = r.Int(); _peerReadyHash = r.Int();
@@ -576,6 +578,30 @@ namespace Craquez.Online
             c.tacticsA = new Tactics { formation = r.Str(), mentality = r.Int(), press = r.Int() };
             c.tacticsB = new Tactics { formation = r.Str(), mentality = r.Int(), press = r.Int() };
             delay = Mathf.Clamp(r.Int(), 3, 16);
+            c.kitA = Mathf.Clamp(c.kitA, 0, Mathf.Max(0, Teams.Get(c.teamA).kits.Count - 1));
+            c.kitB = Mathf.Clamp(c.kitB, -1, Mathf.Max(0, Teams.Get(c.teamB).kits.Count - 1));
+            SafeTactics(c.tacticsA, c.mode);
+            SafeTactics(c.tacticsB, c.mode);
+        }
+
+        /// <summary>Tática vinda da rede: formação que existe na modalidade, postura e marcação de 0 a 2.</summary>
+        static Tactics SafeTactics(Tactics t, string mode)
+        {
+            var forms = GameModes.Formations(mode);
+            if (string.IsNullOrEmpty(t.formation) || !forms.ContainsKey(t.formation)) t.formation = new Tactics().formation;
+            if (!string.IsNullOrEmpty(t.formation) && !forms.ContainsKey(t.formation)) t.formation = null;
+            t.mentality = Mathf.Clamp(t.mentality, 0, 2);
+            t.press = Mathf.Clamp(t.press, 0, 2);
+            return t;
+        }
+
+        /// <summary>Texto vindo do outro aparelho (motivo de saída, versão): curto e sem marcação de texto rico.</summary>
+        static string SafeText(string s, int max = 120)
+        {
+            if (string.IsNullOrEmpty(s)) return "";
+            var sb = new System.Text.StringBuilder();
+            foreach (char ch in s) { if (sb.Length >= max) break; if (ch != '<' && ch != '>' && !char.IsControl(ch)) sb.Append(ch); }
+            return sb.ToString();
         }
 
         // ------------------------------------------------------------ configuração dos times (45 s)
@@ -665,20 +691,25 @@ namespace Craquez.Online
                 if (m == null || m.Length == 0) continue;
                 var r = new Reader(m);
                 byte type = r.Byte();
-                if (type == MsgBye) { Fail(r.Str()); return; }
+                if (type == MsgBye) { Fail("O adversário saiu: " + SafeText(r.Str())); return; }
                 if (type == MsgPing) { var w = new Writer(MsgPong); w.Int(r.Int()); _link.Send(w.Bytes()); }
-                else if (type == MsgPong) _rtts.Add(Time.realtimeSinceStartup * 1000f - r.Int());
+                else if (type == MsgPong)
+                {
+                    float rtt = Time.realtimeSinceStartup * 1000f - r.Int();
+                    if (rtt >= 0f && rtt < 5000f && _rtts.Count < 200) _rtts.Add(rtt);
+                }
                 else if (type == MsgLineup)
                 {
-                    _peerTac = new Tactics { formation = r.Str(), mentality = r.Int(), press = r.Int() };
-                    _peerKit = r.Int();
+                    _peerTac = SafeTactics(new Tactics { formation = r.Str(), mentality = r.Int(), press = r.Int() }, _pending.mode);
+                    int peerTeam = _link.IsHost ? _pending.teamB : _pending.teamA;
+                    _peerKit = Mathf.Clamp(r.Int(), _link.IsHost ? -1 : 0, Mathf.Max(0, Teams.Get(peerTeam).kits.Count - 1));
                     _peerSent = true;
                     if (_status != null) _status.text = SetupText();
                 }
                 else if (type == MsgStart && !_link.IsHost)
                 {
                     var cfg = ReadConfig(r, out int hashA, out int hashB);
-                    if (cfg == null) { Bye("Configuração da partida inválida."); return; }
+                    if (cfg == null || TeamHash(cfg.teamA) != hashA || TeamHash(cfg.teamB) != hashB) { Bye("Configuração da partida inválida."); return; }
                     ReadFinal(r, cfg, out int dl);
                     Begin(cfg, 1, dl);
                     return;
@@ -713,6 +744,17 @@ namespace Craquez.Online
             c.mode = r.Str(); c.teamA = r.Int(); c.teamB = r.Int(); hashA = r.Int(); hashB = r.Int();
             c.minutes = r.Int(); c.seed = (uint)r.Int(); c.weather = r.Str(); c.timeOfDay = r.Str(); c.venue = r.Int(); c.stadium = r.Int(); c.ball = r.Int(); c.streetPlayers = r.Int();
             if (c.teamA < 0 || c.teamA >= Teams.Count || c.teamB < 0 || c.teamB >= Teams.Count) return null;
+            // segurança: tudo o que vem do outro aparelho é conferido (valores fora do normal travavam ou
+            // derrubavam o jogo: milhares de atletas, local inexistente, partida sem fim...)
+            if (Array.IndexOf(GameModes.All, c.mode) < 0 || c.mode != Mode) return null;
+            if (Array.IndexOf(new[] { 4, 6, 10, 20 }, c.minutes) < 0) return null;
+            if (c.weather != "sol" && c.weather != "nublado") return null;   // (chuva/neve dependem do relógio de cada aparelho)
+            if (c.timeOfDay != "dia" && c.timeOfDay != "tarde" && c.timeOfDay != "noite") return null;
+            if (c.venue < 0 || c.venue >= Mathf.Max(1, VenueCount(c.mode))) return null;
+            if (c.stadium < 0 || c.stadium >= Mathf.Max(1, VenueBuilder.StadiumModels.Length)) return null;
+            if (c.streetPlayers < 3 || c.streetPlayers > 5) return null;
+            var balls = BallCatalog.ForMode(c.mode);
+            if (balls.Count > 0 && !balls.Contains(c.ball)) return null;
             c.national = Teams.Get(c.teamA).IsNational && Teams.Get(c.teamB).IsNational;
             return c;
         }

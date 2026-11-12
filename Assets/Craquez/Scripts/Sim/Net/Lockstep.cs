@@ -56,6 +56,8 @@ namespace Craquez.Sim.Net
     public class LockstepSession
     {
         const byte MsgInput = 1, MsgHash = 2;
+        /// <summary>Máximo de passos à frente aceitos do outro lado (10 s).</summary>
+        const int MaxAhead = 600;
         public readonly int localTeam;
         public readonly int delay;
         readonly INetTransport _net;
@@ -108,9 +110,18 @@ namespace Craquez.Sim.Net
             {
                 if (m == null || m.Length < 5) continue;
                 int t = ReadInt(m, 1);
-                if (m[0] == MsgInput && m.Length >= 5 + InputFrame.Size) { _remote[t] = InputFrame.Read(m, 5); if (t > _maxRemote) _maxRemote = t; }
-                else if (m[0] == MsgHash && m.Length >= 9) { _hashRemote[t] = ReadInt(m, 5); Check(t); }
-                else if (m[0] >= 20) Extra.Enqueue(m);
+                // segurança: só passos dentro de uma janela razoável (um aparelho mal-intencionado mandando
+                // passos muito à frente lotava a memória) e sem reescrever um comando que já chegou
+                bool inWindow = t >= Tick && t <= Tick + MaxAhead;
+                if (m[0] == MsgInput && m.Length >= 5 + InputFrame.Size)
+                {
+                    if (inWindow && !_remote.ContainsKey(t)) { _remote[t] = InputFrame.Read(m, 5); if (t > _maxRemote) _maxRemote = t; }
+                }
+                else if (m[0] == MsgHash && m.Length >= 9)
+                {
+                    if (t > 0 && t >= Tick - MaxAhead && t <= Tick + MaxAhead && _hashRemote.Count < 64) { _hashRemote[t] = ReadInt(m, 5); Check(t); }
+                }
+                else if (m[0] >= 20 && Extra.Count < 64) Extra.Enqueue(m);
             }
         }
 
@@ -138,6 +149,7 @@ namespace Craquez.Sim.Net
             {
                 int h = sim.StateHash();
                 _hashLocal[Tick] = h;
+                if (_hashLocal.Count > 64) { var old = new List<int>(); foreach (var k in _hashLocal.Keys) if (k < Tick - MaxAhead) old.Add(k); foreach (var k in old) _hashLocal.Remove(k); }
                 var msg = new byte[9];
                 msg[0] = MsgHash;
                 WriteInt(msg, 1, Tick);
