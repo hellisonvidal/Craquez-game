@@ -808,6 +808,8 @@ namespace Craquez.Sim
         /// <summary>Bola devolvida pelo gandula/torcedor (jogada de longe até o goleiro).</summary>
         public bool gkToss;
         Vector2 gkTossFrom;
+        /// <summary>De onde o gandula joga a bola de volta ao goleiro (o gandula vai até lá).</summary>
+        public Vector2 GkTossFrom => gkTossFrom;
         bool _tossThrown;
         Vector2 gkFetchBall, gkFetchSpot, gkFetchFacing;
 
@@ -1702,8 +1704,13 @@ namespace Craquez.Sim
                 passFrom = ball.pos;
             }
             else target = ball.pos + aim * Mathf.Lerp(8f, 32f, power);
-            target.x = Mathf.Clamp(target.x, -halfLen - 2f, halfLen + 2f);
-            target.y = Mathf.Clamp(target.y, -halfW + 0.5f, halfW - 0.5f);
+            // longe das linhas: na quadra, o passe que mirava a 0,5 m da lateral saía num desvio ou num domínio
+            // ruim (no futsal a maioria das bolas fora vinha de passe)
+            bool smallC = mode.id != GameModes.Field;
+            float edgeY = smallC ? 1.6f : 0.9f, edgeX = smallC ? 1.2f : -2f;
+            target.x = Mathf.Clamp(target.x, -halfLen + edgeX, halfLen - edgeX);
+            target.y = Mathf.Clamp(target.y, -halfW + edgeY, halfW - edgeY);
+            float nearLine = Mathf.Clamp01(1f - (halfW - Mathf.Abs(target.y)) / 3f);
             var toT = target - ball.pos;
             float dist = Mathf.Max(toT.magnitude, 0.5f);
             var dirv = toT / dist;
@@ -1724,6 +1731,7 @@ namespace Craquez.Sim
                 // força casada com a distância: curto chega macio, longo chega firme (sem morrer no caminho)
                 // (mais tensos que antes: na quadra o passe curto saía a ~4,5 m/s e o marcador cortava)
                 float vEnd = small ? Mathf.Min(9f, 4.6f + dist * 0.2f + power * 2.2f) : Mathf.Min(13f, 6f + dist * 0.14f + power * 3.5f);
+                vEnd *= 1f - nearLine * 0.25f;   // perto da lateral chega mais macia
                 float v0 = Mathf.Clamp(PassSpeed(dist, vEnd), small ? 6.5f : 9f, 32f);
                 ball.vel = dirv * v0;
                 ball.vz = v0 > 22f ? 0.6f : 0f;
@@ -1774,8 +1782,10 @@ namespace Craquez.Sim
             float dist = Mathf.Clamp(toT.magnitude, 1.5f, maxD);
             var dirv = (toT.magnitude > 0.01f ? toT.normalized : aim).Rotated(rng.Gauss() * 0.04f * (1.2f - p.passing));
             // parábola saindo a 2 m: curto chega na altura do peito/pé, longo cai na área
-            float h0 = 2.05f, hEnd = longThrow ? 0.3f : 0.15f;
-            float flight = (longThrow ? 0.95f : 0.6f) + dist / (longThrow ? 26f : 22f);
+            // (o curto vai reto e baixo, para o pé/peito: com o arco alto o companheiro, correndo ao encontro,
+            // pegava a bola na altura da cabeça e cabeceava — muitas vezes para fora, outro lateral)
+            float h0 = 2.05f, hEnd = longThrow ? 0.3f : 0.1f;
+            float flight = longThrow ? 0.95f + dist / 26f : 0.32f + dist / 34f;
             ball.z = h0;
             ball.vel = dirv * (dist * 1.02f / flight);
             ball.vz = (hEnd - h0 + 0.5f * SimBall.G * flight * flight) / flight;

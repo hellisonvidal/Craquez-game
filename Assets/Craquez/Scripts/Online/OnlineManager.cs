@@ -20,14 +20,14 @@ namespace Craquez.Online
     /// </summary>
     public class OnlineManager : MonoBehaviour
     {
-        const byte MsgHello = 10, MsgStart = 11, MsgBye = 12;
+        const byte MsgHello = 10, MsgStart = 11, MsgBye = 12, MsgReady = 13;
         const int Protocol = 1;
         const int NetDelay = 6;   // passos de atraso dos comandos (~80 ms): cobre a ida e volta pelo Relay
         /// <summary>Página do convite (abre o jogo na sala, ou leva para baixar).</summary>
         public const string InviteUrl = "https://hellisonvidal.github.io/Craquez-game/sala/?c=";
 
         static OnlineManager _i;
-        enum St { Idle, Busy, Waiting, Handshake, Playing, Error }
+        enum St { Idle, Busy, Waiting, Handshake, Playing, Room, Error }
         St _st = St.Idle;
         string _msg = "";
         ISession _session;
@@ -40,6 +40,9 @@ namespace Craquez.Online
         int _peerTeam = -1, _peerHash;
         float _handshakeT;
         string _pendingCode;
+        // sala depois da partida: revanche (1) ou trocar os times (2)
+        MatchConfig _last;
+        int _myReady, _peerReady, _peerReadyTeam = -1, _peerReadyHash;
 
         // escolhas (guardadas no aparelho)
         static string Mode { get => PlayerPrefs.GetString("online.mode", GameModes.Field); set => PlayerPrefs.SetString("online.mode", value); }
@@ -59,6 +62,7 @@ namespace Craquez.Online
             Craquez.Sim.Net.Online.DisabledReason = configured ? "" : "O servidor do on-line ainda não foi ligado a este jogo (falta o projeto na Unity Cloud). Em breve!";
             OnlineHooks.BuildPage = (app, area) => _i.BuildPage(app, area);
             OnlineHooks.Leave = () => _i.Leave();
+            OnlineHooks.AfterMatch = rematch => _i.AfterMatch(rematch);
             // convite aberto pelo link (craquez://sala/CODIGO)
             Application.deepLinkActivated += url => _i.OnDeepLink(url);
             if (!string.IsNullOrEmpty(Application.absoluteURL)) _i.OnDeepLink(Application.absoluteURL);
@@ -94,52 +98,56 @@ namespace Craquez.Online
             UiKit.Clear(area);
             var panel = UiKit.Panel(area).rectTransform.Place(0, 0, 1, 1);
             var list = UiKit.Rect(panel, "lista").Place(0, 0, 1, 1, 40, 30, 40, 30);
-            UiKit.VList(list, 12, 0, false);
+            UiKit.VList(list, 8, 0, false);
             if (_st == St.Waiting && _session != null)
             {
                 BuildWaiting(list);
+                return;
+            }
+            if (_st == St.Room && _last != null)
+            {
+                BuildRoom(list);
                 return;
             }
             // modalidade, time e duração
             string[] modes = GameModes.All;
             string[] modeNames = Array.ConvertAll(modes, GameModes.DisplayName);
             int mi = Mathf.Max(0, Array.IndexOf(modes, Mode));
-            UiKit.Size(UiKit.Cycler(list, "Modalidade", modeNames, mi, i => { Mode = modes[i]; BuildPage(_app, _area); }), 64, 64);
+            UiKit.Size(UiKit.Cycler(list, "Modalidade", modeNames, mi, i => { Mode = modes[i]; BuildPage(_app, _area); }), 56, 56);
+            // seu time: clubes por país e liga, seleções por continente
             var teams = TeamsOf(Mode);
-            int cur = TeamFor(Mode);
-            int ti = Mathf.Max(0, teams.IndexOf(cur));
             if (teams.Count > 0)
             {
-                var names = teams.ConvertAll(t => Teams.Get(t).name);
-                SetTeamFor(Mode, teams[ti]);
-                UiKit.Size(UiKit.Cycler(list, "Seu time", names, ti, i => SetTeamFor(Mode, teams[i])), 64, 64);
+                int cur = TeamFor(Mode);
+                if (!teams.Contains(cur)) { cur = teams[0]; SetTeamFor(Mode, cur); }
+                App.TeamPicker(list, Mode, cur, t => SetTeamFor(Mode, t), 56f);
             }
             int[] mins = { 4, 6, 10, 20 };
             int mn = Mathf.Max(0, Array.IndexOf(mins, Minutes));
-            UiKit.Size(UiKit.Cycler(list, "Duração (quem cria a sala)", Array.ConvertAll(mins, m => m + " min"), mn, i => Minutes = mins[i]), 64, 64);
+            UiKit.Size(UiKit.Cycler(list, "Duração (quem cria a sala)", Array.ConvertAll(mins, m => m + " min"), mn, i => Minutes = mins[i]), 56, 56);
             var row = UiKit.Rect(list, "ações");
-            UiKit.Size(row, 84, 84);
+            UiKit.Size(row, 72, 72);
             UiKit.HList(row, 16);
-            var quick = UiKit.Button(row, "Partida rápida", () => Run(QuickMatch()), 30, new Color(0.1f, 0.55f, 0.28f));
-            UiKit.Button(row, "Criar sala", () => Run(CreateRoom()), 30, Theme.PanelLight);
+            var quick = UiKit.Button(row, "Partida rápida", () => Run(QuickMatch), 30, new Color(0.1f, 0.55f, 0.28f));
+            UiKit.Button(row, "Criar sala", () => Run(CreateRoom), 30, Theme.PanelLight);
             // entrar com código
             var row2 = UiKit.Rect(list, "código");
-            UiKit.Size(row2, 76, 76);
+            UiKit.Size(row2, 64, 64);
             UiKit.HList(row2, 16);
             _codeInput = CodeField(row2);
             UiKit.Button(row2, "Colar", () => { _codeInput.text = Clean(GUIUtility.systemCopyBuffer); }, 26, Theme.PanelLight);
-            UiKit.Button(row2, "Entrar", () => Run(JoinByCode(Clean(_codeInput.text))), 28, new Color(0.15f, 0.35f, 0.62f));
+            UiKit.Button(row2, "Entrar", () => Run(() => JoinByCode(Clean(_codeInput.text))), 28, new Color(0.15f, 0.35f, 0.62f));
             _status = UiKit.Label(list, _msg, 24, Theme.Body, _st == St.Error ? Theme.Hot : Theme.TextDim, TextAnchor.MiddleCenter);
-            UiKit.Size(_status, 70, 70);
-            var back = UiKit.Button(list, "‹  Voltar", () => _app.OnlineBack(), 28);
-            UiKit.Size(back, 64, 64);
+            UiKit.Size(_status, 50, 50);
+            var back = UiKit.Button(list, "‹  Voltar", () => _app.OnlineBack(), 26);
+            UiKit.Size(back, 56, 56);
             UiKit.Select(quick);
             if (!string.IsNullOrEmpty(_pendingCode))
             {
                 string c = _pendingCode;
                 _pendingCode = null;
                 _codeInput.text = c;
-                Run(JoinByCode(c));
+                Run(() => JoinByCode(c));
             }
         }
 
@@ -159,6 +167,101 @@ namespace Craquez.Online
             var cancel = UiKit.Button(list, "Cancelar a sala", () => { Leave(); BuildPage(_app, _area); }, 28, new Color(0.7f, 0.1f, 0.14f));
             UiKit.Size(cancel, 64, 64);
             UiKit.Select(share);
+        }
+
+        /// <summary>Sala depois da partida: os dois continuam conectados; revanche ou trocar os times.</summary>
+        void BuildRoom(RectTransform list)
+        {
+            bool host = _link != null && _link.IsHost;
+            var ta = Teams.Get(_last.teamA);
+            var tb = Teams.Get(_last.teamB);
+            UiKit.Size(UiKit.Label(list, "SALA  •  " + GameModes.DisplayName(_last.mode).ToUpperInvariant(), 34, Theme.HeadItalic, Theme.Accent, TextAnchor.MiddleCenter), 56, 56);
+            UiKit.Size(UiKit.Label(list, "Última partida: " + ta.name + "  x  " + tb.name, 26, Theme.Body, Theme.Text, TextAnchor.MiddleCenter), 44, 44);
+            var re = UiKit.Button(list, "Revanche  (mesma partida)", () => SendReady(1), 32, new Color(0.1f, 0.55f, 0.28f));
+            UiKit.Size(re, 80, 80);
+            int mine = host ? _last.teamA : _last.teamB;
+            if (TeamFor(_last.mode) < 0) SetTeamFor(_last.mode, mine);
+            App.TeamPicker(list, _last.mode, TeamFor(_last.mode), t => SetTeamFor(_last.mode, t), 56f);
+            UiKit.Size(UiKit.Button(list, "Jogar com este time", () => SendReady(2), 30, new Color(0.15f, 0.35f, 0.62f)), 72, 72);
+            _status = UiKit.Label(list, RoomText(), 24, Theme.Body, Theme.TextDim, TextAnchor.MiddleCenter);
+            UiKit.Size(_status, 60, 60);
+            UiKit.Size(UiKit.Button(list, "Sair da sala", () => { Leave(); _app.OnlineBack(); }, 28, new Color(0.7f, 0.1f, 0.14f)), 64, 64);
+            UiKit.Select(re);
+        }
+
+        string RoomText()
+        {
+            string me = _myReady == 1 ? "Você pediu a revanche." : _myReady == 2 ? "Você está pronto com o novo time." : "";
+            string peer = _peerReady == 1 ? "O adversário quer a revanche!" : _peerReady == 2 ? "O adversário escolheu o time e está pronto." : "Esperando o adversário decidir…";
+            return (me.Length > 0 ? me + "  " : "") + peer;
+        }
+
+        void AfterMatch(bool rematch)
+        {
+            if (_link == null || !_link.Connected)
+            {
+                Leave();
+                Say("O adversário saiu da sala.", true);
+                return;
+            }
+            _st = St.Room;
+            _myReady = 0; _peerReady = 0; _peerReadyTeam = -1;
+            Drain();
+            if (rematch) SendReady(1);
+        }
+
+        /// <summary>Descarta o que sobrou da partida que acabou (comandos e resumos) antes da próxima.</summary>
+        void Drain()
+        {
+            if (_link == null) return;
+            _link.Pump();
+            while (_link.TryReceive(out var m))
+            {
+                if (m == null || m.Length == 0) continue;
+                if (m[0] == MsgReady || m[0] == MsgStart || m[0] == MsgBye) { _held.Enqueue(m); }
+            }
+        }
+
+        readonly Queue<byte[]> _held = new Queue<byte[]>();
+
+        void SendReady(int kind)
+        {
+            if (_link == null || !_link.Connected) { Fail("O adversário saiu da sala."); return; }
+            bool host = _link.IsHost;
+            int team = kind == 1 ? (host ? _last.teamA : _last.teamB) : TeamFor(_last.mode);
+            _myReady = kind;
+            var w = new Writer(MsgReady);
+            w.Int(kind); w.Int(team); w.Int(TeamHash(team));
+            _link.Send(w.Bytes());
+            _link.Pump();
+            if (_status != null) _status.text = RoomText();
+            if (host) TryStartRoom();
+        }
+
+        void TryStartRoom()
+        {
+            if (_myReady == 0 || _peerReady == 0) return;
+            if (_myReady == 1 && _peerReady == 1)
+            {
+                // revanche: tudo igual (local, horário, bola, tempo), só uma nova semente
+                var c = new MatchConfig
+                {
+                    mode = _last.mode, teamA = _last.teamA, teamB = _last.teamB, sideA = Side.Player1, sideB = Side.Player2,
+                    minutes = _last.minutes, weather = _last.weather, dynamicWeather = false, timeOfDay = _last.timeOfDay,
+                    ceremony = false, toss = true, streetPlayers = _last.streetPlayers, venue = _last.venue, stadium = _last.stadium,
+                    ball = _last.ball, national = _last.national,
+                    seed = (uint)new System.Random(Environment.TickCount).Next(1, int.MaxValue) | 1u,
+                };
+                SendStart(c);
+                return;
+            }
+            // trocar os times: cada um com o time que escolheu (quem pediu revanche fica com o da última)
+            int myTeam = _myReady == 1 ? _last.teamA : TeamFor(_last.mode);
+            int peerTeam = _peerReadyTeam;
+            if (peerTeam < 0 || peerTeam >= Teams.Count || TeamHash(peerTeam) != _peerReadyHash) { Bye("Os dados dos times são diferentes nos dois aparelhos (option file). Usem os dados padrão."); return; }
+            Mode = _last.mode;
+            Minutes = _last.minutes;
+            StartAsHost(myTeam, peerTeam);
         }
 
         static InputField CodeField(RectTransform parent)
@@ -205,10 +308,11 @@ namespace Craquez.Online
             if (_status != null) { _status.text = m; _status.color = error ? Theme.Hot : Theme.TextDim; }
         }
 
-        async void Run(Task t)
+        /// <summary>Roda uma ação de rede (uma de cada vez: dois toques não criam duas salas).</summary>
+        async void Run(Func<Task> action)
         {
             if (_st == St.Busy) return;
-            try { await t; }
+            try { await action(); }
             catch (Exception e)
             {
                 Debug.LogWarning("[on-line] " + e);
@@ -315,6 +419,7 @@ namespace Craquez.Online
         {
             if (_link == null) return;
             _link.Pump();
+            if (_st == St.Room) { UpdateRoom(); return; }
             if (_st != St.Handshake) return;
             _handshakeT += Time.unscaledDeltaTime;
             if (_handshakeT > 25f) { Leave(); Say("Não deu para conectar ao adversário. Tente de novo.", true); if (_area != null) BuildPage(_app, _area); return; }
@@ -351,6 +456,35 @@ namespace Craquez.Online
                 }
             }
         }
+
+        void UpdateRoom()
+        {
+            if (!_link.Connected) { Fail("O adversário saiu da sala."); return; }
+            while (_held.Count > 0 || _link.TryReceive(out _tmp))
+            {
+                var m = _held.Count > 0 ? _held.Dequeue() : _tmp;
+                if (m == null || m.Length == 0) continue;
+                var r = new Reader(m);
+                byte type = r.Byte();
+                if (type == MsgBye) { Fail(r.Str()); return; }
+                if (type == MsgReady)
+                {
+                    _peerReady = r.Int(); _peerReadyTeam = r.Int(); _peerReadyHash = r.Int();
+                    if (_status != null) _status.text = RoomText();
+                    if (_link.IsHost) { TryStartRoom(); if (_st != St.Room) return; }
+                }
+                else if (type == MsgStart && !_link.IsHost)
+                {
+                    var cfg = ReadConfig(r, out int hashA, out int hashB);
+                    if (cfg == null || TeamHash(cfg.teamA) != hashA || TeamHash(cfg.teamB) != hashB) { Bye("Os dados dos times são diferentes nos dois aparelhos (option file). Usem os dados padrão."); return; }
+                    Begin(cfg, 1);
+                    return;
+                }
+                // (1/2: comandos e resumos que sobraram da partida que acabou — descartados)
+            }
+        }
+
+        byte[] _tmp;
 
         void Bye(string why)
         {
@@ -392,6 +526,11 @@ namespace Craquez.Online
             var balls = BallCatalog.ForMode(c.mode);
             c.ball = balls.Count > 0 ? balls[rnd.Next(balls.Count)] : 0;
             c.national = Teams.Get(c.teamA).IsNational && Teams.Get(c.teamB).IsNational;
+            SendStart(c);
+        }
+
+        void SendStart(MatchConfig c)
+        {
             var w = new Writer(MsgStart);
             w.Str(c.mode); w.Int(c.teamA); w.Int(c.teamB); w.Int(TeamHash(c.teamA)); w.Int(TeamHash(c.teamB));
             w.Int(c.minutes); w.Int((int)c.seed); w.Str(c.weather); w.Str(c.timeOfDay); w.Int(c.venue); w.Int(c.stadium); w.Int(c.ball); w.Int(c.streetPlayers);
@@ -417,6 +556,8 @@ namespace Craquez.Online
         void Begin(MatchConfig c, int localTeam)
         {
             _st = St.Playing;
+            _last = c;
+            _myReady = 0; _peerReady = 0;
             var session = new LockstepSession(_link, localTeam, NetDelay);
             _app.StartOnlineMatch(c, session);
         }
@@ -475,6 +616,8 @@ namespace Craquez.Online
             if (s != null) { try { _ = s.LeaveAsync(); } catch { } }
             _link?.Dispose();
             _link = null;
+            _held.Clear();
+            _last = null;
             if (_st != St.Error) _st = St.Idle;
         }
 

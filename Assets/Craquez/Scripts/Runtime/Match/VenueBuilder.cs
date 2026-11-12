@@ -166,9 +166,7 @@ namespace Craquez
                     var lens = at + Quaternion.Euler(0, yaw, 0) * new Vector3(0f, 1.25f, 0.3f);
                     gear.Cylinder(lens, lens + Quaternion.Euler(0, yaw, 0) * Vector3.forward * 0.4f, 0.06f, 8);
                 }
-                // gandulas nos cantos
-                for (int j = -1; j <= 1; j += 2)
-                    Figure(staff, skin, new Vector3(s * (hl + 2.5f), 0f, j * (hw + 1.8f)), s > 0 ? -135f * j : 45f * j, false);
+                // (os gandulas agora são atletas animados que correm atrás da bola: MatchView.BallBoys)
             }
             // cinegrafistas na lateral oposta à câmera principal e no lado da câmera, com tripé
             for (int i = -1; i <= 1; i++)

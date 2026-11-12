@@ -29,6 +29,8 @@ namespace Craquez
         public Craquez.Sim.Net.LockstepSession net;
         /// <summary>On-line: mensagem quando a conexão cai ou as partidas divergem.</summary>
         public string netProblem;
+        /// <summary>On-line: botão Revanche no fim do jogo.</summary>
+        public System.Action onNetRematch;
         float _netWait;
         bool _netWarned;
         object _goalSnap;
@@ -936,8 +938,13 @@ namespace Craquez
             UiKit.HList(row, 30);
             if (net != null)
             {
-                var menu = UiKit.Button(row, "Menu principal", () => onExit?.Invoke());
-                UiKit.Select(menu);
+                if (netProblem == null)
+                {
+                    var re = UiKit.Button(row, "Revanche", () => onNetRematch?.Invoke(), 34, new Color(0.1f, 0.55f, 0.28f));
+                    UiKit.Button(row, "Trocar os times", () => onExit?.Invoke());
+                    UiKit.Select(re);
+                }
+                else UiKit.Select(UiKit.Button(row, "Voltar", () => onExit?.Invoke()));
             }
             else if (onResult != null)
             {

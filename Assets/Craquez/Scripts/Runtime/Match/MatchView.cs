@@ -8,7 +8,7 @@ namespace Craquez
     /// Mundo 3D da partida: local (estádio/quadra/rua), luz por horário, clima,
     /// atletas, bola, árbitro, câmera de transmissão e reações aos eventos.
     /// </summary>
-    public class MatchView : MonoBehaviour
+    public partial class MatchView : MonoBehaviour
     {
         public MatchSim sim;
         public MatchConfig cfg;
@@ -119,7 +119,7 @@ namespace Craquez
             if (s.mode.id == GameModes.Field && !c.training) { BuildReferee(parent, q); BuildAssistants(parent, q); }
             if (s.mode.id == GameModes.Field && !c.training) BuildBench(parent, q);
             BuildBall(q);
-            if (!c.training) BuildStations();
+            if (!c.training) { BuildStations(); BuildBallBoys(parent, q); }
             _marker0 = Marker(new Color(0.1f, 0.85f, 1f));
             _marker1 = Marker(new Color(1f, 0.55f, 0.1f));
             bcam = cam.gameObject.GetComponent<BroadcastCamera>();
@@ -889,6 +889,7 @@ namespace Craquez
             }
             RefereeStep();
             AssistantStep();
+            BallBoysStep();
             BenchStep();
             _ballPrev = _ballCur;
             _ballCur = new Vector3(sim.ball.pos.x, sim.ball.z + sim.ball.radius, sim.ball.pos.y);
@@ -982,8 +983,9 @@ namespace Craquez
                     }
                     break;
                 case "balltoss":
-                    // o gandula/torcedor devolve a bola com as mãos (som do lançamento, sem chute)
+                    // o gandula devolve a bola com as mãos (som do lançamento, sem chute)
                     Sfx.Touch();
+                    BallBoyToss();
                     break;
                 case "spareball":
                     // o goleiro pega a bola do cone; a que saiu fica lá fora até o gandula recolher
@@ -999,6 +1001,7 @@ namespace Craquez
                         _decoy.gameObject.SetActive(true);
                         _decoy.position = new Vector3(sim.spareFrom.x, sim.ball.radius, sim.spareFrom.y);
                         _decoy.rotation = _ball.rotation;
+                        BallBoyRefill(e.skill);   // o gandula busca a que saiu e repõe o cone
                     }
                     break;
                 case "offside":
@@ -1131,7 +1134,9 @@ namespace Craquez
                 var d = bp - _ball.position;
                 d.y = 0;
                 // nas mãos do goleiro a bola não gira (ele a reposiciona em LateUpdate)
-                bool held = sim.ball.owner >= 0 && sim.players[sim.ball.owner].isKeeper && sim.players[sim.ball.owner].InHands;
+                // (nem nas mãos de quem cobra o lateral: ela acompanhava os ajustes do cobrador e ficava girando)
+                bool held = sim.ball.owner >= 0 && ((sim.players[sim.ball.owner].isKeeper && sim.players[sim.ball.owner].InHands)
+                    || (sim.throwIn && sim.ball.owner == sim.throwInTaker));
                 if (!held && d.sqrMagnitude > 1e-6f && d.magnitude < 1.5f)
                 {
                     var axis = Vector3.Cross(Vector3.up, d.normalized);

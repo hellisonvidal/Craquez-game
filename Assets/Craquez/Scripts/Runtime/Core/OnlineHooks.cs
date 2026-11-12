@@ -12,5 +12,7 @@ namespace Craquez
         public static System.Action<App, RectTransform> BuildPage;
         /// <summary>Sai da sala/sessão (chamado ao voltar para o menu).</summary>
         public static System.Action Leave;
+        /// <summary>Fim da partida on-line: volta para a sala (true = já pede a revanche).</summary>
+        public static System.Action<bool> AfterMatch;
     }
 }
