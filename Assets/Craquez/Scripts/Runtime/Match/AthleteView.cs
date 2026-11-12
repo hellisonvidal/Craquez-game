@@ -429,6 +429,7 @@ namespace Craquez
         }
 
         int _fallStage;   // 0 em pé, 1 caindo (captura), 2 no chão, 3 levantando
+        bool _tripClip;   // a queda começou pela captura do tropeço (o corpo todo fica com a captura)
 
         /// <summary>
         /// Queda com as capturas do Mixamo: tropeça e cai (de lado/por trás; a pancada de frente cai de
@@ -447,11 +448,20 @@ namespace Craquez
                     if (_fallStage == 0)
                     {
                         _fallStage = 1;
-                        if (p.fallKind != 0 && AthleteAnimator.Has("Trip")) anim.Play("Trip", 0.2f, 1.05f, 1.6f, 0.06f);
+                        if (p.fallKind != 0 && AthleteAnimator.Has("Trip")) { anim.Play("Trip", 0.2f, 1.05f, 1.6f, 0.06f); _tripClip = true; }
+                        else _tripClip = false;
+                    }
+                    // o tropeço da captura já termina deitado: emenda no "caído" ANTES de ele sumir (antes, no
+                    // fim do tropeço o peso da captura caía e o giro procedural de deitar somava por cima da pose
+                    // já deitada — o jogador virava de pernas para o ar, "voando" por cima de quem deu o carrinho)
+                    if (_fallStage == 1 && _tripClip && (anim.CurrentAction != "Trip" || anim.ActionLeft < 0.22f))
+                    {
+                        _fallStage = 2;
+                        anim.Play("FallenIdle", (p.id * 0.31f) % 1f, -1f, 1f, 0.2f);
                     }
                     break;
                 case 3:
-                    if (_fallStage < 2 && (anim.CurrentAction != "Trip" || anim.ActionWeight < 0.6f || p.downTotal - p.down > 0.9f)) _fallStage = 2;
+                    if (_fallStage < 2) _fallStage = 2;
                     if (_fallStage == 2 && anim.CurrentAction != "FallenIdle") anim.Play("FallenIdle", (p.id * 0.31f) % 1f, -1f, 1f, 0.3f);
                     break;
                 case 4:
@@ -466,6 +476,9 @@ namespace Craquez
             string ca = anim.CurrentAction;
             bool clip = ca == "FallenIdle" || ca == "StandUp" || ca == "Trip";
             float w = clip ? anim.ActionWeight : 0f;
+            // queda pela captura (tropeço → caído → levanta): o giro procedural do corpo nunca soma por cima
+            // (as poses da captura já estão deitadas; qualquer sobra vira cambalhota)
+            if (_tripClip && _fallStage >= 1) w = 1f;
             // (de costas no tropeço procedural: a captura do chão entra suave por cima)
             pitch = Mathf.Lerp(pitch, 0f, w); roll = Mathf.Lerp(roll, _lean, w); lift = Mathf.Lerp(lift, 0f, w);
         }

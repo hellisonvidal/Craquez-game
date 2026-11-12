@@ -288,7 +288,10 @@ namespace Craquez.Sim
                 }
                 if (_holdBtn == 0 && _cooldown == 0)
                 {
-                    float shootRange = sim.halfLen * Mathf.Lerp(0.4f, 0.55f, skill) * (0.72f + 0.45f * sty.shooter + 0.15f * sty.risk) * (p.Has(Trait.LongaDistancia) ? 1.2f : 1f);
+                    // alcance do chute: no campo, distâncias de verdade (a maioria dos chutes de dentro ou da entrada
+                    // da área; antes chutava de 25-30 m e o goleiro defendia tudo: zero gol em 8 partidas)
+                    float baseRange = sim.mode.id == GameModes.Field ? Mathf.Lerp(15f, 19f, skill) : sim.halfLen * Mathf.Lerp(0.4f, 0.55f, skill);
+                    float shootRange = baseRange * (0.72f + 0.45f * sty.shooter + 0.15f * sty.risk) * (p.Has(Trait.LongaDistancia) ? 1.25f : 1f);
                     var option = BestOption(sim, p, out float optScore);
                     // cara a cara (ninguém de linha entre ele e o gol nem chegando): conduz até perto e só
                     // então finaliza, ou quando o goleiro sai em cima (antes chutava de ~20 m sozinho)

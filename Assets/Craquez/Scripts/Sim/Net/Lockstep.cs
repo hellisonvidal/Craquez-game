@@ -27,6 +27,8 @@ namespace Craquez.Sim.Net
         bool Connected { get; }
         void Send(byte[] data);
         bool TryReceive(out byte[] data);
+        /// <summary>Envia o que está na fila e lê o que chegou agora (sem esperar o próximo quadro).</summary>
+        void Pump();
     }
 
     /// <summary>Transporte em memória: dois lados ligados diretamente (testes e partidas locais pela "rede").</summary>
@@ -44,6 +46,7 @@ namespace Craquez.Sim.Net
 
         public void Send(byte[] data) { if (_peer != null) _peer._in.Enqueue((byte[])data.Clone()); }
         public bool TryReceive(out byte[] data) { if (_in.Count > 0) { data = _in.Dequeue(); return true; } data = null; return false; }
+        public void Pump() { }
     }
 
     /// <summary>
@@ -60,6 +63,14 @@ namespace Craquez.Sim.Net
         readonly Dictionary<int, int> _hashLocal = new Dictionary<int, int>(), _hashRemote = new Dictionary<int, int>();
         int _nextSend;
         public int Tick { get; private set; }
+        /// <summary>Mensagens que não são da partida (pausa, continuar...), na ordem em que chegaram.</summary>
+        public readonly Queue<byte[]> Extra = new Queue<byte[]>();
+        int _maxRemote = -1;
+        /// <summary>Quantos passos de comando do outro lado já chegaram à frente do passo atual (folga da rede).</summary>
+        public int RemoteAhead => _maxRemote - Tick + 1;
+        public void Pump() => _net.Pump();
+        /// <summary>Envia uma mensagem que não é da partida (tipo &gt;= 20, pelo menos 5 bytes).</summary>
+        public void SendRaw(byte[] m) => _net.Send(m);
         /// <summary>Quantos passos de comando local já foram enviados à frente do passo atual.</summary>
         public int Ahead => _nextSend - Tick;
         /// <summary>O canal com o outro aparelho ainda está de pé?</summary>
@@ -97,8 +108,9 @@ namespace Craquez.Sim.Net
             {
                 if (m == null || m.Length < 5) continue;
                 int t = ReadInt(m, 1);
-                if (m[0] == MsgInput && m.Length >= 5 + InputFrame.Size) _remote[t] = InputFrame.Read(m, 5);
+                if (m[0] == MsgInput && m.Length >= 5 + InputFrame.Size) { _remote[t] = InputFrame.Read(m, 5); if (t > _maxRemote) _maxRemote = t; }
                 else if (m[0] == MsgHash && m.Length >= 9) { _hashRemote[t] = ReadInt(m, 5); Check(t); }
+                else if (m[0] >= 20) Extra.Enqueue(m);
             }
         }
 

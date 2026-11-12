@@ -366,6 +366,8 @@ namespace Craquez
 
         public string CurrentAction { get; private set; }
         public float ActionWeight => _actionW;
+        /// <summary>Segundos (de relógio) que faltam para a ação atual acabar.</summary>
+        public float ActionLeft => CurrentAction == null ? 0f : Mathf.Max(0f, (_actionEnd - _actionT) / Mathf.Max(0.01f, _actionRate));
 
         public AthleteAnimator(Animator animator, string name, int seed = 0)
         {

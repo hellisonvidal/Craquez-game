@@ -1,3 +1,53 @@
+## Craquez 2.19.0
+
+Jogo de futebol feito 100% com inteligência artificial, **gratuito**.
+
+### Download
+- **Celular Android**: `Craquez-v2.19.0.apk`
+- **TV (Google TV / Android TV, ex.: TCL C6K)**: `Craquez-TV-v2.19.0.apk` — use este na TV (32 e 64 bits).
+
+### Novidades
+- **Escolha por continente**: novo seletor "Continente" na escolha dos times (partida e on-line), que
+  filtra os países e as seleções daquele continente.
+- **Mapa do continente** ao lado da escolha, com o país do time em destaque (mapas de domínio público,
+  Natural Earth).
+- **Câmera bem perto**: as partidas começam com a câmera "TV Bem Perto" e zoom "Bem perto" em todas as
+  modalidades (troque em Configurações se preferir).
+
+### Correções
+- **Quedas no carrinho**: o jogador derrubado não dá mais cambalhota no ar nem cai por cima de quem deu o
+  carrinho. A animação de tropeço emenda direto na de caído, sem o giro extra que o virava de pernas para o ar.
+- **Corpos no chão**: quem está caído ocupa o espaço do corpo inteiro; os outros jogadores saem de cima
+  em vez de deitar ou pisar nele.
+- **Telas que piscavam** ao trocar de modalidade (on-line, treino, times): o conteúdo antigo sumia só no
+  fim do quadro e aparecia junto com o novo; agora some na hora. O destaque também fica na opção que você
+  está mudando, sem pular para outro botão.
+
+## Craquez 2.18.0
+
+Jogo de futebol feito 100% com inteligência artificial, **gratuito**.
+
+### Download
+- **Celular Android**: `Craquez-v2.18.0.apk`
+- **TV (Google TV / Android TV, ex.: TCL C6K)**: `Craquez-TV-v2.18.0.apk` — use este na TV (32 e 64 bits).
+
+### Novidades
+- **On-line: 45 s para configurar o time** depois de montar a partida (formação, postura, marcação e
+  uniforme); começa antes se os dois tocarem "Pronto". A revanche mantém as escolhas.
+- **On-line: pausa** — os dois aparelhos param; qualquer um continua (volta sozinha em 90 s).
+- **On-line: menos travamento** — os comandos saem na hora, a folga dos comandos é calculada pela demora
+  real da conexão (medida durante a configuração) e, quando a rede atrasa, a partida desacelera um pouco em
+  vez de parar.
+- **Mais cabelos**: longo, rabo de cavalo, tranças e chanel, além dos curtos e do black power.
+- **Ginásios diferentes por fora**: telhado em arco, plano, duas águas, cúpula ou uma água; concreto,
+  tijolo, chapa ou pintura; cores próprias e letreiro com o nome na entrada.
+- **Tutorial só na primeira abertura**; ao terminar, vai para a tela principal.
+
+### Correções
+- **Cabelos**: parte dos jogadores aparecia careca (estilos que ficavam só com o cabelo desenhado).
+- **Placas de publicidade**: a logo aparece de verdade (a textura estava girada e virava faixas coloridas).
+- **CPU no campo**: chutava de 25-30 m e quase não fazia gol; agora finaliza de dentro ou da entrada da área.
+
 ## Craquez 2.17.1
 
 Jogo de futebol feito 100% com inteligência artificial, **gratuito**.
