@@ -4050,6 +4050,48 @@ namespace Craquez.Sim
                     }
                 }
             }
+            LyingBodies();
+        }
+
+        /// <summary>
+        /// Quem está caído ocupa o chão com o corpo inteiro (dos pés à cabeça, ~1,5 m na direção em que caiu),
+        /// não só o círculo dos pés: os outros (inclusive quem deu o carrinho ou também caiu) são afastados
+        /// do corpo aos poucos — ninguém deita em cima de ninguém nem pisa no caído.
+        /// </summary>
+        void LyingBodies()
+        {
+            int n = players.Count;
+            for (int i = 0; i < n; i++)
+            {
+                var p = players[i];
+                if (p.sentOff || p.down <= 0f || p.isKeeper) continue;
+                // queda de costas (pancada de frente) deita para trás; as demais, para a frente
+                var dir = p.fallKind == 0 ? -p.facing : p.facing;
+                if (dir.sqrMagnitude < 0.01f) continue;
+                dir = dir.normalized;
+                var a = p.position;
+                for (int j = 0; j < n; j++)
+                {
+                    if (j == i) continue;
+                    var q = players[j];
+                    if (q.sentOff) continue;
+                    var rel = q.position - a;
+                    float t = Mathf.Clamp(Vector2.Dot(rel, dir), 0f, 1.5f);
+                    var off = rel - dir * t;
+                    float l = off.magnitude;
+                    const float need = 0.55f;
+                    if (l >= need) continue;
+                    // (bem em cima da linha do corpo: sai para o lado do id, sem sorteio — determinístico)
+                    var nrm = l > 0.001f ? off / l : new Vector2(-dir.y, dir.x) * ((q.id & 1) == 0 ? 1f : -1f);
+                    // quem está de pé (ou caiu depois) sai de cima
+                    float step = Mathf.Min(need - l, 2.4f * DT);
+                    // (q caiu antes: é p quem sai de cima dele — feito quando o laço chega ao corpo de q)
+                    if (q.down > 0f && !q.isKeeper && q.downTotal - q.down > p.downTotal - p.down) continue;
+                    q.position += nrm * step;
+                    float vin = Vector2.Dot(q.vel, -nrm);
+                    if (vin > 0f) q.vel += nrm * vin;
+                }
+            }
         }
 
         // ------------------------------------------------------------ bola

@@ -319,13 +319,50 @@ namespace Craquez.UI
         public static void Select(Selectable s)
         {
             if (s == null || EventSystem.current == null) return;
+            // a tela foi refeita por uma opção que o jogador estava mudando (ex.: a modalidade): o foco
+            // continua nela, em vez de pular para o botão principal (o destaque "piscava" de um para o outro)
+            if (_focusRoot != null && _focusName != null)
+            {
+                var keep = Find(_focusRoot, _focusName);
+                _focusRoot = null; _focusName = null;
+                if (keep != null && keep.gameObject.activeInHierarchy) s = keep;
+            }
             EventSystem.current.SetSelectedGameObject(null);
             EventSystem.current.SetSelectedGameObject(s.gameObject);
         }
 
+        static Transform _focusRoot;
+        static string _focusName;
+
+        static Selectable Find(Transform t, string name)
+        {
+            if (t == null) return null;
+            if (t.name == name && t.gameObject.activeSelf && t.TryGetComponent<Selectable>(out var s)) return s;
+            for (int i = 0; i < t.childCount; i++)
+            {
+                var r = Find(t.GetChild(i), name);
+                if (r != null) return r;
+            }
+            return null;
+        }
+
+        /// <summary>
+        /// Apaga o conteúdo para refazer a tela. Os filhos somem já neste quadro (o Destroy só vale no fim
+        /// dele: antes, o conteúdo velho e o novo apareciam juntos por um quadro — a tela "piscava" ao trocar
+        /// de modalidade). Se o foco estava numa opção daqui, guarda o nome para devolvê-lo na tela nova.
+        /// </summary>
         public static void Clear(Transform t)
         {
-            for (int i = t.childCount - 1; i >= 0; i--) UnityEngine.Object.Destroy(t.GetChild(i).gameObject);
+            var sel = EventSystem.current != null ? EventSystem.current.currentSelectedGameObject : null;
+            // (tocou na setinha da opção: o foco volta para a opção inteira)
+            for (var s = sel != null ? sel.transform : null; s != null && s != t; s = s.parent)
+                if (s.name.StartsWith("cycler:")) { _focusRoot = t; _focusName = s.name; break; }
+            for (int i = t.childCount - 1; i >= 0; i--)
+            {
+                var c = t.GetChild(i).gameObject;
+                c.SetActive(false);
+                UnityEngine.Object.Destroy(c);
+            }
         }
     }
 

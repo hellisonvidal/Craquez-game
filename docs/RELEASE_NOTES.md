@@ -1,3 +1,28 @@
+## Craquez 2.19.0
+
+Jogo de futebol feito 100% com inteligência artificial, **gratuito**.
+
+### Download
+- **Celular Android**: `Craquez-v2.19.0.apk`
+- **TV (Google TV / Android TV, ex.: TCL C6K)**: `Craquez-TV-v2.19.0.apk` — use este na TV (32 e 64 bits).
+
+### Novidades
+- **Escolha por continente**: novo seletor "Continente" na escolha dos times (partida e on-line), que
+  filtra os países e as seleções daquele continente.
+- **Mapa do continente** ao lado da escolha, com o país do time em destaque (mapas de domínio público,
+  Natural Earth).
+- **Câmera bem perto**: as partidas começam com a câmera "TV Bem Perto" e zoom "Bem perto" em todas as
+  modalidades (troque em Configurações se preferir).
+
+### Correções
+- **Quedas no carrinho**: o jogador derrubado não dá mais cambalhota no ar nem cai por cima de quem deu o
+  carrinho. A animação de tropeço emenda direto na de caído, sem o giro extra que o virava de pernas para o ar.
+- **Corpos no chão**: quem está caído ocupa o espaço do corpo inteiro; os outros jogadores saem de cima
+  em vez de deitar ou pisar nele.
+- **Telas que piscavam** ao trocar de modalidade (on-line, treino, times): o conteúdo antigo sumia só no
+  fim do quadro e aparecia junto com o novo; agora some na hora. O destaque também fica na opção que você
+  está mudando, sem pular para outro botão.
+
 ## Craquez 2.18.0
 
 Jogo de futebol feito 100% com inteligência artificial, **gratuito**.

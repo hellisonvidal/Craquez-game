@@ -132,15 +132,33 @@ namespace Craquez
             {
                 if (!PlayerPrefs.HasKey("camera_v2") && PlayerPrefs.HasKey("camera"))
                     PlayerPrefs.SetInt("camera_v2", BroadcastCamera.FromOld(PlayerPrefs.GetInt("camera", 0)));
-                return PlayerPrefs.GetInt("camera_v2", 0);
+                CloseCameraOnce();
+                return PlayerPrefs.GetInt("camera_v2", CloseCamera);
             }
             set { PlayerPrefs.SetInt("camera_v2", value); PlayerPrefs.Save(); }
+        }
+
+        /// <summary>Padrão: "TV Bem Perto" (a câmera de transmissão mais próxima dos atletas).</summary>
+        static int CloseCamera => (int)BroadcastCamera.Kind.Close;
+
+        /// <summary>
+        /// 2.19: as partidas começam com a câmera o mais perto possível dos jogadores, em todas as
+        /// modalidades ("TV Bem Perto" com zoom "Bem perto"). Vale uma vez para quem já jogava; depois,
+        /// o que a pessoa escolher em Configurações fica.
+        /// </summary>
+        static void CloseCameraOnce()
+        {
+            if (PlayerPrefs.GetInt("camera_close_v1", 0) == 1) return;
+            PlayerPrefs.SetInt("camera_close_v1", 1);
+            PlayerPrefs.SetInt("camera_v2", CloseCamera);
+            PlayerPrefs.SetInt("camera_zoom", 2);
+            PlayerPrefs.Save();
         }
 
         /// <summary>-2 (aberto) .. +2 (perto).</summary>
         public static int CameraZoom
         {
-            get => PlayerPrefs.GetInt("camera_zoom", 0);
+            get { CloseCameraOnce(); return PlayerPrefs.GetInt("camera_zoom", 2); }
             set { PlayerPrefs.SetInt("camera_zoom", value); PlayerPrefs.Save(); }
         }
 
