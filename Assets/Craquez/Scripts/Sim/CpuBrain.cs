@@ -12,6 +12,7 @@ namespace Craquez.Sim
         public float skill;
         int _throwWait;
         int _holdBtn, _holdTicks, _cooldown, _skillCd, _carryT, _gkFeetT;
+        int _fakeOn;   // finta de chute: em quantos passos do fim do chute armado aperta o passe
         Vector2 _carry;
         bool _finesse;
 
@@ -43,6 +44,8 @@ namespace Craquez.Sim
             {
                 f.buttons |= _holdBtn;
                 if (_finesse) f.buttons |= InputFrame.Finesse;
+                // finta de chute: com o chute armado, aperta o passe (o chute é cancelado e ele corta para o lado)
+                if (_fakeOn > 0 && _holdTicks == _fakeOn) { f.buttons |= InputFrame.Pass; _holdTicks = 1; _fakeOn = 0; }
                 _holdTicks--;
                 if (_holdTicks <= 0)
                 {
@@ -302,7 +305,41 @@ namespace Craquez.Sim
                     bool fieldM = sim.mode.id == GameModes.Field;
                     float finish = fieldM ? 11.5f : sim.halfLen * 0.38f;
                     bool holdOn = alone && sim.mode.keeper && toGoal.magnitude > finish && gkD > (fieldM ? 10.5f : sim.mode.id == GameModes.Futsal ? 6.5f : 6.8f);
-                    if (holdOn)
+                    // tabela: acabou de receber de quem agora corre livre à frente — devolve de primeira, na corrida
+                    var giver = sim.LastPasser >= 0 && sim.LastPasser < sim.players.Count ? sim.players[sim.LastPasser] : null;
+                    bool giveGo = giver != null && giver.team == team && giver != p && !giver.sentOff && _cooldown == 0
+                        && sim.tick - sim.TakeTick < 40 && sim.tick - sim.PassTick < 120
+                        && (giver.position.x - p.position.x) * dir > 2f && Vector2.Dot(giver.vel, new Vector2(dir, 0f)) > 2.5f
+                        && sim.LaneFree(team, p.position, giver.position + giver.vel * 0.6f) > (fieldM ? 1.4f : 1f)
+                        && toGoal.magnitude > shootRange * 0.8f && Noise(sim, 31) < 0.35f;
+                    // goleiro adiantado e bola perto da área: cavadinha (passe alto por cima dele)
+                    bool chip = gkO != null && sim.mode.keeper && toGoal.magnitude < (fieldM ? 24f : sim.halfLen * 0.6f)
+                        && Mathf.Abs(gkO.position.x - sim.halfLen * dir) > (fieldM ? 3.5f : 2.2f) && gkD > 2.5f && gkD < toGoal.magnitude * 0.9f;
+                    // zagueiro bem na frente, fechando o chute: finta de chute (quem dribla bem)
+                    bool blocker = false;
+                    foreach (var o in sim.players)
+                    {
+                        if (o.team == team || o.isKeeper || o.sentOff) continue;
+                        var ro = o.position - p.position;
+                        if (ro.magnitude < 2.6f && Vector2.Dot(ro.normalized, toGoal.normalized) > 0.75f) { blocker = true; break; }
+                    }
+                    if (giveGo)
+                    {
+                        f.move = (giver.position + giver.vel * 0.7f - p.position).Norm();
+                        Press(ref f, InputFrame.Through, 6 + (int)(Noise(sim, 33) * 5f));
+                    }
+                    else if (chip && toGoal.magnitude < shootRange && Noise(sim, 32) < 0.04f + skill * 0.04f)
+                    {
+                        f.move = toGoal.Norm();
+                        Press(ref f, InputFrame.Lob, 10 + (int)(Noise(sim, 34) * 6f));
+                    }
+                    else if (blocker && toGoal.magnitude < shootRange * 1.1f && sty.dribble > 0.45f && Noise(sim, 35) < 0.03f + sty.dribble * 0.03f)
+                    {
+                        f.move = toGoal.Norm();
+                        Press(ref f, InputFrame.Shoot, 18);
+                        _fakeOn = 9;
+                    }
+                    else if (holdOn)
                     {
                         f.move = toGoal.Norm();
                         f.buttons |= InputFrame.Sprint;

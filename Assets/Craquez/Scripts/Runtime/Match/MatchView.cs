@@ -1201,6 +1201,18 @@ namespace Craquez
             Sfx.Crowd(((sim.mode.id == GameModes.Field ? 0.5f : 0.28f) + _crowdHype * 0.3f + tense) * quiet,
                 sim.mode.id == GameModes.Field ? (0.22f + (homeAttack ? danger * 0.18f : -danger * 0.1f)) * quiet : 0f);
             Sfx.Drums(sim.mode.id == GameModes.Street ? 0f : (0.12f + _crowdHype * 0.3f) * quiet);
+            // placas interativas: a cada ~4 s a fila de placas desliza uma placa para o lado (como LED de estádio)
+            if (venue.boardSteps.Count > 0)
+            {
+                float cyc = Time.time / 4f;
+                float step = Mathf.Floor(cyc) + Mathf.SmoothStep(0f, 1f, Mathf.Clamp01((cyc - Mathf.Floor(cyc) - 0.88f) / 0.12f));
+                var bo = new Vector2(step / 6f, 0f);
+                foreach (var m in venue.boardSteps)
+                {
+                    m.mainTextureOffset = bo;
+                    if (m.HasProperty("_BaseMap")) m.SetTextureOffset("_BaseMap", bo);
+                }
+            }
             foreach (var m in venue.ledMats)
             {
                 var o = new Vector2(Time.time * 0.015f, 0);

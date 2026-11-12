@@ -43,6 +43,7 @@ namespace Craquez
         public int streetPlayers = 3;    // rua: 3x3, 4x4 ou 5x5
         public int stadium;              // campo: 0 = estádio do mandante; 1.. = modelos
         public bool training;
+        public bool tutorial;            // treino guiado do primeiro acesso (com dois companheiros)
         public int trainingRoster = -1;
         public int trainingKeeper = -1;  // treino: goleiro escolhido (índice no elenco do time B)  // treino: atleta escolhido (índice no elenco; -1 = o melhor finalizador)            // arena de treino: atacante x goleiro, sem relógio
         public bool toss = true;         // sorteio do juiz: lados e saída aleatórios

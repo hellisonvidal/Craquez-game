@@ -178,6 +178,10 @@ namespace Craquez.Sim
         public static float F(object o, string k, float def = 0f)
             => (o as Dictionary<string, object>) != null && ((Dictionary<string, object>)o).TryGetValue(k, out var v) && v is double d ? (float)d : def;
 
+        /// <summary>Número sem perder precisão (tamanhos de arquivo: o float perdia bytes acima de 16 MB).</summary>
+        public static double D(object o, string k, double def = 0)
+            => (o as Dictionary<string, object>) != null && ((Dictionary<string, object>)o).TryGetValue(k, out var v) && v is double d ? d : def;
+
         public static int I(object o, string k, int def = 0)
             => (o as Dictionary<string, object>) != null && ((Dictionary<string, object>)o).TryGetValue(k, out var v) && v is double d ? (int)d : def;
     }

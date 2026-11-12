@@ -231,6 +231,18 @@ namespace Craquez
                 + (ps ? "L1" : "LB") + " trocar  •  " + (ps ? "L2" : "LT") + " proteger/conter  •  " + fin + " colocado  •  Analógico direito: dribles";
         }
 
+        /// <summary>Nomes dos comandos no controle (tutorial): mover, passe, chute, alto, correr, drible.</summary>
+        public static (string move, string pass, string shoot, string lob, string sprint, string skill) Names(DeviceKind d)
+        {
+            if (d == DeviceKind.Touch) return ("o analógico (lado esquerdo da tela)", "PASSE", "CHUTE", "ALTO", "CORRER", "deslize o dedo no lado direito da tela");
+            if (d == DeviceKind.Keyboard1) return ("W A S D", "J", "K", "L", "Shift", "as setas");
+            if (d == DeviceKind.Keyboard2) return ("as setas", "Num1", "Num2", "Num3", "Num0", "Home/End/Del/PgDn");
+            bool ps = IsPlayStation(Pad(d == DeviceKind.Gamepad1 ? 0 : 1));
+            var m = Settings.PadMap;
+            bool sh = Settings.SprintOnShoulder;
+            return ("a alavanca esquerda", FaceName(m[0], ps), FaceName(m[1], ps), FaceName(m[2], ps), ps ? (sh ? "R1" : "R2") : (sh ? "RB" : "RT"), "a alavanca direita");
+        }
+
         /// <summary>Opções da cobrança de falta (o chute direto só aparece perto do gol).</summary>
         public static string SetPieceHelp(DeviceKind d, bool shot, string title = "FALTA")
         {

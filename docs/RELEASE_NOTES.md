@@ -1,3 +1,35 @@
+## Craquez 2.17.0
+
+Jogo de futebol feito 100% com inteligência artificial, **gratuito**.
+
+### Download
+- **Celular Android**: `Craquez-v2.17.0.apk`
+- **TV (Google TV / Android TV, ex.: TCL C6K)**: `Craquez-TV-v2.17.0.apk` — use este na TV (32 e 64 bits).
+
+> **Atualizando de 2.15.0 ou 2.16.0**: instale esta versão **uma vez** pela página de versões (a versão
+> instalada tem o erro do "download incompleto"); depois o botão ATUALIZAR do jogo volta a funcionar.
+
+### Novidades
+- **Tutorial no primeiro acesso**: depois de "toque para iniciar", a arena de treino (com dois
+  companheiros) ensina o básico com metas marcadas na tela — mover, correr, passe, tabela, drible,
+  cruzamento, chute e gol — com os botões do seu controle. Dá para pular, e rever em Configurações ›
+  Controles.
+- **Tabela**: quem passa a bola arranca para o espaço à frente para receber de volta (o seu jogador também,
+  enquanto você comanda quem recebeu); a CPU devolve de primeira quando a corrida está livre.
+- **CPU com mais repertório**: cavadinha quando o goleiro sai, finta de chute quando o zagueiro fecha.
+- **Logo do Craquez nas placas de publicidade**, intercalada com placas de cor única (azul, vermelho,
+  branco); nos estádios grandes as placas são de LED e trocam de tempos em tempos.
+- **Som da bola na trave**: baque da bola, estalo e o "pléin" do tubo de alumínio vibrando.
+- **Gandulas atrás das placas** de publicidade (devolvem a bola por cima delas).
+
+### Correções
+- **Atualização pelo jogo**: "download incompleto (115 de 115 MB)" — o tamanho do arquivo era lido sem
+  precisão e não batia por poucos bytes.
+- **Toque nas câmeras atrás do jogador**: o analógico segue a câmera e a direção fica travada enquanto o
+  dedo segura (antes o jogador ia saindo de lado e se afastando da bola até sumir da tela).
+- **"CONFIGURAÇÕES" numa linha só** no menu.
+- **On-line**: o desenho nunca mais mexe na simulação (clima) — as duas partidas ficam iguais.
+
 ## Craquez 2.16.0
 
 Jogo de futebol feito 100% com inteligência artificial, **gratuito**.

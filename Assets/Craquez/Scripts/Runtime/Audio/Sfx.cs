@@ -171,7 +171,7 @@ namespace Craquez
         public static void WhistleLong() => Play(_i?._whistleLong, 0.6f);
         public static void WhistleEnd() => Play(_i?._whistleEnd, 0.65f);
         public static void Net() => Play(_i?._net, 0.75f);
-        public static void Post() => Play(_i?._post, 0.7f);
+        public static void Post() => Play(_i?._post, 1f, Random.Range(0.94f, 1.06f));   // (cada trave soa um pouco diferente)
         /// <summary>Bater de asas (pombos levantando voo).</summary>
         public static void Flutter() => Play(_i?._flutter, 0.22f, 0.85f + Random.value * 0.3f);
         /// <summary>Latido (vira-lata da rua).</summary>
@@ -394,17 +394,37 @@ namespace Craquez
             return Make("rede", d);
         }
 
+        /// <summary>
+        /// Bola na trave ("pléin"): baque seco do couro no impacto + estalo + o tubo de alumínio vibrando —
+        /// modos de uma barra livre (1 : 2,76 : 5,40 : 8,93), cada um em par levemente desafinado (batimento
+        /// que dá o "tremor" do metal), o agudo some rápido e o grave fica soando.
+        /// </summary>
         static AudioClip Metal(System.Random r)
         {
-            int n = (int)(0.9f * Rate);
+            int n = (int)(1.6f * Rate);
             var d = new float[n];
-            float[] fr = { 523f, 1187f, 1965f, 2810f };
+            float f0 = 640f;
+            float[] ratio = { 1f, 2.76f, 5.4f, 8.93f };
+            float[] amp = { 1f, 0.7f, 0.45f, 0.25f };
+            float[] dec = { 2.6f, 4.5f, 8f, 14f };
+            float lp = 0f;
             for (int i = 0; i < n; i++)
             {
                 float t = i / (float)Rate;
-                float s = 0;
-                for (int k = 0; k < fr.Length; k++) s += Mathf.Sin(2 * Mathf.PI * fr[k] * t) * Mathf.Exp(-t * (4f + k * 3f)) / (k + 1);
-                d[i] = s * 0.5f;
+                float ring = 0f;
+                for (int k = 0; k < ratio.Length; k++)
+                {
+                    float f = f0 * ratio[k];
+                    float env = Mathf.Exp(-t * dec[k]);
+                    ring += amp[k] * env * (Mathf.Sin(2 * Mathf.PI * f * t) + 0.6f * Mathf.Sin(2 * Mathf.PI * (f * 1.004f + 1.3f) * t + 0.7f));
+                }
+                ring *= 0.32f * (1f - Mathf.Exp(-t * 900f));   // ataque instantâneo, sem estalo digital
+                // baque da bola (grave e curto) + estalo do impacto (ruído filtrado de poucos ms)
+                float thud = Mathf.Sin(2 * Mathf.PI * (95f + 60f * Mathf.Exp(-t * 40f)) * t) * Mathf.Exp(-t * 28f) * 0.9f;
+                float nz = ((float)r.NextDouble() * 2f - 1f);
+                lp += (nz - lp) * 0.35f;
+                float click = lp * Mathf.Exp(-t * 160f) * 1.1f;
+                d[i] = Mathf.Clamp(ring + thud + click, -1f, 1f) * 0.9f;
             }
             return Make("post", d);
         }

@@ -16,6 +16,8 @@ namespace Craquez
         public readonly List<(Material mat, Texture normal, Texture cheer)> crowdCheer = new List<(Material, Texture, Texture)>();
         public readonly List<Light> floodlights = new List<Light>();
         public readonly List<Material> ledMats = new List<Material>();
+        /// <summary>Placas interativas (LED que troca de placa em passos); as outras ficam paradas.</summary>
+        public readonly List<Material> boardSteps = new List<Material>();
         public Material pitchMat, pitchMat2;
         public Vector3 tunnel;
         /// <summary>Fundo do corredor dos vestiários (de onde os atletas saem) e o comprimento dele.</summary>
@@ -95,7 +97,7 @@ namespace Craquez
             if (sm.track) Track(v, hl, hw);
             Lines(v, sim, hl, hw);
             Goals(v, sim, hl, true);
-            Boards(v, hl, hw, home, away);
+            Boards(v, hl, hw, home, away, tier >= 2);
             var st = StyleOf(model, home.stadium.tier);
             Stands(v, hl, hw, st, home, away, homeKit, awayKit, night, quality);
             StandBand(v, hl, hw, st, night);
@@ -554,15 +556,16 @@ namespace Craquez
         static Texture2D _brandTex;
         static Texture2D BrandTex => _brandTex != null ? _brandTex : (_brandTex = Gfx.BrandBoards());
 
-        static void Boards(Venue v, float hl, float hw, TeamData home, TeamData away)
+        static void Boards(Venue v, float hl, float hw, TeamData home, TeamData away, bool interactive)
         {
-            // placas do Craquez (nome do jogo intercalado com azul, vermelho e branco)
+            // placas do Craquez (logo do jogo intercalada com placas lisas azul, vermelha e branca); nos
+            // estádios grandes são de LED e trocam de placa de tempos em tempos
             var mat = Gfx.Emissive(Color.white, new Color(0.75f, 0.75f, 0.75f), BrandTex);
-            v.ledMats.Add(mat);
+            if (interactive) v.boardSteps.Add(mat);
             float h = 0.95f, d = 5.2f, dz = 4.2f;
             float x0 = -(hl + d), x1 = hl + d, z0 = -(hw + dz), z1 = hw + dz;
-            float L = (x1 - x0) / 30f;   // (6 placas de 5 m por volta da textura: proporção da placa)
-            float Lz = (z1 - z0) / 30f;
+            float L = (x1 - x0) / 15.2f;   // (6 placas de 2,5 m por volta da textura: a logo sem esticar)
+            float Lz = (z1 - z0) / 15.2f;
             // um objeto por lado: a placa do lado da câmera some sozinha quando tapa a visão
             var k = new MeshKit();
             k.Quad(new Vector3(x0, 0, z1), new Vector3(x0, h, z1), new Vector3(x1, h, z1), new Vector3(x1, 0, z1), new Vector2(0, 0), new Vector2(L, 1));
@@ -1553,17 +1556,16 @@ namespace Craquez
             Goals(v, sim, hl, true);
             // placas de publicidade na beira da quadra (três lados; o da câmera fica livre)
             // placas do Craquez (nome do jogo intercalado com azul, vermelho e branco)
-            var led = Gfx.Emissive(Color.white, new Color(0.7f, 0.7f, 0.7f), BrandTex);
-            v.ledMats.Add(led);
+            var led = Gfx.Emissive(Color.white, new Color(0.7f, 0.7f, 0.7f), BrandTex);   // (paradas no ginásio)
             float bx = hl + 2.2f, bz = hw + 2.2f, bh = 0.8f;
             var bd = new MeshKit();
-            bd.Quad(new Vector3(-bx, 0, bz), new Vector3(-bx, bh, bz), new Vector3(bx, bh, bz), new Vector3(bx, 0, bz), new Vector2(0, 0), new Vector2(bx * 2f / 25.6f, 1));
+            bd.Quad(new Vector3(-bx, 0, bz), new Vector3(-bx, bh, bz), new Vector3(bx, bh, bz), new Vector3(bx, 0, bz), new Vector2(0, 0), new Vector2(bx * 2f / 12.8f, 1));
             bd.Object("Placas (fundo)", led, v.root, false);
             bd = new MeshKit();
-            bd.Quad(new Vector3(bx, 0, bz), new Vector3(bx, bh, bz), new Vector3(bx, bh, -bz), new Vector3(bx, 0, -bz), new Vector2(0, 0), new Vector2(bz * 2f / 25.6f, 1));
+            bd.Quad(new Vector3(bx, 0, bz), new Vector3(bx, bh, bz), new Vector3(bx, bh, -bz), new Vector3(bx, 0, -bz), new Vector2(0, 0), new Vector2(bz * 2f / 12.8f, 1));
             bd.Object("Placas (direita)", led, v.root, false);
             bd = new MeshKit();
-            bd.Quad(new Vector3(-bx, 0, -bz), new Vector3(-bx, bh, -bz), new Vector3(-bx, bh, bz), new Vector3(-bx, 0, bz), new Vector2(0, 0), new Vector2(bz * 2f / 25.6f, 1));
+            bd.Quad(new Vector3(-bx, 0, -bz), new Vector3(-bx, bh, -bz), new Vector3(-bx, bh, bz), new Vector3(-bx, 0, bz), new Vector2(0, 0), new Vector2(bz * 2f / 12.8f, 1));
             bd.Object("Placas (esquerda)", led, v.root, false);
             // ginásio
             float W = hl + 18f, D = hw + 17f, H = 17f;

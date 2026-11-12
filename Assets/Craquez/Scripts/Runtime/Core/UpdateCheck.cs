@@ -68,7 +68,7 @@ namespace Craquez
                         // a versão de TV se atualiza com o APK de TV (32 e 64 bits); o celular, com o do celular
                         if (Platform.TvBuild != ln.Contains("-tv")) continue;
                         ApkUrl = MiniJson.S(a, "browser_download_url", "");
-                        ApkSize = (long)MiniJson.F(a, "size", 0f);
+                        ApkSize = (long)MiniJson.D(a, "size", 0);   // (com float, 120.923.124 virava 120.923.120: "download incompleto")
                         break;
                     }
                 Url = string.IsNullOrEmpty(url) ? Page : url;
@@ -121,7 +121,7 @@ namespace Craquez
             // download cortado no meio (rede caiu) vira "app não instalado" no Android: confere o tamanho
             long got = 0;
             try { got = new System.IO.FileInfo(path).Length; } catch { got = 0; }
-            if (ApkSize > 0 && got != ApkSize)
+            if (ApkSize > 0 && got + 16 < ApkSize)   // (só faltando pedaço; a assinatura e o pacote são conferidos antes de instalar)
             {
                 try { System.IO.File.Delete(path); } catch { }
                 Fail("O download veio incompleto (" + got / 1048576 + " de " + ApkSize / 1048576 + " MB). Toque em ATUALIZAR de novo.", changed);

@@ -392,6 +392,14 @@ namespace Craquez
                 _app.Tour_EndMatch();
                 yield return new WaitForSecondsRealtime(0.5f);
             }
+            // tutorial do primeiro acesso (lista de metas e instrução no alto)
+            {
+                _app.StartTutorial();
+                yield return new WaitForSecondsRealtime(2f);
+                yield return Shot("tutorial", 1f);
+                _app.Tour_EndMatch();
+                yield return new WaitForSecondsRealtime(0.5f);
+            }
             // estádios: vista aberta de cada modelo (arquibancada, cobertura, torcida, entorno)
             foreach (int m in new[] { 1, 6, 13, 15, 17, 18, 21, 26, 29 })
             {
