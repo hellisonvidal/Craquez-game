@@ -56,6 +56,7 @@ namespace Craquez
 
         public void Begin(MatchConfig c, Camera cam)
         {
+            ThermalGuard.InMatch = true;   // partida: quadro cheio (nos menus, 30)
             cfg = c;
             _cam = cam;
             Time.timeScale = attract ? 1f : GameSpeed;
@@ -584,12 +585,15 @@ namespace Craquez
         float _netPauseT;
 
         /// <summary>Lê pausa/continuar vindos do outro aparelho. true = a partida entrou em pausa agora.</summary>
+        int _peerPauses;
+
         bool NetExtras()
         {
             while (net.Extra.Count > 0)
             {
                 var m = net.Extra.Dequeue();
-                if (m[0] == MsgPause && _phase != Phase.Paused) { NetPause(false); return true; }
+                // (no máximo 6 pausas do outro lado por partida: ninguém trava o jogo pausando sem parar)
+                if (m[0] == MsgPause && _phase != Phase.Paused && _peerPauses < 6) { _peerPauses++; NetPause(false); return true; }
                 if (m[0] == MsgResume && _phase == Phase.Paused) NetResume(false);
             }
             return false;
@@ -1083,6 +1087,7 @@ namespace Craquez
 
         void OnDestroy()
         {
+            ThermalGuard.InMatch = false;
             Sfx.Crowd(0f, 0f);   // saiu da partida: nada de ruído de torcida nos menus
             Time.timeScale = 1f;   // menus em tempo real
         }

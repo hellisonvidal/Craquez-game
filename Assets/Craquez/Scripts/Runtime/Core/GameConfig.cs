@@ -25,10 +25,21 @@ namespace Craquez
         /// <summary>Clima efetivo da partida: sorteia o aleatório e tira chuva/neve dos locais cobertos.</summary>
         public string WeatherKind()
         {
-            string w = weather == "aleatorio" ? WeatherFx.Kinds[(int)(Mix(seed ^ 0x9E3779B9u) % (uint)WeatherFx.Kinds.Length)] : weather;
+            string w = weather == "aleatorio" ? RandomWeather(seed) : weather;
             if (Indoor(mode, venue) && (w == "chuva" || w == "tempestade" || w == "neve" || w == "nevasca")) w = "nublado";
             return w;
         }
+        /// <summary>
+        /// Sorteio do "Aleatório" com pesos de um ano de futebol (antes os 6 climas tinham a mesma chance:
+        /// neve ou nevasca em 1 de cada 3 partidas). Agora: sol 40%, nublado 28%, chuva 18%, tempestade 7%,
+        /// neve 5%, nevasca 2%.
+        /// </summary>
+        public static string RandomWeather(uint seed)
+        {
+            uint r = Mix(seed ^ 0x9E3779B9u) % 100u;
+            return r < 40 ? "sol" : r < 68 ? "nublado" : r < 86 ? "chuva" : r < 93 ? "tempestade" : r < 98 ? "neve" : "nevasca";
+        }
+
         /// <summary>Embaralha a semente (a semente da partida é sempre ímpar: o resto direto por 6 só dava
         /// nublado, tempestade ou nevasca).</summary>
         public static uint Mix(uint x)
@@ -143,22 +154,34 @@ namespace Craquez
 
         /// <summary>
         /// 2.19: as partidas começam com a câmera o mais perto possível dos jogadores, em todas as
-        /// modalidades ("TV Bem Perto" com zoom "Bem perto"). Vale uma vez para quem já jogava; depois,
+        /// modalidades ("TV Bem Perto" com zoom "Perto"). Vale uma vez para quem já jogava; depois,
         /// o que a pessoa escolher em Configurações fica.
         /// </summary>
         static void CloseCameraOnce()
         {
-            if (PlayerPrefs.GetInt("camera_close_v1", 0) == 1) return;
-            PlayerPrefs.SetInt("camera_close_v1", 1);
-            PlayerPrefs.SetInt("camera_v2", CloseCamera);
-            PlayerPrefs.SetInt("camera_zoom", 2);
-            PlayerPrefs.Save();
+            if (PlayerPrefs.GetInt("camera_close_v1", 0) == 0)
+            {
+                PlayerPrefs.SetInt("camera_close_v1", 1);
+                PlayerPrefs.SetInt("camera_v2", CloseCamera);
+                PlayerPrefs.SetInt("camera_zoom", DefaultZoom);
+                PlayerPrefs.SetInt("camera_close_v2", 1);
+                PlayerPrefs.Save();
+            }
+            // 2.20: "Bem perto" ficou perto demais; o padrão passa a "Perto" (só para quem estava no padrão)
+            if (PlayerPrefs.GetInt("camera_close_v2", 0) == 0)
+            {
+                PlayerPrefs.SetInt("camera_close_v2", 1);
+                if (PlayerPrefs.GetInt("camera_zoom", DefaultZoom) == 2) PlayerPrefs.SetInt("camera_zoom", DefaultZoom);
+                PlayerPrefs.Save();
+            }
         }
+
+        const int DefaultZoom = 1;
 
         /// <summary>-2 (aberto) .. +2 (perto).</summary>
         public static int CameraZoom
         {
-            get { CloseCameraOnce(); return PlayerPrefs.GetInt("camera_zoom", 2); }
+            get { CloseCameraOnce(); return PlayerPrefs.GetInt("camera_zoom", DefaultZoom); }
             set { PlayerPrefs.SetInt("camera_zoom", value); PlayerPrefs.Save(); }
         }
 

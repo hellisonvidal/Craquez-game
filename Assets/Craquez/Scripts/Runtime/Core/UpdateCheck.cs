@@ -68,10 +68,13 @@ namespace Craquez
                         // a versão de TV se atualiza com o APK de TV (32 e 64 bits); o celular, com o do celular
                         if (Platform.TvBuild != ln.Contains("-tv")) continue;
                         ApkUrl = MiniJson.S(a, "browser_download_url", "");
+                        // segurança: só baixa APK do próprio repositório do jogo, por HTTPS
+                        if (!ApkUrl.StartsWith("https://github.com/hellisonvidal/Craquez-game/releases/download/", System.StringComparison.OrdinalIgnoreCase)) { ApkUrl = ""; continue; }
                         ApkSize = (long)MiniJson.D(a, "size", 0);   // (com float, 120.923.124 virava 120.923.120: "download incompleto")
                         break;
                     }
-                Url = string.IsNullOrEmpty(url) ? Page : url;
+                // (a página aberta no navegador também tem de ser a do jogo no GitHub)
+                Url = !string.IsNullOrEmpty(url) && url.StartsWith("https://github.com/hellisonvidal/Craquez-game/", System.StringComparison.OrdinalIgnoreCase) ? url : Page;
                 Status = Newer(Latest, Application.version) ? State.NewVersion : State.UpToDate;
                 done?.Invoke();
             }

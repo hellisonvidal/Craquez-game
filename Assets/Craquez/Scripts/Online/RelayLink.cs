@@ -25,6 +25,7 @@ namespace Craquez.Online
         readonly Queue<byte[]> _in = new Queue<byte[]>();
         readonly List<byte[]> _out = new List<byte[]>();
         const int MaxPacket = 1000;
+        const int MaxQueued = 8192;
 
         /// <summary>Conectado ao outro aparelho (o anfitrião, quando o convidado entra).</summary>
         public bool Connected { get; private set; }
@@ -118,7 +119,8 @@ namespace Craquez.Online
                             if (n <= 0 || o + n > buf.Length) break;
                             var m = new byte[n];
                             Buffer.BlockCopy(buf, o, m, 0, n);
-                            _in.Enqueue(m);
+                            // (fila limitada: um outro lado inundando mensagens não esgota a memória)
+                            if (_in.Count < MaxQueued) _in.Enqueue(m);
                             o += n;
                         }
                         break;

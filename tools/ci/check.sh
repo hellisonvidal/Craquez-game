@@ -23,7 +23,7 @@ $CSC $REFS -out:$W/Sim.dll $(find $ROOT/Assets/Craquez/Scripts/Sim -name "*.cs")
 echo "== Craquez.Runtime (sem UrpSetup, que depende do URP)"
 cat > $W/UrpStub.cs <<'CS'
 namespace Craquez { public static class UrpSetup {
- public static void Camera(UnityEngine.Camera c, int q){} public static void Quality(int q){}
+ public static void Camera(UnityEngine.Camera c, int q){} public static void Quality(int q){} public static void Thermal(float r, float s){}
  public static void Grade(bool n, float b, float e, float s, float c, float v){} } }
 CS
 $CSC $REFS -r:$W/Sim.dll -r:$W/UnityEngine.UI.dll -r:$W/Unity.InputSystem.dll -define:UNITY_ANDROID -out:$W/Runtime.dll $(find $ROOT/Assets/Craquez/Scripts/Runtime -name "*.cs" | grep -v UrpSetup) $W/UrpStub.cs

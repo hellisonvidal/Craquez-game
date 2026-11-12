@@ -567,6 +567,28 @@ namespace Craquez
             k.Quad(left + up, right + up, right, left, new Vector2(0f, 1f), new Vector2(uLen, 0f));
         }
 
+        /// <summary>Placas ao longo de z fixo, de x0 a x1, com vãos (a textura segue contínua de um trecho ao outro).</summary>
+        static void BoardRun(MeshKit k, float x0, float x1, float z, float h, float metersPerTile, (float a, float b)[] gaps, bool facingMinusZ)
+        {
+            var cuts = new List<(float a, float b)>();
+            float cur = x0;
+            foreach (var g in gaps)
+            {
+                if (g.a > cur) cuts.Add((cur, Mathf.Min(g.a, x1)));
+                cur = Mathf.Max(cur, g.b);
+            }
+            if (cur < x1) cuts.Add((cur, x1));
+            var up = Vector3.up * h;
+            foreach (var c in cuts)
+            {
+                float u0 = (c.a - x0) / metersPerTile, u1 = (c.b - x0) / metersPerTile;
+                var A = new Vector3(c.a, 0, z); var B = new Vector3(c.b, 0, z);
+                // de quem olha do campo: no fundo a esquerda é -x; do lado da câmera a esquerda é +x
+                if (!facingMinusZ) k.Quad(A + up, B + up, B, A, new Vector2(u0, 1f), new Vector2(u1, 0f));
+                else k.Quad(B + up, A + up, A, B, new Vector2(-u1, 1f), new Vector2(-u0, 0f));
+            }
+        }
+
         static void Boards(Venue v, float hl, float hw, TeamData home, TeamData away, bool interactive)
         {
             // placas do Craquez (logo do jogo intercalada com placas lisas azul, vermelha e branca); nos
@@ -578,11 +600,14 @@ namespace Craquez
             float L = (x1 - x0) / 15.2f;   // (6 placas de 2,5 m por volta da textura: a logo sem esticar)
             float Lz = (z1 - z0) / 15.2f;
             // um objeto por lado: a placa do lado da câmera some sozinha quando tapa a visão
+            // vãos: na saída do vestiário (os atletas passavam por cima das placas) e na frente dos bancos de
+            // reservas (as placas atravessavam os bancos, em x = ±9 m, 7 m de largura)
+            float per = (x1 - x0) / L;   // metros por volta da textura
             var k = new MeshKit();
-            BoardFace(k, new Vector3(x0, 0, z1), new Vector3(x1, 0, z1), h, L);     // fundo: olhando para +z, a direita é +x
+            BoardRun(k, x0, x1, z1, h, per, new[] { (-12.9f, -5.1f), (5.1f, 12.9f) }, false);   // fundo: olhando para +z
             k.Object("Placas LED (fundo)", mat, v.root, false);
             k = new MeshKit();
-            BoardFace(k, new Vector3(x1, 0, z0), new Vector3(x0, 0, z0), h, L);     // lado da câmera: olhando para -z
+            BoardRun(k, x0, x1, z0, h, per, new[] { (-3.8f, 3.8f) }, true);                     // lado da câmera (túnel)
             k.Object("Placas LED (câmera)", mat, v.root, false);
             k = new MeshKit();
             BoardFace(k, new Vector3(x1, 0, z1), new Vector3(x1, 0, z0), h, Lz);    // direita: olhando para +x

@@ -65,6 +65,22 @@ namespace Craquez
             if (vsync) Application.targetFrameRate = -1;
             else if (cap == 0) Application.targetFrameRate = mobile ? (q == 0 ? 30 : 60) : Mathf.Clamp(hz, 60, 144);
             else Application.targetFrameRate = cap < 0 ? (mobile ? 120 : 1000) : cap;
+            // controle de temperatura: parte destes valores e reduz se o aparelho esquentar (e nos menus)
+            if (GraphicsSettings.currentRenderPipeline is UniversalRenderPipelineAsset u)
+                ThermalGuard.Rebase(u.renderScale, u.shadowDistance, Application.targetFrameRate, cap == 0 && !vsync,
+                    Settings.RenderScaleValues[Mathf.Clamp(Settings.RenderScale, 0, Settings.RenderScaleValues.Length - 1)] <= 0f);
+        }
+
+        /// <summary>Controle de temperatura: escala de render (negativa = não mexe) e distância das sombras.</summary>
+        public static void Thermal(float renderScale, float shadowDistance)
+        {
+            if (!(GraphicsSettings.currentRenderPipeline is UniversalRenderPipelineAsset urp)) return;
+            if (renderScale > 0f)
+            {
+                urp.renderScale = renderScale;
+                urp.upscalingFilter = renderScale < 0.99f ? UpscalingFilterSelection.FSR : UpscalingFilterSelection.Auto;
+            }
+            urp.shadowDistance = shadowDistance;
         }
 
         /// <summary>Visual de transmissão: contraste, saturação leve, bloom nos refletores.</summary>
