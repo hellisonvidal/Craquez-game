@@ -1,3 +1,16 @@
+## Craquez 2.24.0
+
+Jogo de futebol feito 100% com inteligência artificial, **gratuito**.
+
+### Download
+- **Celular Android**: `Craquez-v2.24.0.apk`
+- **TV (Google TV / Android TV, ex.: TCL C6K)**: `Craquez-TV-v2.24.0.apk` — use este na TV (32 e 64 bits).
+
+### Mudanças
+- **Volta ao corpo dos atletas da 2.21.0**: desfeitas as mudanças de corpo da 2.22 (porte pelo molde) e da 2.23 (corpo
+  único). Os atletas voltam a ter os quatro modelos, 23 traços de rosto, os cabelos e as expressões. O resto do jogo
+  é o mesmo da 2.21.0.
+
 ## Craquez 2.23.0
 
 Jogo de futebol feito 100% com inteligência artificial, **gratuito**.

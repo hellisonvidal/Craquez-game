@@ -353,7 +353,7 @@ def build(name, v):
 # tools/blender/README). Aplicada só METADE da diferença medida (parte dela é roupa folgada e caneleira),
 # limitada a +30%. Tronco: fatores de largura (x) e profundidade (y) por altura; pernas e braços: raio
 # em volta do osso. Cabeça, mãos e pés ficam iguais.
-FIT = "--no-fit" not in sys.argv
+FIT = "--fit" in sys.argv   # (2.24: voltou ao corpo da 2.21 — o porte do molde fica desligado)
 FIT_TORSO = [  # (altura, largura, profundidade na frente, profundidade atrás)
     # (frente do peito sem crescer — e um pouco mais plana: o peito ficava "saltado"; o volume vai para as
     # costas, a cintura e os lados)
