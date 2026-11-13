@@ -354,9 +354,12 @@ def build(name, v):
 # limitada a +30%. Tronco: fatores de largura (x) e profundidade (y) por altura; pernas e braços: raio
 # em volta do osso. Cabeça, mãos e pés ficam iguais.
 FIT = "--no-fit" not in sys.argv
-FIT_TORSO = [  # (altura, largura, profundidade)
-    (0.98, 1.06, 1.08), (1.06, 1.07, 1.09), (1.15, 1.08, 1.14), (1.22, 1.15, 1.20), (1.32, 1.13, 1.18),
-    (1.42, 1.15, 1.18), (1.50, 1.12, 1.15), (1.58, 1.10, 1.10), (1.66, 1.10, 1.08), (1.72, 1.0, 1.0),
+FIT_TORSO = [  # (altura, largura, profundidade na frente, profundidade atrás)
+    # (frente do peito sem crescer — e um pouco mais plana: o peito ficava "saltado"; o volume vai para as
+    # costas, a cintura e os lados)
+    (0.98, 1.06, 1.05, 1.08), (1.06, 1.07, 1.06, 1.10), (1.15, 1.08, 1.08, 1.14), (1.22, 1.13, 1.08, 1.18),
+    (1.30, 1.11, 1.0, 1.15), (1.36, 1.10, 0.96, 1.14), (1.42, 1.11, 0.95, 1.14), (1.50, 1.10, 0.98, 1.12),
+    (1.58, 1.08, 1.0, 1.08), (1.66, 1.08, 1.0, 1.06), (1.72, 1.0, 1.0, 1.0),
 ]
 FIT_LEG = [(1.02, 1.12), (0.95, 1.16), (0.80, 1.18), (0.65, 1.2), (0.52, 1.12), (0.40, 1.18), (0.30, 1.1), (0.18, 1.03), (0.10, 1.0)]
 FIT_ARM = {"upperarm": 1.12, "lowerarm": 1.12}
@@ -397,8 +400,9 @@ def fit_body(rig):
         tot = 0.0
         for bone, w in weights:
             if bone in TORSO_BONES:
-                fw, fd = _interp(FIT_TORSO, p.z, 2)
+                fw, ff, fb = _interp(FIT_TORSO, p.z, 3)
                 yc = axis_y(p.z)
+                fd = ff if p.y < yc else fb   # (a frente do corpo é -y)
                 dd = Vector((p.x * (fw - 1.0), (p.y - yc) * (fd - 1.0), 0.0))
             elif bone.startswith(("thigh", "calf")):
                 dd = radial(p, bone, _interp(FIT_LEG, p.z, 1)[0])
