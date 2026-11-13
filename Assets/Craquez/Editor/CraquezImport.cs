@@ -17,7 +17,7 @@ namespace Craquez.EditorTools
         const string AthleteDir = "Assets/Craquez/Resources/Athletes/";
 
         /// <summary>Muda quando as regras mudam: força reimportar os FBX.</summary>
-        public override uint GetVersion() => 3;
+        public override uint GetVersion() => 4;
 
         void OnPreprocessModel()
         {
@@ -121,14 +121,14 @@ namespace Craquez.EditorTools
             if (!assetPath.StartsWith(AthleteDir + "Textures/")) return;
             var ti = (TextureImporter)assetImporter;
             string n = Path.GetFileNameWithoutExtension(assetPath);
-            bool skin = n.Contains("skinned");
+            bool skin = n.Contains("skinned") || n.StartsWith("athlete_base");   // (corpo único: rosto e pele precisam de resolução)
             ti.mipmapEnabled = true;
             ti.alphaIsTransparency = !skin;
             ti.maxTextureSize = skin ? 2048 : 1024;
             ti.anisoLevel = 4;
             var android = ti.GetPlatformTextureSettings("Android");
             android.overridden = true;
-            android.maxTextureSize = skin ? 1024 : 512;
+            android.maxTextureSize = skin ? (n.StartsWith("athlete_base") ? 2048 : 1024) : 512;
             android.format = TextureImporterFormat.ASTC_6x6;
             ti.SetPlatformTextureSettings(android);
         }
