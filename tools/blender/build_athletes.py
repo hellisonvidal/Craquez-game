@@ -341,9 +341,107 @@ def build(name, v):
         for m in list(c.modifiers):
             if m.type in ("SUBSURF", "MASK"):
                 c.modifiers.remove(m)
+    if FIT:
+        fit_body(rig)
     names = sorted(o.name for o in ObjectService.get_list_of_children(rig))
     log(name, "objetos:", names)
     return h, rig
+
+
+# ---------------------------------------------------------------- porte do corpo (2.22)
+# Molde: modelo de jogador enviado pelo dono do jogo (medido em cortes horizontais e nos braços, ver
+# tools/blender/README). Aplicada só METADE da diferença medida (parte dela é roupa folgada e caneleira),
+# limitada a +30%. Tronco: fatores de largura (x) e profundidade (y) por altura; pernas e braços: raio
+# em volta do osso. Cabeça, mãos e pés ficam iguais.
+FIT = "--no-fit" not in sys.argv
+FIT_TORSO = [  # (altura, largura, profundidade na frente, profundidade atrás)
+    # (frente do peito sem crescer — e um pouco mais plana: o peito ficava "saltado"; o volume vai para as
+    # costas, a cintura e os lados)
+    (0.98, 1.06, 1.05, 1.08), (1.06, 1.07, 1.06, 1.10), (1.15, 1.08, 1.08, 1.14), (1.22, 1.13, 1.08, 1.18),
+    (1.30, 1.11, 1.0, 1.15), (1.36, 1.10, 0.96, 1.14), (1.42, 1.11, 0.95, 1.14), (1.50, 1.10, 0.98, 1.12),
+    (1.58, 1.08, 1.0, 1.08), (1.66, 1.08, 1.0, 1.06), (1.72, 1.0, 1.0, 1.0),
+]
+FIT_LEG = [(1.02, 1.12), (0.95, 1.16), (0.80, 1.18), (0.65, 1.2), (0.52, 1.12), (0.40, 1.18), (0.30, 1.1), (0.18, 1.03), (0.10, 1.0)]
+FIT_ARM = {"upperarm": 1.12, "lowerarm": 1.12}
+TORSO_BONES = ("pelvis", "spine_01", "spine_02", "spine_03", "neck_01", "clavicle_l", "clavicle_r")
+
+
+def _interp(table, z, cols):
+    t = sorted(table)
+    if z <= t[0][0]:
+        return t[0][1:1 + cols]
+    if z >= t[-1][0]:
+        return t[-1][1:1 + cols]
+    for a, b in zip(t, t[1:]):
+        if a[0] <= z <= b[0]:
+            k = (z - a[0]) / (b[0] - a[0])
+            return tuple(a[i] + (b[i] - a[i]) * k for i in range(1, 1 + cols))
+
+
+def fit_body(rig):
+    """Engrossa o corpo e o uniforme no porte do molde (mesma deformação em todas as malhas e shape keys)."""
+    mw = rig.matrix_world
+    seg = {b.name: (mw @ b.head_local, mw @ b.tail_local) for b in rig.data.bones}
+    # eixo do tronco (y do meio do corpo em cada altura): pelas cabeças dos ossos da coluna
+    spine = sorted([(seg[n][0].z, seg[n][0].y) for n in ("pelvis", "spine_01", "spine_02", "spine_03", "neck_01", "head")])
+
+    def axis_y(z):
+        return _interp([(a, b) for a, b in spine], z, 1)[0]
+
+    def radial(p, bone, f):
+        a, b = seg[bone]
+        ab = b - a
+        t = max(0.0, min(1.0, (p - a).dot(ab) / max(1e-9, ab.length_squared)))
+        c = a + ab * t
+        return (p - c) * (f - 1.0)
+
+    def delta(p, weights):
+        d = Vector((0, 0, 0))
+        tot = 0.0
+        for bone, w in weights:
+            if bone in TORSO_BONES:
+                fw, ff, fb = _interp(FIT_TORSO, p.z, 3)
+                yc = axis_y(p.z)
+                fd = ff if p.y < yc else fb   # (a frente do corpo é -y)
+                dd = Vector((p.x * (fw - 1.0), (p.y - yc) * (fd - 1.0), 0.0))
+            elif bone.startswith(("thigh", "calf")):
+                dd = radial(p, bone, _interp(FIT_LEG, p.z, 1)[0])
+            elif bone.startswith("upperarm"):
+                dd = radial(p, bone, FIT_ARM["upperarm"])
+            elif bone.startswith("lowerarm"):
+                dd = radial(p, bone, FIT_ARM["lowerarm"])
+            else:
+                dd = Vector((0, 0, 0))
+            d += dd * w
+            tot += w
+        return d / tot if tot > 0 else d
+
+    bones = set(rig.data.bones.keys())
+    for o in ObjectService.get_list_of_children(rig):
+        if o.type != "MESH" or o.name.startswith("Hair_") or o.name in ("Eyes", "Eyebrows", "Eyelashes"):
+            continue
+        me = o.data
+        gn = {g.index: g.name for g in o.vertex_groups if g.name in bones}
+        omw = o.matrix_world
+        inv = omw.inverted()
+        deltas = []
+        for v in me.vertices:
+            ws = [(gn[g.group], g.weight) for g in v.groups if g.group in gn and g.weight > 0.01]
+            p = omw @ v.co
+            deltas.append(inv.to_3x3() @ delta(p, ws) if ws else Vector((0, 0, 0)))
+        if me.shape_keys:
+            # todas as formas (rosto) andam junto; a malha segue a forma base
+            for kb in me.shape_keys.key_blocks:
+                for i, d in enumerate(deltas):
+                    kb.data[i].co = kb.data[i].co + d
+            basis = me.shape_keys.reference_key
+            for i in range(len(deltas)):
+                me.vertices[i].co = basis.data[i].co
+        else:
+            for i, d in enumerate(deltas):
+                me.vertices[i].co = me.vertices[i].co + d
+        me.update()
+        log("porte:", o.name, len(deltas), "vértices")
 
 
 def export(name, rig):
