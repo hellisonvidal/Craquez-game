@@ -1,3 +1,19 @@
+## Craquez 2.23.0
+
+Jogo de futebol feito 100% com inteligência artificial, **gratuito**.
+
+### Download
+- **Celular Android**: `Craquez-v2.23.0.apk`
+- **TV (Google TV / Android TV, ex.: TCL C6K)**: `Craquez-TV-v2.23.0.apk` — use este na TV (32 e 64 bits).
+
+### Novidades
+- **Novo corpo dos atletas**: todos os jogadores agora são variações de um único modelo 3D de jogador (rosto, cabelo
+  e corpo), preso ao esqueleto das animações. Cada um varia em altura (1,68 a 1,93 m), tom de pele, porte (magro a
+  forte) e largura dos ombros; o uniforme de cada time é pintado nele e as chuteiras seguem os 16 modelos do jogo.
+
+### Correções
+- **Mechas loiras no cabelo**: os cabelos antigos saíram (o cabelo agora é o do próprio modelo).
+
 ## Craquez 2.22.0
 
 Jogo de futebol feito 100% com inteligência artificial, **gratuito**.

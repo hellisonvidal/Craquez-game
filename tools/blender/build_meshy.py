@@ -98,10 +98,10 @@ for p in me.polygons:
         sk = False
     if 0.66 < z <= 0.93:
         sk = False
-    if sk or z > 1.58:
+    if 0.93 < z <= 1.62 and not sk:
+        cls[p.index] = 1          # gola: o tecido do pescoço é da camisa (a gola original não aparece)
+    elif sk or z > 1.62:
         cls[p.index] = 0
-    elif z > 0.93:
-        cls[p.index] = 1
     elif z > 0.6:
         cls[p.index] = 2
     elif z > 0.105:
