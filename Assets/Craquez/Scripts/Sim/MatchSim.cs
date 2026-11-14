@@ -2169,6 +2169,31 @@ namespace Craquez.Sim
             p.faceBall = !urgent && d < 10f && ball.pos.Dist(p.position) < 35f;
         }
 
+        readonly SimBall _pred = new SimBall();
+
+        /// <summary>Simula a bola até ela cruzar x = planeX (até 2,2 s): tempo, y e altura nesse ponto (t &lt; 0: não cruza).</summary>
+        void Predict(float planeX, out float t, out float y, out float z)
+        {
+            _pred.pos = ball.pos; _pred.vel = ball.vel; _pred.z = ball.z; _pred.vz = ball.vz; _pred.spin = ball.spin;
+            _pred.slideT = ball.slideT; _pred.radius = ball.radius; _pred.owner = -1;
+            float side0 = Mathf.Sign(ball.pos.x - planeX);
+            t = -1f; y = 0f; z = 0f;
+            for (int i = 0; i < 132; i++)
+            {
+                var prev = _pred.pos; float pz = _pred.z;
+                _pred.Step(DT, mode);
+                if (Mathf.Sign(_pred.pos.x - planeX) != side0)
+                {
+                    float f = Mathf.Abs(prev.x - planeX) / Mathf.Max(1e-4f, Mathf.Abs(_pred.pos.x - prev.x));
+                    t = (i + f) * DT;
+                    y = Mathf.Lerp(prev.y, _pred.pos.y, f);
+                    z = Mathf.Max(0f, Mathf.Lerp(pz, _pred.z, f));
+                    return;
+                }
+                if (_pred.Speed < 1f) return;
+            }
+        }
+
         void AiKeeper(SimPlayer p, bool frozen)
         {
             float dir = TeamDir(p.team);
@@ -2216,10 +2241,17 @@ namespace Craquez.Sim
                 {
                     // leitura imperfeita: chute forte e de longe engana mais (o goleiro ruim mais ainda)
                     float readErr = ((p.id * 7919 + lastShotTick * 31) % 1000 / 1000f - 0.5f) * 2f;
-                    float yK = ball.pos.y + ball.vel.y * tK + readErr * Mathf.Clamp01(ball.Speed / 30f) * Mathf.Lerp(0.55f, 0.2f, p.defense);
-                    float zK = Mathf.Max(0f, ball.z + ball.vz * tK - 0.5f * SimBall.G * tK * tK);
-                    float yCross = ball.pos.y + ball.vel.y * tCross;
-                    float zCross = ball.z + ball.vz * tCross - 0.5f * SimBall.G * tCross * tCross;
+                    // (o erro de leitura diminui conforme a bola chega: de longe dá tempo de corrigir)
+                    // trajetória de verdade (efeito, arrasto e quique), não uma reta: bola com curva ou
+                    // que cai por trás do goleiro não engana mais a leitura
+                    Predict(planeX, out float tKp, out float yKp, out float zKp);
+                    Predict(gx, out float tCp, out float yCp, out float zCp);
+                    if (tKp > 0f) tK = tKp;
+                    if (tCp > 0f) tCross = tCp;
+                    float yK = (tKp > 0f ? yKp : ball.pos.y + ball.vel.y * tK) + readErr * Mathf.Clamp01(ball.Speed / 30f) * Mathf.Lerp(0.55f, 0.2f, p.defense) * Mathf.Clamp01(tK / 0.7f);
+                    float zK = tKp > 0f ? zKp : Mathf.Max(0f, ball.z + ball.vz * tK - 0.5f * SimBall.G * tK * tK);
+                    float yCross = tCp > 0f ? yCp : ball.pos.y + ball.vel.y * tCross;
+                    float zCross = tCp > 0f ? zCp : ball.z + ball.vz * tCross - 0.5f * SimBall.G * tCross * tCross;
                     bool over = zCross > goalH + 0.35f && ball.vz < 2f;
                     bool wide = Mathf.Abs(yCross) > goalHalf + 0.6f;   // vai para fora: só acompanha
                     if (Mathf.Abs(yCross) < goalHalf + 1.5f && !over)
@@ -2233,10 +2265,11 @@ namespace Craquez.Sim
                         float gs = Mathf.Clamp(goalHalf / 3.66f, 0.6f, 1f);
                         float armReach = 0.6f * gs;
                         // dá tempo de chegar de lado (passadas laterais ~4 m/s) e ainda encaixar de frente?
-                        bool stepIn = side - armReach < (tK - 0.15f) * Lerp01(1.5f, 2.2f, p.defense);
+                        // (com folga: se ficar no limite, é melhor mergulhar do que encaixar e ver a bola passar)
+                        bool stepIn = side - armReach * 0.75f < (tK - 0.2f) * Lerp01(1.4f, 2.0f, p.defense);
                         if (p.saveKind == 0 && !wide)
                         {
-                            if (side <= armReach || (stepIn && tK > 0.32f))
+                            if (side <= armReach * 0.8f || (stepIn && tK > 0.32f))
                             {
                                 // encaixe: de frente, baixo (cai sobre a bola) ou saltando no alto
                                 if (tK < 0.45f)
@@ -2261,7 +2294,8 @@ namespace Craquez.Sim
             if (!threat)
             {
                 // na bissetriz do ângulo (linha bola -> centro do gol), mais adiantado quanto mais longe a bola
-                float outD = Mathf.Clamp(toBall.magnitude * 0.12f, 0.6f, mode.boxDepth * 0.3f);
+                // (mais perto da linha com a bola longe: adiantado demais, tomava gol "por cima" em chute de longe)
+                float outD = Mathf.Clamp(toBall.magnitude * 0.07f, 0.6f, mode.id == GameModes.Field ? 1.9f : mode.boxDepth * 0.25f);
                 target = toBall.magnitude > 0.1f ? goal + toBall.normalized * outD : goal + new Vector2(dir, 0);
                 target.y = Mathf.Clamp(target.y, -goalHalf - 0.5f, goalHalf + 0.5f);
                 // mano a mano: atacante com a bola de frente para o gol e ninguém na cobertura -> sai fechando o ângulo

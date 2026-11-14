@@ -1114,7 +1114,11 @@ namespace Craquez
             float err = lowest - lift;
             // suaviza para não tremer, mas corrige rápido
             _ground = Mathf.Lerp(_ground, err, 1f - Mathf.Exp(-Time.deltaTime * 18f));
-            if (p.slide <= 0f && !(p.isKeeper && p.dive > 0f) && p.stun < 0.5f && p.down <= 0f)
+            // (no mergulho/defesa do goleiro, os pés saem do chão de propósito: "pôr o pé no chão" ali
+            // enterrava o corpo deitado no gramado e o goleiro sumia)
+            bool keeperAir = p.isKeeper && (p.dive > 0f || p.saveKind > 0 || _saveRec > 0f);
+            if (keeperAir) _ground = Mathf.Lerp(_ground, 0f, 1f - Mathf.Exp(-Time.deltaTime * 10f));
+            if (p.slide <= 0f && !keeperAir && p.stun < 0.5f && p.down <= 0f)
                 rig.model.position -= Vector3.up * _ground;
             // sombra de contato
             if (_shadow == null)

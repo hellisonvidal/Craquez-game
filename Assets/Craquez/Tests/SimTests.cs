@@ -489,6 +489,51 @@ namespace Craquez.Tests
         }
 
         /// <summary>Chutes no gol de 11 a 22 m: o goleiro defende boa parte, mas não todos (e mergulha nos cantos).</summary>
+        /// <summary>Chute de longe (22-32 m), com o goleiro posicionado pela IA: quase nunca entra.</summary>
+        [Test] public void LongShotsAreRarelyGoals()
+        {
+            int goals = 0, shots = 0, onTarget = 0, keeperIn = 0;
+            var r = new System.Random(11);
+            for (int n = 0; n < 80; n++)
+            {
+                var sim = NewMatch(GameModes.Field, (uint)(n + 3));
+                for (int i = 0; i < 70; i++) sim.Step(new InputFrame[2]);
+                sim.kickoffPass = false;
+                float dir = sim.TeamDir(0);
+                float gx = dir * sim.halfLen;
+                var at = FirstOutfield(sim, 0);
+                foreach (var q in sim.players) if (!q.isKeeper && q != at) q.position = new Vector2(-dir * 25f, q.position.y);
+                float dist = 22f + (float)r.NextDouble() * 10f;
+                at.position = new Vector2(gx - dir * dist, ((float)r.NextDouble() * 2f - 1f) * 10f);
+                at.vel = Vector2.zero;
+                sim.ball.pos = at.position + new Vector2(dir * 0.5f, 0f); sim.ball.vel = Vector2.zero; sim.ball.z = 0f;
+                sim.ball.owner = at.id;
+                sim.ctrl[0].player = at.id;
+                // o goleiro se posiciona
+                for (int i = 0; i < 60; i++) sim.Step(new[] { new InputFrame(), default });
+                if (sim.ball.owner != at.id) continue;
+                var gk = sim.players.Find(x => x.team == 1 && x.isKeeper);
+                var aim = new Vector2(dir, ((float)r.NextDouble() * 2f - 1f) * 0.6f).normalized;
+                int hold = 18 + r.Next(22);
+                bool fin = r.NextDouble() < 0.4;
+                int before = sim.statsShots[0];
+                for (int i = 0; i < hold; i++) sim.Step(new[] { new InputFrame { move = aim, buttons = InputFrame.Shoot | (fin ? InputFrame.Finesse : 0) }, default });
+                for (int i = 0; i < 200 && sim.state == MatchState.Playing; i++)
+                {
+                    sim.Step(new[] { new InputFrame(), default });
+                    float kgx = -sim.halfLen * sim.TeamDir(1);
+                    if (Mathf.Abs(gk.position.y) < sim.goalHalf && (gk.position.x - kgx) * -Mathf.Sign(kgx) < 0.1f) keeperIn++;
+                    if (Mathf.Abs(sim.ball.pos.x) > sim.halfLen && Mathf.Abs(sim.ball.pos.y) < sim.goalHalf) { onTarget++; break; }
+                }
+                if (sim.statsShots[0] > before) shots++;
+                if (sim.score[0] > 0) { goals++; System.Console.WriteLine($"   gol de longe: dist {dist:F0} m, força {hold}, colocado {fin}, aim.y {aim.y:F2}, goleiro em x {(gk.position.x - (-sim.halfLen * sim.TeamDir(1))) * -Mathf.Sign(-sim.halfLen * sim.TeamDir(1)):F1} m da linha, defesa {gk.saveKind}"); }
+            }
+            System.Console.WriteLine($"[chute de longe] {goals} gols em {shots} chutes ({onTarget} cruzaram a linha no gol), goleiro dentro do gol: {keeperIn}");
+            Assert.Greater(shots, 40);
+            Assert.LessOrEqual(goals, shots / 8, "gol bobo de longe demais");
+            Assert.AreEqual(0, keeperIn, "goleiro dentro do gol");
+        }
+
         [Test] public void KeeperSavesAndConcedes()
         {
             int goals = 0, shots = 0, dives = 0, stands = 0;
