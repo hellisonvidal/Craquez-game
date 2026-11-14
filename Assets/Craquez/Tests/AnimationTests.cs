@@ -12,8 +12,8 @@ namespace Craquez.Tests
     {
         static (GameObject root, AthleteRig rig) Make(string name)
         {
-            var model = Resources.Load<GameObject>("Athletes/Athlete_base");
-            Assert.IsNotNull(model, "modelo Athlete_base ausente");
+            var model = Resources.Load<GameObject>("Athletes/Athlete_latino");
+            Assert.IsNotNull(model, "modelo Athlete_latino ausente");
             var root = new GameObject(name);
             var inst = Object.Instantiate(model, root.transform, false);
             inst.name = "model";
