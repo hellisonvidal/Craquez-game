@@ -201,6 +201,22 @@ namespace Craquez
             return false;
         }
 
+        /// <summary>Aparelhos de entrada conectados (diagnóstico na aba Controles).</summary>
+        public static string DeviceReport()
+        {
+            var sb = new System.Text.StringBuilder("Aparelhos detectados:");
+            int n = 0;
+            foreach (var d in InputSystem.devices)
+            {
+                if (d is Mouse || d is Touchscreen || d is Sensor) continue;
+                string kind = d is Gamepad ? "controle" : d is Joystick ? "joystick (não reconhecido como controle)" : d is Keyboard ? "teclado/controle remoto" : d.layout;
+                sb.Append("\n•  ").Append(string.IsNullOrEmpty(d.displayName) ? d.name : d.displayName).Append("  —  ").Append(kind);
+                n++;
+            }
+            if (n == 0) sb.Append(" nenhum");
+            return sb.ToString();
+        }
+
         public static string DeviceName(DeviceKind d)
         {
             switch (d)

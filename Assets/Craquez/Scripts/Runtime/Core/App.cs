@@ -51,6 +51,8 @@ namespace Craquez
             Teams.OptionFileDisabled = PlayerPrefs.GetInt(OptionOffKey, 0) == 1;
             if (Teams.CustomOptionFile != "" || Teams.OptionFileDisabled) Teams.Reload();
             OptionFile.Apply();   // bolas, chuteiras e nomes dos locais do option file (os times o banco já aplica)
+            // versão nova publicada: atualização obrigatória logo na abertura (a checagem roda em paralelo)
+            if (!ShotTour.Requested() && !VenueBake.Requested()) UpdateCheck.Auto(this, MandatoryUpdate);
             UrpSetup.Quality(Settings.Quality);
             Gfx.ToonLook(false);
             var cgo = new GameObject("Câmera");
@@ -164,6 +166,14 @@ namespace Craquez
         {
             if (_introT >= 0f) { UpdateIntro(); return; }
             if (UpdateIntroVideo()) return;
+            if (_forceUpdate != null)
+            {
+                // atualização obrigatória por cima de tudo: o resto do jogo não responde, o foco fica no botão
+                var es0 = EventSystem.current;
+                if (es0 != null && (es0.currentSelectedGameObject == null || !es0.currentSelectedGameObject.transform.IsChildOf(_forceUpdate.transform)) && _forceBtn != null)
+                    UiKit.Select(_forceBtn);
+                return;
+            }
             if (_pressText != null)
             {
                 float since = Time.unscaledTime - _titleShownAt;
@@ -631,6 +641,42 @@ namespace Craquez
         }
 
         /// <summary>Pergunta antes de fechar o jogo (Application.Quit).</summary>
+        Canvas _forceUpdate;
+        Selectable _forceBtn;
+
+        /// <summary>
+        /// Versão nova publicada: tela de atualização obrigatória por cima de tudo (só dá para atualizar ou sair).
+        /// Sem internet ou se a checagem falha, o jogo segue normal. A versão "casa" se atualiza pelos rascunhos.
+        /// </summary>
+        void MandatoryUpdate()
+        {
+            if (!UpdateCheck.HasUpdate || _forceUpdate != null || Application.identifier.EndsWith(".casa")) return;
+            _forceUpdate = UiKit.Canvas("Atualização obrigatória", 5000);
+            var rt = (RectTransform)_forceUpdate.transform;
+            var shade = UiKit.Image(rt, new Color(0.01f, 0.02f, 0.06f, 0.94f), null, "fundo").rectTransform.Place(0, 0, 1, 1);
+            var box = UiKit.Image(shade, new Color(0.04f, 0.07f, 0.16f, 0.98f), null, "caixa").rectTransform.At(0.5f, 0.5f, 1000, 470);
+            UiKit.Image(box, Theme.Accent, null, "faixa").rectTransform.Place(0, 1, 1, 1, 0, -6, 0, 0);
+            UiKit.Label(box, "ATUALIZAÇÃO OBRIGATÓRIA", 52, Theme.HeadItalic, Color.white, TextAnchor.MiddleCenter).rectTransform.Place(0, 1, 1, 1, 20, -110, 20, 20);
+            UiKit.Label(box, "A versão " + UpdateCheck.Latest + " já está disponível (você está na " + Application.version + ").\nAtualize para continuar jogando.",
+                28, Theme.Body, Theme.TextDim, TextAnchor.MiddleCenter).rectTransform.Place(0, 1, 1, 1, 30, -230, 30, 115);
+            var status = UiKit.Label(box, "", 24, Theme.Body, Theme.Text, TextAnchor.MiddleCenter);
+            status.rectTransform.Place(0, 0, 1, 0, 30, 110, 30, -160);
+            var go = UiKit.Button(box, UpdateCheck.CanInstallInGame ? "ATUALIZAR AGORA" : "BAIXAR A VERSÃO NOVA", () =>
+                UpdateCheck.Update(this, () => { if (status != null) status.text = UpdateCheck.InstallMsg; }), 34, new Color(0.1f, 0.55f, 0.28f));
+            ((RectTransform)go.transform).Place(0.08f, 0, 0.62f, 0, 0, 25, 0, -100);
+            var quit = UiKit.Button(box, "SAIR", () =>
+            {
+#if UNITY_EDITOR
+                UnityEditor.EditorApplication.isPlaying = false;
+#else
+                Application.Quit();
+#endif
+            }, 28, new Color(0.55f, 0.1f, 0.14f));
+            ((RectTransform)quit.transform).Place(0.66f, 0, 0.92f, 0, 0, 25, 0, -100);
+            _forceBtn = go;
+            UiKit.Select(go);
+        }
+
         void ConfirmQuit()
         {
             var prevBack = _back;
@@ -1530,6 +1576,9 @@ namespace Craquez
                         Settings.SprintOnShoulder ? 1 : 0, i => Settings.SprintOnShoulder = i == 1));
                     var hint = UiKit.Label(list, InputRouter.Help(UnityEngine.InputSystem.Gamepad.all.Count > 0 ? DeviceKind.Gamepad1 : DeviceKind.Gamepad1), 22, Theme.Body, Theme.TextDim);
                     hint.gameObject.AddComponent<LayoutElement>().minHeight = 70;
+                    // diagnóstico: o que o sistema vê (controle que não funciona aparece aqui como "joystick" ou nem aparece)
+                    var devs = UiKit.Label(list, InputRouter.DeviceReport(), 20, Theme.Body, Theme.TextDim);
+                    devs.gameObject.AddComponent<LayoutElement>().minHeight = 90;
                     break;
                 }
                 case 5:

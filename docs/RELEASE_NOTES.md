@@ -1,3 +1,22 @@
+## Craquez 2.25.0
+
+Jogo de futebol feito 100% com inteligência artificial, **gratuito**.
+
+### Download
+- **Celular Android**: `Craquez-v2.25.0.apk`
+- **TV (Google TV / Android TV, ex.: TCL C6K)**: `Craquez-TV-v2.25.0.apk` — use este na TV (32 e 64 bits).
+
+### Novidades
+- **Atualização obrigatória**: ao abrir o jogo com uma versão nova publicada, aparece a tela de atualização por cima de
+  tudo (atualizar ou sair). Sem internet, o jogo segue normal.
+- **Controles na TV**: o APK de TV passa a receber os controles pela entrada clássica do Android (a nova, padrão do
+  Unity 6, não reconhecia controles de PlayStation/Xbox em várias TVs). Em Configurações › Controles aparece a lista
+  dos aparelhos que o jogo enxerga.
+
+### Correções
+- **Mancha loira atrás da cabeça**: a camada de cabelo por baixo (que aparece na nuca, onde o cabelo é ralo) era 2 a 4
+  vezes mais clara que o cabelo de cima; agora segue o tom do cabelo de cada jogador.
+
 ## Craquez 2.24.0
 
 Jogo de futebol feito 100% com inteligência artificial, **gratuito**.

@@ -29,7 +29,10 @@ namespace Craquez.EditorTools
             if (report.summary.platform == BuildTarget.Android && File.Exists("Assets/Craquez/Resources/flavor.txt") && File.ReadAllText("Assets/Craquez/Resources/flavor.txt").Trim() == "tv")
             {
                 PlayerSettings.Android.targetArchitectures = AndroidArchitecture.ARMv7 | AndroidArchitecture.ARM64;
-                Debug.Log("[build] versão TV: ARMv7 + ARM64");
+                // controles de PlayStation/Xbox na TV: a entrada "GameActivity" (padrão do Unity 6) não reconhecia
+                // controles em várias TVs; a Activity clássica entrega os controles ao Input System como gamepad
+                PlayerSettings.Android.applicationEntry = AndroidApplicationEntry.Activity;
+                Debug.Log("[build] versão TV: ARMv7 + ARM64, entrada Activity");
             }
         }
 

@@ -28,6 +28,8 @@ namespace Craquez
             ["afro"] = "eyebrow001", ["latino"] = "eyebrow006", ["europeu"] = "eyebrow003", ["asiatico"] = "eyebrow009",
         };
         public static readonly string[] Hairs = { "short02", "short01", "short03", "short04", "afro01", "long01", "ponytail01", "braid01", "bob02" };
+        /// <summary>Brilho médio (fios visíveis) da textura de cada cabelo, na ordem de <see cref="Hairs"/>.</summary>
+        static readonly float[] HairLum = { 0.242f, 0.107f, 0.225f, 0.141f, 0.06f, 0.128f, 0.243f, 0.077f, 0.583f };
         static readonly Color[] HairColors =
         {
             new Color(0.05f, 0.04f, 0.035f), new Color(0.16f, 0.1f, 0.06f), new Color(0.3f, 0.19f, 0.1f),
@@ -359,7 +361,12 @@ namespace Craquez
             foreach (var r in smrs) { if (r.name == "Eyes") eyesR = r; else if (r.name == "Eyebrows") browR = r; else if (r.name == "Eyelashes") lashR = r; }
             if (rig.body != null && eyesR != null && bodyMesh != null) FaceRig.Build(rig.body, eyesR, axes, browR, lashR);
             // cabelo com volume e estilo (antes muitos pareciam carecas)
-            if (rig.body != null && eyesR != null && bodyMesh != null && look.hairStyle >= 0) HairCap.Build(rig.body, eyesR, axes, look.hairStyle, look.hairColor * (look.hairStyle == 0 ? 0.8f : 1.15f), quality);
+            // (o cabelo de cima é cor × 2,2 × o brilho médio da textura dele — 0,1 a 0,25 nos curtos —, ou seja, só
+            // 25-55% da cor; a touca de baixo estava em ~100% e, na nuca, onde a malha é rala, aparecia como uma
+            // mancha "loira". Agora a touca segue o tom real do cabelo escolhido, um pouco mais escura, como sombra)
+            float capK = look.hairStyle == 0 ? 0.8f
+                : look.hair >= 0 && look.hair < HairLum.Length ? 2.2f * HairLum[look.hair] / 0.84f * 0.9f : 0.5f;
+            if (rig.body != null && eyesR != null && bodyMesh != null && look.hairStyle >= 0) HairCap.Build(rig.body, eyesR, axes, look.hairStyle, look.hairColor * capK, quality);
             rig.untucked = look.untucked;
             // (o número agora vem pintado na camisa)
         }
