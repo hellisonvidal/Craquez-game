@@ -282,10 +282,16 @@ namespace Craquez
         {
             if (_tried) return _tpl;
             _tried = true;
-            var asset = Resources.Load<TextAsset>("Athletes/Athlete_Meshy.glb");
-            if (asset == null) return null;
+            // Carrega o novo modelo do corpo (Body_Model.glb) do Resources
+            var asset = Resources.Load<TextAsset>("Athletes/Body_Model");
+            if (asset == null)
+            {
+                // Fallback para o modelo antigo se o novo não existir
+                asset = Resources.Load<TextAsset>("Athletes/Athlete_Meshy");
+                if (asset == null) return null;
+            }
             try { _tpl = ParseGlb(asset.bytes); }
-            catch (Exception e) { Debug.LogError("Falha ao carregar Athlete_Meshy.glb: " + e); _tpl = null; }
+            catch (Exception e) { Debug.LogError("Falha ao carregar modelo do corpo: " + e); _tpl = null; }
             return _tpl;
         }
 
