@@ -95,27 +95,44 @@ namespace Craquez
             // os clipes vêm de um FBX só com o esqueleto: a Unity remove o nó raiz e os caminhos
             // começam em "Root/..."; no modelo eles ficam sob "Armature". O Animator vai no
             // "Armature" para os caminhos baterem (antes nenhuma curva encontrava os ossos).
+            bool isMeshy = bones.ContainsKey("mixamorig:Hips");
             var arm = Bone("Armature") ?? Bone("SmartRigArmature");
-            var animHost = arm != null && arm != m ? arm.gameObject : m.gameObject;
-            var old = m.GetComponent<Animator>();
-            if (old != null && animHost != m.gameObject) old.enabled = false;
-            animator = animHost.GetComponent<Animator>();
-            if (animator == null) animator = animHost.AddComponent<Animator>();   // (?? não vê o "nulo" da Unity)
-            animator.applyRootMotion = false;
-            animator.cullingMode = AnimatorCullingMode.AlwaysAnimate;   // ossos sempre atualizados (evita cabeça "solta")
+            if (!isMeshy)
+            {
+                var animHost = arm != null && arm != m ? arm.gameObject : m.gameObject;
+                var old = m.GetComponent<Animator>();
+                if (old != null && animHost != m.gameObject) old.enabled = false;
+                animator = animHost.GetComponent<Animator>();
+                if (animator == null) animator = animHost.AddComponent<Animator>();   // (?? não vê o "nulo" da Unity)
+                animator.applyRootMotion = false;
+                animator.cullingMode = AnimatorCullingMode.AlwaysAnimate;   // ossos sempre atualizados (evita cabeça "solta")
+            }
             if (head != null)
                 Debug.Log($"[diag] modelo {m.name}: cabeça em repouso a {head.position.y - transform.position.y:F2} m; filhos {m.childCount}; Armature rot {(arm != null ? arm.localEulerAngles.ToString() : "-")}");
-            // descobre para onde o modelo olha (pé -> ponta do pé) e corrige para +Z
-            var ballL = toeL;
-            if (footL != null && ballL != null)
+            // descobre para onde o modelo olha e corrige para +Z
+            Vector3 fwdDir = Vector3.zero;
+            if (isMeshy && bones.TryGetValue("upperarm_l", out var ual) && bones.TryGetValue("upperarm_r", out var uar))
             {
-                var f = ballL.position - footL.position;
-                f.y = 0;
-                if (f.sqrMagnitude > 1e-6f)
+                var armR = uar.position - ual.position; armR.y = 0f;
+                if (armR.sqrMagnitude > 1e-6f) fwdDir = Vector3.Cross(Vector3.up, armR.normalized);
+            }
+            else
+            {
+                if (footL != null && toeL != null)
                 {
-                    modelFix = Quaternion.FromToRotation(f.normalized, Vector3.forward);
-                    m.localRotation = modelFix * m.localRotation;
+                    var f = toeL.position - footL.position; f.y = 0f;
+                    if (f.sqrMagnitude > 1e-6f) fwdDir += f.normalized;
                 }
+                if (footR != null && toeR != null)
+                {
+                    var f = toeR.position - footR.position; f.y = 0f;
+                    if (f.sqrMagnitude > 1e-6f) fwdDir += f.normalized;
+                }
+            }
+            if (fwdDir.sqrMagnitude > 1e-6f)
+            {
+                modelFix = Quaternion.FromToRotation(fwdDir.normalized, Vector3.forward);
+                m.localRotation = modelFix * m.localRotation;
             }
             if (pelvis != null) pelvisRest = transform.InverseTransformPoint(pelvis.position);
             footPitchRest = FootPitch(footL, toeL);
@@ -127,7 +144,189 @@ namespace Craquez
                     if (t != null) minY = Mathf.Min(minY, t.position.y);
                 if (minY < 0.3f && minY > -0.3f) m.localPosition += Vector3.up * (0.035f - (minY - transform.position.y));
             }
+            if (isMeshy) SetupMeshyDriver(m);
             ConfigureHierarchyAndSockets();
+        }
+
+        struct DriverNodeSpec
+        {
+            public string name;
+            public int parent;
+            public Vector3 pos;
+            public Quaternion rot;
+            public Vector3 scale;
+        }
+
+        struct DriverLink
+        {
+            public Transform src;
+            public Transform dst;
+            public Quaternion restOffset;
+        }
+
+        static DriverNodeSpec[] _driverSpec;
+        static bool _driverSpecTried;
+
+        Transform _driverRoot, _driverHips, _meshyHips;
+        DriverLink[] _driverLinks;
+        Vector3 _driverPelvisRest, _meshyPelvisRest;
+        float _hipHeightScale = 1f;
+        bool _driverInitScaled;
+
+        static DriverNodeSpec[] EnsureDriverSpec()
+        {
+            if (_driverSpecTried) return _driverSpec;
+            _driverSpecTried = true;
+            GameObject proto = null;
+            foreach (var r in new[] { "Athletes/Athlete_latino", "Athletes/Athlete_europeu", "Athletes/Athlete_afro", "Athletes/Athlete_asiatico" })
+            {
+                proto = Resources.Load<GameObject>(r);
+                if (proto != null) break;
+            }
+            if (proto == null) return null;
+            Transform arm = null;
+            foreach (var t in proto.GetComponentsInChildren<Transform>(true))
+                if (t.name == "Armature") { arm = t; break; }
+            if (arm == null) return null;
+
+            var list = new List<DriverNodeSpec>(64);
+            void Collect(Transform t, int parentIdx)
+            {
+                if (t.GetComponent<Renderer>() != null) return;
+                int myIdx = list.Count;
+                list.Add(new DriverNodeSpec
+                {
+                    name = t.name,
+                    parent = parentIdx,
+                    pos = t.localPosition,
+                    rot = t.localRotation,
+                    scale = t.localScale,
+                });
+                for (int i = 0; i < t.childCount; i++) Collect(t.GetChild(i), myIdx);
+            }
+            Collect(arm, -1);
+            _driverSpec = list.ToArray();
+            return _driverSpec;
+        }
+
+        void SetupMeshyDriver(Transform m)
+        {
+            foreach (var a in m.GetComponentsInChildren<Animator>(true)) a.enabled = false;
+            var spec = EnsureDriverSpec();
+            if (spec == null || spec.Length == 0) return;
+
+            var drvGo = new GameObject("AnimDriver");
+            _driverRoot = drvGo.transform;
+            _driverRoot.SetParent(transform, false);
+
+            var nodes = new Transform[spec.Length];
+            var byName = new Dictionary<string, Transform>(spec.Length);
+            for (int i = 0; i < spec.Length; i++)
+            {
+                var sp = spec[i];
+                var go = new GameObject(sp.name);
+                var tr = go.transform;
+                tr.SetParent(sp.parent < 0 ? _driverRoot : nodes[sp.parent], false);
+                tr.localPosition = sp.pos;
+                tr.localRotation = sp.rot;
+                tr.localScale = sp.scale;
+                nodes[i] = tr;
+                if (!byName.ContainsKey(sp.name)) byName[sp.name] = tr;
+            }
+
+            // Alinha o driver para +Z na pose de repouso (mesma referência de frente do modelo Meshy)
+            byName.TryGetValue("foot_l", out var dFl);
+            byName.TryGetValue("ball_l", out var dTl);
+            byName.TryGetValue("foot_r", out var dFr);
+            byName.TryGetValue("ball_r", out var dTr);
+            Vector3 dFwd = Vector3.zero;
+            if (dFl != null && dTl != null)
+            {
+                var f = dTl.position - dFl.position; f.y = 0f;
+                if (f.sqrMagnitude > 1e-6f) dFwd += f.normalized;
+            }
+            if (dFr != null && dTr != null)
+            {
+                var f = dTr.position - dFr.position; f.y = 0f;
+                if (f.sqrMagnitude > 1e-6f) dFwd += f.normalized;
+            }
+            if (dFwd.sqrMagnitude > 1e-6f)
+                _driverRoot.localRotation = Quaternion.FromToRotation(dFwd.normalized, Vector3.forward);
+
+            animator = nodes[0].gameObject.AddComponent<Animator>();
+            animator.applyRootMotion = false;
+            animator.cullingMode = AnimatorCullingMode.AlwaysAnimate;
+
+            byName.TryGetValue("pelvis", out _driverHips);
+            _meshyHips = pelvis;
+            if (_driverHips != null && _meshyHips != null)
+            {
+                _driverPelvisRest = _driverRoot.InverseTransformPoint(_driverHips.position);
+                _meshyPelvisRest = m.InverseTransformPoint(_meshyHips.position);
+                float dh = _driverHips.position.y - transform.position.y;
+                float mh = _meshyHips.position.y - transform.position.y;
+                _hipHeightScale = Mathf.Clamp(mh / Mathf.Max(0.2f, dh), 0.75f, 1.35f);
+            }
+
+            var childMap = new Dictionary<string, string>
+            {
+                { "upperarm_l", "lowerarm_l" }, { "lowerarm_l", "hand_l" },
+                { "upperarm_r", "lowerarm_r" }, { "lowerarm_r", "hand_r" },
+                { "thigh_l", "calf_l" }, { "calf_l", "foot_l" },
+                { "thigh_r", "calf_r" }, { "calf_r", "foot_r" },
+            };
+            var armAlign = new Dictionary<string, Quaternion>();
+            Quaternion LimbAlign(string alias, Transform src, Transform dst)
+            {
+                if (alias == "hand_l" && armAlign.TryGetValue("lowerarm_l", out var alL)) return alL;
+                if (alias == "hand_r" && armAlign.TryGetValue("lowerarm_r", out var alR)) return alR;
+                if (!childMap.TryGetValue(alias, out var chName)) return Quaternion.identity;
+                if (!byName.TryGetValue(chName, out var srcCh) || !bones.TryGetValue(chName, out var dstCh))
+                    return Quaternion.identity;
+                Vector3 sd = srcCh.position - src.position;
+                Vector3 dd = dstCh.position - dst.position;
+                if (sd.sqrMagnitude < 1e-6f || dd.sqrMagnitude < 1e-6f) return Quaternion.identity;
+                var q = Quaternion.FromToRotation(dd.normalized, sd.normalized);
+                if (alias.StartsWith("lowerarm")) armAlign[alias] = q;
+                return q;
+            }
+
+            var links = new List<DriverLink>(MixamoAliases.Length);
+            foreach (var (alias, mix) in MixamoAliases)
+            {
+                if (!byName.TryGetValue(alias, out var src) || !bones.TryGetValue(mix, out var dst)) continue;
+                Quaternion align = LimbAlign(alias, src, dst);
+                links.Add(new DriverLink
+                {
+                    src = src,
+                    dst = dst,
+                    restOffset = Quaternion.Inverse(src.rotation) * (align * dst.rotation),
+                });
+            }
+            _driverLinks = links.ToArray();
+        }
+
+        /// <summary>Copia a pose avaliada no esqueleto MakeHuman oculto para os ossos Mixamo do Meshy.</summary>
+        public void SyncDriver()
+        {
+            if (_driverLinks == null || model == null) return;
+            if (!_driverInitScaled)
+            {
+                _driverInitScaled = true;
+                if (_meshyHips != null)
+                    pelvisRest = transform.InverseTransformPoint(model.TransformPoint(_meshyPelvisRest));
+            }
+            if (_driverHips != null && _meshyHips != null && _driverRoot != null)
+            {
+                Vector3 dPelvis = _driverRoot.InverseTransformPoint(_driverHips.position) - _driverPelvisRest;
+                _meshyHips.position = model.TransformPoint(_meshyPelvisRest + dPelvis * _hipHeightScale);
+            }
+            for (int i = 0; i < _driverLinks.Length; i++)
+            {
+                var ln = _driverLinks[i];
+                if (ln.src != null && ln.dst != null)
+                    ln.dst.rotation = ln.src.rotation * ln.restOffset;
+            }
         }
 
         /// <summary>

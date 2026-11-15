@@ -178,9 +178,9 @@ namespace Craquez
                     continue;
                 }
 
-                // Pele: tons quentes claros (lum > 0.34) em cabeça/rosto ou braços/mãos
-                bool isWarmSkin = (zone == ZoneHead || zone == ZoneArm || zone == ZoneShirt)
-                    && r > g + 0.05f && g >= b + 0.04f && lum > 0.34f && sat > 0.22f;
+                // Pele: tons quentes claros (lum > 0.34) em cabeça/rosto, braços/mãos, gola ou pernas/joelhos expostos
+                bool isWarmSkin = (zone == ZoneHead || zone == ZoneArm || zone == ZoneShirt || zone == ZoneShorts || zone == ZoneSocks)
+                    && r > g + 0.05f && g >= b + 0.04f && lum > 0.34f && sat > 0.24f;
                 if (isWarmSkin)
                 {
                     float shade = Mathf.Clamp(lum / 0.58f, 0.38f, 1.15f);
@@ -189,7 +189,7 @@ namespace Craquez
                 }
 
                 // Tecido do uniforme (branco / cinza claro na textura base): aplica padrão, gola, punhos e faixas
-                if (sat < 0.22f && lum > 0.40f)
+                if ((zone == ZoneShirt || zone == ZoneShorts || zone == ZoneSocks) && sat < 0.24f && lum > 0.28f)
                 {
                     float shade = Mathf.Clamp(lum / 0.90f, 0.54f, 1.04f);
                     if (zone == ZoneShirt)
@@ -310,7 +310,8 @@ namespace Craquez
             {
                 var a = (Dictionary<string, object>)accs[accIdx];
                 var bv = (Dictionary<string, object>)bvs[Convert.ToInt32(a["bufferView"])];
-                int o = binOff + Convert.ToInt32(bv["byteOffset"]) + (a.TryGetValue("byteOffset", out var bo) ? Convert.ToInt32(bo) : 0);
+                int bvOff = bv.TryGetValue("byteOffset", out var bvo) ? Convert.ToInt32(bvo) : 0;
+                int o = binOff + bvOff + (a.TryGetValue("byteOffset", out var bo) ? Convert.ToInt32(bo) : 0);
                 int l = Convert.ToInt32(bv["byteLength"]);
                 return (o, l);
             }
@@ -423,9 +424,11 @@ namespace Craquez
             mesh.bindposes = bindposes;
             mesh.RecalculateBounds();
 
-            var im0 = (Dictionary<string, object>)imagesList[0];
+            int imgIdx = ResolveBaseColorImageIndex(root, imagesList);
+            var im0 = (Dictionary<string, object>)imagesList[imgIdx];
             var imBv = (Dictionary<string, object>)bvs[Convert.ToInt32(im0["bufferView"])];
-            int imOff = binOff + Convert.ToInt32(imBv["byteOffset"]);
+            int imBvOff = imBv.TryGetValue("byteOffset", out var imBo) ? Convert.ToInt32(imBo) : 0;
+            int imOff = binOff + imBvOff;
             int imLen = Convert.ToInt32(imBv["byteLength"]);
             var png = new byte[imLen];
             Buffer.BlockCopy(bytes, imOff, png, 0, imLen);
@@ -433,6 +436,9 @@ namespace Craquez
             tex.LoadImage(png, false);
             int tw = tex.width, th = tex.height;
             var basePixels = tex.GetPixels32();
+            UnityEngine.Object.Destroy(tex);
+            if (tw > 1024 || th > 1024)
+                basePixels = DownscalePixels(basePixels, ref tw, ref th, 1024);
 
             var jointZone = new byte[skinJoints.Length];
             for (int j = 0; j < skinJoints.Length; j++)
@@ -534,6 +540,68 @@ namespace Craquez
             if (v.y >= 1.56f || (v.y >= 1.43f && v.z < -0.015f)) return ZoneHair;
             if (v.y >= 1.43f) return ZoneHead;
             return z != ZoneNone ? z : (v.y > 0.96f ? ZoneShirt : ZoneShorts);
+        }
+
+        static int ResolveBaseColorImageIndex(Dictionary<string, object> root, List<object> imagesList)
+        {
+            // No GLB do Meshy: image[0] é normal, image[1] é texture_0 (pbrMetallicRoughness.baseColorTexture)
+            if (root.TryGetValue("materials", out var matsObj) && matsObj is List<object> mats && mats.Count > 0
+                && mats[0] is Dictionary<string, object> mat0
+                && mat0.TryGetValue("pbrMetallicRoughness", out var pbrObj) && pbrObj is Dictionary<string, object> pbr
+                && pbr.TryGetValue("baseColorTexture", out var bctObj) && bctObj is Dictionary<string, object> bct
+                && bct.TryGetValue("index", out var texIdxObj)
+                && root.TryGetValue("textures", out var texsObj) && texsObj is List<object> texs)
+            {
+                int ti = Convert.ToInt32(texIdxObj);
+                if (ti >= 0 && ti < texs.Count && texs[ti] is Dictionary<string, object> texDef
+                    && texDef.TryGetValue("source", out var srcObj))
+                {
+                    int si = Convert.ToInt32(srcObj);
+                    if (si >= 0 && si < imagesList.Count) return si;
+                }
+            }
+            for (int i = 0; i < imagesList.Count; i++)
+            {
+                if (imagesList[i] is Dictionary<string, object> im
+                    && im.TryGetValue("name", out var nmObj) && nmObj is string nm
+                    && nm.IndexOf("texture_0", StringComparison.OrdinalIgnoreCase) >= 0
+                    && nm.IndexOf("normal", StringComparison.OrdinalIgnoreCase) < 0
+                    && nm.IndexOf("metallic", StringComparison.OrdinalIgnoreCase) < 0)
+                    return i;
+            }
+            return imagesList.Count > 1 ? 1 : 0;
+        }
+
+        static Color32[] DownscalePixels(Color32[] src, ref int w, ref int h, int maxDim)
+        {
+            int step = Mathf.Max(1, Mathf.CeilToInt(Mathf.Max(w, h) / (float)maxDim));
+            if (step <= 1) return src;
+            int dw = Mathf.Max(1, w / step);
+            int dh = Mathf.Max(1, h / step);
+            var dst = new Color32[dw * dh];
+            int area = step * step;
+            for (int y = 0; y < dh; y++)
+            {
+                int sy0 = y * step;
+                for (int x = 0; x < dw; x++)
+                {
+                    int sx0 = x * step;
+                    int r = 0, g = 0, b = 0, a = 0;
+                    for (int dy = 0; dy < step; dy++)
+                    {
+                        int row = Mathf.Min(h - 1, sy0 + dy) * w;
+                        for (int dx = 0; dx < step; dx++)
+                        {
+                            Color32 c = src[row + Mathf.Min(w - 1, sx0 + dx)];
+                            r += c.r; g += c.g; b += c.b; a += c.a;
+                        }
+                    }
+                    dst[y * dw + x] = new Color32((byte)(r / area), (byte)(g / area), (byte)(b / area), (byte)(a / area));
+                }
+            }
+            w = dw;
+            h = dh;
+            return dst;
         }
 
         static float Edge(Vector2 a, Vector2 b, Vector2 c) => (c.x - a.x) * (b.y - a.y) - (c.y - a.y) * (b.x - a.x);

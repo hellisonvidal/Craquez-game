@@ -226,6 +226,7 @@ namespace Craquez
         float _phase;
         bool _valid;
         readonly float[] _locoTarget = new float[Loco.Length];
+        readonly AthleteRig _rig;
         static float[] _contact;   // fase (0..1) do apoio do pé esquerdo em cada clipe de locomoção
         static float[] _groundSpeed; // velocidade real dos pés no chão em cada clipe (m/s), medida na pose
         float _idleRate = 1f, _idleT, _idleOff;
@@ -378,6 +379,7 @@ namespace Craquez
             _idleOff = ((h >> 4) % 1000u) / 1000f * 8f;   // cada um num ponto da respiração
             var clips = Clips;
             if (clips.Count == 0 || animator == null) return;
+            _rig = animator.GetComponentInParent<AthleteRig>();
             if (_contact == null)
             {
                 try { FindContacts(animator); }
@@ -588,6 +590,7 @@ namespace Craquez
                 _action.Destroy();
             }
             _graph.Evaluate(0f);
+            _rig?.SyncDriver();
         }
     }
 }
