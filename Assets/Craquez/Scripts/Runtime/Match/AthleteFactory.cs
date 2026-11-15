@@ -30,8 +30,8 @@ namespace Craquez
         public static readonly string[] Hairs = { "short02", "short01", "short03", "short04", "afro01", "long01", "ponytail01", "braid01", "bob02" };
         static readonly Color[] HairColors =
         {
-            new Color(0.05f, 0.04f, 0.035f), new Color(0.16f, 0.1f, 0.06f), new Color(0.3f, 0.19f, 0.1f),
-            new Color(0.62f, 0.45f, 0.26f), new Color(0.75f, 0.6f, 0.38f), new Color(0.45f, 0.18f, 0.08f),
+            new Color(0.04f, 0.035f, 0.03f), new Color(0.11f, 0.07f, 0.045f), new Color(0.20f, 0.13f, 0.075f),
+            new Color(0.32f, 0.21f, 0.12f), new Color(0.58f, 0.46f, 0.26f), new Color(0.34f, 0.14f, 0.06f),
         };
 
         static GameObject Model(string b)
@@ -107,16 +107,21 @@ namespace Craquez
             if (p.nat == "JP" || p.nat == "KR" || p.nat == "CN") b = "asiatico";
             int style = Mathf.RoundToInt(F(2, R(4) * 5f));
             int hair = b == "afro" ? (style % 2 == 0 ? 4 : 0) : (style % 4);
-            int hc = Mathf.RoundToInt(F(1, R(5) * 5f));
-            if (b == "afro" || b == "asiatico") hc = Mathf.Min(hc, 1);
+            int rawHc = Mathf.RoundToInt(F(1, R(5) * 5f));
+            int hc;
+            if (b == "afro" || b == "asiatico") hc = rawHc <= 0 ? 0 : 1;
+            else if (rawHc <= 2) hc = rawHc;
+            else if (rawHc == 4 && b == "europeu" && R(13) < 0.25f) hc = 4;
+            else if (rawHc == 5 && b == "europeu" && R(13) < 0.12f) hc = 5;
+            else hc = rawHc % 3;
             float tone = Mathf.Clamp(skin, 0, 5);
             var tint = b == "afro" ? Color.Lerp(new Color(1.05f, 1.02f, 1f), new Color(0.82f, 0.78f, 0.76f), (tone - 3f) / 2f)
                 : Color.Lerp(new Color(1.04f, 1.02f, 1f), new Color(0.9f, 0.82f, 0.74f), tone / 3f);
             // cada pele um pouco diferente (mais quente, mais rosada, mais oliva)
             float warm = (R(11) - 0.5f) * 0.08f, rosy = (R(12) - 0.5f) * 0.05f;
             tint = new Color(tint.r * (1f + warm + rosy), tint.g * (1f + warm * 0.3f), tint.b * (1f - warm * 0.6f + rosy * 0.4f));
-            // cabelo: alguns raspados, poucos descoloridos
-            if (R(13) < 0.04f) hc = 4;
+            // cabelo: alguns raspados, raros descoloridos
+            if (R(13) < 0.02f) hc = 4;
             bool shaved = R(14) < 0.08f;
             float posTall = p.isKeeper ? 0.14f : (p.pos == "DF" ? 0.06f : (p.pos == "FW" && Mathf.Abs(p.basePos.y) > 0.45f ? -0.05f : 0f));
             float hMix = Mathf.Clamp01(F(5, R(6) * 4f) / 4f * 0.45f + (R(8) + R(9)) * 0.275f + posTall);

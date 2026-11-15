@@ -113,7 +113,8 @@ namespace Craquez.Sim
         /// <summary>Faltas do time no tempo (futsal: da 6ª em diante, tiro livre sem barreira).</summary>
         public int[] teamFouls = new int[2];
         /// <summary>Quem fez o último passe com o pé (regra do recuo: o goleiro não pega com as mãos).</summary>
-        int lastPasser = -1;
+        int lastPasser = -1, lastFootPasser = -1;
+        bool IsBackPass(SimPlayer p) => mode.id != GameModes.Street && ball.owner < 0 && ball.lastTouchTeam == p.team && ball.lastTouchId != p.id && ball.lastTouchId == lastFootPasser;
         bool noWallKick;
         public int kickInTimeouts;
         public int throwInTaker = -1;
@@ -537,6 +538,7 @@ namespace Craquez.Sim
             cornerKick = false;
             ball.pos = Vector2.zero; ball.vel = Vector2.zero; ball.z = 0; ball.vz = 0; ball.spin = 0; ball.slideT = 0; ball.owner = -1;
             passReceiver = -1;
+            lastFootPasser = -1;
             penaltyTeam = -1;
             offsideIds.Clear();
             offsideTeam = -1;
@@ -1492,6 +1494,11 @@ namespace Craquez.Sim
             c.autoT -= DT;
             if (c.autoT > 0f || TeamHasBall(t) || c.charging != 0) return;
             c.autoT = AutoSwitchEvery;
+            if (passReceiver >= 0 && passReceiver == kickoffMate && kickoffMate >= 0 && tick - passTick < 90 && ball.owner < 0 && players[passReceiver].team == t)
+            {
+                c.player = passReceiver;
+                return;
+            }
             var cur = players[c.player];
             var n = NearestToBall(t);
             if (n != null && n.id != cur.id && cur.position.Dist(ball.pos) > n.position.Dist(ball.pos) + 4.5f)
@@ -1714,11 +1721,13 @@ namespace Craquez.Sim
             ball.slideT = 0f;
             passReceiver = mate.id;
             passReceiverT = 2f;
-            passTick = tick; lastPasser = p.id;
+            passTick = tick; lastPasser = p.id; lastFootPasser = p.id;
             passFrom = ball.pos;
-            lastPasser = p.id;
             noOffsideKick = true;
             ReleaseBall(p);
+            // o batedor não corre atrás do próprio passe de saída; o controle já vai para o companheiro
+            p.kickCd = kickoffBack ? 1.8f : 1.0f;
+            if (ctrl[p.team].player == p.id) ctrl[p.team].player = mate.id;
             // o adversário ainda não entra no círculo até a bola chegar ao companheiro
             protectTeam = p.team;
             protectT = kickoffBack ? 1.4f : 0.9f;
@@ -1800,6 +1809,7 @@ namespace Craquez.Sim
                 passFrom = ball.pos;
             }
             else target = ball.pos + aim * Mathf.Lerp(8f, 32f, power);
+            lastFootPasser = p.id;
             // longe das linhas: na quadra, o passe que mirava a 0,5 m da lateral saía num desvio ou num domínio
             // ruim (no futsal a maioria das bolas fora vinha de passe)
             bool smallC = mode.id != GameModes.Field;
@@ -1894,7 +1904,7 @@ namespace Craquez.Sim
             ball.spin = 0f;
             ball.slideT = 0f;
             if (best != null) { passReceiver = best.id; passReceiverT = 3f; }
-            passTick = tick; lastPasser = p.id;
+            passTick = tick; lastPasser = p.id; lastFootPasser = -1;
             passFrom = ball.pos;
             noOffsideKick = true;
             p.facing = dirv;
@@ -1923,6 +1933,7 @@ namespace Craquez.Sim
             // lateral do futsal/society: não vale chutar ao gol, sai um passe para o companheiro
             if (kickIn && setPiece && p.id == setPieceTaker && ball.owner == p.id) { Pass(p, aim, 0.5f, false, false); return; }
             p.kickKind = InputFrame.Shoot;
+            lastFootPasser = p.id;
             float dir = TeamDir(p.team);
             float gx = halfLen * dir;
             float aimY;
@@ -2342,6 +2353,7 @@ namespace Craquez.Sim
             foulSpot = spot;
             _foulPenalty = mode.penaltyDist > 0f && Mathf.Abs(spot.x - gx) < mode.boxDepth && Mathf.Abs(spot.y) < mode.boxHalf;
             passReceiver = -1;
+            lastFootPasser = -1;
             penaltyTeam = -1;
             kickoffPass = false;
             foreach (var c in ctrl) { c.charging = 0; c.pending = 0; }
@@ -2686,6 +2698,12 @@ namespace Craquez.Sim
                 // dupla da saída fica no lugar: batedor na bola, companheiro esperando o toque
                 if (p.id == kickoffMate) { SteerTo(p, kickoffMateSpot, false); p.facing = (ball.pos - p.position).Norm(); }
                 else { p.intent = Vector2.zero; p.wantSprint = false; }
+                return;
+            }
+            if (!frozen && ball.owner < 0 && p.id == kickoffKicker && passReceiver == kickoffMate && kickoffMate >= 0)
+            {
+                // após o toque de saída, o batedor avança para receber à frente em vez de voltar na própria bola
+                SteerTo(p, new Vector2(TeamDir(t) * 6f, p.basePos.y * halfW * 0.3f), false);
                 return;
             }
             if (setPiece && ((!frozen && state == MatchState.Playing) || (cornerKick && state == MatchState.Restart)))
@@ -3281,7 +3299,7 @@ namespace Craquez.Sim
             if (p.oneOnOne) react = Mathf.Max(8, react - 3);   // cara a cara: já está armado esperando o chute
             else react += 2;   // chute de média distância: o goleiro precisa ver a bola sair (~0,25-0,4 s)
             bool reacting = tick - lastShotTick < react;
-            if (ball.owner < 0 && ball.vel.x * dir < -5f && !reacting)
+            if (ball.owner < 0 && ball.vel.x * dir < -5f && !reacting && !IsBackPass(p))
             {
                 // trajetória até a linha do goleiro (não a do gol): é ali que ele precisa estar. Antes,
                 // adiantado mais de 3 m, ele corria de costas até a linha do gol enquanto a bola vinha
@@ -4734,9 +4752,8 @@ namespace Craquez.Sim
             float rel = (ball.vel - p.vel).magnitude;
             bool keeperZone = p.isKeeper && InOwnBox(p);
             float limit = 9f + 12f * p.control;
-            // recuo: passe com o pé de um companheiro não pode ser agarrado; o goleiro joga com os pés
-            bool backPass = keeperZone && mode.id != GameModes.Street && ball.lastTouchTeam == p.team && ball.lastTouchId != p.id
-                && ball.lastTouchId == lastPasser && tick - passTick < 240 && ball.owner < 0;
+            // recuo: passe/toque com o pé de um companheiro não pode ser agarrado; o goleiro domina e joga com os pés
+            bool backPass = keeperZone && IsBackPass(p);
             if (keeperZone && backPass) Emit("backpass", p.team, p.id);
             if (keeperZone && !backPass)
             {
@@ -4817,7 +4834,7 @@ namespace Craquez.Sim
             }
             // domínio: o pé vai na bola e amortece (a vista mostra o gesto; bola forte = toque mais longo)
             if (ball.z < 0.6f && rel > 3f) Emit("receive", p.team, p.id, null, rel > 11f, rel);
-            if (rel > limit)
+            if (rel > limit && !backPass)
             {
                 // bola rápida demais: bate no corpo e desvia conforme o ângulo (domínio falho)
                 var nrm = (ball.pos - p.position).Norm();

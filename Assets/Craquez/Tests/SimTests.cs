@@ -689,10 +689,10 @@ namespace Craquez.Tests
             }
         }
 
-        /// <summary>Recuo: passe com o pé do companheiro para o goleiro não pode ser agarrado.</summary>
+        /// <summary>Recuo: passe com o pé do companheiro para o goleiro não pode ser agarrado (nem após 4 s).</summary>
         [Test] public void BackPassIsNotCaught()
         {
-            int held = 0, tries = 0;
+            int held = 0, dived = 0, controlled = 0, tries = 0;
             for (uint seed = 1; seed <= 6; seed++)
             {
                 var sim = NewMatch(GameModes.Field, seed);
@@ -700,17 +700,27 @@ namespace Craquez.Tests
                 sim.kickoffPass = false;
                 var gk = sim.players.Find(x => x.team == 0 && x.isKeeper);
                 var df = sim.players.Find(x => x.team == 0 && !x.isKeeper);
-                foreach (var q in sim.players) if (q.team == 1) q.position = new Vector2(sim.TeamDir(0) * 30f, q.position.y);
-                df.position = gk.position + new Vector2(sim.TeamDir(0) * 14f, 2f);
+                foreach (var q in sim.players) if (q != df && q != gk) q.position = new Vector2(sim.TeamDir(0) * 30f, q.position.y);
+                df.position = gk.position + new Vector2(sim.TeamDir(0) * (seed > 4 ? 26f : 14f), 2f);
                 sim.ball.owner = df.id; sim.ball.pos = df.position; sim.ball.vel = Vector2.zero; sim.ball.z = 0;
                 sim.ctrl[0].player = df.id;
                 var aim = (gk.position - df.position).Norm();
                 var press = new InputFrame { move = aim, buttons = InputFrame.Pass };
                 for (int i = 0; i < 6; i++) sim.Step(new[] { press, default });
                 tries++;
-                for (int i = 0; i < 150; i++) { sim.Step(new[] { new InputFrame(), default }); if (gk.hold > 0f) { held++; break; } }
+                bool got = false;
+                for (int i = 0; i < 320; i++)
+                {
+                    sim.Step(new[] { new InputFrame(), default });
+                    if (gk.hold > 0f) { held++; break; }
+                    if (gk.Diving) { dived++; break; }
+                    if (sim.ball.owner == gk.id && gk.hold <= 0f) { got = true; break; }
+                }
+                if (got) controlled++;
             }
             Assert.AreEqual(0, held, "o goleiro agarrou um recuo de " + tries);
+            Assert.AreEqual(0, dived, "o goleiro mergulhou em um recuo");
+            Assert.AreEqual(tries, controlled, "o goleiro deve dominar o recuo com os pés");
         }
 
         /// <summary>Cartões: falta violenta expulsa; o expulso fica fora e o jogo segue sem ele.</summary>
@@ -1168,10 +1178,14 @@ namespace Craquez.Tests
             var cpuA = new CpuBrain(0, 0.7f); var cpuB = new CpuBrain(1, 0.7f);
             for (int i = 0; i < 60 * 3 && sim1.kickoffPass; i++) sim1.Step(new[] { cpuA.MakeInput(sim1), cpuB.MakeInput(sim1) });
             Assert.IsFalse(sim1.kickoffPass, "CPU x CPU deve executar o toque de saída em 4-3-3");
+            Assert.Less(sim1.kickoffT, 1.0f, "CPU deve tocar antes do tempo limite");
             Assert.Less(sim1.ball.vel.x * sim1.TeamDir(0), 0f, "com 1 atacante o toque de saída deve ir para trás");
+            int got1 = -1;
+            for (int i = 0; i < 180 && got1 < 0; i++) { sim1.Step(new[] { cpuA.MakeInput(sim1), cpuB.MakeInput(sim1) }); if (sim1.ball.owner >= 0) got1 = sim1.ball.owner; }
+            Assert.AreEqual(sim1.kickoffMate, got1, $"companheiro deve receber a saída em 4-3-3 (got={got1}, mate={sim1.kickoffMate}, kicker={sim1.kickoffKicker}, ball={sim1.ball.pos})");
 
-            // 2 atacantes (4-4-2): um atacante toca para o outro ao lado
-            var sim2 = new MatchSim();
+            // 2 atacantes (4-4-2), time 1 dando a saída: um atacante toca para o outro ao lado
+            var sim2 = new MatchSim { firstKickoff = 1 };
             sim2.Setup(GameModes.Field,
                 new TeamSetup { data = Teams.Get(0), tactics = new Tactics { formation = "4-4-2" } },
                 new TeamSetup { data = Teams.Get(1), tactics = new Tactics { formation = "4-4-2" } }, 123, 120f);
@@ -1180,6 +1194,10 @@ namespace Craquez.Tests
             Assert.AreEqual("FW", mate2.pos, "com 2 atacantes o companheiro da saída deve ser o outro atacante");
             for (int i = 0; i < 60 * 3 && sim2.kickoffPass; i++) sim2.Step(new[] { cpuA.MakeInput(sim2), cpuB.MakeInput(sim2) });
             Assert.IsFalse(sim2.kickoffPass, "CPU x CPU deve executar o toque de saída em 4-4-2");
+            Assert.Less(sim2.kickoffT, 1.0f, "CPU time 1 deve tocar antes do tempo limite");
+            int got2 = -1;
+            for (int i = 0; i < 180 && got2 < 0; i++) { sim2.Step(new[] { cpuA.MakeInput(sim2), cpuB.MakeInput(sim2) }); if (sim2.ball.owner >= 0) got2 = sim2.ball.owner; }
+            Assert.AreEqual(sim2.kickoffMate, got2, "companheiro deve receber a saída em 4-4-2");
         }
     }
 }

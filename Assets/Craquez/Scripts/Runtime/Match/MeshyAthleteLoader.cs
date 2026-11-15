@@ -158,25 +158,22 @@ namespace Craquez
                 // Zona dedicada de cabelo (topo e parte de trás da cabeça / nuca): nunca vira pele ou loiro falso
                 if (zone == ZoneHair)
                 {
-                    if (lum < 0.46f)
-                    {
-                        float shade = Mathf.Clamp(lum / 0.21f, 0.42f, 1.10f);
-                        dst[i] = To32(hairTarget * shade);
-                        continue;
-                    }
                     // Se houver pele clara na nuca baixa, aplica tom de pele da raça
-                    if (r > g + 0.05f && sat > 0.22f)
+                    if (lum > 0.50f && r > g + 0.06f && g >= b + 0.04f && sat > 0.26f)
                     {
                         float shade = Mathf.Clamp(lum / 0.58f, 0.40f, 1.12f);
                         dst[i] = To32(raceSkin * shade);
                         continue;
                     }
+                    float hShade = Mathf.Clamp(lum / 0.24f, 0.42f, 0.96f);
+                    dst[i] = To32(hairTarget * hShade);
+                    continue;
                 }
 
                 // Cabelo / sobrancelha / cílios na frente/laterais da cabeça (escuro, antes da detecção de pele)
                 if (zone == ZoneHead && lum <= 0.34f && mx < 0.42f)
                 {
-                    float shade = Mathf.Clamp(lum / 0.18f, 0.42f, 1.12f);
+                    float shade = Mathf.Clamp(lum / 0.18f, 0.42f, 0.96f);
                     dst[i] = To32(hairTarget * shade);
                     continue;
                 }

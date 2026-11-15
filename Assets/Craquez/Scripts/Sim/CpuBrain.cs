@@ -35,7 +35,11 @@ namespace Craquez.Sim
         public InputFrame MakeInput(MatchSim sim)
         {
             var f = new InputFrame();
-            if (sim.state != MatchState.Playing) return f;
+            if (sim.state != MatchState.Playing)
+            {
+                _holdBtn = 0; _holdTicks = 0; _cooldown = 0; _fakeOn = 0; _finesse = false;
+                return f;
+            }
             var p = sim.Controlled(team);
             float dir = sim.TeamDir(team);
             _cooldown = Mathf.Max(0, _cooldown - 1);
