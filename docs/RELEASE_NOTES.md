@@ -1,3 +1,17 @@
+## Craquez 2.29.0
+
+Jogo de futebol feito 100% com inteligência artificial, **gratuito**.
+
+### Download
+- **Celular Android**: `Craquez-v2.29.0.apk`
+- **TV (Google TV / Android TV, ex.: TCL C6K)**: `Craquez-TV-v2.29.0.apk` — use este na TV (32 e 64 bits).
+
+### Mudanças
+- **Modelo oficial completo (`Athlete_Meshy.glb.bytes`) e aparência dos jogadores (`MeshyAthleteLoader` / `AthleteFactory`)**: restaurado o arquivo GLB completo (39,2 MB) que estava truncado em 30 bytes, corrigida a pintura de cabelo/nuca (`ZoneHair` e remoção do brilho excessivo) e ajustado o mapeamento de cores de cabelo para predominar tons naturais em vez de loiro generalizado.
+- **Uniformes e quedas (`AthleteView` / `MeshyAthleteLoader`)**: suavizadas as animações de queda e levantada no chão sem tremedeira, e aprimoradas as texturas dos uniformes por zona corporal.
+- **Saída de bola na CPU (`MatchSim` / `CpuBrain`)**: corrigida a saída de bola onde o batedor voltava para interceptar o próprio passe; agora o controle passa ao companheiro receptor (`kickoffMate`) e o batedor avança em apoio.
+- **Regra do recuo ao goleiro (`MatchSim`)**: `IsBackPass` rastreia o último passe/toque com os pés sem expiração prematura, impede mergulho/encaixe com as mãos em recuos de companheiros e garante o domínio limpo nos pés para o goleiro sair tocando.
+
 ## Craquez 2.28.0
 
 Jogo de futebol feito 100% com inteligência artificial, **gratuito**.
