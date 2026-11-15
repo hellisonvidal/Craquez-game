@@ -4027,6 +4027,8 @@ namespace Craquez.Sim
                     float w = (rr - l) / rr;
                     // quem está mais perto da bola tem preferência: o outro abre espaço
                     float pri = lead ? 2.2f : m.position.Dist(ball.pos) < p.position.Dist(ball.pos) ? 1.15f : 0.7f;
+                    // Companheiros em formação (defesa/ataque) mantêm estrutura: menos desvio aleatório
+                    if (!lead && m.vel.magnitude < 1f && p.vel.magnitude < 1f) pri *= 0.5f; // ambos parados: mantém posição
                     sep += d.Norm() * w * w * pri;
                 }
                 if (sep.sqrMagnitude > 1e-4f)
@@ -4274,6 +4276,22 @@ namespace Craquez.Sim
                     {
                         var push = d / l * (minD - l) * 0.5f;
                         float wa = 0.5f + Mathf.Clamp((b.vel.magnitude - a.vel.magnitude) * 0.05f, -0.3f, 0.3f);
+                        // --- OMBRO A OMBRO (shoulder-to-shoulder) ---
+                        // Jogadores correndo lado a lado em velocidade similar: inclinam um contra o outro
+                        // em vez de se separarem completamente. Isso cria disputa de posição realista.
+                        bool shoulderDuel = false;
+                        if (a.team != b.team && a.vel.magnitude > 3f && b.vel.magnitude > 3f)
+                        {
+                            float speedDiff = Mathf.Abs(a.vel.magnitude - b.vel.magnitude);
+                            float velAlign = Vector2.Dot(a.vel.normalized, b.vel.normalized);
+                            if (speedDiff < 1.5f && velAlign > 0.7f && l < minD * 0.85f)
+                            {
+                                shoulderDuel = true;
+                                // Marca para a view renderizar inclinação
+                                a.offBalance = Mathf.Max(a.offBalance, 0.15f);
+                                b.offBalance = Mathf.Max(b.offBalance, 0.15f);
+                            }
+                        }
                         // trombada entre adversários: os dois perdem velocidade; quem vem mais fraco se desequilibra
                         if (a.team != b.team)
                         {
@@ -4281,23 +4299,31 @@ namespace Craquez.Sim
                             if (closing > 2.5f && a.bumpCd <= 0f && b.bumpCd <= 0f)
                             {
                                 a.bumpCd = b.bumpCd = 0.35f;
-                                float sa = a.defense + a.vel.magnitude * 0.05f + rng.Range(0f, 0.3f), sb = b.defense + b.vel.magnitude * 0.05f + rng.Range(0f, 0.3f);
+                                // Força baseada em defense, massa (velocidade), e atributos físicos
+                                float sa = a.defense + a.vel.magnitude * 0.05f + rng.Range(0f, 0.3f);
+                                float sb = b.defense + b.vel.magnitude * 0.05f + rng.Range(0f, 0.3f);
+                                // Trait Muralha dá vantagem em choques
+                                if (a.Has(Trait.Muralha)) sa += 0.4f;
+                                if (b.Has(Trait.Muralha)) sb += 0.4f;
                                 var weak = sa < sb ? a : b;
                                 // choque de corpo: impulso só na direção do contato (inelástico, e = 0,2);
                                 // quem é mais forte/rápido "pesa" mais e perde menos velocidade; o resto
                                 // da velocidade (de lado) continua — um passa raspando pelo outro
                                 var nAB = d / l;
-                                float ma = 1f + a.defense * 0.35f + a.vel.magnitude * 0.03f, mb = 1f + b.defense * 0.35f + b.vel.magnitude * 0.03f;
+                                float ma = 1f + a.defense * 0.35f + a.vel.magnitude * 0.03f;
+                                float mb = 1f + b.defense * 0.35f + b.vel.magnitude * 0.03f;
+                                // Muralha aumenta massa efetiva
+                                if (a.Has(Trait.Muralha)) ma *= 1.3f;
+                                if (b.Has(Trait.Muralha)) mb *= 1.3f;
                                 float imp = closing * 0.95f / (1f / ma + 1f / mb);
                                 a.vel -= nAB * (imp / ma);
                                 b.vel += nAB * (imp / mb);
-                                a.vel *= 0.92f; b.vel *= 0.92f;
+                                // Perda de velocidade lateral menor (roçam um no outro)
+                                a.vel *= 0.94f; b.vel *= 0.94f;
                                 weak.offBalance = Mathf.Max(weak.offBalance, 0.3f);
                                 var strong = weak == a ? b : a;
                                 Emit("bump", weak.team, weak.id, null, false, closing, strong.id);
-                                // trombada forte de verdade (sem falta): de vez em quando quem perde cai e levanta
-                                // (antes: 10% a partir de 5,5 m/s — mais quedas por trombada do que por falta, jogador "caindo
-                                // sem motivo". Agora só no choque de frente em velocidade alta e bem desigual)
+                                // trombada forte de verdade (sem falta): só no choque de frente em velocidade alta e bem desigual
                                 if (closing > 7.5f && Mathf.Abs(sa - sb) > 0.35f && weak.down <= 0f && !weak.isKeeper && state == MatchState.Playing && rng.Chance(0.05f))
                                 {
                                     weak.fallDir = (weak.position - strong.position).Norm();
@@ -4307,7 +4333,6 @@ namespace Craquez.Sim
                                     weak.stun = weak.down + 0.1f;
                                     weak.fallRoll = false;
                                     weak.fallLight = true; weak.fallTrip = false;
-                                    weak.down = rng.Range(0.9f, 1.4f); weak.downTotal = weak.down; weak.stun = weak.down + 0.1f;
                                     if (ball.owner == weak.id) { ball.owner = -1; ball.vel = ball.vel * 0.5f + weak.fallDir * 1.2f; }
                                 }
                                 // quem conduz pode perder a bola no choque
@@ -4322,15 +4347,16 @@ namespace Craquez.Sim
                         // goleiro (sobretudo com a bola) não é empurrado: quem sai é o outro
                         if (a.isKeeper && !b.isKeeper) wa = a.hold > 0f ? 0f : 0.2f;
                         else if (b.isKeeper && !a.isKeeper) wa = b.hold > 0f ? 1f : 0.8f;
-                        // separa em alguns quadros (sem "estalo" de posição), mas sem deixar atravessar
-                        float k = l < minD * 0.6f ? 2f : 1.2f;
+                        // Em duelo ombro a ombro, não separa totalmente - mantém contato lateral
+                        float k = shoulderDuel ? 0.6f : (l < minD * 0.6f ? 2f : 1.2f);
                         a.position -= push * k * wa;
                         b.position += push * k * (1f - wa);
                         // ninguém fica "correndo parado" empurrando o outro: some a velocidade contra o contato
                         var nn = d / l;
                         float va = Vector2.Dot(a.vel, nn), vb = Vector2.Dot(b.vel, -nn);
-                        if (va > 0f) a.vel -= nn * va * (a.team == b.team ? 1f : 0.6f);
-                        if (vb > 0f) b.vel += nn * vb * (a.team == b.team ? 1f : 0.6f);
+                        float velDamp = shoulderDuel ? 0.3f : (a.team == b.team ? 1f : 0.6f);
+                        if (va > 0f) a.vel -= nn * va * velDamp;
+                        if (vb > 0f) b.vel += nn * vb * velDamp;
                     }
                 }
             }

@@ -15,7 +15,9 @@ namespace Craquez.Sim
     /// <summary>Estado de um atleta na simulação (puro dado + lógica).</summary>
     public class SimPlayer
     {
-        public const float Radius = 0.38f;
+        // Raio de colisão do corpo do jogador (ajustado para ser mais realista: ~0.45m para ombros/quadril)
+        // Antes era 0.38f que era muito fino para atletas adultos
+        public const float Radius = 0.45f;
         public static readonly float[] SkillTime = { 0f, 0.25f, 0.5f, 0.42f, 0.55f, 0.62f, 0.46f, 0.8f, 0.3f, 0.28f, 0.34f };
         public static readonly string[] SkillNames = { "", "Toque à frente", "Puxada", "Arrastada", "Pedalada simples", "Roleta", "Elástico", "Pedalada", "Chapéu", "Caneta", "Corte" };
 
