@@ -2962,6 +2962,44 @@ namespace Craquez.Sim
             p.faceBall = !urgent && d < 10f && ball.pos.Dist(p.position) < 35f;
         }
 
+        readonly SimBall _pred = new SimBall();
+
+        /// <summary>
+        /// Simula a trajetória real da bola (arrasto, efeito Magnus, gravidade e quiques)
+        /// até cruzar o plano x = planeX (até 2,4 s). Retorna t &lt; 0 se não cruzar.
+        /// </summary>
+        void Predict(float planeX, out float t, out float y, out float z)
+        {
+            _pred.pos = ball.pos;
+            _pred.vel = ball.vel;
+            _pred.z = ball.z;
+            _pred.vz = ball.vz;
+            _pred.spin = ball.spin;
+            _pred.slideT = ball.slideT;
+            _pred.radius = ball.radius;
+            _pred.owner = -1;
+            _pred.puddle = ball.puddle;
+            _pred.snowCover = ball.snowCover;
+            _pred.wet = ball.wet;
+            float side0 = Mathf.Sign(ball.pos.x - planeX);
+            t = -1f; y = 0f; z = 0f;
+            for (int i = 0; i < 144; i++)
+            {
+                var prev = _pred.pos;
+                float pz = _pred.z;
+                _pred.Step(DT, mode);
+                if (Mathf.Sign(_pred.pos.x - planeX) != side0)
+                {
+                    float f = Mathf.Abs(prev.x - planeX) / Mathf.Max(1e-4f, Mathf.Abs(_pred.pos.x - prev.x));
+                    t = (i + f) * DT;
+                    y = Mathf.Lerp(prev.y, _pred.pos.y, f);
+                    z = Mathf.Max(0f, Mathf.Lerp(pz, _pred.z, f));
+                    return;
+                }
+                if (_pred.Speed < 1f) return;
+            }
+        }
+
         void AiKeeper(SimPlayer p, bool frozen)
         {
             float dir = TeamDir(p.team);
@@ -3054,18 +3092,19 @@ namespace Craquez.Sim
                     for (int k = 0; k < 40 && (x - gx) * inwardK > 0.3f && ZAt(x) > reachTop - 0.15f; k++) x -= inwardK * 0.25f;
                     planeX = (x - gx) * inwardK < 0.3f ? gx + inwardK * 0.3f : x;
                 }
-                float tK = (planeX - ball.pos.x) / ball.vel.x;
-                float tCross = (gx - ball.pos.x) / ball.vel.x;
+                Predict(planeX, out float tKp, out float yKp, out float zKp);
+                Predict(gx, out float tCp, out float yCp, out float zCp);
+                float tK = tKp > 0f ? tKp : (planeX - ball.pos.x) / ball.vel.x;
+                float tCross = tCp > 0f ? tCp : (gx - ball.pos.x) / ball.vel.x;
                 if (tK > 0f && tK < 2.4f)
                 {
                     // leitura imperfeita: chute forte e de longe engana mais (o goleiro ruim mais ainda), mas
                     // ele corrige a leitura conforme a bola chega (de longe sobra tempo para se ajeitar)
                     float readErr = ((p.id * 7919 + lastShotTick * 31) % 1000 / 1000f - 0.5f) * 2f;
-                    float settle = Mathf.Lerp(1f, 0.5f, Mathf.Clamp01(((tick - lastShotTick) * DT - 0.25f) / 0.45f));
-                    float yK = ball.pos.y + ball.vel.y * tK + readErr * settle * Mathf.Clamp01(ball.Speed / 30f) * Mathf.Lerp(0.55f, 0.2f, p.defense);
-                    float zK = Mathf.Max(0f, ball.z + ball.vz * tK - 0.5f * SimBall.G * tK * tK);
-                    float yCross = ball.pos.y + ball.vel.y * tCross;
-                    float zCross = ball.z + ball.vz * tCross - 0.5f * SimBall.G * tCross * tCross;
+                    float yK = (tKp > 0f ? yKp : ball.pos.y + ball.vel.y * tK) + readErr * Mathf.Clamp01(ball.Speed / 30f) * Mathf.Lerp(0.55f, 0.2f, p.defense) * Mathf.Clamp01(tK / 0.7f);
+                    float zK = tKp > 0f ? zKp : Mathf.Max(0f, ball.z + ball.vz * tK - 0.5f * SimBall.G * tK * tK);
+                    float yCross = tCp > 0f ? yCp : ball.pos.y + ball.vel.y * tCross;
+                    float zCross = tCp > 0f ? zCp : ball.z + ball.vz * tCross - 0.5f * SimBall.G * tCross * tCross;
                     bool over = zCross > goalH + 0.35f && ball.vz < 2f;
                     bool wide = Mathf.Abs(yCross) > goalHalf + 0.6f;   // vai para fora: só acompanha
                     if (Mathf.Abs(yCross) < goalHalf + 1.5f && !over)
@@ -3109,7 +3148,7 @@ namespace Craquez.Sim
                                 p.dive = 0.6f;
                                 // impulso lateral: o necessário para as mãos chegarem, até o limite da impulsão
                                 float need = Mathf.Max(0f, side - DiveReach(p, kind) * 0.85f) / Mathf.Max(0.18f, tK);
-                                float push = Mathf.Clamp(need, 1.6f, Lerp01(2.4f, 3.3f, p.defense) * gs);   // (2.20: impulsão menor — ia buscar tudo no ângulo)
+                                float push = Mathf.Clamp(need, 1.3f, Lerp01(1.9f, 2.6f, p.defense) * gs);
                                 // (para a frente ou para trás só um pouco: ninguém voa de costas para dentro do gol)
                                 p.vel = new Vector2(Mathf.Clamp((planeX - p.position.x) * 2f, -1.2f, 1.5f), Mathf.Sign(lat) * push);
                                 Emit("dive", p.team, p.id);
@@ -3189,7 +3228,7 @@ namespace Craquez.Sim
         float DiveReach(SimPlayer p, int kind)
         {
             float gs = Mathf.Clamp(goalHalf / 3.66f, 0.6f, 1f);
-            float body = kind == 5 ? 1.22f : kind == 4 ? 1.27f : kind == 3 ? 1.18f : 0.7f;   // (2.20: um pouco menos: o goleiro pegava 83% dos chutes no gol, até no ângulo)
+            float body = kind == 5 ? 1.08f : kind == 4 ? 1.12f : kind == 3 ? 1.06f : 0.68f;   // (2.20: um pouco menos: o goleiro pegava 83% dos chutes no gol, até no ângulo)
             return (body + 0.15f * p.defense + (p.Has(Trait.Reflexo) ? 0.1f : 0f)) * gs;
         }
 
@@ -3803,10 +3842,9 @@ namespace Craquez.Sim
             if (p.hold > 0f && gkFetch != p.id) maxS *= 0.4f;
             var targetV = intent * maxS;
             float spd = p.vel.magnitude;
-            float acc = Mathf.Lerp(5f, 8.5f, p.accel) * (p.burst > 0f ? 1.6f : 1f) * (p.offBalance > 0f ? 0.4f : 1f) * (0.82f + 0.18f * p.stamina);
+            float acc = Mathf.Lerp(14f, 18f, p.accel) * (p.isKeeper && p.keeperSet ? 0.65f : 1f) * (p.burst > 0f ? 1.35f : 1f) * (p.offBalance > 0f ? 0.4f : 1f) * (0.82f + 0.18f * p.stamina);
             // movimento do atleta em duas componentes (ao longo da corrida e de lado):
-            //   • arrancada forte parado e cada vez menor perto da velocidade máxima;
-            //   • frenagem limitada pelo atrito (mais curta devagar, mais longa no pique);
+            //   • arrancada responsiva (14..18 m/s²) e frenagem firme (25..19 m/s²), sem deslizar no gelo;
             //   • curva limitada pela aceleração lateral (aberta no pique, fechada devagar)
             var dv = targetV - p.vel;
             float agil = (0.85f + 0.3f * p.accel) * (p.offBalance > 0f ? 0.4f : 1f) * (p.burst > 0f ? 1.3f : 1f);
@@ -3816,9 +3854,9 @@ namespace Craquez.Sim
                 var ndir = new Vector2(-tdir.y, tdir.x);
                 float dT = Vector2.Dot(dv, tdir), dN = Vector2.Dot(dv, ndir);
                 float top = Mathf.Max(4f, p.TopSpeed());
-                float accT = acc * Mathf.Clamp(1.35f - spd / top, 0.3f, 1.35f);
-                float brake = Mathf.Lerp(14f, 8.5f, Mathf.Clamp01(spd / 9f)) * agil;
-                float lat = Mathf.Lerp(17f, 7.5f, Mathf.Clamp01(spd / 9f)) * agil * (hasBall ? 0.85f : 1f);
+                float accT = acc * Mathf.Clamp(1.25f - spd / top * 0.65f, 0.45f, 1.25f);
+                float brake = Mathf.Lerp(25f, 19f, Mathf.Clamp01(spd / 9f)) * agil;
+                float lat = Mathf.Lerp(22f, 11f, Mathf.Clamp01(spd / 9f)) * agil * (hasBall ? 0.88f : 1f);
                 dT = Mathf.Clamp(dT, -brake * DT, accT * DT);
                 dN = Mathf.Clamp(dN, -lat * DT, lat * DT);
                 // ninguém dá voltas seguidas em volta do marcador (antes, colados no adversário, os dois
@@ -3828,11 +3866,12 @@ namespace Craquez.Sim
                     dN *= 0.15f;
                 p.vel += tdir * dT + ndir * dN;
             }
-            else p.vel += dv.Limit(acc * 1.35f * DT);   // saindo do lugar: para qualquer lado
+            else p.vel += dv.Limit(acc * 1.15f * DT);   // saindo do lugar: para qualquer lado
             p.position += p.vel * DT;
             var faceTarget = p.vel.magnitude > 0.4f ? p.vel : intent;
             if (p.faceBall && !hasBall && !p.sprinting && ctrl[p.team].player != p.id) faceTarget = ball.pos - p.position;
-            float turnRate = Mathf.Lerp(11f, 4f, Mathf.Clamp01(p.vel.magnitude / 9f)) * (hasBall ? 0.8f : 1f);
+            // Turn Rate dinâmico: 540°/s (9.42 rad/s) em baixa velocidade/proteção até 300°/s (5.24 rad/s) no Sprint
+            float turnRate = Mathf.Lerp(9.42f, 5.24f, p.sprinting ? 1f : Mathf.Clamp01(p.vel.magnitude / 9f)) * (hasBall ? 0.85f : 1f);
             // devagar, sem a bola e sem comando: o corpo fica de frente para o jogo (dá passos de lado/de
             // costas) em vez de seguir a direção de cada empurrãozinho — era isso que fazia o atleta rodar
             if (!hasBall && ctrl[p.team].player != p.id && p.vel.magnitude < 1.8f && !p.isKeeper)
@@ -4255,13 +4294,15 @@ namespace Craquez.Sim
                 else ball.vel -= perp * sideErr * 5f * DT;   // entre os toques a bola rola solta (leve correção de rumo)
                 return;
             }
-            float ahead = 0.3f + spd * 0.05f;   // parado/andando: bola no pé
-            if (o.shielding) ahead = 0.34f + spd * 0.03f;
-            if (o.windup > 0f) ahead = 0.4f;
+            // BallControlPoint (0.35 m a 0.45 m à frente do Root): condução magnética suave
+            float ahead = Mathf.Clamp(0.35f + spd * 0.04f, 0.35f, 0.45f);
+            if (o.shielding) ahead = 0.36f;
+            if (o.windup > 0f) ahead = 0.42f;
             var target = o.position + o.facing * ahead;
-            float k = 6f + 6f * o.control;
+            float distCtrl = o.position.Dist(ball.pos);
+            float k = distCtrl < 0.65f ? (9f + 7f * o.control) : (6f + 6f * o.control);
             var desired = o.vel + (target - ball.pos) * k;
-            float blend = Mathf.Clamp01((0.22f + 0.3f * o.control) * 60f * DT);
+            float blend = Mathf.Clamp01((0.25f + 0.32f * o.control) * 60f * DT);
             ball.vel = Vector2.Lerp(ball.vel, desired, blend);
             if (ball.z < 0.35f) { ball.z = 0f; ball.vz = 0f; }
             ball.spin = 0f;

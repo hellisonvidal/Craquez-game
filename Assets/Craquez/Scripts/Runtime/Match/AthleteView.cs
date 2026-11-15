@@ -2284,8 +2284,12 @@ namespace Craquez
                 _pose.Rotate(lo, Quaternion.Slerp(Quaternion.identity, Quaternion.FromToRotation(hd.position - lo.position, handT - lo.position), _holdW));
                 if (s < 0) handL = hd.position; else handR = hd.position;
             }
+            rig.UpdateSockets();
             if (holding && view.BallVisual != null)
-                view.BallVisual.position = Vector3.Lerp(view.BallVisual.position, (handL + handR) * 0.5f + fwd * 0.06f, _holdW);
+            {
+                var socketPos = rig.gkCatchSocket != null ? rig.gkCatchSocket.position : (handL + handR) * 0.5f + fwd * 0.06f;
+                view.BallVisual.position = Vector3.Lerp(view.BallVisual.position, socketPos, _holdW);
+            }
         }
 
         float _armsUp;

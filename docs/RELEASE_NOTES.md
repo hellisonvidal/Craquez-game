@@ -1,3 +1,16 @@
+## Craquez 2.25.0
+
+Jogo de futebol feito 100% com inteligência artificial, **gratuito**.
+
+### Download
+- **Celular Android**: `Craquez-v2.25.0.apk`
+- **TV (Google TV / Android TV, ex.: TCL C6K)**: `Craquez-TV-v2.25.0.apk` — use este na TV (32 e 64 bits).
+
+### Mudanças
+- **Física e locomoção dos atletas**: aceleração (`14..18 m/s²`), frenagem (`19..25 m/s²`) e taxa de giro dinâmica (`540°/s` em baixa velocidade a `300°/s` no sprint) mais responsivas, além de condução magnética refinada em torno do `BallControlPoint`.
+- **Hierarquia 3D e sockets (`AthleteRig` / `AthleteView`)**: suporte a fallback de ossos `mixamorig:*`, isolamento de colisor opcional na camada `PlayerBody` ignorando `Ball`, e criação automática dos sockets virtuais `BallControlPoint` e `GK_CatchSocket`.
+- **Predição real de trajetória do goleiro (`MatchSim.Predict`)**: leitura de chutes considerando arrasto, efeito Magnus, gravidade e quiques no gramado, com ajuste fino de alcance e impulsão nas defesas.
+
 ## Craquez 2.24.0
 
 Jogo de futebol feito 100% com inteligência artificial, **gratuito**.

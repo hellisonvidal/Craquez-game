@@ -13,7 +13,11 @@ namespace Craquez
         public bool untucked;
         public Animator animator;
         public readonly Dictionary<string, Transform> bones = new Dictionary<string, Transform>();
-        public Transform head, neck, spine, pelvis, footL, footR, handL, handR;
+        public Transform head, neck, spine, pelvis, footL, footR, toeL, toeR, handL, handR, forearmL, forearmR;
+        /// <summary>Pontos virtuais (sockets) para condução de bola e encaixe do goleiro.</summary>
+        public Transform ballControlPoint, gkCatchSocket;
+        /// <summary>Colisor opcional de corpo-a-corpo no Root (ignora camada Ball).</summary>
+        public CapsuleCollider rootCollider;
         /// <summary>Rotação que alinha a frente do modelo com +Z do objeto raiz.</summary>
         public Quaternion modelFix = Quaternion.identity;
         /// <summary>Rotações locais de repouso do pescoço e da cabeça.</summary>
@@ -30,19 +34,35 @@ namespace Craquez
             return Mathf.Atan2(d.y, new Vector2(d.x, d.z).magnitude) * Mathf.Rad2Deg;
         }
 
+        Transform Bone(string primary, string mixamoFallback = null)
+        {
+            if (bones.TryGetValue(primary, out var t)) return t;
+            if (!string.IsNullOrEmpty(mixamoFallback) && bones.TryGetValue(mixamoFallback, out var m)) return m;
+            return null;
+        }
+
         public void Init(Transform m)
         {
             model = m;
             foreach (var t in m.GetComponentsInChildren<Transform>(true)) bones[t.name] = t;
-            Transform B(string n) => bones.TryGetValue(n, out var t) ? t : null;
-            head = B("head"); neck = B("neck_01");
+            head = Bone("head", "mixamorig:Head");
+            neck = Bone("neck_01", "mixamorig:Neck");
             if (head != null) headRest = head.localRotation;
-            if (neck != null) neckRest = neck.localRotation; spine = B("spine_03"); pelvis = B("pelvis");
-            footL = B("foot_l"); footR = B("foot_r"); handL = B("hand_l"); handR = B("hand_r");
+            if (neck != null) neckRest = neck.localRotation;
+            spine = Bone("spine_03", "mixamorig:Spine2");
+            pelvis = Bone("pelvis", "mixamorig:Hips");
+            footL = Bone("foot_l", "mixamorig:LeftFoot");
+            footR = Bone("foot_r", "mixamorig:RightFoot");
+            toeL = Bone("ball_l", "mixamorig:LeftToeBase");
+            toeR = Bone("ball_r", "mixamorig:RightToeBase");
+            handL = Bone("hand_l", "mixamorig:LeftHand");
+            handR = Bone("hand_r", "mixamorig:RightHand");
+            forearmL = Bone("lowerarm_l", "mixamorig:LeftForeArm");
+            forearmR = Bone("lowerarm_r", "mixamorig:RightForeArm");
             // os clipes vêm de um FBX só com o esqueleto: a Unity remove o nó raiz e os caminhos
             // começam em "Root/..."; no modelo eles ficam sob "Armature". O Animator vai no
             // "Armature" para os caminhos baterem (antes nenhuma curva encontrava os ossos).
-            var arm = B("Armature");
+            var arm = Bone("Armature");
             var animHost = arm != null && arm != m ? arm.gameObject : m.gameObject;
             var old = m.GetComponent<Animator>();
             if (old != null && animHost != m.gameObject) old.enabled = false;
@@ -51,9 +71,9 @@ namespace Craquez
             animator.applyRootMotion = false;
             animator.cullingMode = AnimatorCullingMode.AlwaysAnimate;   // ossos sempre atualizados (evita cabeça "solta")
             if (head != null)
-                Debug.Log($"[diag] modelo {m.name}: cabeça em repouso a {head.position.y - transform.position.y:F2} m; filhos {m.childCount}; Armature rot {(B("Armature") != null ? B("Armature").localEulerAngles.ToString() : "-")}");
+                Debug.Log($"[diag] modelo {m.name}: cabeça em repouso a {head.position.y - transform.position.y:F2} m; filhos {m.childCount}; Armature rot {(arm != null ? arm.localEulerAngles.ToString() : "-")}");
             // descobre para onde o modelo olha (pé -> ponta do pé) e corrige para +Z
-            var ballL = B("ball_l");
+            var ballL = toeL;
             if (footL != null && ballL != null)
             {
                 var f = ballL.position - footL.position;
@@ -65,14 +85,79 @@ namespace Craquez
                 }
             }
             if (pelvis != null) pelvisRest = transform.InverseTransformPoint(pelvis.position);
-            footPitchRest = FootPitch(footL, B("ball_l"));
+            footPitchRest = FootPitch(footL, toeL);
             // pés no chão
             if (footL != null)
             {
                 float minY = float.MaxValue;
-                foreach (var t in new[] { footL, footR, ballL, B("ball_r") })
+                foreach (var t in new[] { footL, footR, toeL, toeR })
                     if (t != null) minY = Mathf.Min(minY, t.position.y);
                 if (minY < 0.3f && minY > -0.3f) m.localPosition += Vector3.up * (0.035f - (minY - transform.position.y));
+            }
+            ConfigureHierarchyAndSockets();
+        }
+
+        /// <summary>
+        /// Camada 1 (Root/Collision) + Camada 3 (Sockets virtuais):
+        /// isola qualquer colisor de tronco da camada Ball e cria BallControlPoint / GK_CatchSocket.
+        /// </summary>
+        void ConfigureHierarchyAndSockets()
+        {
+            int bodyLayer = LayerMask.NameToLayer("PlayerBody");
+            int ballLayer = LayerMask.NameToLayer("Ball");
+            if (bodyLayer >= 0)
+            {
+                gameObject.layer = bodyLayer;
+                if (ballLayer >= 0) Physics.IgnoreLayerCollision(bodyLayer, ballLayer, true);
+            }
+            rootCollider = GetComponent<CapsuleCollider>();
+            if (rootCollider != null)
+            {
+                // Mantém a cápsula restrita ao eixo do tronco para corpo-a-corpo sem rebater a bola.
+                rootCollider.radius = Mathf.Min(rootCollider.radius, 0.28f);
+                rootCollider.height = Mathf.Max(rootCollider.height, 1.72f);
+                rootCollider.center = new Vector3(0f, rootCollider.height * 0.5f, 0f);
+            }
+            if (ballControlPoint == null)
+            {
+                var existing = transform.Find("BallControlPoint");
+                if (existing != null) ballControlPoint = existing;
+                else
+                {
+                    var go = new GameObject("BallControlPoint");
+                    go.transform.SetParent(transform, false);
+                    go.transform.localPosition = new Vector3(0f, 0.11f, 0.40f);
+                    ballControlPoint = go.transform;
+                }
+            }
+            if (gkCatchSocket == null)
+            {
+                var parent = spine != null ? spine : transform;
+                var existing = parent.Find("GK_CatchSocket");
+                if (existing != null) gkCatchSocket = existing;
+                else
+                {
+                    var go = new GameObject("GK_CatchSocket");
+                    go.transform.SetParent(parent, false);
+                    go.transform.localPosition = new Vector3(0f, -0.05f, 0.30f);
+                    gkCatchSocket = go.transform;
+                }
+            }
+            UpdateSockets();
+        }
+
+        /// <summary>Atualiza a posição do GK_CatchSocket entre handL e handR à frente do tronco.</summary>
+        public void UpdateSockets()
+        {
+            if (gkCatchSocket == null) return;
+            if (handL != null && handR != null)
+            {
+                var mid = (handL.position + handR.position) * 0.5f;
+                gkCatchSocket.position = mid + transform.forward * 0.06f;
+            }
+            else if (spine != null)
+            {
+                gkCatchSocket.position = spine.position + transform.forward * 0.30f - Vector3.up * 0.08f;
             }
         }
 
