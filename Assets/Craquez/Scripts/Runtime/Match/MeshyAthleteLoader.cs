@@ -122,7 +122,7 @@ namespace Craquez
             Color shortsCol = kit.shorts;
             Color socksCol = kit.socks;
             int bi = ((look.boots % BootPainter.Designs.Length) + BootPainter.Designs.Length) % BootPainter.Designs.Length;
-            Color bootCol = BootPainter.Designs[bi].upper;
+            Color bootCol = BootPainter.Designs[bi].baseC;
 
             for (int i = 0; i < n; i++)
             {
@@ -306,7 +306,7 @@ namespace Craquez
             int vCount = Convert.ToInt32(((Dictionary<string, object>)accs[posAcc])["count"]);
             int iCount = Convert.ToInt32(((Dictionary<string, object>)accs[idxAcc])["count"]);
             var (pOff, _) = AccSpan(posAcc);
-            var (nOff, _) = AccSpan(nAcc);
+            var (nOff, _) = AccSpan(nrmAcc);
             var (uOff, _) = AccSpan(uvAcc);
             var (jOff, _) = AccSpan(jntAcc);
             var (wOff, _) = AccSpan(wgtAcc);
