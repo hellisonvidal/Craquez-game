@@ -118,6 +118,8 @@ namespace Craquez
             // cabelo: alguns raspados, alguns descoloridos
             if (R(13) < 0.07f) hc = 4;
             bool shaved = R(14) < 0.08f;
+            float posTall = p.isKeeper ? 0.14f : (p.pos == "DF" ? 0.06f : (p.pos == "FW" && Mathf.Abs(p.basePos.y) > 0.45f ? -0.05f : 0f));
+            float hMix = Mathf.Clamp01(F(5, R(6) * 4f) / 4f * 0.45f + (R(8) + R(9)) * 0.275f + posTall);
             return new Look
             {
                 baseName = b, hair = shaved ? -1 : PickHair(b, hair, R(7), R(17)), hairColor = HairColors[Mathf.Clamp(hc, 0, HairColors.Length - 1)],
@@ -127,11 +129,11 @@ namespace Craquez
                 // camisa por dentro do calção em 90% dos atletas, por fora em 10%
                 untucked = ((h >> 21) & 1023u) % 10u == 0u,
                 faceSeed = (int)h2,
-                // altura: do baixinho (1,68 m) ao grandalhão (1,93 m), mais gente perto da média
-                skinTint = tint, scale = Mathf.Lerp(0.91f, 1.09f, Mathf.Clamp01(F(5, R(6) * 4f) / 4f * 0.5f + (R(8) + R(9)) * 0.25f)), face = f,
-                frame = Mathf.Clamp01(R(10) * 0.7f + F(5, 2f) / 4f * 0.3f),
-                // maioria magro/médio; só alguns fortes (porte do banco + sorteio por nome)
-                build = Mathf.Clamp01(Mathf.Pow(Mathf.Clamp01(F(5, R(6) * 4f) / 4f * 0.6f + R(7) * 0.4f), 1.6f)),
+                // altura: do baixinho (1,66 m) ao grandalhão (1,95 m), variando por jogador e posição
+                skinTint = tint, scale = Mathf.Lerp(0.91f, 1.09f, hMix), face = f,
+                frame = Mathf.Clamp01(R(10) * 0.65f + F(5, 2f) / 4f * 0.35f),
+                // peso/porte físico variado (magro, atlético, forte/pesado)
+                build = Mathf.Clamp01(Mathf.Clamp01(F(5, R(6) * 4f) / 4f * 0.55f + R(7) * 0.45f) + (p.isKeeper ? 0.08f : 0f)),
                 boots = (int)((h >> 5) % (uint)BootPainter.Designs.Length),
             };
         }
@@ -141,32 +143,44 @@ namespace Craquez
         {
             var look = LookFor(p);
             if (boots >= 0) look.boots = boots;
-            var model = Model(look.baseName) ?? Model("latino");
-            if (model == null)
-            {
-                Debug.LogError("Modelos de atleta ausentes em Resources/Athletes");
-                var cap = GameObject.CreatePrimitive(PrimitiveType.Capsule);
-                cap.transform.SetParent(parent, false);
-                return cap.AddComponent<AthleteRig>();
-            }
             var root = new GameObject("Atleta " + p.number + " " + p.name);
             root.transform.SetParent(parent, false);
-            var inst = Object.Instantiate(model, root.transform, false);
-            inst.name = "model";
+            bool isMeshy = false;
+            GameObject inst = MeshyAthleteLoader.InstantiateModel(root.transform, out _);
+            if (inst != null)
+            {
+                isMeshy = true;
+            }
+            else
+            {
+                var model = Model(look.baseName) ?? Model("latino");
+                if (model == null)
+                {
+                    Debug.LogError("Modelos de atleta ausentes em Resources/Athletes");
+                    var cap = GameObject.CreatePrimitive(PrimitiveType.Capsule);
+                    cap.transform.SetParent(root.transform, false);
+                    return root.AddComponent<AthleteRig>();
+                }
+                inst = Object.Instantiate(model, root.transform, false);
+                inst.name = "model";
+            }
             var rig = root.AddComponent<AthleteRig>();
             rig.Init(inst.transform);
             rig.Physique(look.build, look.frame);
-            // altura de verdade: cada modelo tem uma altura própria (cabeça em repouso de 1,60 a 1,74 m,
-            // ou seja, 1,81 a 1,95 m no topo), e a escala sorteada ia de 0,91 a 1,09 — saíam atletas de
-            // até 2,10 m, grandes demais para o campo. Agora a escala leva cada um à altura sorteada,
-            // de 1,68 a 1,93 m (média ~1,80 m).
+            // altura real variando entre 1,66 m e 1,95 m por jogador
             float u = Mathf.InverseLerp(0.91f, 1.09f, look.scale);
-            float tall = Mathf.Lerp(1.68f, 1.93f, u);
-            float modelH = rig.head != null ? rig.head.position.y - root.transform.position.y + 0.21f : 1.85f;
-            inst.transform.localScale = Vector3.one * Mathf.Clamp(tall / Mathf.Max(1.2f, modelH), 0.82f, 1.08f);
-            // mãos do modelo eram grandes demais para o corpo: um pouco menores
-            foreach (var hn in new[] { "hand_l", "hand_r" })
-                if (rig.bones.TryGetValue(hn, out var hb)) hb.localScale = hb.localScale * 0.75f;   // (0,85 ainda parecia mão grande; 0,68 sumia com a mão)
+            float tall = Mathf.Lerp(1.66f, 1.95f, u);
+            float modelH = rig.head != null ? rig.head.position.y - root.transform.position.y + 0.19f : 1.70f;
+            float baseScale = Mathf.Clamp(tall / Mathf.Max(1.2f, modelH), 0.85f, 1.18f);
+            // leve variação de largura corporal proporcional ao peso/build sem alterar a altura
+            float weightXZ = Mathf.Lerp(0.93f, 1.08f, look.build);
+            inst.transform.localScale = new Vector3(baseScale * weightXZ, baseScale, baseScale * weightXZ);
+            // mãos do modelo MakeHuman antigo eram grandes demais
+            if (!isMeshy)
+            {
+                foreach (var hn in new[] { "hand_l", "hand_r" })
+                    if (rig.bones.TryGetValue(hn, out var hb)) hb.localScale = hb.localScale * 0.75f;
+            }
             Dress(rig, look, p.isKeeper ? keeperKit : kit, p.id < 0 && p.number <= 0 ? -1 : p.number, quality);   // (juiz e técnico: sem número)
             Accessories(rig, look, p.isKeeper ? keeperKit : kit, p.isKeeper, captain, quality);
             return rig;
@@ -289,6 +303,13 @@ namespace Craquez
                 smr.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.On;
                 switch (n)
                 {
+                    case "output_unwrapped":
+                    {
+                        var mat = MeshyAthleteLoader.MaterialFor(look, kit, quality);
+                        if (mat != null) smr.sharedMaterial = mat;
+                        rig.body = smr;
+                        break;
+                    }
                     case "Body":
                     {
                         var skin = Shared("skin:" + look.baseName + Teams.Hex(look.skinTint), () =>

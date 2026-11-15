@@ -41,10 +41,43 @@ namespace Craquez
             return null;
         }
 
+        static readonly (string alias, string mixamo)[] MixamoAliases =
+        {
+            ("pelvis", "mixamorig:Hips"),
+            ("spine_01", "mixamorig:Spine"),
+            ("spine_02", "mixamorig:Spine1"),
+            ("spine_03", "mixamorig:Spine2"),
+            ("neck_01", "mixamorig:Neck"),
+            ("head", "mixamorig:Head"),
+            ("clavicle_l", "mixamorig:LeftShoulder"),
+            ("clavicle_r", "mixamorig:RightShoulder"),
+            ("upperarm_l", "mixamorig:LeftArm"),
+            ("upperarm_r", "mixamorig:RightArm"),
+            ("lowerarm_l", "mixamorig:LeftForeArm"),
+            ("lowerarm_r", "mixamorig:RightForeArm"),
+            ("hand_l", "mixamorig:LeftHand"),
+            ("hand_r", "mixamorig:RightHand"),
+            ("thigh_l", "mixamorig:LeftUpLeg"),
+            ("thigh_r", "mixamorig:RightUpLeg"),
+            ("calf_l", "mixamorig:LeftLeg"),
+            ("calf_r", "mixamorig:RightLeg"),
+            ("foot_l", "mixamorig:LeftFoot"),
+            ("foot_r", "mixamorig:RightFoot"),
+            ("ball_l", "mixamorig:LeftToeBase"),
+            ("ball_r", "mixamorig:RightToeBase"),
+        };
+
+        void AliasMixamoBones()
+        {
+            foreach (var (alias, mix) in MixamoAliases)
+                if (!bones.ContainsKey(alias) && bones.TryGetValue(mix, out var t)) bones[alias] = t;
+        }
+
         public void Init(Transform m)
         {
             model = m;
             foreach (var t in m.GetComponentsInChildren<Transform>(true)) bones[t.name] = t;
+            AliasMixamoBones();
             head = Bone("head", "mixamorig:Head");
             neck = Bone("neck_01", "mixamorig:Neck");
             if (head != null) headRest = head.localRotation;
@@ -62,7 +95,7 @@ namespace Craquez
             // os clipes vêm de um FBX só com o esqueleto: a Unity remove o nó raiz e os caminhos
             // começam em "Root/..."; no modelo eles ficam sob "Armature". O Animator vai no
             // "Armature" para os caminhos baterem (antes nenhuma curva encontrava os ossos).
-            var arm = Bone("Armature");
+            var arm = Bone("Armature") ?? Bone("SmartRigArmature");
             var animHost = arm != null && arm != m ? arm.gameObject : m.gameObject;
             var old = m.GetComponent<Animator>();
             if (old != null && animHost != m.gameObject) old.enabled = false;
@@ -182,9 +215,9 @@ namespace Craquez
             // só o tronco e o pescoço: os ossos que dobram (coxa, canela, braço, antebraço) não são
             // escalados — com escala desigual, o joelho e o cotovelo entortavam ao dobrar (pernas
             // "para dentro"); a perna fica com a forma original do modelo
-            // cintura fina e peito mais cheio (o "V" do atleta)
-            ("spine_01", 0.84f, 0.95f), ("spine_02", 0.92f, 1.02f), ("spine_03", 1.0f, 1.09f),
-            ("clavicle_l", 0.98f, 1.03f), ("clavicle_r", 0.98f, 1.03f), ("neck_01", 1.0f, 1.08f),
+            // variação nítida de peso/porte físico: do leve/magro ao pesado/forte
+            ("spine_01", 0.80f, 1.08f), ("spine_02", 0.88f, 1.12f), ("spine_03", 0.94f, 1.16f),
+            ("clavicle_l", 0.94f, 1.08f), ("clavicle_r", 0.94f, 1.08f), ("neck_01", 0.96f, 1.10f),
         };
 
         /// <summary>
@@ -240,6 +273,7 @@ namespace Craquez
         /// </summary>
         void Proportions()
         {
+            if (bones.ContainsKey("mixamorig:Hips")) return; // modelo Meshy já vem proporcionado em A-pose
             void Move(string n, float k) { if (bones.TryGetValue(n, out var t)) t.localPosition *= k; }
             Move("spine_02", 0.95f); Move("spine_03", 0.95f); Move("neck_01", 0.97f);
             Move("lowerarm_l", 1.08f); Move("lowerarm_r", 1.08f);
