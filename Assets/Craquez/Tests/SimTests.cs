@@ -1156,5 +1156,30 @@ namespace Craquez.Tests
             Assert.AreEqual(MatchState.Foul, sim.state);
             Assert.GreaterOrEqual(offender.yellows, 1, "3+ faltas devem gerar cartão amarelo por persistência");
         }
+
+        [Test] public void CpuKickoffRespectsFormationStrikers()
+        {
+            // 1 atacante central (4-3-3): sai obrigatoriamente para trás
+            var sim1 = new MatchSim();
+            sim1.Setup(GameModes.Field,
+                new TeamSetup { data = Teams.Get(0), tactics = new Tactics { formation = "4-3-3" } },
+                new TeamSetup { data = Teams.Get(1), tactics = new Tactics { formation = "4-3-3" } }, 123, 120f);
+            Assert.IsTrue(sim1.kickoffBack, "4-3-3 tem 1 centroavante e deve tocar para trás na saída");
+            var cpuA = new CpuBrain(0, 0.7f); var cpuB = new CpuBrain(1, 0.7f);
+            for (int i = 0; i < 60 * 3 && sim1.kickoffPass; i++) sim1.Step(new[] { cpuA.MakeInput(sim1), cpuB.MakeInput(sim1) });
+            Assert.IsFalse(sim1.kickoffPass, "CPU x CPU deve executar o toque de saída em 4-3-3");
+            Assert.Less(sim1.ball.vel.x * sim1.TeamDir(0), 0f, "com 1 atacante o toque de saída deve ir para trás");
+
+            // 2 atacantes (4-4-2): um atacante toca para o outro ao lado
+            var sim2 = new MatchSim();
+            sim2.Setup(GameModes.Field,
+                new TeamSetup { data = Teams.Get(0), tactics = new Tactics { formation = "4-4-2" } },
+                new TeamSetup { data = Teams.Get(1), tactics = new Tactics { formation = "4-4-2" } }, 123, 120f);
+            Assert.IsFalse(sim2.kickoffBack, "4-4-2 tem 2 atacantes e deve tocar para o parceiro de ataque");
+            var mate2 = sim2.players[sim2.kickoffMate];
+            Assert.AreEqual("FW", mate2.pos, "com 2 atacantes o companheiro da saída deve ser o outro atacante");
+            for (int i = 0; i < 60 * 3 && sim2.kickoffPass; i++) sim2.Step(new[] { cpuA.MakeInput(sim2), cpuB.MakeInput(sim2) });
+            Assert.IsFalse(sim2.kickoffPass, "CPU x CPU deve executar o toque de saída em 4-4-2");
+        }
     }
 }

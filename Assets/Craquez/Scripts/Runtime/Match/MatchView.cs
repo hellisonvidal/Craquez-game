@@ -816,10 +816,6 @@ namespace Craquez
                 if (p.position.Dist(v) < 9f) _referee.point = AthleteView.W(new Vector2(sim.TeamDir(sim.foulTeam), 0f));
                 if (_cardT > 0f) _referee.point = Vector3.up * 3f + AthleteView.W(new Vector2(sim.TeamDir(sim.foulTeam), 0f)) * 0.3f;   // cartão erguido
             }
-            else if (sim.advantageT > 0f)
-            {
-                _referee.point = AthleteView.W(new Vector2(sim.TeamDir(sim.advantageTeam), 0f)) * 1.15f;
-            }
             else if (sim.setPiece)
             {
                 // na cobrança: perto da barreira, fora da linha do chute
@@ -841,6 +837,8 @@ namespace Craquez
                 else if (d > want + 6f) target = ball - toBall / d * (want + 6f);
                 urgency = Mathf.Clamp01((p.position.Dist(target) - 10f) / 15f);
             }
+            if (sim.advantageT > 0f && sim.state == MatchState.Playing)
+                _referee.point = AthleteView.W(new Vector2(sim.TeamDir(sim.advantageTeam), 0f)) * 1.15f;
             // fora das linhas de passe e de cima dos jogadores
             if (--_refThink <= 0)
             {

@@ -57,8 +57,8 @@ namespace Craquez.Sim
             }
             if (sim.kickoffPass && sim.ball.owner == p.id && p.id == sim.kickoffKicker)
             {
-                // saída de bola: toque para o companheiro depois de um instante
-                if (sim.kickoffMate >= 0 && sim.players[sim.kickoffMate].position.Dist(sim.kickoffMateSpot) < 0.8f && Noise(sim, 21) < 0.06f)
+                // saída de bola: CPU toca obrigatoriamente para o companheiro (para trás se 1 atacante, de lado se 2)
+                if (sim.state == MatchState.Playing && sim.kickoffMate >= 0 && sim.kickoffT > 0.25f)
                     f.buttons |= InputFrame.Pass;
                 return f;
             }

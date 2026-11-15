@@ -128,7 +128,7 @@ namespace Craquez.Sim
         /// <summary>Saída para trás (formação com um atacante só).</summary>
         public bool kickoffBack;
         public Vector2 kickoffMateSpot;
-        float kickoffT;
+        public float kickoffT;
         public float passReceiverT;
         public int penaltyTeam = -1, penaltyTaker = -1;
         public float penaltyT;
@@ -559,9 +559,12 @@ namespace Craquez.Sim
             foreach (var p in players)
                 if (p.team == t && !p.isKeeper && !p.sentOff && (kicker == null || p.basePos.x > kicker.basePos.x)) kicker = p;
             // companheiro da saída: com dois atacantes, o parceiro de ataque (toque de lado, os dois trabalham a
-            // bola); com um atacante só, o meia mais central, que vem buscar atrás (toque para trás)
+            // bola); com um atacante só, o meia mais central, que vem buscar atrás (obrigatório toque para trás)
             int strikers = 0;
-            foreach (var p in players) if (p.team == t && !p.isKeeper && !p.sentOff && p.basePos.x > -0.25f) strikers++;
+            bool fieldMode = mode.id == GameModes.Field;
+            foreach (var p in players)
+                if (p.team == t && !p.isKeeper && !p.sentOff && (fieldMode ? (p.basePos.x > -0.25f && Mathf.Abs(p.basePos.y) < 0.48f) : p.basePos.x >= -0.3f))
+                    strikers++;
             bool twoUp = strikers >= 2;
             foreach (var p in players)
             {
@@ -569,6 +572,11 @@ namespace Craquez.Sim
                 if (twoUp) { if (mate == null || p.basePos.x > mate.basePos.x) mate = p; }
                 else if (p.basePos.x > -0.62f && (mate == null || Mathf.Abs(p.basePos.y) < Mathf.Abs(mate.basePos.y) - 0.05f
                          || (Mathf.Abs(Mathf.Abs(p.basePos.y) - Mathf.Abs(mate.basePos.y)) <= 0.05f && p.basePos.x > mate.basePos.x))) mate = p;
+            }
+            if (mate == null)
+            {
+                foreach (var p in players)
+                    if (p.team == t && !p.isKeeper && !p.sentOff && p != kicker && (mate == null || p.basePos.x > mate.basePos.x)) mate = p;
             }
             kickoffBack = !twoUp;
             kicker.position = new Vector2(-TeamDir(t) * 0.5f, 0);
@@ -1214,7 +1222,7 @@ namespace Craquez.Sim
                 // ninguém demora: depois de alguns segundos a saída é feita automaticamente
                 kickoffT += DT;
                 protectT = Mathf.Max(protectT, 0.3f);
-                if (kickoffT > 6f) KickoffTouch(players[kickoffKicker]);
+                if (kickoffT > 2.5f) KickoffTouch(players[kickoffKicker]);
             }
             AiAll(false);
             foreach (var p in players) MovePlayer(p);
