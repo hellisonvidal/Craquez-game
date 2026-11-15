@@ -13,7 +13,7 @@ namespace Craquez
     public static class BallCatalog
     {
         public enum Panels { Classic32, Propeller6, Curved8, TwoPiece, Leather18, Tri20 }
-        public enum Art { Plain, Pentagons, Triads, Swoosh, Stripes, Comet, Stars, Gradient, Waves, Splash, Band, Laces, Halves, Shards, Corners, Arcs, Ribbons, Outline, Dots, Zigzag, Spiral }
+        public enum Art { Plain, Pentagons, Triads, Swoosh, Stripes, Comet, Stars, Gradient, Waves, Splash, Band, Laces, Halves, Shards, Corners, Arcs, Ribbons, Outline, Dots, Zigzag, Spiral, CraquezRemesh }
 
         public class Ball
         {
@@ -45,7 +45,7 @@ namespace Craquez
         public static readonly Ball[] All =
         {
             // ---- brancas (campo)
-            B("Craquez Pro 26", Panels.Propeller6, Art.Corners, W, "#0b1f4d", "#e11d48"),
+            B("Craquez Pro 26", Panels.Classic32, Art.CraquezRemesh, W, "#dc1428", "#d4a017"),
             B("Clássica 70", Panels.Classic32, Art.Pentagons, W, "#121212", "#121212"),
             B("Tríade", Panels.Classic32, Art.Triads, W, "#111827", "#9ca3af"),
             B("Copa Branca", Panels.Tri20, Art.Outline, W, "#1d4ed8", "#f59e0b"),
@@ -97,6 +97,21 @@ namespace Craquez
             i = ((i % All.Length) + All.Length) % All.Length;
             long key = i * 100000L + w;
             if (_cache.TryGetValue(key, out var t) && t != null) return t;
+            var b = All[i];
+            if (b.art == Art.CraquezRemesh && Mathf.Abs(b.a.r - 0.968f) < 0.05f)
+            {
+                var asset = Resources.Load<TextAsset>("UI/ball_craquez.png");
+                if (asset != null)
+                {
+                    var rt = new Texture2D(2, 2, TextureFormat.RGBA32, true) { wrapMode = TextureWrapMode.Repeat, anisoLevel = 8 };
+                    if (rt.LoadImage(asset.bytes, true))
+                    {
+                        _cache[key] = rt;
+                        return rt;
+                    }
+                    Object.Destroy(rt);
+                }
+            }
             t = new Texture2D(w, w / 2, TextureFormat.RGBA32, true) { wrapMode = TextureWrapMode.Repeat, anisoLevel = 8 };
             t.SetPixels32(Pixels(i, w));
             t.Apply(true, true);
@@ -476,6 +491,29 @@ namespace Craquez
                     float f = Mathf.Repeat((lon + p.y * 5f) / (Mathf.PI * 2f) * 4f, 1f);
                     c = Color.Lerp(c, b.b, Band(f - 0.5f, 0.05f, aa * 2f) * Smooth(0.98f, 0.8f, Mathf.Abs(p.y)));
                     c = Color.Lerp(c, b.c, Band(f - 0.66f, 0.012f, aa * 2f) * Smooth(0.98f, 0.8f, Mathf.Abs(p.y)));
+                    break;
+                }
+                case Art.CraquezRemesh:
+                {
+                    // Design Soccer_Ball_Craquez_Remesh (Meshy): arcos triplos em vermelho, preto-carbono e dourado
+                    // com retícula de meio-tom (halftone) e respingos dinâmicos contornando os 32 gomos
+                    var blk = new Color(0.07f, 0.08f, 0.1f);
+                    float curve = lx * 0.82f + ly * 0.57f + 0.22f * Mathf.Sin(ly * 6.5f + idx * 1.1f);
+                    float ribRed = Band(curve - 0.14f, 0.048f, aa * 1.2f);
+                    float ribBlk = Band(curve - 0.03f, 0.044f, aa * 1.2f);
+                    float ribGld = Band(curve + 0.075f, 0.042f, aa * 1.2f);
+                    c = Color.Lerp(c, b.b, ribRed);
+                    c = Color.Lerp(c, blk, ribBlk);
+                    c = Color.Lerp(c, b.c, ribGld);
+                    // Pontos de meio-tom (halftone) ao longo das faixas dourada e preta
+                    var q = p * 26f;
+                    var f = new Vector3(q.x - Mathf.Round(q.x), q.y - Mathf.Round(q.y), q.z - Mathf.Round(q.z));
+                    float dotMask = Smooth(0.18f, 0.02f, Mathf.Abs(curve + 0.02f));
+                    float dotR = 0.42f * dotMask;
+                    c = Color.Lerp(c, blk, Smooth(dotR + aa * 18f, dotR - aa * 18f, f.magnitude) * dotMask * 0.85f);
+                    // Respingos vermelhos e dourados nas bordas dos gomos
+                    float sp = Gfx.VNoise(p.x * 18 + 7, p.y * 18 + p.z * 16 + 7, 64, 5);
+                    c = Color.Lerp(c, b.b, Smooth(0.74f, 0.78f, sp) * Smooth(0.25f, 0.04f, seam));
                     break;
                 }
                 default:

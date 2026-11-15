@@ -1,3 +1,16 @@
+## Craquez 2.26.0
+
+Jogo de futebol feito 100% com inteligência artificial, **gratuito**.
+
+### Download
+- **Celular Android**: `Craquez-v2.26.0.apk`
+- **TV (Google TV / Android TV, ex.: TCL C6K)**: `Craquez-TV-v2.26.0.apk` — use este na TV (32 e 64 bits).
+
+### Mudanças
+- **Nova bola oficial (`Craquez Pro 26` — `Soccer_Ball_Craquez_Remesh`)**: implementada a bola personalizada do Meshy (faixas curvilíneas em vermelho, preto e dourado com arte urbana, pontilhados *halftone* e o logo *Craquez*), mantendo integralmente o shader *cel shading* (`Craquez/ToonOutline`) e contorno em tempo real.
+- **Física 3D da bola reformulada (`SimBall` / `MatchSim`)**: aerodinâmica 3D completa com giro vertical (`topSpin` para *dip* em chutes colocados/potentes e *backspin* que flutua e freia no quique em lançamentos e cavadinhas), efeito *knuckleball* (oscilação lateral *folha-seca* em chutes fortes de longa distância com pouco giro), transferência realista de efeito no quique e sub-passos adaptativos.
+- **Inteligência individual, consciência de função e apoio aos companheiros próximos (`MatchSim` / `CpuBrain`)**: cada jogador atua conforme seu papel tático (`GK`, `DF`, `MF`, `FW`, corredor central vs. lateral) e ajuda ativamente os companheiros mais próximos — saindo da sombra de marcação para abrir linha de passe limpa quando o portador está pressionado, fazendo ultrapassagens (*overlap*/*underlap*) pelas alas e cobrindo as costas do companheiro que sai para dar o bote.
+
 ## Craquez 2.25.0
 
 Jogo de futebol feito 100% com inteligência artificial, **gratuito**.

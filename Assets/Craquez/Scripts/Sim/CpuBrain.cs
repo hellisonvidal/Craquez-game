@@ -447,8 +447,8 @@ namespace Craquez.Sim
         }
 
         /// <summary>
-        /// Melhor companheiro para o passe: livre (marcador longe), linha do passe aberta e quanto
-        /// faz o time avançar; atrás só se estiver bem livre. Retorna a nota (maior = melhor).
+        /// Melhor companheiro para o passe: livre (marcador longe), linha do passe aberta, apoio próximo
+        /// quando o portador está pressionado, infiltração em velocidade e avanço territorial. Retorna a nota.
         /// </summary>
         SimPlayer BestOption(MatchSim sim, SimPlayer p, out float bestS)
         {
@@ -456,16 +456,26 @@ namespace Craquez.Sim
             SimPlayer best = null;
             bestS = float.MinValue;
             bool field = sim.mode.id == GameModes.Field;
+            var nearMe = sim.NearestOpponent(p);
+            float myPressD = nearMe != null ? nearMe.position.Dist(p.position) : 99f;
+            bool pressured = myPressD < (field ? 3.2f : 2.2f);
             foreach (var m in sim.players)
             {
                 if (m.team != p.team || m == p || m.isKeeper || m.sentOff) continue;
                 float d = m.position.Dist(p.position);
-                if (d < (field ? 5f : 2.5f) || d > sim.halfLen * 1.2f) continue;
+                if (d < (field ? 4.2f : 2.2f) || d > sim.halfLen * 1.2f) continue;
                 float free = 99f;
                 foreach (var o in sim.players) if (o.team != p.team && !o.sentOff) free = Mathf.Min(free, o.position.Dist(m.position));
                 float lane = sim.LaneFree(p.team, p.position, m.position);
                 float gain = (m.position.x - p.position.x) * dir;
                 float sc = Mathf.Min(free, field ? 8f : 5f) * 0.45f + Mathf.Min(lane, 4f) * 0.6f + gain * (field ? 0.09f : 0.16f) - d * 0.02f;
+                // sob pressão: valoriza o companheiro mais próximo que veio dar apoio com linha de passe limpa
+                if (pressured && d < (field ? 15f : 8.5f) && lane > (field ? 1.5f : 1.0f) && free > (field ? 2.2f : 1.5f))
+                    sc += 0.85f * (1f - d / (field ? 16f : 9f));
+                // companheiro infiltrando ou fazendo ultrapassagem (overlap) em espaço livre recebe bônus de visão
+                float runFwd = Vector2.Dot(m.vel, new Vector2(dir, 0f));
+                if (runFwd > 2.4f && free > (field ? 3.2f : 2.0f) && gain > -2f)
+                    sc += 0.55f * Mathf.Clamp01(runFwd / 6.5f) * (0.6f + 0.4f * p.passing);
                 if (lane < (field ? 1.2f : 0.8f)) sc -= 3f;
                 // sem passe bobo: o adversário corre enquanto a bola viaja (num passe longo ele chega bem mais
                 // longe) e o companheiro colado no marcador perde a bola no domínio
