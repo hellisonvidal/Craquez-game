@@ -167,8 +167,8 @@ namespace Craquez
     /// </summary>
     public class AthleteAnimator
     {
-        public static readonly string[] Loco = { "Idle", "Walk", "Jog", "Run", "Backpedal", "Jockey", "Sprint", "JockeyR", "GkReady", "GkSideL", "GkSideR" };
-        const int IIdle = 0, IWalk = 1, IJog = 2, IRun = 3, IBack = 4, IJockey = 5, ISprint = 6, IJockeyR = 7, IGkReady = 8, IGkSideL = 9, IGkSideR = 10;
+        public static readonly string[] Loco = { "Idle", "Walk", "Jog", "Run", "Backpedal", "Jockey", "Sprint", "JockeyR", "GkReady", "GkSideL", "GkSideR", "InjuredIdle", "InjuredWalk", "InjuredRun", "JogStrafeL", "JogStrafeR" };
+        const int IIdle = 0, IWalk = 1, IJog = 2, IRun = 3, IBack = 4, IJockey = 5, ISprint = 6, IJockeyR = 7, IGkReady = 8, IGkSideL = 9, IGkSideR = 10, IInjIdle = 11, IInjWalk = 12, IInjRun = 13, IJogStrafeL = 14, IJogStrafeR = 15;
 
         public class ClipInfo
         {
@@ -269,7 +269,7 @@ namespace Craquez
             }
             for (int i = 0; i < Loco.Length; i++)
             {
-                if (!Clips.TryGetValue(Loco[i], out var ci) || !ci.loop || i == IIdle || i == IGkReady) continue;
+                if (!Clips.TryGetValue(Loco[i], out var ci) || !ci.loop || i == IIdle || i == IGkReady || i == IInjIdle) continue;
                 float len = ci.clip.length, best = float.MaxValue, bt = 0f;
                 const int N = 40;
                 var rigRoot = go.GetComponentInParent<AthleteRig>();
@@ -311,7 +311,7 @@ namespace Craquez
                     }
                 }
                 float gs = cnt >= 3 ? sum / cnt : 0f;
-                if (i == IBack || i == IJockey || i >= IJockeyR) gs = 0f;   // de costas/de lado a medida (para a frente) não vale: usa o valor do json
+                if (i == IBack || i == IJockey || i == IJockeyR || i >= IGkSideL && i <= IGkSideR || i >= IJogStrafeL) gs = 0f;   // de costas/de lado a medida (para a frente) não vale: usa o valor do json
                 _groundSpeed[i] = gs;
                 Debug.Log($"[anim] {Loco[i]}: apoio do pé esq. em {bt:F2} do ciclo, chão a {gs:F2} m/s (json {ci.speed:F2})");
             }
@@ -451,7 +451,7 @@ namespace Craquez
         /// <summary>Ritmo das passadas (1 = natural; >1 passadas mais curtas e rápidas, como conduzindo a bola).</summary>
         public float cadence = 1f;
 
-        public void Tick(float dt, float speed, float fwd, float side, bool guard, bool keeper = false)
+        public void Tick(float dt, float speed, float fwd, float side, bool guard, bool keeper = false, bool injured = false)
         {
             if (!_valid) return;
             var _w = _locoTarget;
@@ -461,7 +461,23 @@ namespace Craquez
             float lateral = speed > 3.5f ? 0f : Mathf.Clamp01(Mathf.Abs(side) / Mathf.Max(0.4f, speed) - 0.35f) * 1.6f;
             bool gk = keeper && guard && _has[IGkReady];
             bool strafeLR = _has[IJockeyR];
-            if (gk && (speed < 0.25f || Mathf.Abs(side) > Mathf.Abs(fwd) * 0.8f))
+            if (injured && !keeper && _has[IInjIdle] && _has[IInjWalk])
+            {
+                if (speed < 0.25f) _w[IInjIdle] = 1f;
+                else if (speed < _locoSpeed[IInjWalk] * 1.15f || !_has[IInjRun])
+                {
+                    float k = Mathf.Clamp01(speed / Mathf.Max(0.4f, _locoSpeed[IInjWalk]));
+                    _w[IInjWalk] = k;
+                    _w[IInjIdle] = 1f - k;
+                }
+                else
+                {
+                    float t = Mathf.Clamp01((speed - _locoSpeed[IInjWalk]) / Mathf.Max(0.4f, _locoSpeed[IInjRun] - _locoSpeed[IInjWalk]));
+                    _w[IInjWalk] = 1f - t;
+                    _w[IInjRun] = t;
+                }
+            }
+            else if (gk && (speed < 0.25f || Mathf.Abs(side) > Mathf.Abs(fwd) * 0.8f))
             {
                 // goleiro em posição de espera e, deslocando, passos laterais (base larga, joelhos dobrados)
                 float k = Mathf.Clamp01(speed / 1.2f);
@@ -475,10 +491,19 @@ namespace Craquez
             }
             else if (guard || lateral > 0.85f)
             {
-                float k = Mathf.Clamp01(speed / 1.2f);
-                // marcação de lado: passo lateral para o lado do movimento (esquerda/direita)
-                _w[strafeLR && side > 0f ? IJockeyR : IJockey] = k;
-                _w[IIdle] = 1f - k;
+                if (speed > 2.0f && _has[IJogStrafeL] && _has[IJogStrafeR])
+                {
+                    float k = Mathf.Clamp01((speed - 1.8f) / 1.2f);
+                    _w[side > 0f ? IJogStrafeR : IJogStrafeL] = k;
+                    _w[strafeLR && side > 0f ? IJockeyR : IJockey] = 1f - k;
+                }
+                else
+                {
+                    float k = Mathf.Clamp01(speed / 1.2f);
+                    // marcação de lado: passo lateral para o lado do movimento (esquerda/direita)
+                    _w[strafeLR && side > 0f ? IJockeyR : IJockey] = k;
+                    _w[IIdle] = 1f - k;
+                }
             }
             else if (back > 0.55f && speed < 4.5f)
             {
@@ -513,7 +538,7 @@ namespace Craquez
                 if (!_locoP[i].IsValid() || _locoW[i] <= 0f) continue;
                 float len = (float)_locoP[i].GetAnimationClip().length;
                 // ritmo casado com a velocidade (pés sem patinar), dentro de limites naturais
-                float rate = (i == IIdle || i == IGkReady || speed < 0.2f) ? _idleRate : Mathf.Clamp(speed / _locoSpeed[i] * cadence, 0.7f, 1.8f);
+                float rate = (i == IIdle || i == IGkReady || i == IInjIdle || speed < 0.2f) ? _idleRate : Mathf.Clamp(speed / _locoSpeed[i] * cadence, 0.7f, 1.8f);
                 cyclesPerSec += _locoW[i] * rate / Mathf.Max(0.1f, len);
                 wsum += _locoW[i];
             }
@@ -527,7 +552,7 @@ namespace Craquez
                 // parado: a captura "Idle" dá passos no lugar (0,8 m/s de pé mexendo) — ninguém fica assim
                 // em jogo; segura um quadro com os dois pés no chão (o corpo respira por cima, na pose)
                 // (a captura do Mixamo parada é um "respirar" de verdade: toca normalmente, no ritmo de cada um)
-                if (i == IIdle || i == IGkReady)
+                if (i == IIdle || i == IGkReady || i == IInjIdle)
                 {
                     if (_mocap) { _locoP[i].SetTime(Mathf.Repeat(_idleT + _idleOff, len)); }
                     else _locoP[i].SetTime(IdleHold * len);

@@ -254,9 +254,13 @@ namespace Craquez
                     break;
                 case "bote":
                 {
-                    // bote: passo longo esticando a perna na bola
-                    float cb = AthleteAnimator.KickContact("Pass");
-                    anim.Play("Pass", cb - 0.1f, 0.55f, 1.25f, 0.04f);
+                    // bote: passo longo esticando a perna na bola (usa Tackles da captura quando disponíveis)
+                    string tClip = "Pass";
+                    int ti = (p.id + view.sim.tick) % 3;
+                    string cand = ti == 0 ? "Tackle1" : ti == 1 ? "Tackle2" : "Tackle3";
+                    if (AthleteAnimator.Has(cand)) tClip = cand;
+                    float cb = AthleteAnimator.KickContact(tClip);
+                    anim.Play(tClip, Mathf.Max(0f, cb - 0.1f), 0.55f, 1.25f, 0.04f);
                     break;
                 }
                 case "skill":
@@ -289,6 +293,11 @@ namespace Craquez
                     if (away.sqrMagnitude < 1e-4f) break;
                     float k = Mathf.Clamp01(e.power / 7f);
                     _bumpVel += away.normalized * (e.id == p.id ? 35f + 40f * k : 14f);   // (antes ~17° de tranco: parecia que ia cair de costas)
+                    if (e.id == p.id && e.power > 5.5f && anim != null && anim.CurrentAction == null)
+                    {
+                        string hitClip = AthleteAnimator.Has("HitSide") ? "HitSide" : AthleteAnimator.Has("HitBack") ? "HitBack" : null;
+                        if (hitClip != null) anim.Play(hitClip, 0.08f, 0.5f, 1.3f, 0.05f);
+                    }
                     break;
                 }
                 case "fooled":
@@ -304,7 +313,12 @@ namespace Craquez
                     break;
                 case "header":
                     _hopT = 0.55f;
-                    if (AthleteAnimator.Has("Header"))
+                    if (view.sim.ball.z > 1.35f && AthleteAnimator.Has("HeaderJump"))
+                    {
+                        float hc = AthleteAnimator.KickContact("HeaderJump");
+                        anim.Play("HeaderJump", Mathf.Max(0f, hc - 0.12f), 0.72f, 1.15f, 0.04f);
+                    }
+                    else if (AthleteAnimator.Has("Header"))
                     {
                         // a cabeça vai na bola: o golpe de pescoço da captura cai no instante do toque
                         float hc = AthleteAnimator.KickContact("Header");
@@ -318,14 +332,20 @@ namespace Craquez
                     _recvLeg = rig.footL != null && rig.footR != null && (bw - rig.footL.position).sqrMagnitude < (bw - rig.footR.position).sqrMagnitude ? 0 : 1;
                     _recvT = e.ok ? 0.34f : 0.26f;
                     _recvTotal = _recvT;
+                    if (e.ok && view.sim.ball.z > 0.35f && p.vel.magnitude < 3.5f && anim != null && anim.CurrentAction == null && AthleteAnimator.Has("Receive"))
+                        anim.Play("Receive", 0.05f, 0.5f, 1.15f, 0.05f);
                     break;
                 }
                 case "foul":
                     // quem fez a falta: a perna vai no adversário (a pancada aparece; não parece queda sozinha)
                     if (p.slide <= 0f && AthleteAnimator.Mocap && anim != null && anim.CurrentAction == null)
                     {
-                        float fc = AthleteAnimator.KickContact("Pass");
-                        anim.Play("Pass", Mathf.Max(0f, fc - 0.12f), 0.45f, 1.3f, 0.04f);
+                        string fClip = "Pass";
+                        int fi = (p.id + view.sim.tick) % 3;
+                        string cand = fi == 0 ? "Tackle1" : fi == 1 ? "Tackle2" : "Tackle3";
+                        if (AthleteAnimator.Has(cand)) fClip = cand;
+                        float fc = AthleteAnimator.KickContact(fClip);
+                        anim.Play(fClip, Mathf.Max(0f, fc - 0.12f), 0.45f, 1.3f, 0.04f);
                     }
                     break;
                 case "tackle_try":
@@ -344,7 +364,10 @@ namespace Craquez
                     _diveSide = Vector3.Dot(W(view.sim.ball.vel), transform.right) >= 0 ? -1f : 1f;
                     break;
                 case "goal":
-                    _celebrate = 4f;
+                    if (p.isKeeper && e.team != p.team && p.saveKind == 0 && anim != null && AthleteAnimator.Has("GkMiss"))
+                        anim.Play("GkMiss", 0f, 1.1f, 1f, 0.08f);
+                    else
+                        _celebrate = 4f;
                     break;
             }
         }
@@ -449,12 +472,14 @@ namespace Craquez
                     {
                         _fallStage = 1;
                         if (p.fallKind != 0 && AthleteAnimator.Has("Trip")) { anim.Play("Trip", 0.2f, 1.05f, 1.6f, 0.06f); _tripClip = true; }
+                        else if (p.fallKind == 0 && AthleteAnimator.Has("Knockback")) { anim.Play("Knockback", 0.05f, 0.95f, 1.25f, 0.06f); _tripClip = true; }
+                        else if (p.fallKind == 0 && AthleteAnimator.Has("FallFlat")) { anim.Play("FallFlat", 0.05f, 0.95f, 1.25f, 0.06f); _tripClip = true; }
                         else _tripClip = false;
                     }
                     // o tropeço da captura já termina deitado: emenda no "caído" ANTES de ele sumir (antes, no
                     // fim do tropeço o peso da captura caía e o giro procedural de deitar somava por cima da pose
                     // já deitada — o jogador virava de pernas para o ar, "voando" por cima de quem deu o carrinho)
-                    if (_fallStage == 1 && _tripClip && (anim.CurrentAction != "Trip" || anim.ActionLeft < 0.22f))
+                    if (_fallStage == 1 && _tripClip && ((anim.CurrentAction != "Trip" && anim.CurrentAction != "Knockback" && anim.CurrentAction != "FallFlat") || anim.ActionLeft < 0.22f))
                     {
                         _fallStage = 2;
                         anim.Play("FallenIdle", (p.id * 0.31f) % 1f, -1f, 1f, 0.2f);
@@ -689,7 +714,12 @@ namespace Craquez
             else if (!on && anim.CurrentAction == "ArmsFolded") anim.Stop(0.35f);
         }
 
-        public void Bicycle(float seconds) { _bikeT = _bikeTotal = seconds; }
+        public void Bicycle(float seconds)
+        {
+            _bikeT = _bikeTotal = seconds;
+            if (AthleteAnimator.Mocap && anim != null && AthleteAnimator.Has("ScissorKick"))
+                anim.Play("ScissorKick", 0.08f, Mathf.Max(0.8f, seconds), 1.05f, 0.05f);
+        }
         public bool InBicycle => _bikeT > 0f;
         /// <summary>Fase da bicicleta 0..1 (o contato com a bola é em ~0,35).</summary>
         float BikeU => _bikeTotal > 0f ? 1f - _bikeT / _bikeTotal : 1f;
@@ -904,7 +934,9 @@ namespace Craquez
                 bool idle = rawSpd < 0.3f && !hasBall && p.down <= 0f && !p.isKeeper && _celebrate <= 0f;
                 _idleT = idle ? _idleT + dt : 0f;
             }
-            anim?.Tick(dt, animSpeed, animFwd, rawSpd > 0.01f ? lv.x * (_animSpd / rawSpd) : 0f, guard, p.isKeeper);
+            anim?.Tick(dt, animSpeed, animFwd, rawSpd > 0.01f ? lv.x * (_animSpd / rawSpd) : 0f, guard, p.isKeeper, p.injuryT > 0f);
+            if (p.injured && p.vel.magnitude < 0.3f && anim != null && anim.CurrentAction == null && AthleteAnimator.Has("InjuredWave") && ((p.id + view.sim.tick) % 300 == 0))
+                anim.Play("InjuredWave", 0f, 1.2f, 1f, 0.1f);
             if (_slideClip && anim != null)
             {
                 if (p.down > 0f) _slideClip = false;   // (caiu: a queda assume)
@@ -1295,7 +1327,10 @@ namespace Craquez
             float ang = Vector2.SignedAngle(_refDir, dir);   // + = anti-horário visto de cima (esquerda)
             if (spd > 3.6f && p.down <= 0f && Mathf.Abs(ang) > 70f && _cutCd <= 0f && (anim.CurrentAction == null || anim.ActionWeight < 0.2f) && p.slide <= 0f && !p.isKeeper)
             {
-                anim.Play(ang > 0f ? "CutL" : "CutR", 0.28f, 0.5f, 1.4f, 0.1f);
+                string cClip = spd > 5.2f && AthleteAnimator.Has("RunTurnL") && AthleteAnimator.Has("RunTurnR")
+                    ? (ang > 0f ? "RunTurnL" : "RunTurnR")
+                    : (ang > 0f ? "CutL" : "CutR");
+                anim.Play(cClip, 0.28f, 0.5f, 1.4f, 0.1f);
                 _cutCd = 0.9f;
                 // patada no gramado na mudança brusca de direção
                 if (view.Turf != null && rig.footL != null)

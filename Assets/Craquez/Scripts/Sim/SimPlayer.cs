@@ -74,10 +74,13 @@ namespace Craquez.Sim
         public int helping = -1;
         /// <summary>Goleiro com a bola nas mãos (não vale para o tiro de meta, com a bola no chão).</summary>
         public bool InHands => hold > 0f && !goalKick;
-        /// <summary>Cartões: amarelos recebidos e expulsão (fica fora de campo; no futsal volta outro em 2 min).</summary>
-        public int yellows;
+        /// <summary>Cartões: amarelos recebidos, faltas cometidas e expulsão (fica fora de campo; no futsal volta outro em 2 min).</summary>
+        public int yellows, fouls;
         public bool sentOff;
         public float sentOffT;
+        /// <summary>Pancada/lesão temporária: segundos mancando (reduz velocidade e ativa animação de lesão).</summary>
+        public float injuryT;
+        public bool injured;
         /// <summary>Goleiro lendo um chute: desloca em passadas laterais (não corre).</summary>
         public bool keeperSet;
         /// <summary>Há quanto tempo o goleiro está com a bola nas mãos (espera alguém se desmarcar).</summary>

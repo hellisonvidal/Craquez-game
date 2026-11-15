@@ -1,3 +1,17 @@
+## Craquez 2.27.0
+
+Jogo de futebol feito 100% com inteligência artificial, **gratuito**.
+
+### Download
+- **Celular Android**: `Craquez-v2.27.0.apk`
+- **TV (Google TV / Android TV, ex.: TCL C6K)**: `Craquez-TV-v2.27.0.apk` — use este na TV (32 e 64 bits).
+
+### Mudanças
+- **Novas animações integradas (`AthleteAnimator` / `AthleteView`)**: ativados os clipes de locomoção machucada (`InjuredIdle`, `InjuredWalk`, `InjuredRun`, `InjuredWave`), desarmes (`Tackle1`/`2`/`3`), impacto e quedas (`HitSide`, `HitBack`, `Knockback`, `FallFlat`), cabeceio com salto (`HeaderJump`), domínio no ar (`Receive`), meia-bicicleta (`ScissorKick`), giros em velocidade (`RunTurnL`/`R`), deslocamento lateral do goleiro (`JogStrafeL`/`R`) e reação ao gol sofrido (`GkMiss`).
+- **Goleiros, quedas e lesões (`SimPlayer` / `MatchSim`)**: estabilizada a base do goleiro ao fechar o ângulo ou encaixar (`saveKind` 1, 2 e 7) evitando deslizes; adicionada simulação de pancadas e lesões temporárias (`injuryT`, `injured`) com redução progressiva de velocidade, bloqueio de sprint e animação/sinalização de jogador mancando.
+- **Inteligência do árbitro (`MatchSim` / `MatchView`)**: implementada a **Lei da Vantagem** (`advantageT` com sinalização visual de braço estendido do juiz, cartão amarelo diferido ou retorno para a falta caso o time perca a vantagem) e cartão amarelo por faltas repetidas (`>= 3` faltas).
+- **Correção da bola flutuando em reposições (`MatchSim`)**: corrigido o bug em que a bola arremessada pelo gandula/reposição nas laterais ficava congelada no ar quando o cobrador ainda estava se aproximando da linha.
+
 ## Craquez 2.26.0
 
 Jogo de futebol feito 100% com inteligência artificial, **gratuito**.

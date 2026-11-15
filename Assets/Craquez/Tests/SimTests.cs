@@ -1103,5 +1103,58 @@ namespace Craquez.Tests
             var s = MiniJson.Write(o, false);
             Assert.AreEqual("{\"a\":[1,2.5,\"x\\n\"],\"b\":{\"c\":true,\"d\":null}}", s);
         }
+
+        [Test] public void TouchlineBallTossNeverHoversMidAir()
+        {
+            var sim = NewMatch(GameModes.Field, 42);
+            for (int i = 0; i < 65; i++) sim.Step(new InputFrame[2]);
+            sim.kickoffPass = false;
+            // força a bola sair pela lateral longe dos jogadores para acionar o arremesso de reposição (Restart + walkUpTaker)
+            sim.ball.owner = -1;
+            sim.ball.lastTouchTeam = 0;
+            sim.ball.lastTouchId = sim.Controlled(0).id;
+            sim.ball.pos = new Vector2(0f, sim.halfW - 0.1f);
+            sim.ball.vel = new Vector2(0f, 8f);
+            sim.ball.z = 0.2f;
+            sim.ball.vz = 0f;
+            bool enteredRestart = false;
+            int hoveredTicks = 0;
+            for (int i = 0; i < 300; i++)
+            {
+                sim.Step(new InputFrame[2]);
+                if (sim.state == MatchState.Restart && sim.throwIn) enteredRestart = true;
+                if (sim.state == MatchState.Restart && sim.ball.owner < 0 && sim.ball.z > 0.35f && sim.ball.vel.magnitude < 0.05f && Mathf.Abs(sim.ball.vz) < 0.05f)
+                    hoveredTicks++;
+            }
+            Assert.IsTrue(enteredRestart, "deveria entrar em Restart (lateral) após saída lateral");
+            Assert.LessOrEqual(hoveredTicks, 2, "a bola solta não pode ficar flutuando parada no ar durante a reposição");
+        }
+
+        [Test] public void AdvantageAndPersistentFoulYellow()
+        {
+            var sim = NewMatch(GameModes.Field, 77);
+            for (int i = 0; i < 65; i++) sim.Step(new InputFrame[2]);
+            sim.kickoffPass = false;
+            var offender = sim.players.Find(x => x.team == 1 && !x.isKeeper);
+            var victim = sim.players.Find(x => x.team == 0 && !x.isKeeper);
+            offender.fouls = 2;
+            offender.yellows = 0;
+            victim.position = Vector2.zero;
+            offender.position = new Vector2(0.4f, 0f);
+            // coloca atacante do time 0 com a bola à frente para o juiz aplicar vantagem
+            var mate = sim.players.Find(x => x.team == 0 && !x.isKeeper && x.id != victim.id);
+            mate.position = new Vector2(sim.TeamDir(0) * 18f, 0f);
+            sim.ball.owner = mate.id;
+            sim.ball.pos = mate.position;
+            sim.Foul(offender, victim, false);
+            Assert.Greater(sim.advantageT, 0f, "juiz deve dar vantagem quando o time da vítima mantém a posse");
+            Assert.AreEqual(MatchState.Playing, sim.state);
+            // se perder a posse, o juiz puxa a falta e aplica o amarelo por faltas repetidas (>= 3)
+            var opp = sim.players.Find(x => x.team == 1 && !x.isKeeper && x.id != offender.id);
+            sim.ball.owner = opp.id;
+            sim.Step(new InputFrame[2]);
+            Assert.AreEqual(MatchState.Foul, sim.state);
+            Assert.GreaterOrEqual(offender.yellows, 1, "3+ faltas devem gerar cartão amarelo por persistência");
+        }
     }
 }

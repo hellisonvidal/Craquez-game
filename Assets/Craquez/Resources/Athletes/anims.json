@@ -389,5 +389,173 @@
   "speed": 0.69,
   "source": "mixamo:soccer/soccer tackle (3)",
   "contact": 0.333
+ },
+ "Chip": {
+  "frames": 51,
+  "fps": 30,
+  "loop": false,
+  "speed": 3.139,
+  "source": "mixamo:soccer/Chip",
+  "contact": 0.5
+ },
+ "Dribble": {
+  "frames": 53,
+  "fps": 30,
+  "loop": true,
+  "speed": 2.772,
+  "source": "mixamo:soccer/Dribble"
+ },
+ "ThrowIn": {
+  "frames": 84,
+  "fps": 30,
+  "loop": false,
+  "speed": 1.216,
+  "source": "mixamo:soccer/Throw In",
+  "contact": 1.6
+ },
+ "Receive": {
+  "frames": 155,
+  "fps": 30,
+  "loop": false,
+  "speed": 0.769,
+  "source": "mixamo:soccer/Receive Soccerball",
+  "contact": 0.567
+ },
+ "ScissorKick": {
+  "frames": 84,
+  "fps": 30,
+  "loop": false,
+  "speed": 0.533,
+  "source": "mixamo:soccer/scissor kick",
+  "contact": 0.767
+ },
+ "SoccerPass": {
+  "frames": 49,
+  "fps": 30,
+  "loop": false,
+  "speed": 0.444,
+  "source": "mixamo:soccer/Soccer Pass",
+  "contact": 0.433
+ },
+ "SoccerSpin": {
+  "frames": 39,
+  "fps": 30,
+  "loop": false,
+  "speed": 2.977,
+  "source": "mixamo:soccer/Soccer Spin"
+ },
+ "GkMiss": {
+  "frames": 86,
+  "fps": 30,
+  "loop": false,
+  "speed": 0.335,
+  "source": "mixamo:soccer/goalkeeper miss",
+  "contact": 0.767
+ },
+ "JogStrafeL": {
+  "frames": 22,
+  "fps": 30,
+  "loop": true,
+  "speed": 2.995,
+  "source": "mixamo:soccer/jog strafe left"
+ },
+ "JogStrafeR": {
+  "frames": 23,
+  "fps": 30,
+  "loop": true,
+  "speed": 2.391,
+  "source": "mixamo:soccer/jog strafe right"
+ },
+ "HeaderJump": {
+  "frames": 72,
+  "fps": 30,
+  "loop": false,
+  "speed": 0.17,
+  "source": "mixamo:soccer/Soccer Header",
+  "contact": 1.167
+ },
+ "FallFlat": {
+  "frames": 77,
+  "fps": 30,
+  "loop": false,
+  "speed": 1.403,
+  "source": "mixamo:loco/Fall Flat"
+ },
+ "HitBack": {
+  "frames": 76,
+  "fps": 30,
+  "loop": false,
+  "speed": 1.8,
+  "source": "mixamo:loco/Hit On The Back"
+ },
+ "HitSide": {
+  "frames": 75,
+  "fps": 30,
+  "loop": false,
+  "speed": 2.259,
+  "source": "mixamo:loco/Hit On Side Of Body"
+ },
+ "HitHead": {
+  "frames": 100,
+  "fps": 30,
+  "loop": false,
+  "speed": 1.468,
+  "source": "mixamo:loco/Hit On Side Of Head"
+ },
+ "ChangeDir": {
+  "frames": 66,
+  "fps": 30,
+  "loop": false,
+  "speed": 3.125,
+  "source": "mixamo:loco/Change Direction"
+ },
+ "Jump": {
+  "frames": 66,
+  "fps": 30,
+  "loop": false,
+  "speed": 0.288,
+  "source": "mixamo:loco/jump"
+ },
+ "InjuredIdle": {
+  "frames": 278,
+  "fps": 30,
+  "loop": true,
+  "speed": 0.073,
+  "source": "mixamo:injured/injured idle"
+ },
+ "InjuredWalk": {
+  "frames": 50,
+  "fps": 30,
+  "loop": true,
+  "speed": 1.28,
+  "source": "mixamo:injured/injured walk"
+ },
+ "InjuredRun": {
+  "frames": 20,
+  "fps": 30,
+  "loop": true,
+  "speed": 2.458,
+  "source": "mixamo:injured/injured run"
+ },
+ "InjuredHurt": {
+  "frames": 180,
+  "fps": 30,
+  "loop": true,
+  "speed": 0.113,
+  "source": "mixamo:injured/injured hurting idle"
+ },
+ "InjuredStumble": {
+  "frames": 153,
+  "fps": 30,
+  "loop": false,
+  "speed": 0.292,
+  "source": "mixamo:injured/injured stumble idle"
+ },
+ "InjuredWave": {
+  "frames": 152,
+  "fps": 30,
+  "loop": false,
+  "speed": 0.107,
+  "source": "mixamo:injured/injured wave idle"
  }
 }
