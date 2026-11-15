@@ -634,9 +634,9 @@ namespace Craquez
             var sim = view.sim;
             float v = p.vel.magnitude;
             if (v < 3f || p.down > 0f || p.slide > 0f || p.isKeeper) return Vector3.zero;
-            // Usa o raio de colisão do SimPlayer (0.45f) para determinar proximidade
-            float minDist = SimPlayer.Radius * 2f; // 0.9f
-            SimPlayer best = null; float bd = minDist + 0.1f; // 1.0f - um pouco acima do raio de colisão
+            // Usa o raio de colisão do SimPlayer para determinar proximidade
+            float minDist = SimPlayer.Radius * 2f;
+            SimPlayer best = null; float bd = minDist + 0.15f;
             foreach (var o in sim.players)
             {
                 if (o.team == p.team || o.sentOff || o.isKeeper) continue;
@@ -646,8 +646,8 @@ namespace Craquez
             }
             if (best == null) return Vector3.zero;
             var to = W(best.position - p.position); to.y = 0f;
-            float k = Mathf.Clamp01((bd - minDist) / 0.2f); // 0 quando está no raio de colisão, 1 quando está em minDist+0.1f
-            return to.normalized * 8f * k; // Aumentado de 7f para 8f para inclinação mais pronunciada
+            float k = Mathf.Clamp01((bd - minDist) / 0.2f);
+            return to.normalized * 7f * k;
         }
 
         /// <summary>Dando a mão para quem caiu: inclina o tronco e estende o braço até a mão dele.</summary>
