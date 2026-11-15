@@ -115,8 +115,8 @@ namespace Craquez
             // cada pele um pouco diferente (mais quente, mais rosada, mais oliva)
             float warm = (R(11) - 0.5f) * 0.08f, rosy = (R(12) - 0.5f) * 0.05f;
             tint = new Color(tint.r * (1f + warm + rosy), tint.g * (1f + warm * 0.3f), tint.b * (1f - warm * 0.6f + rosy * 0.4f));
-            // cabelo: alguns raspados, alguns descoloridos
-            if (R(13) < 0.07f) hc = 4;
+            // cabelo: alguns raspados, poucos descoloridos
+            if (R(13) < 0.04f) hc = 4;
             bool shaved = R(14) < 0.08f;
             float posTall = p.isKeeper ? 0.14f : (p.pos == "DF" ? 0.06f : (p.pos == "FW" && Mathf.Abs(p.basePos.y) > 0.45f ? -0.05f : 0f));
             float hMix = Mathf.Clamp01(F(5, R(6) * 4f) / 4f * 0.45f + (R(8) + R(9)) * 0.275f + posTall);

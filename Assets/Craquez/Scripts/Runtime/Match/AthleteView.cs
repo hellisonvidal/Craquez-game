@@ -428,9 +428,9 @@ namespace Craquez
                 }
                 case 3:
                 {
-                    // no chão: vira de lado segurando a perna e se contorce
+                    // no chão: vira de lado segurando a perna e se contorce suavemente (sem tremedeira)
                     float turn = p.fallLight ? 0f : Smooth(u * 3f);   // queda leve: sem virar de lado se contorcendo
-                    float writhe = p.fallLight ? 0f : Mathf.Sin(Time.time * 5.5f + p.id) * 6f * (1f - u * 0.6f);
+                    float writhe = p.fallLight ? 0f : Mathf.Sin(Time.time * 1.8f + p.id) * 4f * (1f - u * 0.6f);
                     pitch = lying;
                     roll += _fallSide * Mathf.Lerp(sideRoll * _fallSide, 62f, turn) + writhe;
                     // às vezes rola no chão (uma volta inteira) antes de ficar sentindo
@@ -453,6 +453,8 @@ namespace Craquez
 
         int _fallStage;   // 0 em pé, 1 caindo (captura), 2 no chão, 3 levantando
         bool _tripClip;   // a queda começou pela captura do tropeço (o corpo todo fica com a captura)
+
+        static bool IsFallClip(string ca) => ca == "Trip" || ca == "Knockback" || ca == "FallFlat" || ca == "FallenIdle" || ca == "StandUp";
 
         /// <summary>
         /// Queda com as capturas do Mixamo: tropeça e cai (de lado/por trás; a pancada de frente cai de
@@ -482,25 +484,25 @@ namespace Craquez
                     if (_fallStage == 1 && _tripClip && ((anim.CurrentAction != "Trip" && anim.CurrentAction != "Knockback" && anim.CurrentAction != "FallFlat") || anim.ActionLeft < 0.22f))
                     {
                         _fallStage = 2;
-                        anim.Play("FallenIdle", (p.id * 0.31f) % 1f, -1f, 1f, 0.2f);
+                        anim.Play("FallenIdle", (p.id * 0.31f) % 1f, -1f, 1f, 0.22f);
                     }
                     break;
                 case 3:
                     if (_fallStage < 2) _fallStage = 2;
-                    if (_fallStage == 2 && anim.CurrentAction != "FallenIdle") anim.Play("FallenIdle", (p.id * 0.31f) % 1f, -1f, 1f, 0.3f);
+                    if (_fallStage == 2 && anim.CurrentAction != "FallenIdle") anim.Play("FallenIdle", (p.id * 0.31f) % 1f, -1f, 1f, 0.28f);
                     break;
                 case 4:
                     if (_fallStage < 3)
                     {
                         _fallStage = 3;
                         float len = AthleteAnimator.ClipLength("StandUp");
-                        anim.Play("StandUp", 0.05f, -1f, Mathf.Clamp((len - 0.05f) / Mathf.Max(0.35f, p.down), 0.9f, 2.4f), 0.15f);
+                        float dur = Mathf.Max(0.42f, p.down);
+                        anim.Play("StandUp", 0.05f, dur + 0.08f, Mathf.Clamp((len - 0.05f) / dur, 0.85f, 2.2f), 0.18f);
                     }
                     break;
             }
             string ca = anim.CurrentAction;
-            bool clip = ca == "FallenIdle" || ca == "StandUp" || ca == "Trip";
-            float w = clip ? anim.ActionWeight : 0f;
+            float w = IsFallClip(ca) ? anim.ActionWeight : 0f;
             // queda pela captura (tropeço → caído → levanta): o giro procedural do corpo nunca soma por cima
             // (as poses da captura já estão deitadas; qualquer sobra vira cambalhota)
             if (_tripClip && _fallStage >= 1) w = 1f;
@@ -512,7 +514,7 @@ namespace Craquez
         void FallLimbs()
         {
             if (_bikeT > 0f) return;   // (na bicicleta as pernas são dela)
-            if (_getUp && anim != null && (anim.CurrentAction == "FallenIdle" || anim.CurrentAction == "StandUp" || anim.CurrentAction == "Trip")) { _fallW = 0f; return; }   // (a captura manda)
+            if (_getUp && anim != null && ((_tripClip && _fallStage >= 1) || IsFallClip(anim.CurrentAction))) { _fallW = 0f; return; }   // (a captura manda sem brigar com membros)
             if (_fallPhase == 0) { _fallW = Mathf.MoveTowards(_fallW, 0f, Time.deltaTime * 4f); if (_fallW <= 0f) return; }
             else _fallW = Mathf.MoveTowards(_fallW, 1f, Time.deltaTime * 8f);
             float u = FallState(out int ph);
@@ -527,7 +529,7 @@ namespace Craquez
                 case 3:
                 {
                     float k = Smooth(u * 3f);
-                    float pump = Mathf.Sin(Time.time * 4f + p.id) * 10f;
+                    float pump = Mathf.Sin(Time.time * 1.8f + p.id) * 6f;
                     hurtThigh = Mathf.Lerp(-25f, -75f, k) + pump; hurtCalf = Mathf.Lerp(45f, 110f, k);
                     otherThigh = Mathf.Lerp(-10f, -30f, k); otherCalf = Mathf.Lerp(25f, 50f, k);
                     break;
@@ -1953,7 +1955,7 @@ namespace Craquez
             // deitado com as pernas no alto, o corpo era puxado para baixo até o pé tocar o chão e
             // metade dele sumia dentro do gramado)
             bool keeperSave = p.isKeeper && (p.dive > 0f || p.saveKind > 0 || _saveRec > 0f);
-            if (keeperSave) _ground = Mathf.Lerp(_ground, 0f, 1f - Mathf.Exp(-Time.deltaTime * 10f));
+            if (keeperSave || p.down > 0f || p.slide > 0f) _ground = Mathf.Lerp(_ground, 0f, 1f - Mathf.Exp(-Time.deltaTime * 12f));
             if (p.slide <= 0f && !keeperSave && p.stun < 0.5f && p.down <= 0f)
                 rig.model.position -= Vector3.up * _ground;
             // depois de firmar os pés: o sobe-e-desce da corrida (voo entre as passadas)
@@ -2141,8 +2143,9 @@ namespace Craquez
             if (rig != null && p != null) LowerShoulders();
             if (p != null && rig != null)
             {
-                // ações (cortes, fintas, giro) mantêm um pouco do balanço do quadril; locomoção, nada
-                rig.PinHips(anim != null ? anim.ActionWeight * 0.25f : 0f);
+                // ações (cortes, fintas, giro) mantêm um pouco do balanço do quadril; quedas/levantadas mantêm o quadril da captura; locomoção, nada
+                float hipKeep = p.down > 0f && _fallStage >= 1 ? 1f : (anim != null ? anim.ActionWeight * 0.25f : 0f);
+                rig.PinHips(hipKeep);
                 BodyLayer();
                 FallLimbs();
                 Protest();
