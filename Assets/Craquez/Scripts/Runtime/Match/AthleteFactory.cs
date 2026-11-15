@@ -359,7 +359,7 @@ namespace Craquez
                             smr.gameObject.SetActive(on);
                             if (on)
                                 smr.sharedMaterial = Shared("hair:" + hn + Teams.Hex(look.hairColor), () =>
-                                    Gfx.Cutout(look.hairColor * 2.2f, T(hn == "afro01" ? "afro_diffuse" : hn + "_diffuse"), 0.3f, 0.02f));   // (fosco: sem o reflexo claro do refletor no alto da cabeça)
+                                    Gfx.Cutout(look.hairColor * 1.15f, T(hn == "afro01" ? "afro_diffuse" : hn + "_diffuse"), 0.3f, 0.02f));   // (fosco: sem o reflexo claro do refletor no alto da cabeça)
                         }
                         else if (n == "Eyes")
                         {
