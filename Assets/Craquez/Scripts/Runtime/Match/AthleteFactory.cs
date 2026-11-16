@@ -123,7 +123,7 @@ namespace Craquez
             // cabelo: alguns raspados, sem descoloridos (loiro removido)
             if (R(13) < 0.02f) hc = 3; // marrom claro em vez de loiro
             bool shaved = R(14) < 0.08f;
-            float posTall = p.isKeeper ? 0.14f : (p.pos == "DF" ? 0.06f : (p.pos == "FW" && Mathf.Abs(p.basePos.y) > 0.45f ? -0.05f : 0f));
+            float posTall = p.isKeeper ? 0f : (p.pos == "DF" ? 0.06f : (p.pos == "FW" && Mathf.Abs(p.basePos.y) > 0.45f ? -0.05f : 0f));   // (goleiro: faixa de altura própria)
             float hMix = Mathf.Clamp01(F(5, R(6) * 4f) / 4f * 0.45f + (R(8) + R(9)) * 0.275f + posTall);
             return new Look
             {
@@ -150,42 +150,31 @@ namespace Craquez
             if (boots >= 0) look.boots = boots;
             var root = new GameObject("Atleta " + p.number + " " + p.name);
             root.transform.SetParent(parent, false);
-            bool isMeshy = false;
-            GameObject inst = MeshyAthleteLoader.InstantiateModel(root.transform, out _);
-            if (inst != null)
+            var model = Model(look.baseName) ?? Model("latino");
+            if (model == null)
             {
-                isMeshy = true;
+                Debug.LogError("Modelos de atleta ausentes em Resources/Athletes");
+                var cap = GameObject.CreatePrimitive(PrimitiveType.Capsule);
+                cap.transform.SetParent(root.transform, false);
+                return root.AddComponent<AthleteRig>();
             }
-            else
-            {
-                var model = Model(look.baseName) ?? Model("latino");
-                if (model == null)
-                {
-                    Debug.LogError("Modelos de atleta ausentes em Resources/Athletes");
-                    var cap = GameObject.CreatePrimitive(PrimitiveType.Capsule);
-                    cap.transform.SetParent(root.transform, false);
-                    return root.AddComponent<AthleteRig>();
-                }
-                inst = Object.Instantiate(model, root.transform, false);
-                inst.name = "model";
-            }
+            var inst = Object.Instantiate(model, root.transform, false);
+            inst.name = "model";
             var rig = root.AddComponent<AthleteRig>();
             rig.Init(inst.transform);
             rig.Physique(look.build, look.frame);
-            // altura real variando entre 1,66 m e 1,95 m por jogador
+            // altura real por jogador: de 1,66 m a 1,95 m na linha; goleiros mais altos, de 1,89 m a 2,06 m
             float u = Mathf.InverseLerp(0.91f, 1.09f, look.scale);
-            float tall = Mathf.Lerp(1.66f, 1.95f, u);
+            float tall = p.isKeeper ? Mathf.Lerp(1.89f, 2.06f, u) : Mathf.Lerp(1.66f, 1.95f, u);
             float modelH = rig.head != null ? rig.head.position.y - root.transform.position.y + 0.19f : 1.70f;
-            float baseScale = Mathf.Clamp(tall / Mathf.Max(1.2f, modelH), 0.85f, 1.18f);
+            // (limite largo: o modelo asiático tem 1,54 m — com o limite antigo de 1,18x ninguém dele passava de ~1,82 m)
+            float baseScale = Mathf.Clamp(tall / Mathf.Max(1.2f, modelH), 0.85f, 1.45f);
             // leve variação de largura corporal proporcional ao peso/build sem alterar a altura
-            float weightXZ = Mathf.Lerp(0.93f, 1.08f, look.build);
+            // (só um pouco: escala desigual no corpo inteiro entorta braços e pernas quando giram — o porte vem
+            // do Physique)
+            float weightXZ = Mathf.Lerp(0.97f, 1.03f, look.build);
             inst.transform.localScale = new Vector3(baseScale * weightXZ, baseScale, baseScale * weightXZ);
-            // mãos do modelo MakeHuman antigo eram grandes demais
-            if (!isMeshy)
-            {
-                foreach (var hn in new[] { "hand_l", "hand_r" })
-                    if (rig.bones.TryGetValue(hn, out var hb)) hb.localScale = hb.localScale * 0.75f;
-            }
+            // (mãos: o tamanho é acertado no AthleteRig.Proportions, medido em cada modelo)
             Dress(rig, look, p.isKeeper ? keeperKit : kit, p.id < 0 && p.number <= 0 ? -1 : p.number, quality);   // (juiz e técnico: sem número)
             Accessories(rig, look, p.isKeeper ? keeperKit : kit, p.isKeeper, captain, quality);
             return rig;
@@ -308,13 +297,6 @@ namespace Craquez
                 smr.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.On;
                 switch (n)
                 {
-                    case "output_unwrapped":
-                    {
-                        var mat = MeshyAthleteLoader.MaterialFor(look, kit, quality);
-                        if (mat != null) smr.sharedMaterial = mat;
-                        rig.body = smr;
-                        break;
-                    }
                     case "Body":
                     {
                         var skin = Shared("skin:" + look.baseName + Teams.Hex(look.skinTint), () =>
