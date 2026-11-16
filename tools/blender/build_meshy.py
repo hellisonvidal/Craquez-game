@@ -175,6 +175,60 @@ new[hd, 2] = NECK + (new[hd, 2] - NECK) * k
 blend = (new[:, 2] > NECK - 0.04) & ~hd
 t = (new[blend, 2] - (NECK - 0.04)) / 0.04
 new[blend, 0] *= 1 - (1 - k) * t
+# braços segmento a segmento: em pose T o braço do modelo pode não ser reto (ex.: antebraço dobrado para a
+# frente) nem ter o comprimento do esqueleto das animações. Antes uma linha reta só pelo antebraço orientava os
+# três ossos: o osso do braço ficava torto na malha, o cotovelo do esqueleto caía fora do cotovelo do modelo e o
+# braço dobrava no lugar errado ("braços abertos"). Aqui: acha ombro -> cotovelo -> punho -> ponta da mão na
+# malha (MESHY_ELBOW_X / MESHY_WRIST_X, em metros do centro), estica braço e antebraço até o comprimento dos ossos
+# e orienta cada osso no seu trecho.
+SEG_DIRS = None
+if os.environ.get("MESHY_ELBOW_X"):
+    EX, WX = float(os.environ["MESHY_ELBOW_X"]), float(os.environ.get("MESHY_WRIST_X", "0.63"))
+    rb = rig.data.bones
+    mw_ = rig.matrix_world
+    L_up = (mw_ @ rb["lowerarm_l"].head_local - mw_ @ rb["upperarm_l"].head_local).length
+    L_fo = (mw_ @ rb["hand_l"].head_local - mw_ @ rb["lowerarm_l"].head_local).length
+
+    def center(pts, x):
+        m = (np.abs(pts[:, 0] - x) < 0.012) & (pts[:, 2] > 1.2)
+        return np.array([x, pts[m, 1].mean(), pts[m, 2].mean()])
+
+    def stretch(pts, o, d, L, k, w):
+        t = (pts - o) @ d
+        dt = np.where(t <= 0, 0.0, np.where(t < L, t * (k - 1), L * (k - 1)))
+        return pts + np.outer(dt * w, d)
+
+    SEG_DIRS = {}
+    for side in (1.0, -1.0):
+        sel = (new[:, 0] * side > 0.17) & (new[:, 2] > 1.2)
+        pts = new[sel] * np.array([side, 1.0, 1.0])             # trabalha sempre no lado +x
+        w0 = np.clip((pts[:, 0] - 0.19) / 0.07, 0.0, 1.0)      # emenda suave no ombro
+        S = np.array([SH.x, SH.y, SH.z])
+        E, W, T = center(pts, EX), center(pts, WX), center(pts, pts[:, 0].max() - 0.03)
+        u = (E - S) / np.linalg.norm(E - S)
+        k_u = L_up / np.linalg.norm(E - S)
+        land = np.array([E, W, T])
+        pts = stretch(pts, S, u, np.linalg.norm(E - S), k_u, w0)
+        land = stretch(land, S, u, np.linalg.norm(E - S), k_u, np.ones(3))
+        E, W, T = land
+        f = (W - E) / np.linalg.norm(W - E)
+        k_f = L_fo / np.linalg.norm(W - E)
+        pts = stretch(pts, E, f, np.linalg.norm(W - E), k_f, w0)
+        land = stretch(land, E, f, np.linalg.norm(W - E), k_f, np.ones(3))
+        E, W, T = land
+        h = (T - W) / np.linalg.norm(T - W)
+        new[sel] = pts * np.array([side, 1.0, 1.0])
+        if side > 0:
+            SEG_DIRS = {"upperarm_": u, "lowerarm_": f, "hand_": h}
+            log("braço: cotovelo %s punho %s; braço x%.2f antebraço x%.2f" % (E.round(3), W.round(3), k_u, k_f))
+
+# braços para dentro: o centro do braço da malha (em T) fica alguns cm para fora da articulação do ombro do
+# esqueleto; ao baixar o braço ele girava em volta de um ponto "dentro" do ombro e ficava aberto
+ARM_IN = float(os.environ.get("MESHY_ARM_IN", "0"))
+if ARM_IN > 0:
+    ax_ = np.abs(new[:, 0])
+    w_in = np.clip((ax_ - 0.19) / 0.07, 0.0, 1.0) * (new[:, 2] > 1.25)
+    new[:, 0] -= np.sign(new[:, 0]) * ARM_IN * w_in
 me.vertices.foreach_set("co", new.ravel())
 me.update()
 co = new
@@ -189,8 +243,12 @@ trig.data.pose_position = "POSE"
 bpy.ops.object.mode_set(mode="POSE")
 arm_dir = Vector((1.0, slope_y[0], slope_z[0])).normalized()
 for side in ("l", "r"):
-    d = Vector((arm_dir.x * (1 if side == "l" else -1), arm_dir.y, arm_dir.z))
+    sg = 1 if side == "l" else -1
+    d = Vector((arm_dir.x * sg, arm_dir.y, arm_dir.z))
     for bn in ("upperarm_", "lowerarm_", "hand_"):
+        if SEG_DIRS is not None:
+            v = SEG_DIRS[bn]
+            d = Vector((v[0] * sg, v[1], v[2]))
         pb = trig.pose.bones[bn + side]
         bpy.context.view_layer.update()
         cur = (trig.matrix_world @ pb.matrix).to_3x3() @ Vector((0, 1, 0))

@@ -16,6 +16,17 @@ bpyenv/bin/python tools/blender/retarget.py out/Athlete_afro.blend mocap out --m
 
 Copie os FBX, `anims.json` e as texturas para `Assets/Craquez/Resources/Athletes/`.
 
+## Corpo único (modelo Meshy)
+
+```bash
+# modelo em pose T (FBX + textura de cor do Meshy); rig.blend = só o "Armature" do Athlete_europeu.fbx
+# proporções já iguais às do esqueleto: sem remapear; braço em segmentos (cotovelo e punho em x, metros)
+MESHY_CROTCH=0.885 MESHY_SHOULDER=1.59 MESHY_HEAD=1 MESHY_ELBOW_X=0.47 MESHY_WRIST_X=0.63 \
+  bpyenv/bin/python tools/blender/build_meshy.py modelo.fbx modelo.png out rig.blend   # -> out/Athlete_base.fbx
+```
+
+Copie `Athlete_base.fbx` para `Assets/Craquez/Resources/Athletes/` e `athlete_base.jpg` para `.../Athletes/Textures/`.
+
 ## Cenário (Quaternius, CC0)
 
 ```bash
