@@ -28,8 +28,8 @@ namespace Craquez.UI
         Kit[] _kits;
         // Minimapa
         RectTransform _minimapRoot;
-        Image _minimapField;
-        readonly List<Image> _minimapDots = new List<Image>();
+        RectTransform _minimapField;
+        readonly List<RectTransform> _minimapDots = new List<RectTransform>();
         CanvasGroup _minimapCg;
 
         public void Build(MatchSim sim, MatchConfig cfg, Kit[] kits)
@@ -230,7 +230,7 @@ namespace Craquez.UI
                 dot.Place(0.5f, 0.5f, 8, 8);
                 dot.anchorMin = dot.anchorMax = new Vector2(0f, 0f);
                 dot.pivot = new Vector2(0.5f, 0.5f);
-                _minimapDots.Add(dot.GetComponent<Image>());
+                _minimapDots.Add(dot);
             }
 
             // Atualiza jogadores
@@ -244,9 +244,10 @@ namespace Craquez.UI
                 float mx = (p.position.x + halfLen) / (2f * halfLen); // 0..1
                 float my = (p.position.y + halfW) / (2f * halfW);     // 0..1
                 var dot = _minimapDots[idx];
-                dot.rectTransform.anchoredPosition = new Vector2(mx * fieldW - fieldW * 0.5f, my * fieldH - fieldH * 0.5f);
-                dot.color = _kits[p.team].c1;
-                dot.rectTransform.sizeDelta = p.isKeeper ? new Vector2(10, 10) : new Vector2(8, 8);
+                dot.anchoredPosition = new Vector2(mx * fieldW - fieldW * 0.5f, my * fieldH - fieldH * 0.5f);
+                var img = dot.GetComponent<Image>();
+                if (img != null) img.color = _kits[p.team].c1;
+                dot.sizeDelta = p.isKeeper ? new Vector2(10, 10) : new Vector2(8, 8);
                 dot.gameObject.SetActive(true);
                 idx++;
             }
@@ -257,9 +258,10 @@ namespace Craquez.UI
                 float mx = (_sim.ball.pos.x + halfLen) / (2f * halfLen);
                 float my = (_sim.ball.pos.y + halfW) / (2f * halfW);
                 var dot = _minimapDots[idx];
-                dot.rectTransform.anchoredPosition = new Vector2(mx * fieldW - fieldW * 0.5f, my * fieldH - fieldH * 0.5f);
-                dot.color = new Color(1f, 1f, 1f, 0.9f);
-                dot.rectTransform.sizeDelta = new Vector2(6, 6);
+                dot.anchoredPosition = new Vector2(mx * fieldW - fieldW * 0.5f, my * fieldH - fieldH * 0.5f);
+                var img = dot.GetComponent<Image>();
+                if (img != null) img.color = new Color(1f, 1f, 1f, 0.9f);
+                dot.sizeDelta = new Vector2(6, 6);
                 dot.gameObject.SetActive(true);
                 idx++;
             }

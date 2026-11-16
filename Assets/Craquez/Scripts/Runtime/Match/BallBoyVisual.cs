@@ -80,9 +80,10 @@ namespace Craquez
             _taskTimer += dt;
 
             // Update task from data
-            if (_currentTask != _boyData.task)
+            var newTask = (BoyTask)_boyData.task;
+            if (_currentTask != newTask)
             {
-                OnTaskChanged(_boyData.task);
+                OnTaskChanged(newTask);
             }
 
             // Update carrying state
@@ -227,11 +228,16 @@ namespace Craquez
             _throwTimer = 0f;
 
             // Face target
-            var target = _boyData?.target ?? transform.position;
-            transform.rotation = Quaternion.LookRotation((target - transform.position).normalized);
+            var target = _boyData?.target ?? Vector2.zero;
+            var target3D = new Vector3(target.x, 0f, target.y);
+            transform.rotation = Quaternion.LookRotation((target3D - transform.position).normalized);
 
             // Play throw animation
-            PlayThrowAnimation();
+            if (_av != null && _av.anim != null && AthleteAnimator.Has("GkThrow"))
+            {
+                float c = AthleteAnimator.KickContact("GkThrow");
+                _av.anim.Play("GkThrow", Mathf.Max(0f, c - 0.1f), 0.8f, 1.1f, 0.1f);
+            }
         }
 
         void ExecuteThrow()
@@ -377,11 +383,8 @@ namespace Craquez
         // Animation events (called from animation clips)
         public void OnThrowRelease()
         {
-            // Ball leaves hands - notify MatchView
-            if (_boyData != null)
-            {
-                MatchView.BallBoyToss?.Invoke(); // If static event exists
-            }
+            // Ball leaves hands - notify MatchView via static event
+            MatchView.OnBallBoyToss?.Invoke();
         }
 
         public void OnPlaceComplete()

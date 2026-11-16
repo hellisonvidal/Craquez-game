@@ -36,6 +36,20 @@ namespace Craquez
         float _cardT;
         GameObject _card;
 
+        /// <summary>Evento estático para notificar que um gandula deve arremessar a bola.</summary>
+        public static event System.Action OnBallBoyToss;
+
+        /// <summary>Manipulador estático para o evento OnBallBoyToss - chama o método de instância.</summary>
+        static void OnBallBoyTossStatic()
+        {
+            // Find the MatchView instance and call the instance method
+            var matchView = FindObjectOfType<MatchView>();
+            if (matchView != null)
+            {
+                matchView.BallBoyToss();
+            }
+        }
+
         /// <summary>O juiz ergue o cartão (amarelo ou vermelho) na mão direita por ~2,5 s.</summary>
         void ShowCard(Color c)
         {
@@ -120,6 +134,8 @@ namespace Craquez
             if (s.mode.id == GameModes.Field && !c.training) BuildBench(parent, q);
             BuildBall(q);
             if (!c.training) { BuildStations(); BuildBallBoys(parent, q); }
+            // Subscribe to static event for ball boy toss
+            MatchView.OnBallBoyToss += OnBallBoyTossStatic;
             _marker0 = Marker(new Color(0.1f, 0.85f, 1f));
             _marker1 = Marker(new Color(1f, 0.55f, 0.1f));
             bcam = cam.gameObject.GetComponent<BroadcastCamera>();

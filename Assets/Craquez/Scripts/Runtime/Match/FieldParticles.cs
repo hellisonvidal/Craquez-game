@@ -150,7 +150,7 @@ namespace Craquez
             emission.rateOverTime = 0;
             emission.SetBursts(new[] { new ParticleSystem.Burst(0f, 8, 15) });
             var shape = ps.shape;
-            shape.shapeType = ParticleSystemShapeType.Disc;
+            shape.shapeType = ParticleSystemShapeType.Circle;
             shape.radius = 0.15f;
             shape.position = new Vector3(0, 0.02f, 0);
             var velocity = ps.velocityOverLifetime;
@@ -259,12 +259,21 @@ namespace Craquez
             main.startLifetime = new ParticleSystem.MinMaxCurve(2f, 5f);
             main.startSpeed = new ParticleSystem.MinMaxCurve(1f, 4f);
             main.startSize = new ParticleSystem.MinMaxCurve(0.05f, 0.1f);
-            main.startColor = new ParticleSystem.MinMaxGradient(
-                new Color(1f, 0.2f, 0.2f, 1f),
-                new Color(0.2f, 0.2f, 1f, 1f),
-                new Color(1f, 1f, 0.2f, 1f),
-                new Color(0.2f, 1f, 0.2f, 1f)
+            // Use a gradient for confetti colors (random between 4 colors)
+            var gradient = new Gradient();
+            gradient.SetKeys(
+                new GradientColorKey[] {
+                    new GradientColorKey(new Color(1f, 0.2f, 0.2f, 1f), 0f),
+                    new GradientColorKey(new Color(0.2f, 0.2f, 1f, 1f), 0.33f),
+                    new GradientColorKey(new Color(1f, 1f, 0.2f, 1f), 0.66f),
+                    new GradientColorKey(new Color(0.2f, 1f, 0.2f, 1f), 1f)
+                },
+                new GradientAlphaKey[] {
+                    new GradientAlphaKey(1f, 0f),
+                    new GradientAlphaKey(1f, 1f)
+                }
             );
+            main.startColor = new ParticleSystem.MinMaxGradient(gradient);
             main.gravityModifier = 0.5f;
             var emission = ps.emission;
             emission.rateOverTime = 0;
@@ -285,8 +294,8 @@ namespace Craquez
 
         void Start()
         {
-            if (sim == null) sim = FindObjectOfType<MatchSim>();
-            if (view == null) view = FindObjectOfType<MatchView>();
+            if (sim == null) sim = GameObject.FindObjectOfType<MatchSim>();
+            if (view == null) view = GameObject.FindObjectOfType<MatchView>();
         }
 
         // Public methods for triggering effects
@@ -328,7 +337,7 @@ namespace Craquez
             var main = ps.main;
             main.startColor = GetSurfaceColor(surface);
             var emission = ps.emission;
-            emission.SetBursts(new[] { new ParticleSystem.Burst(0f, Mathf.RoundToInt(8 * intensity), Mathf.RoundToInt(15 * intensity)) });
+            emission.SetBursts(new[] { new ParticleSystem.Burst(0f, (short)Mathf.RoundToInt(8 * intensity), (short)Mathf.RoundToInt(15 * intensity)) });
             var velocity = ps.velocityOverLifetime;
             velocity.y = new ParticleSystem.MinMaxCurve(0.5f * intensity, 2f * intensity);
             ps.Play();

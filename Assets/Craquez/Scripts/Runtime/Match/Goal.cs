@@ -43,7 +43,7 @@ namespace Craquez
         void InitializeGoal()
         {
             _postFilter = gameObject.AddComponent<MeshFilter>();
-            _postRenderer = gameObject.GetOrAddComponent<MeshRenderer>();
+            _postRenderer = gameObject.GetComponent<MeshRenderer>() ?? gameObject.AddComponent<MeshRenderer>();
 
             // Create goal posts mesh
             var postMesh = CreatePostMesh();
@@ -200,14 +200,12 @@ namespace Craquez
         {
             _netCloth = _netFilter.gameObject.AddComponent<Cloth>();
             _netCloth.useGravity = true;
-            _netCloth.stretchStiffness = netStiffness;
-            _netCloth.bendingStiffness = netStiffness * 0.5f;
+            _netCloth.stiffness = netStiffness;
             _netCloth.damping = netDamping;
             _netCloth.externalAcceleration = Vector3.zero;
             _netCloth.randomAcceleration = Vector3.zero;
             _netCloth.friction = 0.3f;
             _netCloth.collisionMassScale = 0.1f;
-            _netCloth.thickness = 0.02f;
 
             // Constrain corners to goal posts
             var constraints = new ClothSkinningCoefficient[_netVertices.Length];
@@ -262,8 +260,11 @@ namespace Craquez
         {
             if (!enableNetPhysics || _netCloth == null) return;
 
-            // Apply impulse to nearby net vertices
+            // Apply impulse to nearby net vertices by modifying particle velocities
             int affected = 0;
+            var vertices = _netCloth.vertices;
+            var velocities = _netCloth.velocities;
+
             for (int i = 0; i < _netVertices.Length; i++)
             {
                 float dist = Vector3.Distance(_netFilter.transform.TransformPoint(_netVertices[i]), hitPoint);
@@ -271,10 +272,11 @@ namespace Craquez
                 {
                     float force = (1.5f - dist) * velocity.magnitude * 0.1f;
                     Vector3 dir = (velocity.normalized + Random.insideUnitSphere * 0.2f).normalized;
-                    _netCloth.AddForceAt(i, dir * force);
+                    velocities[i] += dir * force;
                     affected++;
                 }
             }
+            _netCloth.velocities = velocities;
             // Debug.Log($"Net hit: {affected} vertices affected");
         }
 

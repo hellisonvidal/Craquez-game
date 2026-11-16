@@ -91,8 +91,8 @@ namespace Craquez
 
         void Start()
         {
-            if (sim == null) sim = FindObjectOfType<MatchSim>();
-            if (view == null) view = FindObjectOfType<MatchView>();
+            if (sim == null) sim = GameObject.FindObjectOfType<MatchSim>();
+            if (view == null) view = GameObject.FindObjectOfType<MatchView>();
 
             // Start ambient
             PlayRandomAmbient();
@@ -257,7 +257,7 @@ namespace Craquez
         void UpdateChants()
         {
             // Auto-start chants during exciting moments
-            if (!_chantCoroutine && chantTeam.Length > 0 && !chantSource.isPlaying)
+            if (_chantCoroutine == null && chantTeam.Length > 0 && !chantSource.isPlaying)
             {
                 if (sim.state == MatchState.Playing)
                 {

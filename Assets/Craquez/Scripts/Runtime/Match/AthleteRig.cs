@@ -46,7 +46,7 @@ namespace Craquez
             ("pelvis", "mixamorig:Hips"),
             ("spine_01", "mixamorig:Spine"),
             ("spine_02", "mixamorig:Spine1"),
-            ("spine_03", "mixamorig:Spine2"),
+            ("spine", "mixamorig:Spine2"),
             ("neck_01", "mixamorig:Neck"),
             ("head", "mixamorig:Head"),
             ("clavicle_l", "mixamorig:LeftShoulder"),
@@ -82,7 +82,7 @@ namespace Craquez
             neck = Bone("neck_01", "mixamorig:Neck");
             if (head != null) headRest = head.localRotation;
             if (neck != null) neckRest = neck.localRotation;
-            spine = Bone("spine_03", "mixamorig:Spine2");
+            spine = Bone("spine", "mixamorig:Spine2");
             pelvis = Bone("pelvis", "mixamorig:Hips");
             footL = Bone("foot_l", "mixamorig:LeftFoot");
             footR = Bone("foot_r", "mixamorig:RightFoot");
@@ -414,7 +414,7 @@ namespace Craquez
         static readonly (string bone, float slim, float strong)[] Shape =
         {
             // tronco e pescoço
-            ("spine_01", 0.80f, 1.08f), ("spine_02", 0.88f, 1.12f), ("spine_03", 0.94f, 1.16f),
+            ("spine_01", 0.80f, 1.08f), ("spine_02", 0.88f, 1.12f), ("spine", 0.94f, 1.16f),
             ("clavicle_l", 0.94f, 1.08f), ("clavicle_r", 0.94f, 1.08f), ("neck_01", 0.96f, 1.10f),
             // quadril/ombros para largura corporal (escala apenas espessura, não comprimento)
             ("pelvis", 0.88f, 1.12f), ("mixamorig:Hips", 0.88f, 1.12f),
@@ -440,7 +440,7 @@ namespace Craquez
             {
                 float k = Mathf.Lerp(slim, strong, build);
                 // ombros e quadril recebem influência do frame (largura)
-                if (name == "spine_03" || name.StartsWith("clavicle") || name == "pelvis" || name == "mixamorig:Hips")
+                if (name == "spine" || name.StartsWith("clavicle") || name == "pelvis" || name == "mixamorig:Hips")
                     k *= fr;
                 if (!bones.TryGetValue(name, out var b) || b.childCount == 0) continue;
                 // eixo do comprimento: o que aponta para o primeiro osso filho
@@ -476,14 +476,14 @@ namespace Craquez
 
             // Ajusta posições das clavículas relativas à coluna após o escalonamento
             // para manter a conexão anatômica correta (clavícula sai do esterno/espinha)
-            if (spine_03 != null)
+            if (spine != null)
             {
                 foreach (var cn in new[] { "clavicle_l", "clavicle_r", "mixamorig:LeftShoulder", "mixamorig:RightShoulder" })
                 {
                     if (bones.TryGetValue(cn, out var clv))
                     {
                         // A clavícula deve apontar para o ombro (filho), mas sua base deve ficar no esterno
-                        // Ajusta a posição local para compensar a escala do spine_03
+                        // Ajusta a posição local para compensar a escala do spine
                         var child = clv.childCount > 0 ? clv.GetChild(0) : null;
                         if (child != null)
                         {
@@ -516,7 +516,7 @@ namespace Craquez
             }
             // tronco mais curto -> pernas proporcionalmente mais longas
             Move("spine_02", "mixamorig:Spine1", 0.95f);
-            Move("spine_03", "mixamorig:Spine2", 0.95f);
+            Move("spine", "mixamorig:Spine2", 0.95f);
             Move("neck_01", "mixamorig:Neck", 0.97f);
             // braços mais longos
             Move("lowerarm_l", "mixamorig:LeftForeArm", 1.08f);
@@ -529,8 +529,8 @@ namespace Craquez
                 {
                     if (bones.TryGetValue(cn, out var clv))
                     {
-                        // Ajusta posição da clavícula relativa à coluna (spine_03)
-                        if (spine_03 != null)
+                        // Ajusta posição da clavícula relativa à coluna (spine)
+                        if (spine != null)
                         {
                             var offset = clv.localPosition;
                             // Mantém a direção mas ajusta a distância do esterno
@@ -546,7 +546,7 @@ namespace Craquez
                 {
                     if (bones.TryGetValue(cn, out var clv))
                     {
-                        if (spine_03 != null)
+                        if (spine != null)
                         {
                             var offset = clv.localPosition;
                             offset *= 1.02f;
