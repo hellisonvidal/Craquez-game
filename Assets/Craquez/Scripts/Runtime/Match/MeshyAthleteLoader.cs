@@ -283,11 +283,12 @@ namespace Craquez
             if (_tried) return _tpl;
             _tried = true;
             // Carrega o novo modelo do corpo (Body_Model.glb) do Resources
-            var asset = Resources.Load<TextAsset>("Athletes/Body_Model");
+            // (a Unity só carrega como TextAsset arquivos .bytes: Body_Model.glb.bytes vira "Body_Model.glb")
+            var asset = Resources.Load<TextAsset>("Athletes/Body_Model.glb");
             if (asset == null)
             {
                 // Fallback para o modelo antigo se o novo não existir
-                asset = Resources.Load<TextAsset>("Athletes/Athlete_Meshy");
+                asset = Resources.Load<TextAsset>("Athletes/Athlete_Meshy.glb");
                 if (asset == null) return null;
             }
             try { _tpl = ParseGlb(asset.bytes); }
@@ -442,7 +443,8 @@ namespace Craquez
             tex.LoadImage(png, false);
             int tw = tex.width, th = tex.height;
             var basePixels = tex.GetPixels32();
-            UnityEngine.Object.Destroy(tex);
+            // (DestroyImmediate fora do modo de jogo: Destroy dá erro nos testes do editor)
+            if (Application.isPlaying) UnityEngine.Object.Destroy(tex); else UnityEngine.Object.DestroyImmediate(tex);
             if (tw > 1024 || th > 1024)
                 basePixels = DownscalePixels(basePixels, ref tw, ref th, 1024);
 

@@ -96,28 +96,32 @@ half3 ToonLight(Light l, half3 n, half3 v, half3 albedo, half smooth, half shado
     return c;
 }
 
-// ---------------------------------------------------------------- atletas (luz suave)
+// ---------------------------------------------------------------- atletas (cel shading)
+// Mesmo visual em faixas do cenário, com três tons (luz, sombra, sombra funda) para dar volume
+// sem gradiente: a borda de cada faixa é dura (só suavizada pelo tamanho do pixel, sem serrilhado).
+half CelBand(half x, half edge)
+{
+    half aa = max(fwidth(x), 0.002);
+    return smoothstep(edge - aa, edge + aa, x);
+}
+
 half3 AthleteLight(Light l, half3 n, half3 v, half3 albedo, half smooth, half skin, half shadowAtten)
 {
     half ndl = dot(n, l.direction);
-    half sh = smoothstep(0.2, 0.8, shadowAtten);
-    // difusa envolvente (wrap): transição gradual da luz para a sombra, que dá volume aos
-    // músculos; um pouco da faixa do cel shading fica para manter a identidade do jogo
-    // (envolvente mais curta e mais faixa: forma definida, músculos firmes — antes o volume "derretia")
-    half w = saturate((ndl + 0.12) / 1.12);
-    half soft = w * w * (3.0 - 2.0 * w);
-    half lit = lerp(soft, ToonStep(ndl), 0.42) * sh;
-    half3 band = lerp(_ToonShadowTint.rgb, half3(1, 1, 1), lit);
+    half sh = step(0.5, shadowAtten);                       // sombra projetada também em faixa dura
+    half lit = ToonStep(ndl) * sh;                          // faixa principal (luz / sombra)
+    half deep = 1.0 - CelBand(ndl, -0.45);                  // sombra funda (lado de trás do corpo)
+    half3 shade = lerp(_ToonShadowTint.rgb, _ToonShadowTint.rgb * 0.78, deep);
+    half3 band = lerp(shade, half3(1, 1, 1), lit);
     half3 c = albedo * band * l.color;
-    // pele: a luz que entra e sai sob a superfície deixa o limite luz/sombra quente (avermelhado)
-    half term = saturate(1.0 - abs(ndl - 0.05) * 2.6) * skin;
-    c += albedo * half3(0.42, 0.13, 0.06) * term * l.color * lerp(0.4, 1.0, sh);
-    // brilho largo e suave (pele levemente suada, tecido acetinado, couro da chuteira)
+    // pele: uma faixa estreita e quente logo depois do limite luz/sombra (o "terminador" do anime)
+    half term = saturate(CelBand(ndl, _ToonParams.x - 0.16) - CelBand(ndl, _ToonParams.x)) * skin * sh;
+    c += albedo * half3(0.30, 0.09, 0.04) * term * l.color;
+    // brilho especular em faixa (pele suada, tecido acetinado, couro da chuteira)
     half3 h = SafeNormalize(l.direction + v);
     half ndh = saturate(dot(n, h));
-    half e = lerp(12.0, 56.0, smooth);
-    half spec = pow(max(ndh, 0.001), e) * smooth * lit * lerp(0.18, 0.3, skin);
-    c += min(spec, 0.3) * min(l.color, 1.5);
+    half spec = CelBand(ndh, 0.985 - smooth * 0.04) * smooth * lit;
+    c += min(spec * lerp(0.22, 0.3, skin), 0.3) * min(l.color, 1.5);
     return c;
 }
 
@@ -155,14 +159,13 @@ half4 ToonFrag(ToonVaryings i, FRONT_FACE_TYPE face : FRONT_FACE_SEMANTIC) : SV_
 #endif
 
 #if defined(CRAQUEZ_ATHLETE)
-    // ambiente com volume: céu por cima, reflexo do chão por baixo (queixo, axilas e a parte de
-    // baixo das coxas ficam mais escuras) e um recorte suave que destaca a silhueta
-    half up = n.y * 0.5 + 0.5;
+    // ambiente em dois tons: céu por cima, um tom mais escuro por baixo (queixo, axilas, parte de
+    // baixo das coxas), e o recorte duro de cel shading que destaca a silhueta
     half3 sky = SampleSH(half3(0, 1, 0));
-    half3 amb = lerp(sky * 0.45, SampleSH(n), 0.5) * lerp(0.62, 1.12, up) * _ToonParams.w * 1.25;
+    half3 amb = sky * lerp(0.7, 1.15, CelBand(n.y, -0.25)) * _ToonParams.w * 1.25;
     col += albedo.rgb * amb;
     half fres = 1.0 - saturate(dot(n, v));
-    half rim = smoothstep(0.45, 0.95, fres) * saturate(dot(n, mainLight.direction) + 0.5);
+    half rim = CelBand(fres, 0.66) * CelBand(dot(n, mainLight.direction), -0.3);
     col += rim * _ToonParams.z * 0.8 * mainLight.color * albedo.rgb;
 #else
     // ambiente plano (o céu) + luz de recorte nas bordas iluminadas
@@ -194,7 +197,7 @@ ToonVaryings OutlineVert(ToonAttributes v)
     float dist = length(GetCameraPositionWS() - posWS);
     float w = clamp(_ToonOutline.x * dist / 10.0, _ToonOutline.y, _ToonOutline.z);
 #if defined(CRAQUEZ_ATHLETE)
-    w *= 0.6;   // atletas: traço fino (só separa a silhueta do fundo)
+    w *= 0.8;   // atletas: traço um pouco mais fino que o dos objetos (destaca a silhueta)
 #endif
     // por peça (camisa, calção): traço ainda mais fino nas bordas da roupa — a gola, as mangas e a
     // cintura não parecem peças emendadas no corpo
