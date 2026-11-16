@@ -95,38 +95,26 @@ namespace Craquez
             // os clipes vêm de um FBX só com o esqueleto: a Unity remove o nó raiz e os caminhos
             // começam em "Root/..."; no modelo eles ficam sob "Armature". O Animator vai no
             // "Armature" para os caminhos baterem (antes nenhuma curva encontrava os ossos).
-            bool isMeshy = bones.ContainsKey("mixamorig:Hips");
             var arm = Bone("Armature") ?? Bone("SmartRigArmature");
-            if (!isMeshy)
-            {
-                var animHost = arm != null && arm != m ? arm.gameObject : m.gameObject;
-                var old = m.GetComponent<Animator>();
-                if (old != null && animHost != m.gameObject) old.enabled = false;
-                animator = animHost.GetComponent<Animator>();
-                if (animator == null) animator = animHost.AddComponent<Animator>();   // (?? não vê o "nulo" da Unity)
-                animator.applyRootMotion = false;
-                animator.cullingMode = AnimatorCullingMode.AlwaysAnimate;   // ossos sempre atualizados (evita cabeça "solta")
-            }
+            var animHost = arm != null && arm != m ? arm.gameObject : m.gameObject;
+            var old = m.GetComponent<Animator>();
+            if (old != null && animHost != m.gameObject) old.enabled = false;
+            animator = animHost.GetComponent<Animator>();
+            if (animator == null) animator = animHost.AddComponent<Animator>();   // (?? não vê o "nulo" da Unity)
+            animator.applyRootMotion = false;
+            animator.cullingMode = AnimatorCullingMode.AlwaysAnimate;   // ossos sempre atualizados (evita cabeça "solta")
             if (head != null)
                 Debug.Log($"[diag] modelo {m.name}: cabeça em repouso a {head.position.y - transform.position.y:F2} m; filhos {m.childCount}; Armature rot {(arm != null ? arm.localEulerAngles.ToString() : "-")}");
-            // descobre para onde o modelo olha e corrige para +Z
-            Vector3 fwdDir = Vector3.zero;
-            if (isMeshy && bones.TryGetValue("upperarm_l", out var ual) && bones.TryGetValue("upperarm_r", out var uar))
+            // descobre para onde o modelo olha (pé esquerdo -> ponta do pé) e corrige para +Z
+            if (footL != null && toeL != null)
             {
-                var armR = uar.position - ual.position; armR.y = 0f;
-                if (armR.sqrMagnitude > 1e-6f) fwdDir = Vector3.Cross(Vector3.up, armR.normalized);
-            }
-            else if (footL != null && toeL != null)
-            {
-                // MakeHuman: pé esquerdo -> ponta do pé (como antes; a média dos dois pés girava o
-                // modelo alguns graus e a correção dos pés deixava de agir — teste BracosEPesNaturais)
-                var f = toeL.position - footL.position; f.y = 0f;
-                if (f.sqrMagnitude > 1e-6f) fwdDir = f.normalized;
-            }
-            if (fwdDir.sqrMagnitude > 1e-6f)
-            {
-                modelFix = Quaternion.FromToRotation(fwdDir.normalized, Vector3.forward);
-                m.localRotation = modelFix * m.localRotation;
+                var f = toeL.position - footL.position;
+                f.y = 0;
+                if (f.sqrMagnitude > 1e-6f)
+                {
+                    modelFix = Quaternion.FromToRotation(f.normalized, Vector3.forward);
+                    m.localRotation = modelFix * m.localRotation;
+                }
             }
             if (pelvis != null) pelvisRest = transform.InverseTransformPoint(pelvis.position);
             footPitchRest = FootPitch(footL, toeL);
@@ -235,21 +223,18 @@ namespace Craquez
         /// Biotipo (0 = magro .. 1 = forte): escala os ossos só na espessura e compensa nos filhos.
         /// Chamar uma vez, logo depois de Init.
         /// </summary>
-        /// <param name="compact">corpo único (Meshy): o modelo já vem encorpado (ombros largos, peito e costas
-        /// grossos) e preso ao esqueleto na medida certa — variação menor, sem alargar e sem as proporções do
-        /// MakeHuman (somadas, deixavam os ombros largos demais)</param>
-        public void Physique(float build, float frame = 0.5f, bool compact = false)
+        public void Physique(float build, float frame = 0.5f)
         {
             build = Mathf.Clamp01(build);
             // ombros/caixa torácica: estreitos (0) .. largos (1), independente do porte
-            float fr = compact ? Mathf.Lerp(0.93f, 1.02f, Mathf.Clamp01(frame)) : Mathf.Lerp(0.98f, 1.12f, Mathf.Clamp01(frame));
+            // (proporções primeiro: os ombros saem na largura de referência e o biotipo varia em volta dela)
+            Proportions();
+            float fr = Mathf.Lerp(0.95f, 1.06f, Mathf.Clamp01(frame));
             // cabeça um pouco menor (proporção real ~1:7,5 da altura; o modelo base tem cabeça grande)
-            if (head != null) head.localScale *= compact ? 0.98f : 0.93f;
+            if (head != null) head.localScale *= 0.93f;
             foreach (var (name, slim, strong) in Shape)
             {
                 float k = Mathf.Lerp(slim, strong, build);
-                // corpo único: metade da variação e um pouco mais fino (largura e profundidade do tronco)
-                if (compact) k = name == "neck_01" ? 1f + (k - 1f) * 0.5f : 1f + (k - 1f) * 0.5f - 0.04f;
                 if (name == "spine_03" || name.StartsWith("clavicle")) k *= fr;
                 if (!bones.TryGetValue(name, out var b) || b.childCount == 0) continue;
                 // eixo do comprimento: o que aponta para o primeiro osso filho
@@ -261,7 +246,7 @@ namespace Craquez
                 var sc = Vector3.one * k;
                 // comprimento: clavícula mais longa = ombros mais largos (o modelo tinha ombros caídos e
                 // estreitos para um atleta); pescoço um pouco mais curto
-                sc[len] = name.StartsWith("clavicle") ? (compact ? Mathf.Lerp(0.94f, 1.0f, Mathf.Clamp01(frame * 0.6f + build * 0.4f)) : Mathf.Lerp(1.0f, 1.05f, Mathf.Clamp01(frame * 0.6f + build * 0.4f)))
+                sc[len] = name.StartsWith("clavicle") ? Mathf.Lerp(1.0f, 1.05f, Mathf.Clamp01(frame * 0.6f + build * 0.4f))
                     : name == "neck_01" ? 0.94f : 1f;
                 b.localScale = Vector3.Scale(b.localScale, sc);
                 // filhos: desfaz a escala do pai no referencial de cada filho
@@ -278,26 +263,82 @@ namespace Craquez
                     c.localScale = Vector3.Scale(c.localScale, inv);
                 }
             }
-            if (!compact) Proportions();
         }
 
+        // proporções de referência do corpo humano adulto (Drillis & Contini), em fração da altura
+        const float RefUpperArm = 0.186f, RefForearm = 0.146f, RefHand = 0.108f, RefShoulders = 0.215f;
+        // quanto cada modelo se aproxima da referência (o resto mantém a diferença entre os modelos de cada etnia)
+        const float RefBlend = 0.75f;
+        /// <summary>Altura estimada do modelo (m), pela articulação da cabeça (≈ 85,6% da altura).</summary>
+        float ModelHeight() => head != null ? Mathf.Max(1.2f, (head.position.y - transform.position.y) / 0.856f) : 1.78f;
+
         /// <summary>
-        /// Proporções de atleta (medidas num jogador de referência): tronco um pouco mais curto (a altura
-        /// final é a mesma, então as pernas ficam proporcionalmente mais longas, sem afundar os pés), braço
-        /// mais comprido e quadril um pouco mais largo. Só move as articulações (sem escala nos ossos que
-        /// dobram: com escala, joelho e cotovelo entortavam).
+        /// Proporções de atleta, medidas osso a osso em cada modelo (os quatro modelos MakeHuman tinham braço
+        /// curto e antebraço comprido — cotovelo baixo —, mãos e ombros largos demais e, em alguns, canela maior
+        /// que a coxa). Leva cada trecho para perto da referência humana, mantendo um pouco da diferença de cada
+        /// etnia, e devolve os pés ao chão. Só move as articulações (sem escala nos ossos que dobram: com escala,
+        /// joelho e cotovelo entortavam), menos a mão, que é escalada por igual.
         /// </summary>
         void Proportions()
         {
-            if (bones.ContainsKey("mixamorig:Hips")) return; // modelo Meshy já vem proporcionado em A-pose
-            void Move(string n, float k) { if (bones.TryGetValue(n, out var t)) t.localPosition *= k; }
-            Move("spine_02", 0.95f); Move("spine_03", 0.95f); Move("neck_01", 0.97f);
-            Move("lowerarm_l", 1.08f); Move("lowerarm_r", 1.08f);
-            if (bones.TryGetValue("thigh_l", out var tl) && bones.TryGetValue("thigh_r", out var tr) && tl.parent == tr.parent)
+            float H = ModelHeight();
+            Transform B(string n) => bones.TryGetValue(n, out var t) ? t : null;
+            // move a articulação "child" ao longo do osso "parent" até o trecho medir ~target
+            void Seg(string parent, string child, float target)
             {
-                var half = (tl.localPosition - tr.localPosition) * 0.5f;
-                tl.localPosition += half * 0.06f;
-                tr.localPosition -= half * 0.06f;
+                var a = B(parent); var c = B(child);
+                if (a == null || c == null) return;
+                float cur = Vector3.Distance(a.position, c.position);
+                if (cur < 1e-4f) return;
+                c.localPosition *= Mathf.Lerp(1f, target / cur, RefBlend);
+            }
+            // tronco um pouco mais curto (pernas proporcionalmente mais longas)
+            void Move(string n, float k) { var t = B(n); if (t != null) t.localPosition *= k; }
+            Move("spine_02", 0.97f); Move("spine_03", 0.97f);
+            // ombros: distância entre as articulações dos ombros
+            var ul = B("upperarm_l"); var ur = B("upperarm_r");
+            if (ul != null && ur != null)
+            {
+                float w = Vector3.Distance(ul.position, ur.position);
+                if (w > 1e-3f)
+                {
+                    float k = Mathf.Lerp(1f, RefShoulders * H / w, RefBlend);
+                    ul.localPosition *= k; ur.localPosition *= k;
+                }
+            }
+            foreach (var sd in new[] { "_l", "_r" })
+            {
+                // braço e antebraço (cotovelo na altura certa)
+                Seg("upperarm" + sd, "lowerarm" + sd, RefUpperArm * H);
+                Seg("lowerarm" + sd, "hand" + sd, RefForearm * H);
+                // mão: punho até a ponta do dedo médio
+                var hd = B("hand" + sd); var tip = B("middle_03" + sd);
+                if (hd != null && tip != null)
+                {
+                    float cur = Vector3.Distance(hd.position, tip.position) + 0.025f;
+                    hd.localScale *= Mathf.Lerp(1f, RefHand * H / cur, RefBlend);
+                }
+                // coxa e canela do mesmo tamanho (a soma, e a altura do quadril, ficam)
+                var th = B("thigh" + sd); var cf = B("calf" + sd); var ft = B("foot" + sd);
+                if (th != null && cf != null && ft != null)
+                {
+                    float t = Vector3.Distance(th.position, cf.position), sh = Vector3.Distance(cf.position, ft.position);
+                    float m = (t + sh) * 0.5f;
+                    if (t > 1e-3f && sh > 1e-3f)
+                    {
+                        cf.localPosition *= Mathf.Lerp(1f, m / t, RefBlend);
+                        ft.localPosition *= Mathf.Lerp(1f, m / sh, RefBlend);
+                    }
+                }
+            }
+            // pés de volta ao chão (o comprimento das pernas pode ter mudado um pouco)
+            if (model != null)
+            {
+                float minY = float.MaxValue;
+                foreach (var t in new[] { footL, footR, toeL, toeR })
+                    if (t != null) minY = Mathf.Min(minY, t.position.y);
+                if (minY < transform.position.y + 0.3f && minY > transform.position.y - 0.3f)
+                    model.position += Vector3.up * (transform.position.y + 0.035f - minY);
             }
         }
     }

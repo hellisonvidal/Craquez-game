@@ -34,23 +34,6 @@ namespace Craquez
             new Color(0.32f, 0.21f, 0.12f), new Color(0.28f, 0.18f, 0.10f), new Color(0.34f, 0.14f, 0.06f),
         };
 
-        /// <summary>
-        /// Corpo único: todos os atletas são variações do modelo Meshy (Athlete_base, gerado por
-        /// tools/blender/build_meshy.py) preso ao esqueleto das animações do jogo — as capturas tocam
-        /// direto nele. Sem o arquivo, voltam os quatro modelos MakeHuman.
-        /// </summary>
-        public static bool BaseBody => Model("base") != null;
-
-        /// <summary>Tom de pele sobre a textura do corpo único (clara): 0 bem claro .. 5 bem escuro.</summary>
-        static Color SkinMul(float tone)
-        {
-            var light = new Color(1.04f, 1.0f, 0.97f);
-            var mid = new Color(0.86f, 0.74f, 0.64f);
-            var dark = new Color(0.46f, 0.34f, 0.28f);
-            tone = Mathf.Clamp(tone, 0f, 5f);
-            return tone < 2.5f ? Color.Lerp(light, mid, tone / 2.5f) : Color.Lerp(mid, dark, (tone - 2.5f) / 2.5f);
-        }
-
         static GameObject Model(string b)
         {
             if (_models.TryGetValue(b, out var m) && m != null) return m;
@@ -79,7 +62,6 @@ namespace Craquez
         public struct Look
         {
             public string baseName;
-            public string body;   // corpo único usado ("base" ou "base_gk" para goleiros); null = MakeHuman
             public int hair;
             public Color hairColor, skinTint;
             public float scale;
@@ -141,18 +123,14 @@ namespace Craquez
             // cabelo: alguns raspados, sem descoloridos (loiro removido)
             if (R(13) < 0.02f) hc = 3; // marrom claro em vez de loiro
             bool shaved = R(14) < 0.08f;
-            // corpo único: cabelo e rosto vêm do próprio modelo (sem malhas de cabelo nem touca); a pele varia
-            // pelo tom do jogador
-            bool baseBody = BaseBody;
-            if (baseBody) tint = SkinMul(Mathf.Clamp(skin + (R(11) - 0.5f) * 0.8f, 0f, 5f));
             float posTall = p.isKeeper ? 0.14f : (p.pos == "DF" ? 0.06f : (p.pos == "FW" && Mathf.Abs(p.basePos.y) > 0.45f ? -0.05f : 0f));
             float hMix = Mathf.Clamp01(F(5, R(6) * 4f) / 4f * 0.45f + (R(8) + R(9)) * 0.275f + posTall);
             return new Look
             {
-                baseName = b, hair = shaved || baseBody ? -1 : PickHair(b, hair, R(7), R(17)), hairColor = HairColors[Mathf.Clamp(hc, 0, HairColors.Length - 1)],
+                baseName = b, hair = shaved ? -1 : PickHair(b, hair, R(7), R(17)), hairColor = HairColors[Mathf.Clamp(hc, 0, HairColors.Length - 1)],
                 tape = R(15) < 0.3f ? (R(16) < 0.5f ? 1 : 2) : 0,
                 // touca de volume só por baixo dos cabelos curtos (nos longos ela atravessava); raspado = só a sombra
-                hairStyle = baseBody ? -1 : shaved ? 0 : PickHair(b, hair, R(7), R(17)) <= 3 ? 1 : -1,
+                hairStyle = shaved ? 0 : PickHair(b, hair, R(7), R(17)) <= 3 ? 1 : -1,
                 // camisa por dentro do calção em 90% dos atletas, por fora em 10%
                 untucked = ((h >> 21) & 1023u) % 10u == 0u,
                 faceSeed = (int)h2,
@@ -172,12 +150,10 @@ namespace Craquez
             if (boots >= 0) look.boots = boots;
             var root = new GameObject("Atleta " + p.number + " " + p.name);
             root.transform.SetParent(parent, false);
-            // corpo único (Meshy): goleiro com o modelo próprio (manga comprida e luvas), se existir
-            look.body = p.isKeeper && Model("base_gk") != null ? "base_gk" : "base";
-            var model = Model(look.body);
+            var model = Model(look.baseName) ?? Model("latino");
             if (model == null)
             {
-                Debug.LogError("Modelo de atleta ausente em Resources/Athletes (Athlete_base)");
+                Debug.LogError("Modelos de atleta ausentes em Resources/Athletes");
                 var cap = GameObject.CreatePrimitive(PrimitiveType.Capsule);
                 cap.transform.SetParent(root.transform, false);
                 return root.AddComponent<AthleteRig>();
@@ -186,15 +162,18 @@ namespace Craquez
             inst.name = "model";
             var rig = root.AddComponent<AthleteRig>();
             rig.Init(inst.transform);
-            rig.Physique(look.build, look.frame, true);
+            rig.Physique(look.build, look.frame);
             // altura real variando entre 1,66 m e 1,95 m por jogador
             float u = Mathf.InverseLerp(0.91f, 1.09f, look.scale);
             float tall = Mathf.Lerp(1.66f, 1.95f, u);
             float modelH = rig.head != null ? rig.head.position.y - root.transform.position.y + 0.19f : 1.70f;
             float baseScale = Mathf.Clamp(tall / Mathf.Max(1.2f, modelH), 0.85f, 1.18f);
             // leve variação de largura corporal proporcional ao peso/build sem alterar a altura
-            float weightXZ = Mathf.Lerp(0.95f, 1.02f, look.build);
+            // (só um pouco: escala desigual no corpo inteiro entorta braços e pernas quando giram — o porte vem
+            // do Physique)
+            float weightXZ = Mathf.Lerp(0.97f, 1.03f, look.build);
             inst.transform.localScale = new Vector3(baseScale * weightXZ, baseScale, baseScale * weightXZ);
+            // (mãos: o tamanho é acertado no AthleteRig.Proportions, medido em cada modelo)
             Dress(rig, look, p.isKeeper ? keeperKit : kit, p.id < 0 && p.number <= 0 ? -1 : p.number, quality);   // (juiz e técnico: sem número)
             Accessories(rig, look, p.isKeeper ? keeperKit : kit, p.isKeeper, captain, quality);
             return rig;
@@ -319,11 +298,8 @@ namespace Craquez
                 {
                     case "Body":
                     {
-                        string bodyTex = "athlete_" + (look.body ?? "base");
-                        bool baseBody = T(bodyTex) != null && smr.sharedMesh != null && smr.sharedMesh.GetBlendShapeIndex("Body_Lean") >= 0;
-                        var skin = baseBody
-                            ? Shared("skinB:" + bodyTex + Teams.Hex(look.skinTint), () => Gfx.Athlete(look.skinTint, T(bodyTex), 0.3f, 1f))
-                            : Shared("skin:" + look.baseName + Teams.Hex(look.skinTint), () => Gfx.Athlete(look.skinTint, T(SkinTex[look.baseName]), 0.3f, 1f));
+                        var skin = Shared("skin:" + look.baseName + Teams.Hex(look.skinTint), () =>
+                            Gfx.Athlete(look.skinTint, T(SkinTex[look.baseName]), 0.3f, 1f));
                         var mats = new Material[Mathf.Max(1, smr.sharedMesh.subMeshCount)];
                         for (int i = 0; i < mats.Length; i++) mats[i] = skin;
                         smr.sharedMaterials = mats;
@@ -344,14 +320,6 @@ namespace Craquez
                         if (part == KitPart.Shirt) rig.shirt = smr;
                         else if (part == KitPart.Shorts) rig.shorts = smr;
                         smr.sharedMaterial = Shared("kit:" + kt.GetInstanceID(), () => Gfx.Athlete(Color.white, kt, part == KitPart.Shirt ? 0.36f : 0.28f, 0f, true));
-                        break;
-                    }
-                    case "Boots" when smr.sharedMesh != null && smr.sharedMesh.GetBlendShapeIndex("Body_Lean") >= 0:
-                    {
-                        // corpo único: chuteira pintada pela posição (sola, cabedal, faixa e bico) no UV dela
-                        int d = ((look.boots % BootPainter.Designs.Length) + BootPainter.Designs.Length) % BootPainter.Designs.Length;
-                        bool indoor = IndoorShoes;
-                        smr.sharedMaterial = Shared("bootsB:" + d + (indoor ? "f" : ""), () => Gfx.Athlete(Color.white, KitPainter.PaintBoot(smr.sharedMesh, BootPainter.Designs[d], axes, quality >= 2 ? 512 : 256, indoor), indoor ? 0.4f : 0.6f, 0f));
                         break;
                     }
                     case "Boots":
@@ -392,15 +360,6 @@ namespace Craquez
                         }
                         break;
                 }
-            }
-            // corpo único: porte de cada um pelas formas do modelo (magro .. forte), em todas as peças juntas
-            foreach (var r in smrs)
-            {
-                var m = r.sharedMesh;
-                if (m == null) continue;
-                int lean = m.GetBlendShapeIndex("Body_Lean"), strong = m.GetBlendShapeIndex("Body_Strong");
-                if (lean >= 0) r.SetBlendShapeWeight(lean, Mathf.Clamp01((0.45f - look.build) / 0.45f) * 100f);
-                if (strong >= 0) r.SetBlendShapeWeight(strong, Mathf.Clamp01((look.build - 0.55f) / 0.45f) * 50f);   // (o modelo já é forte)
             }
             // expressões faciais (formas criadas uma vez por malha, a partir dos marcos do rosto)
             SkinnedMeshRenderer eyesR = null, browR = null, lashR = null;
