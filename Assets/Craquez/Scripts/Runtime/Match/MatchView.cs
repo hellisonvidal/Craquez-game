@@ -39,11 +39,17 @@ namespace Craquez
         /// <summary>Evento estático para notificar que um gandula deve arremessar a bola.</summary>
         public static event System.Action OnBallBoyToss;
 
+        /// <summary>Invoca o evento OnBallBoyToss (pode ser chamado de classes externas).</summary>
+        public static void InvokeBallBoyToss()
+        {
+            OnBallBoyToss?.Invoke();
+        }
+
         /// <summary>Manipulador estático para o evento OnBallBoyToss - chama o método de instância.</summary>
         static void OnBallBoyTossStatic()
         {
             // Find the MatchView instance and call the instance method
-            var matchView = FindObjectOfType<MatchView>();
+            var matchView = GameObject.FindObjectOfType<MatchView>();
             if (matchView != null)
             {
                 matchView.BallBoyToss();

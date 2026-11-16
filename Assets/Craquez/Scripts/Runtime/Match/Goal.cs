@@ -200,8 +200,8 @@ namespace Craquez
         {
             _netCloth = _netFilter.gameObject.AddComponent<Cloth>();
             _netCloth.useGravity = true;
-            _netCloth.stiffness = netStiffness;
-            _netCloth.damping = netDamping;
+            _netCloth.stiffnessFrequency = netStiffness;
+            _netCloth.dampingRatio = netDamping;
             _netCloth.externalAcceleration = Vector3.zero;
             _netCloth.randomAcceleration = Vector3.zero;
             _netCloth.friction = 0.3f;
@@ -262,10 +262,9 @@ namespace Craquez
 
             // Apply impulse to nearby net vertices by modifying particle velocities
             int affected = 0;
-            var vertices = _netCloth.vertices;
-            var velocities = _netCloth.velocities;
+            var velocities = _netCloth.GetParticleVelocities();
 
-            for (int i = 0; i < _netVertices.Length; i++)
+            for (int i = 0; i < _netVertices.Length && i < velocities.Length; i++)
             {
                 float dist = Vector3.Distance(_netFilter.transform.TransformPoint(_netVertices[i]), hitPoint);
                 if (dist < 1.5f)
@@ -276,7 +275,7 @@ namespace Craquez
                     affected++;
                 }
             }
-            _netCloth.velocities = velocities;
+            _netCloth.SetParticleVelocities(velocities);
             // Debug.Log($"Net hit: {affected} vertices affected");
         }
 

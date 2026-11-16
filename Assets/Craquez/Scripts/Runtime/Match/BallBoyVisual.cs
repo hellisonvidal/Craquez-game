@@ -148,22 +148,26 @@ namespace Craquez
             if (task == BoyTask.Idle)
             {
                 // Return home
-                _targetPos = _boyData?.home ?? transform.position;
+                var home = _boyData?.home ?? new Vector2(transform.position.x, transform.position.z);
+                _targetPos = new Vector3(home.x, 0f, home.y);
                 MoveTowards(_targetPos, walkSpeed);
             }
             else if (task == BoyTask.GoingToBall || task == BoyTask.GoingToKeeper)
             {
-                _targetPos = _boyData?.target ?? transform.position;
+                var target = _boyData?.target ?? new Vector2(transform.position.x, transform.position.z);
+                _targetPos = new Vector3(target.x, 0f, target.y);
                 MoveTowards(_targetPos, runSpeed);
             }
             else if (task == BoyTask.CarryingToCone)
             {
-                _targetPos = _boyData?.target ?? transform.position;
+                var target = _boyData?.target ?? new Vector2(transform.position.x, transform.position.z);
+                _targetPos = new Vector3(target.x, 0f, target.y);
                 MoveTowards(_targetPos, carrySpeed);
             }
             else if (task == BoyTask.ReturningHome)
             {
-                _targetPos = _boyData?.home ?? transform.position;
+                var home = _boyData?.home ?? new Vector2(transform.position.x, transform.position.z);
+                _targetPos = new Vector3(home.x, 0f, home.y);
                 MoveTowards(_targetPos, runSpeed);
             }
             else if (task == BoyTask.Throwing || task == BoyTask.PlacingBall)
@@ -383,8 +387,8 @@ namespace Craquez
         // Animation events (called from animation clips)
         public void OnThrowRelease()
         {
-            // Ball leaves hands - notify MatchView via static event
-            MatchView.OnBallBoyToss?.Invoke();
+            // Ball leaves hands - notify MatchView via static method
+            MatchView.InvokeBallBoyToss();
         }
 
         public void OnPlaceComplete()

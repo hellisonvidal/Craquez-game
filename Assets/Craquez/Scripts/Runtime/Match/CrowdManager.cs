@@ -91,7 +91,11 @@ namespace Craquez
 
         void Start()
         {
-            if (sim == null) sim = GameObject.FindObjectOfType<MatchSim>();
+            if (sim == null)
+            {
+                var mc = GameObject.FindObjectOfType<MatchController>();
+                if (mc != null) sim = mc.sim;
+            }
             if (view == null) view = GameObject.FindObjectOfType<MatchView>();
 
             // Start ambient

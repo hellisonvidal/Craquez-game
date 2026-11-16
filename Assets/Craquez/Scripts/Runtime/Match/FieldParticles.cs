@@ -240,7 +240,8 @@ namespace Craquez
             emission.rateOverTime = 0;
             emission.SetBursts(new[] { new ParticleSystem.Burst(0f, 20, 40) });
             var shape = ps.shape;
-            shape.shapeType = ParticleSystemShapeType.Edge;
+            shape.shapeType = ParticleSystemShapeType.Cone;
+            shape.angle = 15f;
             shape.radius = 0.3f;
             var velocity = ps.velocityOverLifetime;
             velocity.enabled = true;
@@ -294,7 +295,11 @@ namespace Craquez
 
         void Start()
         {
-            if (sim == null) sim = GameObject.FindObjectOfType<MatchSim>();
+            if (sim == null)
+            {
+                var mc = GameObject.FindObjectOfType<MatchController>();
+                if (mc != null) sim = mc.sim;
+            }
             if (view == null) view = GameObject.FindObjectOfType<MatchView>();
         }
 
@@ -337,7 +342,7 @@ namespace Craquez
             var main = ps.main;
             main.startColor = GetSurfaceColor(surface);
             var emission = ps.emission;
-            emission.SetBursts(new[] { new ParticleSystem.Burst(0f, (short)Mathf.RoundToInt(8 * intensity), (short)Mathf.RoundToInt(15 * intensity)) });
+            emission.SetBursts(new[] { new ParticleSystem.Burst(0f, Mathf.RoundToInt(8 * intensity), Mathf.RoundToInt(15 * intensity)) });
             var velocity = ps.velocityOverLifetime;
             velocity.y = new ParticleSystem.MinMaxCurve(0.5f * intensity, 2f * intensity);
             ps.Play();
