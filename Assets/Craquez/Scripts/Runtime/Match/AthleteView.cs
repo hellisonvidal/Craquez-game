@@ -428,9 +428,10 @@ namespace Craquez
                 }
                 case 3:
                 {
-                    // no chão: vira de lado segurando a perna e se contorce suavemente (sem tremedeira)
+                    // no chão: vira de lado segurando a perna e fica estável (sem tremedeira)
                     float turn = p.fallLight ? 0f : Smooth(u * 3f);   // queda leve: sem virar de lado se contorcendo
-                    float writhe = p.fallLight ? 0f : Mathf.Sin(Time.time * 1.8f + p.id) * 4f * (1f - u * 0.6f);
+                    // Sem contorção (writhe) - jogador fica parado no chão se recuperando
+                    float writhe = 0f;
                     pitch = lying;
                     roll += _fallSide * Mathf.Lerp(sideRoll * _fallSide, 62f, turn) + writhe;
                     // às vezes rola no chão (uma volta inteira) antes de ficar sentindo
@@ -529,8 +530,8 @@ namespace Craquez
                 case 3:
                 {
                     float k = Smooth(u * 3f);
-                    float pump = Mathf.Sin(Time.time * 1.8f + p.id) * 6f;
-                    hurtThigh = Mathf.Lerp(-25f, -75f, k) + pump; hurtCalf = Mathf.Lerp(45f, 110f, k);
+                    // Sem tremor no chão: pernas ficam paradas segurando a "lesão"
+                    hurtThigh = Mathf.Lerp(-25f, -75f, k); hurtCalf = Mathf.Lerp(45f, 110f, k);
                     otherThigh = Mathf.Lerp(-10f, -30f, k); otherCalf = Mathf.Lerp(25f, 50f, k);
                     break;
                 }

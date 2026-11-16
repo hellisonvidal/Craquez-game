@@ -26,6 +26,11 @@ namespace Craquez.UI
         readonly List<(RectTransform rt, Text num, Image chip, Text name, CanvasGroup cg)> _tags = new List<(RectTransform, Text, Image, Text, CanvasGroup)>();
         readonly int[] _tagFor = new int[40];
         Kit[] _kits;
+        // Minimapa
+        RectTransform _minimapRoot;
+        Image _minimapField;
+        readonly List<Image> _minimapDots = new List<Image>();
+        CanvasGroup _minimapCg;
 
         public void Build(MatchSim sim, MatchConfig cfg, Kit[] kits)
         {
@@ -137,6 +142,8 @@ namespace Craquez.UI
             _cut.rectTransform.Place(0, 0, 1, 1);
             _cut.raycastTarget = false;
             _cut.color = new Color(0, 0, 0, 0);
+            // Minimapa centralizado na parte inferior
+            CreateMinimap(root);
         }
 
         void Chip(RectTransform sb, Kit k, float x)
@@ -163,6 +170,103 @@ namespace Craquez.UI
             _goalSub.text = scorer + "  •  " + team;
             _goalBig.color = Color.Lerp(c, Theme.Accent2, c.grayscale < 0.2f ? 0.8f : 0.2f);
             _goalT = 3.2f;
+        }
+
+        /// <summary>Cria o minimapa na parte inferior central da tela.</summary>
+        void CreateMinimap(RectTransform root)
+        {
+            _minimapRoot = UiKit.Image(root, new Color(0.02f, 0.03f, 0.07f, 0.85f), Theme.RoundSmall, "minimapa").rectTransform
+                .At(0.5f, 0, 200, 140, 0, 20); // centralizado na parte inferior
+            _minimapCg = _minimapRoot.gameObject.AddComponent<CanvasGroup>();
+            _minimapCg.alpha = 0f; // começa invisível, aparece durante a partida
+            _minimapCg.blocksRaycasts = false;
+            _minimapCg.interactable = false;
+
+            // Campo do minimapa (retângulo verde)
+            _minimapField = UiKit.Image(_minimapRoot, new Color(0.12f, 0.35f, 0.18f, 1f), Theme.RoundSmall, "campo").rectTransform;
+            _minimapField.Place(0.5f, 0.5f, 180, 120); // 180x120 = proporção do campo (1.5:1)
+
+            // Linhas do campo (meio-campo, área, círculo central)
+            var halfway = UiKit.Image(_minimapField, new Color(1f, 1f, 1f, 0.25f), null, "meio-campo").rectTransform;
+            halfway.Place(0.5f, 0.5f, 2, 1f); // linha vertical no meio
+
+            // Círculo central
+            var centerCircle = UiKit.Image(_minimapField, new Color(1f, 1f, 1f, 0.15f), Theme.Round, "círculo-central").rectTransform;
+            centerCircle.Place(0.5f, 0.5f, 30, 30); // 30px de diâmetro
+
+            // Áreas (grandes áreas)
+            var areaA = UiKit.Image(_minimapField, new Color(1f, 1f, 1f, 0.15f), Theme.RoundSmall, "área-A").rectTransform;
+            areaA.Place(0.05f, 0.5f, 24, 60); // área do time A (esquerda)
+            var areaB = UiKit.Image(_minimapField, new Color(1f, 1f, 1f, 0.15f), Theme.RoundSmall, "área-B").rectTransform;
+            areaB.Place(0.95f, 0.5f, 24, 60); // área do time B (direita)
+
+            // Gols
+            var goalA = UiKit.Image(_minimapField, new Color(1f, 1f, 1f, 0.5f), null, "gol-A").rectTransform;
+            goalA.Place(0f, 0.5f, 4, 24); // gol do time A
+            var goalB = UiKit.Image(_minimapField, new Color(1f, 1f, 1f, 0.5f), null, "gol-B").rectTransform;
+            goalB.Place(1f, 0.5f, 4, 24); // gol do time B
+        }
+
+        /// <summary>Atualiza as posições dos jogadores e da bola no minimapa.</summary>
+        void UpdateMinimap()
+        {
+            if (_sim == null || _minimapRoot == null) return;
+            // Mostra o minimapa durante o jogo
+            bool inPlay = _sim.state == MatchState.Playing || _sim.state == MatchState.Restart || _sim.state == MatchState.Foul;
+            _minimapCg.alpha = Mathf.MoveTowards(_minimapCg.alpha, inPlay ? 1f : 0f, Time.unscaledDeltaTime * 2f);
+            if (_minimapCg.alpha <= 0.01f) return;
+
+            // Limite do campo do minimapa (180x120)
+            float fieldW = 180f;
+            float fieldH = 120f;
+            float halfLen = _sim.halfLen;
+            float halfW = _sim.halfW;
+
+            // Garante que temos dots suficientes
+            int needed = _sim.players.Count + 1; // jogadores + bola
+            while (_minimapDots.Count < needed)
+            {
+                var dot = UiKit.Image(_minimapField, Color.white, Theme.Round, "dot" + _minimapDots.Count).rectTransform;
+                dot.Place(0.5f, 0.5f, 8, 8);
+                dot.anchorMin = dot.anchorMax = new Vector2(0f, 0f);
+                dot.pivot = new Vector2(0.5f, 0.5f);
+                _minimapDots.Add(dot.GetComponent<Image>());
+            }
+
+            // Atualiza jogadores
+            int idx = 0;
+            foreach (var p in _sim.players)
+            {
+                if (idx >= _minimapDots.Count) break;
+                if (p.sentOff) { _minimapDots[idx].gameObject.SetActive(false); idx++; continue; }
+
+                // Converte posição do mundo para minimapa
+                float mx = (p.position.x + halfLen) / (2f * halfLen); // 0..1
+                float my = (p.position.y + halfW) / (2f * halfW);     // 0..1
+                var dot = _minimapDots[idx];
+                dot.rectTransform.anchoredPosition = new Vector2(mx * fieldW - fieldW * 0.5f, my * fieldH - fieldH * 0.5f);
+                dot.color = _kits[p.team].c1;
+                dot.rectTransform.sizeDelta = p.isKeeper ? new Vector2(10, 10) : new Vector2(8, 8);
+                dot.gameObject.SetActive(true);
+                idx++;
+            }
+
+            // Bola
+            if (idx < _minimapDots.Count)
+            {
+                float mx = (_sim.ball.pos.x + halfLen) / (2f * halfLen);
+                float my = (_sim.ball.pos.y + halfW) / (2f * halfW);
+                var dot = _minimapDots[idx];
+                dot.rectTransform.anchoredPosition = new Vector2(mx * fieldW - fieldW * 0.5f, my * fieldH - fieldH * 0.5f);
+                dot.color = new Color(1f, 1f, 1f, 0.9f);
+                dot.rectTransform.sizeDelta = new Vector2(6, 6);
+                dot.gameObject.SetActive(true);
+                idx++;
+            }
+
+            // Esconde dots extras
+            for (int i = idx; i < _minimapDots.Count; i++)
+                _minimapDots[i].gameObject.SetActive(false);
         }
 
         public RectTransform Overlay => _overlay;
@@ -319,6 +423,7 @@ namespace Craquez.UI
                 _cutT -= Time.unscaledDeltaTime;
                 _cut.color = new Color(0, 0, 0, Mathf.Clamp01(_cutT / 0.4f));
             }
+            UpdateMinimap();
         }
 
         public void SetWeather(string s) => _weather.text = s;

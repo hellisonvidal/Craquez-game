@@ -31,7 +31,7 @@ namespace Craquez
         static readonly Color[] HairColors =
         {
             new Color(0.04f, 0.035f, 0.03f), new Color(0.11f, 0.07f, 0.045f), new Color(0.20f, 0.13f, 0.075f),
-            new Color(0.32f, 0.21f, 0.12f), new Color(0.58f, 0.46f, 0.26f), new Color(0.34f, 0.14f, 0.06f),
+            new Color(0.32f, 0.21f, 0.12f), new Color(0.28f, 0.18f, 0.10f), new Color(0.34f, 0.14f, 0.06f),
         };
 
         static GameObject Model(string b)
@@ -111,7 +111,7 @@ namespace Craquez
             int hc;
             if (b == "afro" || b == "asiatico") hc = rawHc <= 0 ? 0 : 1;
             else if (rawHc <= 2) hc = rawHc;
-            else if (rawHc == 4 && b == "europeu" && R(13) < 0.25f) hc = 4;
+            else if (rawHc == 4 && b == "europeu" && R(13) < 0.25f) hc = 3; // marrom claro em vez de loiro
             else if (rawHc == 5 && b == "europeu" && R(13) < 0.12f) hc = 5;
             else hc = rawHc % 3;
             float tone = Mathf.Clamp(skin, 0, 5);
@@ -120,8 +120,8 @@ namespace Craquez
             // cada pele um pouco diferente (mais quente, mais rosada, mais oliva)
             float warm = (R(11) - 0.5f) * 0.08f, rosy = (R(12) - 0.5f) * 0.05f;
             tint = new Color(tint.r * (1f + warm + rosy), tint.g * (1f + warm * 0.3f), tint.b * (1f - warm * 0.6f + rosy * 0.4f));
-            // cabelo: alguns raspados, raros descoloridos
-            if (R(13) < 0.02f) hc = 4;
+            // cabelo: alguns raspados, sem descoloridos (loiro removido)
+            if (R(13) < 0.02f) hc = 3; // marrom claro em vez de loiro
             bool shaved = R(14) < 0.08f;
             float posTall = p.isKeeper ? 0.14f : (p.pos == "DF" ? 0.06f : (p.pos == "FW" && Mathf.Abs(p.basePos.y) > 0.45f ? -0.05f : 0f));
             float hMix = Mathf.Clamp01(F(5, R(6) * 4f) / 4f * 0.45f + (R(8) + R(9)) * 0.275f + posTall);
