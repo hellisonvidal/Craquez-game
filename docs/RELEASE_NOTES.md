@@ -12,6 +12,7 @@ Jogo de futebol feito 100% com inteligência artificial, **gratuito**.
 - **Correções nos atletas**: o osso `spine_03` voltou a ser encontrado (a troca para `spine` desligava ombros, postura e biotipo no modelo MakeHuman); as clavículas não encolhem mais 5% a cada quadro; o ombro a ombro volta a inclinar mais quando os atletas estão mais perto; a direção de frente do modelo MakeHuman voltou a usar o pé esquerdo (a correção dos pés tinha deixado de agir).
 - **Modelo `Body_Model`**: renomeado para `.glb.bytes` — sem isso a Unity não o carregava (nem o modelo antigo, pelo nome errado do fallback).
 - **Gandula**: o evento de arremesso não acumula mais uma assinatura por partida.
+- **Minimapa**: o retângulo verde do minimapa cobria metade da tela durante o jogo (tamanho passado como âncora); agora fica do tamanho certo, embaixo no centro.
 - **Ícones**: a lista de ícones do PC tem um ícone por tamanho (fim do erro "8 expected while 1 were specified").
 
 ## Craquez 2.29.1

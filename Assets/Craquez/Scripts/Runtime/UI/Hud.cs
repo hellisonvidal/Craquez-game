@@ -182,29 +182,30 @@ namespace Craquez.UI
             _minimapCg.blocksRaycasts = false;
             _minimapCg.interactable = false;
 
-            // Campo do minimapa (retângulo verde)
+            // Campo do minimapa (retângulo verde). Obs.: Place recebe âncoras (0..1); tamanho fixo é At
+            // (com Place(…, 180, 120) a âncora ia a 180x a tela e o verde cobria metade do jogo)
             _minimapField = UiKit.Image(_minimapRoot, new Color(0.12f, 0.35f, 0.18f, 1f), Theme.RoundSmall, "campo").rectTransform;
-            _minimapField.Place(0.5f, 0.5f, 180, 120); // 180x120 = proporção do campo (1.5:1)
+            _minimapField.At(0.5f, 0.5f, 180, 120); // 180x120 = proporção do campo (1.5:1)
 
             // Linhas do campo (meio-campo, área, círculo central)
             var halfway = UiKit.Image(_minimapField, new Color(1f, 1f, 1f, 0.25f), null, "meio-campo").rectTransform;
-            halfway.Place(0.5f, 0.5f, 2, 1f); // linha vertical no meio
+            halfway.At(0.5f, 0.5f, 2, 120); // linha vertical no meio
 
             // Círculo central
             var centerCircle = UiKit.Image(_minimapField, new Color(1f, 1f, 1f, 0.15f), Theme.Round, "círculo-central").rectTransform;
-            centerCircle.Place(0.5f, 0.5f, 30, 30); // 30px de diâmetro
+            centerCircle.At(0.5f, 0.5f, 30, 30); // 30px de diâmetro
 
             // Áreas (grandes áreas)
             var areaA = UiKit.Image(_minimapField, new Color(1f, 1f, 1f, 0.15f), Theme.RoundSmall, "área-A").rectTransform;
-            areaA.Place(0.05f, 0.5f, 24, 60); // área do time A (esquerda)
+            areaA.At(0f, 0.5f, 24, 60); // área do time A (esquerda)
             var areaB = UiKit.Image(_minimapField, new Color(1f, 1f, 1f, 0.15f), Theme.RoundSmall, "área-B").rectTransform;
-            areaB.Place(0.95f, 0.5f, 24, 60); // área do time B (direita)
+            areaB.At(1f, 0.5f, 24, 60); // área do time B (direita)
 
             // Gols
             var goalA = UiKit.Image(_minimapField, new Color(1f, 1f, 1f, 0.5f), null, "gol-A").rectTransform;
-            goalA.Place(0f, 0.5f, 4, 24); // gol do time A
+            goalA.At(0f, 0.5f, 4, 24); // gol do time A
             var goalB = UiKit.Image(_minimapField, new Color(1f, 1f, 1f, 0.5f), null, "gol-B").rectTransform;
-            goalB.Place(1f, 0.5f, 4, 24); // gol do time B
+            goalB.At(1f, 0.5f, 4, 24); // gol do time B
         }
 
         /// <summary>Atualiza as posições dos jogadores e da bola no minimapa.</summary>
@@ -227,9 +228,8 @@ namespace Craquez.UI
             while (_minimapDots.Count < needed)
             {
                 var dot = UiKit.Image(_minimapField, Color.white, Theme.Round, "dot" + _minimapDots.Count).rectTransform;
-                dot.Place(0.5f, 0.5f, 8, 8);
-                dot.anchorMin = dot.anchorMax = new Vector2(0f, 0f);
-                dot.pivot = new Vector2(0.5f, 0.5f);
+                // (posição relativa ao centro do campo do minimapa)
+                dot.At(0.5f, 0.5f, 8, 8);
                 _minimapDots.Add(dot);
             }
 
