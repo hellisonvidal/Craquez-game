@@ -53,9 +53,17 @@ namespace Craquez
 
         public static bool Available => EnsureTemplate() != null;
 
+        /// <summary>
+        /// Modelo Meshy (esqueleto Mixamo) desligado: as capturas de movimento do jogo são do esqueleto
+        /// MakeHuman e a transferência para o Mixamo deixava os atletas agachados / de cabeça para baixo.
+        /// Os atletas usam o modelo MakeHuman (uniforme vestido, biotipos, rostos e cabelos).
+        /// </summary>
+        public static bool Enabled = false;
+
         public static GameObject InstantiateModel(Transform parent, out SkinnedMeshRenderer smr)
         {
             smr = null;
+            if (!Enabled) return null;
             var tpl = EnsureTemplate();
             if (tpl == null) return null;
 
