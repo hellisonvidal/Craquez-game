@@ -19,7 +19,7 @@ Copie os FBX, `anims.json` e as texturas para `Assets/Craquez/Resources/Athletes
 ## Corpo único (modelo Meshy)
 
 ```bash
-# rig.blend = só o "Armature" do Athlete_europeu.fbx. Modelo em pose A (braços retos a ~45-60°), FBX + textura de cor
+# rig.blend = só o "Armature" do Athlete_base.fbx (o esqueleto das animações). Modelo em pose A (braços retos a ~45-60°), FBX + textura de cor
 # do Meshy; proporções já iguais às do esqueleto (sem remapear). O braço é achado sozinho (ombro -> punho -> mão)
 MESHY_APOSE=1 MESHY_NAME=base MESHY_CROTCH=0.885 MESHY_SHOULDER=1.59 MESHY_HEAD=1 \
   bpyenv/bin/python tools/blender/build_meshy.py jogador.fbx jogador.png out rig.blend    # -> out/Athlete_base.fbx

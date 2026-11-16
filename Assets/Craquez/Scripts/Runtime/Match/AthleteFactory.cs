@@ -172,44 +172,29 @@ namespace Craquez
             if (boots >= 0) look.boots = boots;
             var root = new GameObject("Atleta " + p.number + " " + p.name);
             root.transform.SetParent(parent, false);
-            bool isMeshy = false;
-            GameObject inst = MeshyAthleteLoader.InstantiateModel(root.transform, out _);
-            if (inst != null)
+            // corpo único (Meshy): goleiro com o modelo próprio (manga comprida e luvas), se existir
+            look.body = p.isKeeper && Model("base_gk") != null ? "base_gk" : "base";
+            var model = Model(look.body);
+            if (model == null)
             {
-                isMeshy = true;
+                Debug.LogError("Modelo de atleta ausente em Resources/Athletes (Athlete_base)");
+                var cap = GameObject.CreatePrimitive(PrimitiveType.Capsule);
+                cap.transform.SetParent(root.transform, false);
+                return root.AddComponent<AthleteRig>();
             }
-            else
-            {
-                // corpo único: goleiro com o modelo próprio (manga comprida e luvas), se existir
-                look.body = p.isKeeper && Model("base_gk") != null ? "base_gk" : Model("base") != null ? "base" : null;
-                var model = (look.body != null ? Model(look.body) : null) ?? Model(look.baseName) ?? Model("latino");
-                if (model == null)
-                {
-                    Debug.LogError("Modelos de atleta ausentes em Resources/Athletes");
-                    var cap = GameObject.CreatePrimitive(PrimitiveType.Capsule);
-                    cap.transform.SetParent(root.transform, false);
-                    return root.AddComponent<AthleteRig>();
-                }
-                inst = Object.Instantiate(model, root.transform, false);
-                inst.name = "model";
-            }
+            var inst = Object.Instantiate(model, root.transform, false);
+            inst.name = "model";
             var rig = root.AddComponent<AthleteRig>();
             rig.Init(inst.transform);
-            rig.Physique(look.build, look.frame, look.body != null);
+            rig.Physique(look.build, look.frame, true);
             // altura real variando entre 1,66 m e 1,95 m por jogador
             float u = Mathf.InverseLerp(0.91f, 1.09f, look.scale);
             float tall = Mathf.Lerp(1.66f, 1.95f, u);
             float modelH = rig.head != null ? rig.head.position.y - root.transform.position.y + 0.19f : 1.70f;
             float baseScale = Mathf.Clamp(tall / Mathf.Max(1.2f, modelH), 0.85f, 1.18f);
             // leve variação de largura corporal proporcional ao peso/build sem alterar a altura
-            float weightXZ = look.body != null ? Mathf.Lerp(0.95f, 1.02f, look.build) : Mathf.Lerp(0.93f, 1.08f, look.build);
+            float weightXZ = Mathf.Lerp(0.95f, 1.02f, look.build);
             inst.transform.localScale = new Vector3(baseScale * weightXZ, baseScale, baseScale * weightXZ);
-            // mãos do modelo MakeHuman antigo eram grandes demais (o corpo único já vem com a mão certa)
-            if (!isMeshy && !BaseBody)
-            {
-                foreach (var hn in new[] { "hand_l", "hand_r" })
-                    if (rig.bones.TryGetValue(hn, out var hb)) hb.localScale = hb.localScale * 0.75f;
-            }
             Dress(rig, look, p.isKeeper ? keeperKit : kit, p.id < 0 && p.number <= 0 ? -1 : p.number, quality);   // (juiz e técnico: sem número)
             Accessories(rig, look, p.isKeeper ? keeperKit : kit, p.isKeeper, captain, quality);
             return rig;
@@ -332,13 +317,6 @@ namespace Craquez
                 smr.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.On;
                 switch (n)
                 {
-                    case "output_unwrapped":
-                    {
-                        var mat = MeshyAthleteLoader.MaterialFor(look, kit, quality);
-                        if (mat != null) smr.sharedMaterial = mat;
-                        rig.body = smr;
-                        break;
-                    }
                     case "Body":
                     {
                         string bodyTex = "athlete_" + (look.body ?? "base");

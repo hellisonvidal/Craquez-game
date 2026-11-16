@@ -12,7 +12,7 @@ Feito 100% com inteligência artificial, por isso é e sempre será **gratuito**
 
 | | |
 |---|---|
-| **Atletas realistas** | Corpo humano MakeHuman (CC0) com 4 biotipos, rosto variável por jogador (10 formas), 5 cabelos, tons de pele, número na camisa |
+| **Atletas** | Corpo de jogador (modelo Meshy) preso ao esqueleto das animações, com modelo próprio para o goleiro; altura, tom de pele e porte variam por jogador; uniforme de cada time pintado no corpo, número na camisa |
 | **Movimentos reais** | Animações de **captura de movimento** (CMU): corrida, trote, caminhada, de costas, marcação, cortes, fintas, giro, passe, chute, voleio — misturadas pela velocidade e direção do atleta |
 | **Uniformes vestidos** | Camisa, calção e meião são peças próprias sobre o corpo: folga, barra por fora do calção, mangas, gola, dobras do tecido. 3 uniformes por time com listras, aros, faixa, metades, riscas, gola e punhos |
 | **Chuteiras** | Modeladas (sola, travas, cano acolchoado, cadarço) com 16 desenhos originais; cada atleta usa a sua ou todos o mesmo modelo |
