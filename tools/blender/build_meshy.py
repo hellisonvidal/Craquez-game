@@ -224,6 +224,19 @@ if APOSE:
                 if r < best:
                     best, tw = r, tt
         tw_mesh = tw
+        if os.environ.get("MESHY_ARM_UNIFORM", "0") == "1":
+            # mão grande (luva de goleiro): o punho medido fica dentro da luva e esticar até o punho do esqueleto
+            # deixava o braço comprido demais. Escala o braço inteiro por igual até o comprimento total do braço
+            # do esqueleto (ombro -> ponta do dedo médio): a ponta da luva para onde pararia a mão
+            L_tot = L_up + L_fo + (mw_ @ rb["middle_03_l"].tail_local - mw_ @ rb["hand_l"].head_local).length
+            k_all = L_tot / Ltot
+            pts = new[sel]
+            w0 = np.clip((np.abs(pts[:, 0]) - 0.19) / 0.07, 0.0, 1.0)
+            new[sel] = stretch(pts, S, a, Ltot, k_all, w0)
+            if side > 0:
+                SEG_DIRS = {"upperarm_": a, "lowerarm_": a, "hand_": a}
+                log("braço (pose A, uniforme): ombro->ponta %.3f -> %.3f (x%.2f)" % (Ltot, L_tot, k_all))
+            continue
         te = tw * L_up / (L_up + L_fo)
         def cen(tt):
             m = sel & (np.abs(t - tt) < 0.015)

@@ -23,9 +23,10 @@ Copie os FBX, `anims.json` e as texturas para `Assets/Craquez/Resources/Athletes
 # do Meshy; proporções já iguais às do esqueleto (sem remapear). O braço é achado sozinho (ombro -> punho -> mão)
 MESHY_APOSE=1 MESHY_NAME=base MESHY_CROTCH=0.885 MESHY_SHOULDER=1.59 MESHY_HEAD=1 \
   bpyenv/bin/python tools/blender/build_meshy.py jogador.fbx jogador.png out rig.blend    # -> out/Athlete_base.fbx
-MESHY_APOSE=1 MESHY_NAME=base_gk MESHY_CROTCH=0.885 MESHY_SHOULDER=1.59 MESHY_HEAD=1 \
+MESHY_APOSE=1 MESHY_ARM_UNIFORM=1 MESHY_NAME=base_gk MESHY_CROTCH=0.885 MESHY_SHOULDER=1.59 MESHY_HEAD=1 \
   bpyenv/bin/python tools/blender/build_meshy.py goleiro.fbx goleiro.png out rig.blend    # -> out/Athlete_base_gk.fbx
-# (modelo em pose T: sem MESHY_APOSE; com braço dobrado, MESHY_ELBOW_X / MESHY_WRIST_X em metros do centro)
+# (MESHY_ARM_UNIFORM=1: mão grande, como luva de goleiro — escala o braço inteiro por igual até o comprimento do
+#  braço do esqueleto, em vez de esticar até o punho. Modelo em pose T: sem MESHY_APOSE; com braço dobrado, MESHY_ELBOW_X / MESHY_WRIST_X em metros do centro)
 ```
 
 Copie `Athlete_base*.fbx` para `Assets/Craquez/Resources/Athletes/` e `athlete_base*.jpg` para `.../Athletes/Textures/`
