@@ -19,13 +19,17 @@ Copie os FBX, `anims.json` e as texturas para `Assets/Craquez/Resources/Athletes
 ## Corpo único (modelo Meshy)
 
 ```bash
-# modelo em pose T (FBX + textura de cor do Meshy); rig.blend = só o "Armature" do Athlete_europeu.fbx
-# proporções já iguais às do esqueleto: sem remapear; braço em segmentos (cotovelo e punho em x, metros)
-MESHY_CROTCH=0.885 MESHY_SHOULDER=1.59 MESHY_HEAD=1 MESHY_ELBOW_X=0.47 MESHY_WRIST_X=0.63 \
-  bpyenv/bin/python tools/blender/build_meshy.py modelo.fbx modelo.png out rig.blend   # -> out/Athlete_base.fbx
+# rig.blend = só o "Armature" do Athlete_europeu.fbx. Modelo em pose A (braços retos a ~45-60°), FBX + textura de cor
+# do Meshy; proporções já iguais às do esqueleto (sem remapear). O braço é achado sozinho (ombro -> punho -> mão)
+MESHY_APOSE=1 MESHY_NAME=base MESHY_CROTCH=0.885 MESHY_SHOULDER=1.59 MESHY_HEAD=1 \
+  bpyenv/bin/python tools/blender/build_meshy.py jogador.fbx jogador.png out rig.blend    # -> out/Athlete_base.fbx
+MESHY_APOSE=1 MESHY_NAME=base_gk MESHY_CROTCH=0.885 MESHY_SHOULDER=1.59 MESHY_HEAD=1 \
+  bpyenv/bin/python tools/blender/build_meshy.py goleiro.fbx goleiro.png out rig.blend    # -> out/Athlete_base_gk.fbx
+# (modelo em pose T: sem MESHY_APOSE; com braço dobrado, MESHY_ELBOW_X / MESHY_WRIST_X em metros do centro)
 ```
 
-Copie `Athlete_base.fbx` para `Assets/Craquez/Resources/Athletes/` e `athlete_base.jpg` para `.../Athletes/Textures/`.
+Copie `Athlete_base*.fbx` para `Assets/Craquez/Resources/Athletes/` e `athlete_base*.jpg` para `.../Athletes/Textures/`
+(o jogo usa `base_gk` nos goleiros, se existir).
 
 ## Cenário (Quaternius, CC0)
 

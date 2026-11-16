@@ -25,6 +25,8 @@ from mathutils import Matrix, Vector
 SRC, TEX, OUT = sys.argv[1], sys.argv[2], sys.argv[3]
 RIG_BLEND = sys.argv[4] if len(sys.argv) > 4 else "/tmp/claude-0/athletes10/Athlete_europeu.blend"
 TARGET_FACES = 26000
+APOSE = os.environ.get("MESHY_APOSE", "0") == "1"   # modelo em pose A (braços retos a ~45-60°) em vez de T
+NAME = os.environ.get("MESHY_NAME", "base")         # saída: Athlete_<NAME>.fbx + athlete_<NAME>.jpg
 
 
 def log(*a):
@@ -96,12 +98,14 @@ for p in me.polygons:
     # pele é listra ou dobra do tecido)
     if 0.93 < z <= 1.52 and ax < 0.24:
         sk = False
-    if 0.66 < z <= 0.93:
+    if 0.66 < z <= 0.93 and not (APOSE and ax > 0.27):   # (pose A: as mãos ficam nessa altura)
         sk = False
     if 0.93 < z <= 1.62 and not sk:
         cls[p.index] = 1          # gola: o tecido do pescoço é da camisa (a gola original não aparece)
     elif sk or z > 1.62:
         cls[p.index] = 0
+    elif APOSE and ax > 0.27 and z > 0.72:
+        cls[p.index] = 1          # pose A: manga / luva junto da mão (não é calção)
     elif z > 0.6:
         cls[p.index] = 2
     elif z > 0.105:
@@ -146,23 +150,28 @@ def zmap(z):
 
 
 # braços (em T): centro da seção a cada x, para achar a linha do braço
-arm = np.abs(co[:, 0]) > 0.30
-xs = np.arange(0.45, 0.80, 0.05)
-cz = []
-for x in xs:
-    m = (np.abs(np.abs(co[:, 0]) - x) < 0.01) & (co[:, 2] > 1.0)
-    cz.append([co[m, 1].mean(), co[m, 2].mean()])
-cz = np.array(cz)
-slope_z = np.polyfit(xs, cz[:, 1], 1)
-slope_y = np.polyfit(xs, cz[:, 0], 1)
-shoulder_line_z = np.polyval(slope_z, SH.x)
-arm_dz = SH.z - shoulder_line_z          # braço inteiro sobe/desce até a linha passar pelo ombro do esqueleto
+if APOSE:
+    # pose A: o braço não fica na horizontal; a linha de cada trecho sai da busca por segmentos (abaixo)
+    slope_z = np.array([0.0, SH.z])
+    slope_y = np.array([0.0, 0.0])
+    arm_dz = 0.0
+else:
+    xs = np.arange(0.45, 0.80, 0.05)
+    cz = []
+    for x in xs:
+        m = (np.abs(np.abs(co[:, 0]) - x) < 0.01) & (co[:, 2] > 1.0)
+        cz.append([co[m, 1].mean(), co[m, 2].mean()])
+    cz = np.array(cz)
+    slope_z = np.polyfit(xs, cz[:, 1], 1)
+    slope_y = np.polyfit(xs, cz[:, 0], 1)
+    shoulder_line_z = np.polyval(slope_z, SH.x)
+    arm_dz = SH.z - shoulder_line_z          # braço inteiro sobe/desce até a linha passar pelo ombro do esqueleto
 log("braço: inclinação %.3f, ajuste vertical %.3f" % (slope_z[0], arm_dz))
 new = co.copy()
 for i in range(len(co)):
     x, y, z = co[i]
     zt = zmap(z)
-    w = min(1.0, max(0.0, (abs(x) - 0.26) / 0.10)) if z > 1.0 else 0.0   # 0 tronco .. 1 braço
+    w = min(1.0, max(0.0, (abs(x) - 0.26) / 0.10)) if (z > 1.0 and not APOSE) else 0.0   # 0 tronco .. 1 braço
     za = z + arm_dz
     new[i, 2] = zt * (1 - w) + za * w
 # cabeça um pouco menor por igual (o modelo estilizado tem cabeça grande), em volta da base do pescoço
@@ -182,7 +191,62 @@ new[blend, 0] *= 1 - (1 - k) * t
 # malha (MESHY_ELBOW_X / MESHY_WRIST_X, em metros do centro), estica braço e antebraço até o comprimento dos ossos
 # e orienta cada osso no seu trecho.
 SEG_DIRS = None
-if os.environ.get("MESHY_ELBOW_X"):
+if APOSE:
+    # braço reto em qualquer ângulo: ponta da mão = ponto mais longe do ombro (fora do tronco e das pernas);
+    # a linha ombro -> mão e a seção mais fina perto da mão (punho) dão os trechos; o cotovelo fica na
+    # proporção braço/antebraço do esqueleto. Estica cada trecho até o comprimento do osso.
+    rb = rig.data.bones
+    mw_ = rig.matrix_world
+    L_up = (mw_ @ rb["lowerarm_l"].head_local - mw_ @ rb["upperarm_l"].head_local).length
+    L_fo = (mw_ @ rb["hand_l"].head_local - mw_ @ rb["lowerarm_l"].head_local).length
+
+    def stretch(pts, o, d, L, k, w):
+        t = (pts - o) @ d
+        dt = np.where(t <= 0, 0.0, np.where(t < L, t * (k - 1), L * (k - 1)))
+        return pts + np.outer(dt * w, d)
+
+    for side in (1.0, -1.0):
+        S = np.array([SH.x * side, SH.y, SH.z])
+        cand = (new[:, 0] * side > 0.30) & (new[:, 2] > 0.72)
+        tip = new[cand][np.argmax(np.linalg.norm(new[cand] - S, axis=1))]
+        a = (tip - S) / np.linalg.norm(tip - S)
+        Ltot = np.linalg.norm(tip - S)
+        rel = new - S
+        t = rel @ a
+        rad = np.linalg.norm(rel - np.outer(t, a), axis=1)
+        sel = (t > -0.02) & (rad < 0.11) & (new[:, 0] * side > 0.17)
+        # punho: menor raio médio entre 0,10 e 0,30 m antes da ponta
+        best, tw = 1e9, Ltot - 0.19
+        for tt in np.arange(Ltot - 0.30, Ltot - 0.10, 0.01):
+            m = sel & (np.abs(t - tt) < 0.008)
+            if m.sum() > 8:
+                r = rad[m].mean()
+                if r < best:
+                    best, tw = r, tt
+        tw_mesh = tw
+        te = tw * L_up / (L_up + L_fo)
+        def cen(tt):
+            m = sel & (np.abs(t - tt) < 0.015)
+            return new[m].mean(0) if m.sum() > 3 else S + a * tt
+        E, W = cen(te), cen(tw)
+        E = S + a * te + (E - (S + a * te)) * 0.5     # centro da seção, sem fugir da linha
+        W = S + a * tw + (W - (S + a * tw)) * 0.5
+        pts = new[sel]
+        w0 = np.clip((np.abs(pts[:, 0]) - 0.19) / 0.07, 0.0, 1.0)
+        land = np.array([E, W, tip])
+        u = (E - S) / np.linalg.norm(E - S); ku = L_up / np.linalg.norm(E - S)
+        pts = stretch(pts, S, u, np.linalg.norm(E - S), ku, w0); land = stretch(land, S, u, np.linalg.norm(E - S), ku, np.ones(3))
+        E, W, T = land
+        f = (W - E) / np.linalg.norm(W - E); kf = L_fo / np.linalg.norm(W - E)
+        pts = stretch(pts, E, f, np.linalg.norm(W - E), kf, w0); land = stretch(land, E, f, np.linalg.norm(W - E), kf, np.ones(3))
+        E, W, T = land
+        h = (T - W) / np.linalg.norm(T - W)
+        new[sel] = pts
+        if side > 0:
+            SEG_DIRS = {"upperarm_": u, "lowerarm_": f, "hand_": h}
+            log("braço (pose A): ponta %s, punho a %.2f m do ombro (de %.2f); braço x%.2f antebraço x%.2f"
+                % (tip.round(3), tw_mesh, Ltot, ku, kf))
+elif os.environ.get("MESHY_ELBOW_X"):
     EX, WX = float(os.environ["MESHY_ELBOW_X"]), float(os.environ.get("MESHY_WRIST_X", "0.63"))
     rb = rig.data.bones
     mw_ = rig.matrix_world
@@ -364,12 +428,12 @@ rig.select_set(True)
 for o in parts:
     o.select_set(True)
 bpy.context.view_layer.objects.active = rig
-path = os.path.join(OUT, "Athlete_base.fbx")
+path = os.path.join(OUT, "Athlete_%s.fbx" % NAME)
 bpy.ops.export_scene.fbx(filepath=path, use_selection=True, add_leaf_bones=False, bake_anim=False,
                          object_types={"ARMATURE", "MESH"}, mesh_smooth_type="FACE",
                          use_mesh_modifiers=True, axis_forward="-Z", axis_up="Y",
                          apply_scale_options="FBX_SCALE_ALL", path_mode="COPY", embed_textures=False,
                          use_tspace=True)
-bpy.ops.wm.save_as_mainfile(filepath=os.path.join(OUT, "Athlete_base.blend"))
-Image.open(TEX).convert("RGB").resize((2048, 2048), Image.LANCZOS).save(os.path.join(OUT, "athlete_base.jpg"), quality=92)
+bpy.ops.wm.save_as_mainfile(filepath=os.path.join(OUT, "Athlete_%s.blend" % NAME))
+Image.open(TEX).convert("RGB").resize((2048, 2048), Image.LANCZOS).save(os.path.join(OUT, "athlete_%s.jpg" % NAME), quality=92)
 log("exportado", path, os.path.getsize(path) // 1024, "KB")

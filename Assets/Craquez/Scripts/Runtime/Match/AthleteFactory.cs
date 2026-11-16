@@ -79,6 +79,7 @@ namespace Craquez
         public struct Look
         {
             public string baseName;
+            public string body;   // corpo único usado ("base" ou "base_gk" para goleiros); null = MakeHuman
             public int hair;
             public Color hairColor, skinTint;
             public float scale;
@@ -179,7 +180,9 @@ namespace Craquez
             }
             else
             {
-                var model = Model("base") ?? Model(look.baseName) ?? Model("latino");
+                // corpo único: goleiro com o modelo próprio (manga comprida e luvas), se existir
+                look.body = p.isKeeper && Model("base_gk") != null ? "base_gk" : Model("base") != null ? "base" : null;
+                var model = (look.body != null ? Model(look.body) : null) ?? Model(look.baseName) ?? Model("latino");
                 if (model == null)
                 {
                     Debug.LogError("Modelos de atleta ausentes em Resources/Athletes");
@@ -338,9 +341,10 @@ namespace Craquez
                     }
                     case "Body":
                     {
-                        bool baseBody = T("athlete_base") != null && smr.sharedMesh != null && smr.sharedMesh.GetBlendShapeIndex("Body_Lean") >= 0;
+                        string bodyTex = "athlete_" + (look.body ?? "base");
+                        bool baseBody = T(bodyTex) != null && smr.sharedMesh != null && smr.sharedMesh.GetBlendShapeIndex("Body_Lean") >= 0;
                         var skin = baseBody
-                            ? Shared("skinB:" + Teams.Hex(look.skinTint), () => Gfx.Athlete(look.skinTint, T("athlete_base"), 0.3f, 1f))
+                            ? Shared("skinB:" + bodyTex + Teams.Hex(look.skinTint), () => Gfx.Athlete(look.skinTint, T(bodyTex), 0.3f, 1f))
                             : Shared("skin:" + look.baseName + Teams.Hex(look.skinTint), () => Gfx.Athlete(look.skinTint, T(SkinTex[look.baseName]), 0.3f, 1f));
                         var mats = new Material[Mathf.Max(1, smr.sharedMesh.subMeshCount)];
                         for (int i = 0; i < mats.Length; i++) mats[i] = skin;
