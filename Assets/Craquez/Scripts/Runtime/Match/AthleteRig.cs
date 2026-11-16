@@ -473,6 +473,29 @@ namespace Craquez
                     c.localScale = Vector3.Scale(c.localScale, inv);
                 }
             }
+
+            // Ajusta posições das clavículas relativas à coluna após o escalonamento
+            // para manter a conexão anatômica correta (clavícula sai do esterno/espinha)
+            if (spine_03 != null)
+            {
+                foreach (var cn in new[] { "clavicle_l", "clavicle_r", "mixamorig:LeftShoulder", "mixamorig:RightShoulder" })
+                {
+                    if (bones.TryGetValue(cn, out var clv))
+                    {
+                        // A clavícula deve apontar para o ombro (filho), mas sua base deve ficar no esterno
+                        // Ajusta a posição local para compensar a escala do spine_03
+                        var child = clv.childCount > 0 ? clv.GetChild(0) : null;
+                        if (child != null)
+                        {
+                            // Mantém a direção para o ombro, mas ajusta a distância do esterno
+                            var dir = (child.position - clv.position).normalized;
+                            float targetLen = (child.position - clv.position).magnitude;
+                            clv.localPosition = clv.localPosition * (targetLen / Mathf.Max(0.01f, dir.magnitude));
+                        }
+                    }
+                }
+            }
+
             Proportions();
         }
 
@@ -498,6 +521,41 @@ namespace Craquez
             // braços mais longos
             Move("lowerarm_l", "mixamorig:LeftForeArm", 1.08f);
             Move("lowerarm_r", "mixamorig:RightForeArm", 1.08f);
+
+            // Ajusta posições das clavículas relativas à coluna para manter conexão ombros-tronco
+            if (isMeshy)
+            {
+                foreach (var cn in new[] { "mixamorig:LeftShoulder", "mixamorig:RightShoulder" })
+                {
+                    if (bones.TryGetValue(cn, out var clv))
+                    {
+                        // Ajusta posição da clavícula relativa à coluna (spine_03)
+                        if (spine_03 != null)
+                        {
+                            var offset = clv.localPosition;
+                            // Mantém a direção mas ajusta a distância do esterno
+                            offset *= 1.02f; // leve aumento para ombros mais naturais
+                            clv.localPosition = offset;
+                        }
+                    }
+                }
+            }
+            else
+            {
+                foreach (var cn in new[] { "clavicle_l", "clavicle_r" })
+                {
+                    if (bones.TryGetValue(cn, out var clv))
+                    {
+                        if (spine_03 != null)
+                        {
+                            var offset = clv.localPosition;
+                            offset *= 1.02f;
+                            clv.localPosition = offset;
+                        }
+                    }
+                }
+            }
+
             // quadril um pouco mais largo
             if (isMeshy)
             {

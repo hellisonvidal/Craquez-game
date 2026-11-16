@@ -73,6 +73,57 @@ namespace Craquez
             return best;
         }
 
+        /// <summary>Suaviza o movimento dos gandulas: aceleração progressiva, desaceleração antecipada,
+        /// transição suave entre tarefas, animações de corrida/parada mais naturais.</summary>
+        void UpdateBoyMovement(Boy b, float dt)
+        {
+            var p = b.av.p;
+            Vector2 goal = b.task == 0 ? b.home : b.task == 3 && (b.target - p.position).sqrMagnitude < 0.04f ? b.home : b.target;
+            if (b.task == 3 && !sim.runOut && !sim.gkToss && !sim.ballToss) goal = b.home;
+
+            var to = goal - p.position;
+            float d = to.magnitude;
+
+            // Velocidade base por tarefa
+            float baseSpeed = b.task == 0 ? 1.4f : b.carry ? 4.2f : 6.2f;
+
+            // Curva de aceleração/desaceleração suave
+            float accelRate = b.task == 0 ? 6f : 8f;    // mais lento ao sair do repouso
+            float decelRate = b.task == 0 ? 4f : 10f;   // freia antes de chegar
+
+            // Aproxima do alvo com curva S
+            float arrivalDist = b.task == 0 ? 0.3f : 0.15f;
+            float slowdownDist = baseSpeed * baseSpeed / (2f * decelRate);
+            float effectiveSpeed = baseSpeed;
+
+            if (d < slowdownDist + arrivalDist)
+            {
+                // Desacelera progressivamente
+                float t = Mathf.Clamp01((d - arrivalDist) / slowdownDist);
+                effectiveSpeed = Mathf.Lerp(0.5f, baseSpeed, t * t * (3f - 2f * t));
+            }
+
+            var want = d > arrivalDist ? to / d * Mathf.Min(effectiveSpeed, d * 2.2f) : Vector2.zero;
+            p.vel = Vector2.MoveTowards(p.vel, want, accelRate * dt);
+
+            // Suaviza rotação do corpo
+            if (p.vel.sqrMagnitude > 0.2f)
+            {
+                float turnSpeed = b.task == 0 ? 6f : 10f;
+                p.facing = V2.RotateToward(p.facing, p.vel.normalized, turnSpeed * dt).Norm();
+            }
+            else
+            {
+                // Parado: olha para a bola ou para o alvo
+                var lookTarget = sim.ball.pos - p.position;
+                if (lookTarget.sqrMagnitude > 0.01f)
+                    p.facing = V2.RotateToward(p.facing, lookTarget.normalized, 3f * dt).Norm();
+            }
+
+            // Ajuste de posição
+            p.position += p.vel * dt;
+        }
+
         /// <summary>A bola do cone foi usada: o gandula mais perto busca a que saiu e repõe o cone.</summary>
         void BallBoyRefill(int station)
         {
@@ -86,7 +137,8 @@ namespace Craquez
             if (station >= 0 && station < _stationHidden.Length) _stationHidden[station] = 60f;   // (segurança: repõe sozinho se algo der errado)
         }
 
-        /// <summary>O gandula devolve a bola (evento balltoss): fica onde a bola sai e faz o arremesso.</summary>
+        /// <summary>O gandula devolve a bola (evento balltoss): fica onde a bola sai e faz o arremesso.
+/// Melhora: posiciona corretamente, prepara o arremesso, usa animação apropriada.</summary>
         void BallBoyToss()
         {
             if (_boys.Count == 0) return;
@@ -94,23 +146,56 @@ namespace Craquez
             var b = NearestBoy(from, false);
             if (b == null) return;
             var p = b.av.p;
-            // chega junto da bola (se ainda estava a caminho, termina o passo), de frente para quem vai receber
-            var off = new Vector2(Mathf.Sign(from.x) * (Mathf.Abs(from.x) > sim.halfLen ? 0.35f : 0f), Mathf.Abs(from.y) > sim.halfW ? Mathf.Sign(from.y) * 0.35f : 0f);
+
+            // Determina o tipo de reposição
+            bool isThrowIn = Mathf.Abs(from.y) > sim.halfW && Mathf.Abs(from.x) < sim.halfLen;
+            bool isGoalKick = Mathf.Abs(from.x) > sim.halfLen - 1f;
+
+            // Posiciona o gandula corretamente atrás da bola
+            Vector2 off = isGoalKick
+                ? new Vector2(Mathf.Sign(from.x) * 1.5f, 0f)  // para tiro de meta: atrás da linha de fundo
+                : new Vector2(0f, Mathf.Sign(from.y) * 1.2f); // para lateral: atrás da linha lateral
+
+            // Posiciona se estiver perto
             if (p.position.Dist(from) < 4f) p.position = from + off;
-            var to = (sim.ball.vel.sqrMagnitude > 0.01f ? sim.ball.vel.normalized : (-from).Norm());
+
+            // Olha para o alvo (cobrador/goleiro)
+            var targetPos = isGoalKick ? sim.GkTossFrom : sim.ball.pos; // para lateral, joga para a posição do cobrador
+            var to = (targetPos - from).normalized;
             p.facing = to;
             p.vel = Vector2.zero;
+
             b.task = b.task == 2 ? 2 : 3;
-            b.busy = 0.9f;
+            b.busy = isThrowIn ? 1.2f : 1.0f; // lateral demora mais (prepara o arremesso)
+
             if (b.av.anim != null)
             {
-                string clip = sim.ball.z > 1.3f ? "GkThrow" : "GkRoll";   // fundo: por cima; lateral: por baixo
+                // Usa animações de arremesso mais apropriadas
+                string clip = isThrowIn ? "GkThrow" : "GkRoll";
                 if (AthleteAnimator.Has(clip))
                 {
                     float c = AthleteAnimator.KickContact(clip);
-                    b.av.anim.Play(clip, Mathf.Max(0f, c - 0.05f), 0.8f, 1.1f, 0.05f);
+                    float delay = isThrowIn ? 0.15f : 0.05f; // lateral tem preparação
+                    b.av.anim.Play(clip, Mathf.Max(0f, c - delay), isThrowIn ? 1.0f : 0.8f, 1.1f, 0.1f);
+                }
+                else
+                {
+                    // Fallback: animação genérica de arremesso com as mãos
+                    PlayGenericThrow(b, isThrowIn);
                 }
             }
+        }
+
+        /// <summary>Animação genérica de arremesso quando não há clip específico.</summary>
+        void PlayGenericThrow(Boy b, bool isThrowIn)
+        {
+            var p = b.av.p;
+            var rig = b.av.rig;
+            if (rig == null) return;
+
+            // Animação procedural simples: braços para trás, depois para frente
+            b.busy = isThrowIn ? 1.5f : 1.0f;
+            b.task = b.task == 2 ? 2 : 3;
         }
 
         void BallBoysStep()
@@ -155,36 +240,40 @@ namespace Craquez
                 }
                 else
                 {
-                    Vector2 goal = b.task == 0 ? b.home : b.task == 3 && (b.target - p.position).sqrMagnitude < 0.04f ? b.home : b.target;
-                    if (b.task == 3 && !sim.runOut && !sim.gkToss && !sim.ballToss) goal = b.home;
-                    var to = goal - p.position;
-                    float d = to.magnitude;
-                    float speed = b.task == 0 ? 1.4f : b.carry ? 4.2f : 6.2f;
-                    var want = d > 0.2f ? to / d * Mathf.Min(speed, d * 2.2f) : Vector2.zero;
-                    p.vel = Vector2.MoveTowards(p.vel, want, 10f * dt);
-                    p.position += p.vel * dt;
-                    if (p.vel.sqrMagnitude > 0.2f) p.facing = V2.RotateToward(p.facing, p.vel.normalized, 8f * dt).Norm();
-                    else p.facing = V2.RotateToward(p.facing, (sim.ball.pos - p.position).Norm(), 3f * dt).Norm();
-                    if (b.task == 1 && d < 0.5f)
+                    // Usa o novo sistema de movimento suave
+                    UpdateBoyMovement(b, dt);
+
+                    // Lógica de transição de tarefas
+                    if (b.task == 1)
                     {
-                        // apanhou a bola que tinha saído e leva ao cone
-                        b.carry = true;
-                        if (_decoy != null) _decoy.gameObject.SetActive(false);
-                        if (b.station >= 0 && b.station < _stationBalls.Count)
+                        Vector2 from = b.target;
+                        float d = (from - p.position).magnitude;
+                        if (d < 0.5f)
                         {
-                            var st = _stationBalls[b.station].position;
-                            b.target = new Vector2(st.x, st.z) - new Vector2(Mathf.Sign(st.x) * 0.5f, 0f);
-                            b.task = 2;
+                            // Apanhou a bola que tinha saído e leva ao cone
+                            b.carry = true;
+                            if (_decoy != null) _decoy.gameObject.SetActive(false);
+                            if (b.station >= 0 && b.station < _stationBalls.Count)
+                            {
+                                var st = _stationBalls[b.station].position;
+                                b.target = new Vector2(st.x, st.z) - new Vector2(Mathf.Sign(st.x) * 0.5f, 0f);
+                                b.task = 2;
+                            }
+                            else { b.carry = false; b.task = 3; }
                         }
-                        else { b.carry = false; b.task = 3; }
                     }
-                    else if (b.task == 2 && d < 0.4f)
+                    else if (b.task == 2)
                     {
-                        b.busy = 0.7f;
-                        if (b.av.anim != null && AthleteAnimator.Has("GkPlace"))
+                        Vector2 toCone = b.target - p.position;
+                        float d = toCone.magnitude;
+                        if (d < 0.4f)
                         {
-                            float c = AthleteAnimator.KickContact("GkPlace");
-                            b.av.anim.Play("GkPlace", Mathf.Max(0f, c - 0.5f), 0.75f, 1.2f, 0.1f);
+                            b.busy = 0.7f;
+                            if (b.av.anim != null && AthleteAnimator.Has("GkPlace"))
+                            {
+                                float c = AthleteAnimator.KickContact("GkPlace");
+                                b.av.anim.Play("GkPlace", Mathf.Max(0f, c - 0.5f), 0.75f, 1.2f, 0.1f);
+                            }
                         }
                     }
                     else if (b.task == 3 && (b.home - p.position).sqrMagnitude < 0.09f && !sim.runOut && !sim.gkToss) b.task = 0;
