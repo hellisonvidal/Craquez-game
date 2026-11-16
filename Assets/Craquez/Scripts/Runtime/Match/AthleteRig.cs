@@ -417,16 +417,21 @@ namespace Craquez
         /// Biotipo (0 = magro .. 1 = forte): escala os ossos só na espessura e compensa nos filhos.
         /// Chamar uma vez, logo depois de Init.
         /// </summary>
-        public void Physique(float build, float frame = 0.5f)
+        /// <param name="compact">corpo único (Meshy): o modelo já vem encorpado (ombros largos, peito e costas
+        /// grossos) e preso ao esqueleto na medida certa — variação menor, sem alargar e sem as proporções do
+        /// MakeHuman (somadas, deixavam os ombros largos demais)</param>
+        public void Physique(float build, float frame = 0.5f, bool compact = false)
         {
             build = Mathf.Clamp01(build);
             // ombros/caixa torácica: estreitos (0) .. largos (1), independente do porte
-            float fr = Mathf.Lerp(0.98f, 1.12f, Mathf.Clamp01(frame));
+            float fr = compact ? Mathf.Lerp(0.93f, 1.02f, Mathf.Clamp01(frame)) : Mathf.Lerp(0.98f, 1.12f, Mathf.Clamp01(frame));
             // cabeça um pouco menor (proporção real ~1:7,5 da altura; o modelo base tem cabeça grande)
-            if (head != null) head.localScale *= 0.93f;
+            if (head != null) head.localScale *= compact ? 0.98f : 0.93f;
             foreach (var (name, slim, strong) in Shape)
             {
                 float k = Mathf.Lerp(slim, strong, build);
+                // corpo único: metade da variação e um pouco mais fino (largura e profundidade do tronco)
+                if (compact) k = name == "neck_01" ? 1f + (k - 1f) * 0.5f : 1f + (k - 1f) * 0.5f - 0.04f;
                 if (name == "spine_03" || name.StartsWith("clavicle")) k *= fr;
                 if (!bones.TryGetValue(name, out var b) || b.childCount == 0) continue;
                 // eixo do comprimento: o que aponta para o primeiro osso filho
@@ -438,7 +443,7 @@ namespace Craquez
                 var sc = Vector3.one * k;
                 // comprimento: clavícula mais longa = ombros mais largos (o modelo tinha ombros caídos e
                 // estreitos para um atleta); pescoço um pouco mais curto
-                sc[len] = name.StartsWith("clavicle") ? Mathf.Lerp(1.0f, 1.05f, Mathf.Clamp01(frame * 0.6f + build * 0.4f))
+                sc[len] = name.StartsWith("clavicle") ? (compact ? Mathf.Lerp(0.94f, 1.0f, Mathf.Clamp01(frame * 0.6f + build * 0.4f)) : Mathf.Lerp(1.0f, 1.05f, Mathf.Clamp01(frame * 0.6f + build * 0.4f)))
                     : name == "neck_01" ? 0.94f : 1f;
                 b.localScale = Vector3.Scale(b.localScale, sc);
                 // filhos: desfaz a escala do pai no referencial de cada filho
@@ -455,7 +460,7 @@ namespace Craquez
                     c.localScale = Vector3.Scale(c.localScale, inv);
                 }
             }
-            Proportions();
+            if (!compact) Proportions();
         }
 
         /// <summary>

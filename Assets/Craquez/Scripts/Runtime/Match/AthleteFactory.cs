@@ -195,14 +195,14 @@ namespace Craquez
             }
             var rig = root.AddComponent<AthleteRig>();
             rig.Init(inst.transform);
-            rig.Physique(look.build, look.frame);
+            rig.Physique(look.build, look.frame, look.body != null);
             // altura real variando entre 1,66 m e 1,95 m por jogador
             float u = Mathf.InverseLerp(0.91f, 1.09f, look.scale);
             float tall = Mathf.Lerp(1.66f, 1.95f, u);
             float modelH = rig.head != null ? rig.head.position.y - root.transform.position.y + 0.19f : 1.70f;
             float baseScale = Mathf.Clamp(tall / Mathf.Max(1.2f, modelH), 0.85f, 1.18f);
             // leve variação de largura corporal proporcional ao peso/build sem alterar a altura
-            float weightXZ = Mathf.Lerp(0.93f, 1.08f, look.build);
+            float weightXZ = look.body != null ? Mathf.Lerp(0.95f, 1.02f, look.build) : Mathf.Lerp(0.93f, 1.08f, look.build);
             inst.transform.localScale = new Vector3(baseScale * weightXZ, baseScale, baseScale * weightXZ);
             // mãos do modelo MakeHuman antigo eram grandes demais (o corpo único já vem com a mão certa)
             if (!isMeshy && !BaseBody)
@@ -422,7 +422,7 @@ namespace Craquez
                 if (m == null) continue;
                 int lean = m.GetBlendShapeIndex("Body_Lean"), strong = m.GetBlendShapeIndex("Body_Strong");
                 if (lean >= 0) r.SetBlendShapeWeight(lean, Mathf.Clamp01((0.45f - look.build) / 0.45f) * 100f);
-                if (strong >= 0) r.SetBlendShapeWeight(strong, Mathf.Clamp01((look.build - 0.55f) / 0.45f) * 100f);
+                if (strong >= 0) r.SetBlendShapeWeight(strong, Mathf.Clamp01((look.build - 0.55f) / 0.45f) * 50f);   // (o modelo já é forte)
             }
             // expressões faciais (formas criadas uma vez por malha, a partir dos marcos do rosto)
             SkinnedMeshRenderer eyesR = null, browR = null, lashR = null;
