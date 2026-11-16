@@ -1,7 +1,7 @@
 using System.Collections.Generic;
 using System.IO;
 using UnityEngine;
-using UnityEngine.ImageConversion;
+using static UnityEngine.ImageConversion;
 
 namespace Craquez.Sim
 {
@@ -511,7 +511,7 @@ namespace Craquez.Sim
                     if (png != null)
                     {
                         var tex = new Texture2D(2, 2, TextureFormat.RGBA32, true) { wrapMode = TextureWrapMode.Clamp };
-                        if (ImageConversion.LoadImage(tex, png)) _crests[i] = tex;
+                        if (LoadImage(tex, png)) _crests[i] = tex;
                     }
                     OverrideCount++;
                 }
