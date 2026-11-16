@@ -11,7 +11,10 @@ namespace Craquez
     /// </summary>
     public partial class MatchView
     {
-        class Boy
+        /// <summary>
+        /// Dados de um gandula (estado, posição, tarefa, etc.).
+        /// </summary>
+        public class Boy
         {
             public AthleteView av;
             public Vector2 home;
