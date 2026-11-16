@@ -1,3 +1,19 @@
+## Craquez 2.32.0
+
+Jogo de futebol feito 100% com inteligência artificial, **gratuito**.
+
+### Download
+- **Celular Android**: `Craquez-v2.32.0.apk`
+- **TV (Google TV / Android TV, ex.: TCL C6K)**: `Craquez-TV-v2.32.0.apk` — use este na TV (32 e 64 bits).
+
+### Mudanças
+- **Tudo em cel shading**: os atletas (pele, uniforme, chuteiras) deixaram a luz suave "meio realista" e usam faixas duras como o resto do jogo — três tons (luz, sombra, sombra funda), faixa quente na pele junto ao limite da sombra, brilho e recorte em faixa e contorno um pouco mais marcado. Os materiais transparentes (vidro, água, rede) também passaram para o shader de cel shading, e a trave/rede do `Goal` não usa mais o shader `Standard` (que saía rosa no URP).
+- **Build e testes da Unity voltaram a compilar**: o `manifest.json` estava sem os módulos internos (animação, áudio, partículas, vídeo...), o que gerava centenas de erros CS1069; restaurada a lista de pacotes da Unity 6.3 (sem os módulos `physicscore2d`/`tetgen`/`timelinefoundation`, que não existem nela) e removido o `packages-lock.json` gerado por outra versão do editor.
+- **Correções nos atletas**: o osso `spine_03` voltou a ser encontrado (a troca para `spine` desligava ombros, postura e biotipo no modelo MakeHuman); as clavículas não encolhem mais 5% a cada quadro; o ombro a ombro volta a inclinar mais quando os atletas estão mais perto; a direção de frente do modelo MakeHuman voltou a usar o pé esquerdo (a correção dos pés tinha deixado de agir).
+- **Modelo `Body_Model`**: renomeado para `.glb.bytes` — sem isso a Unity não o carregava (nem o modelo antigo, pelo nome errado do fallback).
+- **Gandula**: o evento de arremesso não acumula mais uma assinatura por partida.
+- **Ícones**: a lista de ícones do PC tem um ícone por tamanho (fim do erro "8 expected while 1 were specified").
+
 ## Craquez 2.29.1
 
 Jogo de futebol feito 100% com inteligência artificial, **gratuito**.

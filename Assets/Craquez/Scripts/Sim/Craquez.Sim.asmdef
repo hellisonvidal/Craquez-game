@@ -1,10 +1,7 @@
 {
     "name": "Craquez.Sim",
     "rootNamespace": "Craquez.Sim",
-    "references": [
-        "UnityEngine.ParticleSystemModule",
-        "UnityEngine.AudioModule"
-    ],
+    "references": [],
     "includePlatforms": [],
     "excludePlatforms": [],
     "allowUnsafeCode": false,

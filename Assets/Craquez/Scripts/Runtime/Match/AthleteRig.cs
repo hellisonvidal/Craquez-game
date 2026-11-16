@@ -46,7 +46,7 @@ namespace Craquez
             ("pelvis", "mixamorig:Hips"),
             ("spine_01", "mixamorig:Spine"),
             ("spine_02", "mixamorig:Spine1"),
-            ("spine", "mixamorig:Spine2"),
+            ("spine_03", "mixamorig:Spine2"),
             ("neck_01", "mixamorig:Neck"),
             ("head", "mixamorig:Head"),
             ("clavicle_l", "mixamorig:LeftShoulder"),
@@ -82,7 +82,7 @@ namespace Craquez
             neck = Bone("neck_01", "mixamorig:Neck");
             if (head != null) headRest = head.localRotation;
             if (neck != null) neckRest = neck.localRotation;
-            spine = Bone("spine", "mixamorig:Spine2");
+            spine = Bone("spine_03", "mixamorig:Spine2");
             pelvis = Bone("pelvis", "mixamorig:Hips");
             footL = Bone("foot_l", "mixamorig:LeftFoot");
             footR = Bone("foot_r", "mixamorig:RightFoot");
@@ -116,18 +116,12 @@ namespace Craquez
                 var armR = uar.position - ual.position; armR.y = 0f;
                 if (armR.sqrMagnitude > 1e-6f) fwdDir = Vector3.Cross(Vector3.up, armR.normalized);
             }
-            else
+            else if (footL != null && toeL != null)
             {
-                if (footL != null && toeL != null)
-                {
-                    var f = toeL.position - footL.position; f.y = 0f;
-                    if (f.sqrMagnitude > 1e-6f) fwdDir += f.normalized;
-                }
-                if (footR != null && toeR != null)
-                {
-                    var f = toeR.position - footR.position; f.y = 0f;
-                    if (f.sqrMagnitude > 1e-6f) fwdDir += f.normalized;
-                }
+                // MakeHuman: pé esquerdo -> ponta do pé (como antes; a média dos dois pés girava o
+                // modelo alguns graus e a correção dos pés deixava de agir — teste BracosEPesNaturais)
+                var f = toeL.position - footL.position; f.y = 0f;
+                if (f.sqrMagnitude > 1e-6f) fwdDir = f.normalized;
             }
             if (fwdDir.sqrMagnitude > 1e-6f)
             {
@@ -409,15 +403,14 @@ namespace Craquez
 
         // espessura (largura/profundidade) de cada osso para o biotipo: (osso, magro, forte).
         // O modelo base já é encorpado: o "médio" afina um pouco; o forte fica perto do original.
-        // Inclui pelvis/hips para largura do quadril, mas NÃO escala ossos que dobram (coxa, canela, braço, antebraço)
-        // para evitar entortar joelho/cotovelo. A forma da perna/braço fica do modelo original.
         static readonly (string bone, float slim, float strong)[] Shape =
         {
-            // tronco e pescoço
-            ("spine_01", 0.80f, 1.08f), ("spine_02", 0.88f, 1.12f), ("spine", 0.94f, 1.16f),
+            // só o tronco e o pescoço: os ossos que dobram (coxa, canela, braço, antebraço) não são
+            // escalados — com escala desigual, o joelho e o cotovelo entortavam ao dobrar (pernas
+            // "para dentro"); a perna fica com a forma original do modelo
+            // variação nítida de peso/porte físico: do leve/magro ao pesado/forte
+            ("spine_01", 0.80f, 1.08f), ("spine_02", 0.88f, 1.12f), ("spine_03", 0.94f, 1.16f),
             ("clavicle_l", 0.94f, 1.08f), ("clavicle_r", 0.94f, 1.08f), ("neck_01", 0.96f, 1.10f),
-            // quadril/ombros para largura corporal (escala apenas espessura, não comprimento)
-            ("pelvis", 0.88f, 1.12f), ("mixamorig:Hips", 0.88f, 1.12f),
         };
 
         /// <summary>
@@ -429,19 +422,12 @@ namespace Craquez
             build = Mathf.Clamp01(build);
             // ombros/caixa torácica: estreitos (0) .. largos (1), independente do porte
             float fr = Mathf.Lerp(0.98f, 1.12f, Mathf.Clamp01(frame));
-            // cabeça: proporção real ~1:7.5 da altura; modelo base tem cabeça grande
-            // magros têm cabeça proporcionalmente maior; fortes têm cabeça menor
-            if (head != null)
-            {
-                float headScale = Mathf.Lerp(0.96f, 0.88f, build); // magro 0.96, forte 0.88
-                head.localScale *= headScale;
-            }
+            // cabeça um pouco menor (proporção real ~1:7,5 da altura; o modelo base tem cabeça grande)
+            if (head != null) head.localScale *= 0.93f;
             foreach (var (name, slim, strong) in Shape)
             {
                 float k = Mathf.Lerp(slim, strong, build);
-                // ombros e quadril recebem influência do frame (largura)
-                if (name == "spine" || name.StartsWith("clavicle") || name == "pelvis" || name == "mixamorig:Hips")
-                    k *= fr;
+                if (name == "spine_03" || name.StartsWith("clavicle")) k *= fr;
                 if (!bones.TryGetValue(name, out var b) || b.childCount == 0) continue;
                 // eixo do comprimento: o que aponta para o primeiro osso filho
                 Transform child = null;
@@ -450,14 +436,10 @@ namespace Craquez
                 var dir = b.InverseTransformDirection(child.position - b.position).normalized;
                 int len = Mathf.Abs(dir.x) > Mathf.Abs(dir.y) ? (Mathf.Abs(dir.x) > Mathf.Abs(dir.z) ? 0 : 2) : (Mathf.Abs(dir.y) > Mathf.Abs(dir.z) ? 1 : 2);
                 var sc = Vector3.one * k;
-                // comprimento: clavícula mais longa = ombros mais largos; pescoço um pouco mais curto
-                // pelvis/hips NÃO alonga (mantém comprimento), só alarga
-                if (name.StartsWith("clavicle"))
-                    sc[len] = Mathf.Lerp(1.0f, 1.05f, Mathf.Clamp01(frame * 0.6f + build * 0.4f));
-                else if (name == "neck_01")
-                    sc[len] = 0.94f;
-                else if (name == "pelvis" || name == "mixamorig:Hips")
-                    sc[len] = 1f; // não alonga o quadril
+                // comprimento: clavícula mais longa = ombros mais largos (o modelo tinha ombros caídos e
+                // estreitos para um atleta); pescoço um pouco mais curto
+                sc[len] = name.StartsWith("clavicle") ? Mathf.Lerp(1.0f, 1.05f, Mathf.Clamp01(frame * 0.6f + build * 0.4f))
+                    : name == "neck_01" ? 0.94f : 1f;
                 b.localScale = Vector3.Scale(b.localScale, sc);
                 // filhos: desfaz a escala do pai no referencial de cada filho
                 foreach (Transform c in b)
@@ -473,29 +455,6 @@ namespace Craquez
                     c.localScale = Vector3.Scale(c.localScale, inv);
                 }
             }
-
-            // Ajusta posições das clavículas relativas à coluna após o escalonamento
-            // para manter a conexão anatômica correta (clavícula sai do esterno/espinha)
-            if (spine != null)
-            {
-                foreach (var cn in new[] { "clavicle_l", "clavicle_r", "mixamorig:LeftShoulder", "mixamorig:RightShoulder" })
-                {
-                    if (bones.TryGetValue(cn, out var clv))
-                    {
-                        // A clavícula deve apontar para o ombro (filho), mas sua base deve ficar no esterno
-                        // Ajusta a posição local para compensar a escala do spine
-                        var child = clv.childCount > 0 ? clv.GetChild(0) : null;
-                        if (child != null)
-                        {
-                            // Mantém a direção para o ombro, mas ajusta a distância do esterno
-                            var dir = (child.position - clv.position).normalized;
-                            float targetLen = (child.position - clv.position).magnitude;
-                            clv.localPosition = clv.localPosition * (targetLen / Mathf.Max(0.01f, dir.magnitude));
-                        }
-                    }
-                }
-            }
-
             Proportions();
         }
 
@@ -504,76 +463,18 @@ namespace Craquez
         /// final é a mesma, então as pernas ficam proporcionalmente mais longas, sem afundar os pés), braço
         /// mais comprido e quadril um pouco mais largo. Só move as articulações (sem escala nos ossos que
         /// dobram: com escala, joelho e cotovelo entortavam).
-        /// Funciona para ambos modelos MakeHuman e Meshy (que usam nomes "mixamorig:*").
         /// </summary>
         void Proportions()
         {
-            bool isMeshy = bones.ContainsKey("mixamorig:Hips");
-            void Move(string primary, string mixamoFallback, float k)
+            if (bones.ContainsKey("mixamorig:Hips")) return; // modelo Meshy já vem proporcionado em A-pose
+            void Move(string n, float k) { if (bones.TryGetValue(n, out var t)) t.localPosition *= k; }
+            Move("spine_02", 0.95f); Move("spine_03", 0.95f); Move("neck_01", 0.97f);
+            Move("lowerarm_l", 1.08f); Move("lowerarm_r", 1.08f);
+            if (bones.TryGetValue("thigh_l", out var tl) && bones.TryGetValue("thigh_r", out var tr) && tl.parent == tr.parent)
             {
-                string key = isMeshy ? mixamoFallback : primary;
-                if (bones.TryGetValue(key, out var t)) t.localPosition *= k;
-            }
-            // tronco mais curto -> pernas proporcionalmente mais longas
-            Move("spine_02", "mixamorig:Spine1", 0.95f);
-            Move("spine", "mixamorig:Spine2", 0.95f);
-            Move("neck_01", "mixamorig:Neck", 0.97f);
-            // braços mais longos
-            Move("lowerarm_l", "mixamorig:LeftForeArm", 1.08f);
-            Move("lowerarm_r", "mixamorig:RightForeArm", 1.08f);
-
-            // Ajusta posições das clavículas relativas à coluna para manter conexão ombros-tronco
-            if (isMeshy)
-            {
-                foreach (var cn in new[] { "mixamorig:LeftShoulder", "mixamorig:RightShoulder" })
-                {
-                    if (bones.TryGetValue(cn, out var clv))
-                    {
-                        // Ajusta posição da clavícula relativa à coluna (spine)
-                        if (spine != null)
-                        {
-                            var offset = clv.localPosition;
-                            // Mantém a direção mas ajusta a distância do esterno
-                            offset *= 1.02f; // leve aumento para ombros mais naturais
-                            clv.localPosition = offset;
-                        }
-                    }
-                }
-            }
-            else
-            {
-                foreach (var cn in new[] { "clavicle_l", "clavicle_r" })
-                {
-                    if (bones.TryGetValue(cn, out var clv))
-                    {
-                        if (spine != null)
-                        {
-                            var offset = clv.localPosition;
-                            offset *= 1.02f;
-                            clv.localPosition = offset;
-                        }
-                    }
-                }
-            }
-
-            // quadril um pouco mais largo
-            if (isMeshy)
-            {
-                if (bones.TryGetValue("mixamorig:LeftUpLeg", out var tl) && bones.TryGetValue("mixamorig:RightUpLeg", out var tr) && tl.parent == tr.parent)
-                {
-                    var half = (tl.localPosition - tr.localPosition) * 0.5f;
-                    tl.localPosition += half * 0.06f;
-                    tr.localPosition -= half * 0.06f;
-                }
-            }
-            else
-            {
-                if (bones.TryGetValue("thigh_l", out var tl) && bones.TryGetValue("thigh_r", out var tr) && tl.parent == tr.parent)
-                {
-                    var half = (tl.localPosition - tr.localPosition) * 0.5f;
-                    tl.localPosition += half * 0.06f;
-                    tr.localPosition -= half * 0.06f;
-                }
+                var half = (tl.localPosition - tr.localPosition) * 0.5f;
+                tl.localPosition += half * 0.06f;
+                tr.localPosition -= half * 0.06f;
             }
         }
     }

@@ -1,5 +1,5 @@
-// Atletas: luz suave e envolvente (pele com espalhamento sob a superfície, volume nos músculos,
-// brilho acetinado no tecido) com um contorno fino — mais realista que o cel shading dos cenários.
+// Atletas em cel shading: três faixas de luz (luz, sombra, sombra funda), faixa quente na pele junto
+// ao limite luz/sombra, brilho e recorte em faixa e contorno — o mesmo visual dos cenários.
 // _Metallic = quanto o material é pele (0 tecido/chuteira .. 1 pele).
 Shader "Craquez/Athlete"
 {

@@ -45,16 +45,8 @@ namespace Craquez
             OnBallBoyToss?.Invoke();
         }
 
-        /// <summary>Manipulador estático para o evento OnBallBoyToss - chama o método de instância.</summary>
-        static void OnBallBoyTossStatic()
-        {
-            // Find the MatchView instance and call the instance method
-            var matchView = GameObject.FindObjectOfType<MatchView>();
-            if (matchView != null)
-            {
-                matchView.BallBoyToss();
-            }
-        }
+        /// <summary>Manipulador do evento OnBallBoyToss: o gandula desta partida arremessa a bola.</summary>
+        void OnBallBoyTossInstance() => BallBoyToss();
 
         /// <summary>O juiz ergue o cartão (amarelo ou vermelho) na mão direita por ~2,5 s.</summary>
         void ShowCard(Color c)
@@ -140,8 +132,10 @@ namespace Craquez
             if (s.mode.id == GameModes.Field && !c.training) BuildBench(parent, q);
             BuildBall(q);
             if (!c.training) { BuildStations(); BuildBallBoys(parent, q); }
-            // Subscribe to static event for ball boy toss
-            MatchView.OnBallBoyToss += OnBallBoyTossStatic;
+            // evento do gandula: assina uma vez só (antes cada partida somava uma assinatura e a
+            // partida já destruída continuava recebendo o evento)
+            OnBallBoyToss -= OnBallBoyTossInstance;
+            OnBallBoyToss += OnBallBoyTossInstance;
             _marker0 = Marker(new Color(0.1f, 0.85f, 1f));
             _marker1 = Marker(new Color(1f, 0.55f, 0.1f));
             bcam = cam.gameObject.GetComponent<BroadcastCamera>();
@@ -1282,6 +1276,7 @@ namespace Craquez
 
         void OnDestroy()
         {
+            OnBallBoyToss -= OnBallBoyTossInstance;
             Sfx.Drums(0f);
             // (ao "jogar de novo" a partida nova já foi montada antes desta ser destruída)
             if (_quietOwner == this) { Sfx.NoCrowd = false; _quietOwner = null; }
