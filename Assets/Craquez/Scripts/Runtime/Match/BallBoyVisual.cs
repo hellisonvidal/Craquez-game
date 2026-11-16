@@ -47,7 +47,7 @@ namespace Craquez
         AthleteView _av;
         AthleteRig _rig;
         Transform _ballVisual;
-        MatchView.BallBoys.Boy _boyData;
+        MatchView.Boy _boyData;
 
         // State
         Vector3 _targetPos;
@@ -66,7 +66,7 @@ namespace Craquez
             _rig = GetComponentInParent<AthleteRig>();
         }
 
-        public void Initialize(MatchView.BallBoys.Boy data)
+        public void Initialize(MatchView.Boy data)
         {
             _boyData = data;
             _targetPos = data.home;
@@ -242,7 +242,7 @@ namespace Craquez
 
         void CompleteThrow()
         {
-            // Task will be changed by BallBoys logic
+            // Task will be changed by MatchView logic
         }
 
         void UpdatePlacing()

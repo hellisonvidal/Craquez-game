@@ -1,5 +1,6 @@
 using UnityEngine;
 using System.Collections.Generic;
+using Craquez.Sim;
 
 namespace Craquez
 {
@@ -33,7 +34,6 @@ namespace Craquez
         [Header("References")]
         public MatchSim sim;
         public MatchView view;
-        public BallController ballController;
 
         // Pools for performance
         Queue<ParticleSystem> _grassPool = new Queue<ParticleSystem>();
