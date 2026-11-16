@@ -149,6 +149,60 @@ $downloads = @(
         Category = "UI"
         Priority = "LOW"
     }
+    @{
+        Name = "CC0 Music Pack - itch.io"
+        Url = "https://itch.io/game-assets/assets-cc0/free/tag-music"
+        Category = "Music"
+        Priority = "HIGH"
+    }
+    @{
+        Name = "Free Music Tag - itch.io"
+        Url = "https://itch.io/game-assets/free/tag-music"
+        Category = "Music"
+        Priority = "HIGH"
+    }
+    @{
+        Name = "Free Music - OpenGameArt"
+        Url = "https://opengameart.org/content/free-music-0"
+        Category = "Music"
+        Priority = "HIGH"
+    }
+    @{
+        Name = "CC0 Music - OpenGameArt"
+        Url = "https://opengameart.org/content/cc0-music-0"
+        Category = "Music"
+        Priority = "HIGH"
+    }
+    @{
+        Name = "CC0 Music - Pixabay"
+        Url = "https://pixabay.com/music/search/cc0/"
+        Category = "Music"
+        Priority = "HIGH"
+    }
+    @{
+        Name = "Game Assets Music - Pixabay"
+        Url = "https://pixabay.com/music/search/game%20assets/"
+        Category = "Music"
+        Priority = "HIGH"
+    }
+    @{
+        Name = "Free Music Loop Bundle - Tallbeard Studios"
+        Url = "https://tallbeard.itch.io/music-loop-bundle"
+        Category = "Music"
+        Priority = "MEDIUM"
+    }
+    @{
+        Name = "Free Game Audio - Hackingtons"
+        Url = "https://www.hackingtons.com/free-game-audio"
+        Category = "Music"
+        Priority = "MEDIUM"
+    }
+    @{
+        Name = "Free Crowd Cheering - Unity Asset Store"
+        Url = "https://marketplace.unity.com/packages/audio/sound-fx/free-crowd-cheering-sounds-225494"
+        Category = "Music"
+        Priority = "MEDIUM"
+    }
 }
 
 Write-Host "`n==========================================" -ForegroundColor Yellow

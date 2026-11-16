@@ -81,6 +81,39 @@ This document outlines free assets to download and integrate to improve the game
 - **itch.io**: [Free UI Packs](https://itch.io/game-assets/free/tag-ui/tag-unity)
 - **Kenney.nl**: [UI Pack](https://kenney.nl/assets/ui-pack) - CC0
 
+## 9. 🎵 Music Packs
+
+### Free Music Packs (CC0 / Royalty-Free)
+
+#### itch.io - CC0 Music
+- [CC0 Music Assets](https://itch.io/game-assets/assets-cc0/free/tag-music) - Domínio público
+- [Free Music Tag](https://itch.io/game-assets/free/tag-music) - Gratuitos
+
+#### OpenGameArt.org
+- [Free Music](https://opengameart.org/content/free-music-0) - Variados
+- [CC0 Music](https://opengameart.org/content/cc0-music-0) - Domínio público
+
+#### Pixabay Music
+- [CC0 Music](https://pixabay.com/music/search/cc0/) - CC0
+- [Game Assets Music](https://pixabay.com/music/search/game%20assets/) - Para jogos
+
+#### Outras Fontes
+- [Tallbeard Studios - Free Music Loop Bundle](https://tallbeard.itch.io/music-loop-bundle) - Loops
+- [Hackingtons Free Game Audio](https://www.hackingtons.com/free-game-audio) - Efeitos + música
+
+### Tipos de Música Necessários
+- **Menu/Title Theme** - Loop suave, 2-3 min
+- **Match Music** - Loop energético, 3-5 min
+- **Menu/In-Game UI** - Loops curtos, 30-60s
+- **Goal Celebration** - Stingers curtos, 3-5s
+- **Half/Full Time** - Transições, 5-10s
+- **Victory/Defeat** - Temas de vitória/derrota, 10-15s
+
+### Formatos Recomendados
+- **OGG** (recomendado para Unity - melhor compressão)
+- **WAV** (para master/loops perfeitos)
+- **MP3** (se OGG não disponível)
+
 ---
 
 ## Integration Priority
