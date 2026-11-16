@@ -129,8 +129,12 @@ bm.free()
 log("peças (faces):", {n: int((cls == i).sum()) for i, n in enumerate(["Body", "Shirt", "Shorts", "Socks", "Boots"])})
 
 # ------------------------------------------------------------------ 2) proporções
-CROTCH_M, CROTCH_G = 0.73, 0.885      # virilha: modelo -> jogo
-SHOULDER_M, SHOULDER_G = 1.585, 1.59  # topo dos ombros
+# (modelo -> jogo). Os padrões são do primeiro modelo (estilizado, pernas curtas); um modelo com proporções
+# reais usa MESHY_CROTCH=0.885 MESHY_SHOULDER=1.59 MESHY_HEAD=1 (sem remapear)
+CROTCH_G, SHOULDER_G = 0.885, 1.59
+CROTCH_M = float(os.environ.get("MESHY_CROTCH", "0.73"))       # virilha
+SHOULDER_M = float(os.environ.get("MESHY_SHOULDER", "1.585"))  # topo dos ombros
+HEAD_K = float(os.environ.get("MESHY_HEAD", "0.88"))           # escala da cabeça
 
 
 def zmap(z):
@@ -164,7 +168,7 @@ for i in range(len(co)):
 # cabeça um pouco menor por igual (o modelo estilizado tem cabeça grande), em volta da base do pescoço
 NECK = SHOULDER_G + 0.03
 hd = new[:, 2] > NECK
-k = 0.88
+k = HEAD_K
 new[hd, 0] *= k
 new[hd, 1] = (new[hd, 1] - new[hd, 1].mean()) * k + new[hd, 1].mean()
 new[hd, 2] = NECK + (new[hd, 2] - NECK) * k

@@ -350,6 +350,46 @@ namespace Craquez
                 }
         }
 
+        /// <summary>
+        /// Chuteira do corpo único (UV livre): cor pela posição — sola e travas embaixo, cabedal na cor do
+        /// modelo, bico e calcanhar no destaque e uma faixa lateral em onda (sem marcas).
+        /// </summary>
+        public static Texture2D PaintBoot(Mesh mesh, BootPainter.Design d, Axes ax, int size, bool indoor)
+        {
+            string key = "boot:" + mesh.GetInstanceID() + ":" + d.name + (indoor ? "f" : "") + ":" + size;
+            if (_cache.TryGetValue(key, out var t) && t != null) return t;
+            var info = Get(mesh);
+            float ground = float.MaxValue, top = float.MinValue, fmin = float.MaxValue, fmax = float.MinValue;
+            foreach (var p in info.v)
+            {
+                float h = p[ax.up] * ax.upSign, f = p[ax.dep] * ax.depSign;
+                ground = Mathf.Min(ground, h); top = Mathf.Max(top, h);
+                fmin = Mathf.Min(fmin, f); fmax = Mathf.Max(fmax, f);
+            }
+            float hh = Mathf.Max(0.01f, top - ground), ll = Mathf.Max(0.01f, fmax - fmin);
+            var sole = indoor ? new Color(0.92f, 0.9f, 0.86f) : d.sole;
+            var px = new Color32[size * size];
+            var filled = new bool[size * size];
+            for (int i = 0; i + 2 < info.tris.Length; i += 3)
+                Raster(px, filled, size, info, info.tris[i], info.tris[i + 1], info.tris[i + 2], (p, trim) =>
+                {
+                    float h = (p[ax.up] * ax.upSign - ground) / hh;      // 0 sola .. 1 boca da chuteira
+                    float f = (p[ax.dep] * ax.depSign - fmin) / ll;      // 0 calcanhar .. 1 bico
+                    if (h < 0.12f) return sole;
+                    if (h < 0.17f) return Color.Lerp(sole, d.baseC, 0.5f);
+                    if (f > 0.86f || f < 0.12f) return Color.Lerp(d.baseC, d.accent, 0.75f);
+                    float wave = 0.42f + 0.12f * Mathf.Sin(f * 9f);
+                    if (Mathf.Abs(h - wave) < 0.06f) return d.accent;
+                    return d.baseC;
+                });
+            Dilate(px, filled, size, 4);
+            t = new Texture2D(size, size, TextureFormat.RGBA32, true) { wrapMode = TextureWrapMode.Clamp, anisoLevel = 2 };
+            t.SetPixels32(px);
+            t.Apply(true, true);
+            _cache[key] = t;
+            return t;
+        }
+
         static void Dilate(Color32[] px, bool[] filled, int size, int passes)
         {
             for (int p = 0; p < passes; p++)
