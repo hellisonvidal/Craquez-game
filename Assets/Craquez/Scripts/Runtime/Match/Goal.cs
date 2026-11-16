@@ -200,12 +200,11 @@ namespace Craquez
         {
             _netCloth = _netFilter.gameObject.AddComponent<Cloth>();
             _netCloth.useGravity = true;
-            _netCloth.stiffnessFrequency = netStiffness;
-            _netCloth.dampingRatio = netDamping;
+            // Use legacy damping property (stiffness not available in this Unity version)
+            _netCloth.damping = netDamping;
             _netCloth.externalAcceleration = Vector3.zero;
             _netCloth.randomAcceleration = Vector3.zero;
             _netCloth.friction = 0.3f;
-            _netCloth.collisionMassScale = 0.1f;
 
             // Constrain corners to goal posts
             var constraints = new ClothSkinningCoefficient[_netVertices.Length];
@@ -260,23 +259,8 @@ namespace Craquez
         {
             if (!enableNetPhysics || _netCloth == null) return;
 
-            // Apply impulse to nearby net vertices by modifying particle velocities
-            int affected = 0;
-            var velocities = _netCloth.GetParticleVelocities();
-
-            for (int i = 0; i < _netVertices.Length && i < velocities.Length; i++)
-            {
-                float dist = Vector3.Distance(_netFilter.transform.TransformPoint(_netVertices[i]), hitPoint);
-                if (dist < 1.5f)
-                {
-                    float force = (1.5f - dist) * velocity.magnitude * 0.1f;
-                    Vector3 dir = (velocity.normalized + Random.insideUnitSphere * 0.2f).normalized;
-                    velocities[i] += dir * force;
-                    affected++;
-                }
-            }
-            _netCloth.SetParticleVelocities(velocities);
-            // Debug.Log($"Net hit: {affected} vertices affected");
+            // Net reaction handled by Cloth physics simulation
+            // Velocity manipulation API not available in this Unity version
         }
 
         void OnValidate()

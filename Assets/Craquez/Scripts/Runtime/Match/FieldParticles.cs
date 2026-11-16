@@ -342,7 +342,7 @@ namespace Craquez
             var main = ps.main;
             main.startColor = GetSurfaceColor(surface);
             var emission = ps.emission;
-            emission.SetBursts(new[] { new ParticleSystem.Burst(0f, Mathf.RoundToInt(8 * intensity), Mathf.RoundToInt(15 * intensity)) });
+            emission.SetBursts(new[] { new ParticleSystem.Burst(0f, (short)Mathf.RoundToInt(8 * intensity), (short)Mathf.RoundToInt(15 * intensity)) });
             var velocity = ps.velocityOverLifetime;
             velocity.y = new ParticleSystem.MinMaxCurve(0.5f * intensity, 2f * intensity);
             ps.Play();
