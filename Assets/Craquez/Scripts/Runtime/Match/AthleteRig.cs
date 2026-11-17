@@ -518,9 +518,9 @@ namespace Craquez
             Move("spine_02", "mixamorig:Spine1", 0.95f);
             Move("spine", "mixamorig:Spine2", 0.95f);
             Move("neck_01", "mixamorig:Neck", 0.97f);
-            // braços mais longos
-            Move("lowerarm_l", "mixamorig:LeftForeArm", 1.08f);
-            Move("lowerarm_r", "mixamorig:RightForeArm", 1.08f);
+            // braços na proporção original do modelo (antes 1.08f alongava demais)
+            Move("lowerarm_l", "mixamorig:LeftForeArm", 1.0f);
+            Move("lowerarm_r", "mixamorig:RightForeArm", 1.0f);
 
             // Ajusta posições das clavículas relativas à coluna para manter conexão ombros-tronco
             if (isMeshy)

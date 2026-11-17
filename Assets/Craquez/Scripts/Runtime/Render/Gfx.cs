@@ -19,11 +19,16 @@ namespace Craquez
             if (m == null)
             {
                 string shader = name.StartsWith("Unlit") ? "Universal Render Pipeline/Unlit" :
-                    name == "Particles" ? "Universal Render Pipeline/Particles/Unlit" :
+                    name == "Particles" ? "Craquez/ToonParticles" :
                     name.StartsWith("ToonOutline") ? "Craquez/ToonOutline" :
+                    name.StartsWith("ToonCutout") ? "Craquez/ToonCutout" :
+                    name.StartsWith("ToonTransparent") ? "Craquez/ToonTransparent" :
+                    name.StartsWith("ToonSky") ? "Craquez/ToonSky" :
                     name.StartsWith("Athlete") ? "Craquez/Athlete" :
                     name == "Crowd" ? "Craquez/Crowd" :
-                    name == "LitTransparent" ? "Universal Render Pipeline/Lit" : "Craquez/Toon";
+                    name == "LitTransparent" ? "Craquez/ToonTransparent" :
+                    name == "LitNormal" || name == "LitNormalCutout" ? "Craquez/Toon" :
+                    "Craquez/Toon";
                 if (Shader.Find(shader) == null) shader = "Universal Render Pipeline/Lit";
                 var sh = Shader.Find(shader) ?? Shader.Find("Standard");
                 m = new Material(sh);
@@ -33,10 +38,10 @@ namespace Craquez
             return m;
         }
 
-        /// <summary>Material Lit opaco.</summary>
+        /// <summary>Material Lit opaco (toon/cel shading).</summary>
         public static Material Lit(Color c, Texture tex = null, float smooth = 0.2f, float metal = 0f)
         {
-            var m = new Material(Template("Lit"));
+            var m = new Material(Template("Toon"));
             Set(m, c, tex);
             m.SetFloat("_Smoothness", smooth);
             m.SetFloat("_Metallic", metal);
@@ -95,10 +100,10 @@ namespace Craquez
             Shader.SetGlobalVector("_ToonOutline", new Vector4(0.011f, 0.004f, 0.06f, 0f));
         }
 
-        /// <summary>Lit com mapa de relevo (normal map) — grama, madeira, tecido, asfalto.</summary>
+        /// <summary>Lit com mapa de relevo (normal map) — grama, madeira, tecido, asfalto (toon/cel shading).</summary>
         public static Material LitN(Color c, Texture tex, Texture2D normal, float smooth = 0.2f, float bump = 1f, bool twoSided = false)
         {
-            var m = new Material(Template(twoSided ? "LitNormalCutout" : "LitNormal"));
+            var m = new Material(Template(twoSided ? "ToonCutout" : "Toon"));
             Set(m, c, tex);
             m.SetFloat("_Smoothness", smooth);
             if (twoSided) m.SetFloat("_Cutoff", 0.01f);
@@ -142,10 +147,10 @@ namespace Craquez
         public static Texture2D KnitNormal => _knitN ??= NormalFromHeight(128, (u, v) => Mathf.Sin(u * Mathf.PI * 2 * 64) * Mathf.Sin(v * Mathf.PI * 2 * 64) * 0.5f + VNoise(u * 16, v * 16, 16, 7) * 0.3f, 2.5f);
         public static Texture2D AsphaltNormal => _asphaltN ??= NormalFromHeight(256, (u, v) => Hash((int)(u * 256), (int)(v * 256), 17) * 0.5f + Fbm(u * 8, v * 8, 8, 3, 3) * 0.6f, 4f);
 
-        /// <summary>Lit com recorte alfa e dois lados (cabelo, cílios, redes, bandeiras).</summary>
+        /// <summary>Toon com recorte alfa e dois lados (grama, bandeiras, cabelo, redes, bandeiras).</summary>
         public static Material Cutout(Color c, Texture tex, float cutoff = 0.4f, float smooth = 0.15f)
         {
-            var m = new Material(Template("LitCutout"));
+            var m = new Material(Template("ToonCutout"));
             Set(m, c, tex);
             m.SetFloat("_Cutoff", cutoff);
             m.SetFloat("_Smoothness", smooth);
@@ -166,8 +171,9 @@ namespace Craquez
 
         public static Material Emissive(Color c, Color emission, Texture tex = null)
         {
-            var m = new Material(Template("LitEmissive"));
+            var m = new Material(Template("Toon"));
             Set(m, c, tex);
+            m.EnableKeyword("_EMISSION");
             m.SetColor("_EmissionColor", emission);
             if (tex != null) m.SetTexture("_EmissionMap", tex);
             return m;
@@ -182,14 +188,14 @@ namespace Craquez
 
         public static Material UnlitTransparent(Color c, Texture tex = null)
         {
-            var m = new Material(Template("UnlitTransparent"));
+            var m = new Material(Template("ToonTransparent"));
             Set(m, c, tex);
             return m;
         }
 
         public static Material Transparent(Color c, Texture tex = null)
         {
-            var m = new Material(Template("LitTransparent"));
+            var m = new Material(Template("ToonTransparent"));
             Set(m, c, tex);
             return m;
         }
@@ -201,7 +207,7 @@ namespace Craquez
             return m;
         }
 
-        public static Material Sky() => new Material(Template("Sky"));
+        public static Material Sky() => new Material(Template("ToonSky"));
 
         static void Set(Material m, Color c, Texture tex)
         {
