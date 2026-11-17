@@ -108,7 +108,8 @@ half CelBand(half x, half edge)
 half3 AthleteLight(Light l, half3 n, half3 v, half3 albedo, half smooth, half skin, half shadowAtten)
 {
     half ndl = dot(n, l.direction);
-    half sh = step(0.5, shadowAtten);                       // sombra projetada também em faixa dura
+    // shadowAtten suave: evita transição dura (quadrados pretos no corpo)
+    half sh = smoothstep(0.3, 0.7, shadowAtten);
     half lit = ToonStep(ndl) * sh;                          // faixa principal (luz / sombra)
     half deep = 1.0 - CelBand(ndl, -0.45);                  // sombra funda (lado de trás do corpo)
     half3 shade = lerp(_ToonShadowTint.rgb, _ToonShadowTint.rgb * 0.78, deep);

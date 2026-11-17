@@ -96,20 +96,26 @@ namespace Craquez
             _face.Update(dt, jaw, smile, down, up, shut);
         }
 
-        // ------------------------------------------------------------ mãos relaxadas
+        // ------------------------------------------------------------ mãos relaxadas / punhos fechados na corrida
         // A captura de movimento não tem dedos: as mãos ficavam espalmadas, duras como tábuas. Na pose de
         // ligação curvamos cada falange na direção da palma (como a mão solta de quem corre) e repomos
-        // essa curva a cada quadro.
+        // essa curva a cada quadro. Alguns atletas fecham o punho ao correr (variação aleatória por jogador).
         Transform[] _fingers;
         Transform _midL, _midR;
-        Quaternion[] _fingerRot;
+        Quaternion[] _fingerRotRelaxed;
+        Quaternion[] _fingerRotClosed;
+        bool _closesFistWhenRunning;  // varia por jogador (50%)
         static readonly string[] FingerNames = { "index", "middle", "ring", "pinky", "thumb" };
 
         void InitFingers()
         {
             if (rig == null) return;
+            // 50% dos jogadores fecham o punho ao correr, 50% mantêm a palma aberta
+            _closesFistWhenRunning = (p.id * 7919 + 12345) % 2 == 0;
+
             var list = new System.Collections.Generic.List<Transform>();
-            var rots = new System.Collections.Generic.List<Quaternion>();
+            var rotsRelaxed = new System.Collections.Generic.List<Quaternion>();
+            var rotsClosed = new System.Collections.Generic.List<Quaternion>();
             foreach (var sfx in new[] { "_l", "_r" })
             {
                 if (!rig.bones.TryGetValue("hand" + sfx, out var hd)) continue;
@@ -132,16 +138,23 @@ namespace Craquez
                         var c = b.GetChild(0);
                         var dir = c.position - b.position;
                         if (dir.sqrMagnitude < 1e-8f) continue;
-                        float ang = thumb ? (k == 1 ? 6f : 12f) : (k == 1 ? 18f : k == 2 ? 30f : 18f) + extra;
-                        var target = Vector3.RotateTowards(dir.normalized, thumb ? (palm + fdir * 0.3f).normalized : palm, ang * Mathf.Deg2Rad, 0f);
-                        b.rotation = Quaternion.FromToRotation(dir.normalized, target) * b.rotation;
+                        // Pose relaxada (mão aberta)
+                        float angRelaxed = thumb ? (k == 1 ? 6f : 12f) : (k == 1 ? 18f : k == 2 ? 30f : 18f) + extra;
+                        var targetRelaxed = Vector3.RotateTowards(dir.normalized, thumb ? (palm + fdir * 0.3f).normalized : palm, angRelaxed * Mathf.Deg2Rad, 0f);
+                        var rotRelaxed = Quaternion.FromToRotation(dir.normalized, targetRelaxed) * b.rotation;
+                        // Pose punho fechado (para corrida)
+                        float angClosed = thumb ? (k == 1 ? 45f : 60f) : (k == 1 ? 60f : k == 2 ? 75f : 50f);
+                        var targetClosed = Vector3.RotateTowards(dir.normalized, -fdir, angClosed * Mathf.Deg2Rad, 0f);
+                        var rotClosed = Quaternion.FromToRotation(dir.normalized, targetClosed) * b.rotation;
                         list.Add(b);
-                        rots.Add(b.localRotation);
+                        rotsRelaxed.Add(rotRelaxed);
+                        rotsClosed.Add(rotClosed);
                     }
                 }
             }
             _fingers = list.ToArray();
-            _fingerRot = rots.ToArray();
+            _fingerRotRelaxed = rotsRelaxed.ToArray();
+            _fingerRotClosed = rotsClosed.ToArray();
         }
 
         static Transform FindDeep(Transform t, string n)
@@ -154,7 +167,21 @@ namespace Craquez
         void ApplyFingers()
         {
             if (_fingers == null) return;
-            for (int i = 0; i < _fingers.Length; i++) _fingers[i].localRotation = _fingerRot[i];
+            // interpola entre pose relaxada e punho fechado baseado na velocidade (só se o jogador for do tipo que fecha o punho)
+            float fistWeight = 0f;
+            if (_closesFistWhenRunning && p != null)
+            {
+                float spd = p.vel.magnitude;
+                // começa a fechar a partir de 3 m/s (trote), totalmente fechado a 7 m/s (corrida/pique)
+                fistWeight = Mathf.Clamp01((spd - 3f) / 4f);
+            }
+            for (int i = 0; i < _fingers.Length; i++)
+            {
+                if (fistWeight > 0.01f)
+                    _fingers[i].localRotation = Quaternion.Slerp(_fingerRotRelaxed[i], _fingerRotClosed[i], fistWeight);
+                else
+                    _fingers[i].localRotation = _fingerRotRelaxed[i];
+            }
         }
 
         void OnDestroy()

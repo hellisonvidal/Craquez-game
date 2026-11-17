@@ -266,7 +266,8 @@ namespace Craquez
         }
 
         // proporções de referência do corpo humano adulto (Drillis & Contini), em fração da altura
-        const float RefUpperArm = 0.186f, RefForearm = 0.146f, RefHand = 0.108f, RefShoulders = 0.215f;
+        // braços ajustados para que a mão chegue levemente acima do joelho em pé (antes 0.186/0.146 = 0.332 do comprimento total)
+        const float RefUpperArm = 0.165f, RefForearm = 0.130f, RefHand = 0.108f, RefShoulders = 0.215f;
         // quanto cada modelo se aproxima da referência (o resto mantém a diferença entre os modelos de cada etnia)
         const float RefBlend = 0.75f;
         /// <summary>Altura estimada do modelo (m), pela articulação da cabeça (≈ 85,6% da altura).</summary>
