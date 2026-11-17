@@ -77,10 +77,14 @@ namespace Craquez.EditorTools
             var fg = L("craquez_icon_fg");
             var bg = L("craquez_icon_bg");
             if (full == null) { Debug.LogWarning("Ícone não encontrado em " + IconDir); return; }
-            PlayerSettings.SetIcons(NamedBuildTarget.Unknown, new[] { full }, IconKind.Any);
+            // (a lista precisa ter um ícone por tamanho: com um só a Unity acusava "8 expected while 1")
+            int nDef = Mathf.Max(1, PlayerSettings.GetIconSizes(NamedBuildTarget.Unknown, IconKind.Any).Length);
+            var def = new Texture2D[nDef];
+            for (int i = 0; i < def.Length; i++) def[i] = full;
+            PlayerSettings.SetIcons(NamedBuildTarget.Unknown, def, IconKind.Any);
             // Windows/Linux: o mesmo ícone em todos os tamanhos (com um só, os tamanhos pequenos —
             // barra de tarefas, atalhos — ficavam com o ícone padrão)
-            int nStd = PlayerSettings.GetIcons(NamedBuildTarget.Standalone, IconKind.Any).Length;
+            int nStd = PlayerSettings.GetIconSizes(NamedBuildTarget.Standalone, IconKind.Any).Length;
             var std = new Texture2D[Mathf.Max(1, nStd)];
             for (int i = 0; i < std.Length; i++) std[i] = full;
             PlayerSettings.SetIcons(NamedBuildTarget.Standalone, std, IconKind.Any);
@@ -111,7 +115,6 @@ namespace Craquez.EditorTools
             var particles = Shader.Find("Universal Render Pipeline/Particles/Unlit");
             var sky = Shader.Find("Skybox/Procedural");
             if (lit == null) { Debug.LogError("Craquez: shader URP Lit não encontrado"); return; }
-            var litReal = lit;
             // visual em cel shading: os materiais opacos usam o shader toon (mesmas propriedades do Lit)
             var toon = Shader.Find("Craquez/Toon");
             var toonOl = Shader.Find("Craquez/ToonOutline");
@@ -164,8 +167,11 @@ namespace Craquez.EditorTools
             cut.doubleSidedGI = true;
             Save("LitCutout", cut);
 
-            var tr = new Material(litReal);
+            // transparentes (vidro, água, rede) também em cel shading
+            var tr = new Material(lit);
             Transparent(tr);
+            tr.SetShaderPassEnabled("ShadowCaster", false);
+            tr.SetShaderPassEnabled("DepthOnly", false);
             Save("LitTransparent", tr);
 
             var nm = new Material(lit);
@@ -235,6 +241,7 @@ namespace Craquez.EditorTools
                 old.CopyPropertiesFromMaterial(m);
                 old.shaderKeywords = m.shaderKeywords;
                 old.renderQueue = m.renderQueue;
+                foreach (var pass in new[] { "ShadowCaster", "DepthOnly" }) old.SetShaderPassEnabled(pass, m.GetShaderPassEnabled(pass));
                 EditorUtility.SetDirty(old);
             }
             else AssetDatabase.CreateAsset(m, path);

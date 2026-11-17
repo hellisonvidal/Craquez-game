@@ -26,9 +26,8 @@ namespace Craquez
                     name.StartsWith("ToonSky") ? "Craquez/ToonSky" :
                     name.StartsWith("Athlete") ? "Craquez/Athlete" :
                     name == "Crowd" ? "Craquez/Crowd" :
-                    name == "LitTransparent" ? "Craquez/ToonTransparent" :
-                    name == "LitNormal" || name == "LitNormalCutout" ? "Craquez/Toon" :
-                    "Craquez/Toon";
+"Craquez/Toon";   // tudo em cel shading (inclusive os transparentes)
+                if (Shader.Find(shader) == null) shader = "Craquez/Toon";
                 if (Shader.Find(shader) == null) shader = "Universal Render Pipeline/Lit";
                 var sh = Shader.Find(shader) ?? Shader.Find("Standard");
                 m = new Material(sh);

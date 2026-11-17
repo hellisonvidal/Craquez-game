@@ -229,31 +229,10 @@ namespace Craquez
             _netCloth.coefficients = constraints;
         }
 
-        Material CreateDefaultPostMaterial()
-        {
-            var mat = new Material(Shader.Find("Standard"));
-            mat.color = new Color(1f, 1f, 1f, 1f);
-            mat.SetFloat("_Metallic", 0.8f);
-            mat.SetFloat("_Glossiness", 0.9f);
-            return mat;
-        }
+        // cel shading como o resto do jogo ("Standard" é do pipeline antigo: no URP saía rosa)
+        Material CreateDefaultPostMaterial() => Gfx.Character(Color.white, null, 0.6f);
 
-        Material CreateDefaultNetMaterial()
-        {
-            var mat = new Material(Shader.Find("Standard"));
-            mat.color = new Color(1f, 1f, 1f, 0.6f);
-            mat.SetFloat("_Mode", 3); // Transparent
-            mat.SetInt("_SrcBlend", (int)UnityEngine.Rendering.BlendMode.SrcAlpha);
-            mat.SetInt("_DstBlend", (int)UnityEngine.Rendering.BlendMode.OneMinusSrcAlpha);
-            mat.SetInt("_ZWrite", 0);
-            mat.DisableKeyword("_ALPHATEST_ON");
-            mat.EnableKeyword("_ALPHABLEND_ON");
-            mat.DisableKeyword("_ALPHAPREMULTIPLY_ON");
-            mat.renderQueue = 3000;
-            mat.SetFloat("_Glossiness", 0.1f);
-            mat.SetFloat("_Metallic", 0f);
-            return mat;
-        }
+        Material CreateDefaultNetMaterial() => Gfx.Transparent(new Color(1f, 1f, 1f, 0.6f));
 
         public void OnBallHit(Vector3 hitPoint, Vector3 velocity)
         {

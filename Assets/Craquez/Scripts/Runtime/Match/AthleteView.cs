@@ -635,9 +635,7 @@ namespace Craquez
             var sim = view.sim;
             float v = p.vel.magnitude;
             if (v < 3f || p.down > 0f || p.slide > 0f || p.isKeeper) return Vector3.zero;
-            // Usa o raio de colisão do SimPlayer para determinar proximidade
-            float minDist = SimPlayer.Radius * 2f;
-            SimPlayer best = null; float bd = minDist + 0.15f;
+            SimPlayer best = null; float bd = 0.95f;
             foreach (var o in sim.players)
             {
                 if (o.team == p.team || o.sentOff || o.isKeeper) continue;
@@ -647,7 +645,8 @@ namespace Craquez
             }
             if (best == null) return Vector3.zero;
             var to = W(best.position - p.position); to.y = 0f;
-            float k = Mathf.Clamp01((bd - minDist) / 0.2f);
+            // quanto mais perto, mais inclina (0 a 0,95 m .. 1 a 0,6 m)
+            float k = Mathf.Clamp01((0.95f - bd) / 0.35f);
             return to.normalized * 7f * k;
         }
 
@@ -1984,8 +1983,7 @@ namespace Craquez
         Transform _uaL, _uaR;
         Vector3 _uaLBase, _uaRBase;
 
-        /// <summary>Ombros mais estreitos: aproxima a articulação do ombro do pescoço (~12%) e ajusta as
-/// clavículas para manter a conexão anatômica correta com o tronco.</summary>
+        /// <summary>Ombros mais estreitos: aproxima a articulação do ombro do pescoço (~12%).</summary>
         void NarrowShoulders()
         {
             if (_uaL == null && rig.bones.TryGetValue("upperarm_l", out _uaL)) _uaLBase = _uaL.localPosition;
@@ -1998,17 +1996,6 @@ namespace Craquez
             float sh = AthleteAnimator.Mocap ? 1f : 0.93f;
             if (_uaL != null) _uaL.localPosition = _uaLBase * sh;
             if (_uaR != null) _uaR.localPosition = _uaRBase * sh;
-
-            // Ajusta também as clavículas para manter a conexão ombros-tronco
-            float clavicleScale = AthleteAnimator.Mocap ? 1f : 0.95f;
-            foreach (var cn in Clavicles)
-            {
-                if (rig.bones.TryGetValue(cn, out var clv))
-                {
-                    clv.localScale = clv.localScale * clavicleScale;
-                }
-            }
-
             // quadril um pouco mais estreito: pernas mais juntas (as coxas saíam muito afastadas)
             if (_thL == null && rig.bones.TryGetValue("thigh_l", out _thL)) _thLBase = _thL.localPosition;
             if (_thR == null && rig.bones.TryGetValue("thigh_r", out _thR)) _thRBase = _thR.localPosition;
@@ -2069,10 +2056,9 @@ namespace Craquez
         }
 
         /// <summary>
-        /// Ombros baixos, acompanhando o fim do pescoço: as clavículas descem ~18° e o pescoço fica um
+        /// Ombros baixos, acompanhando o fim do pescoço: as clavículas descem ~24° e o pescoço fica um
         /// pouco mais longo. Vale em todos os estados (antes só na postura de pé: na comemoração, na
         /// queda e nas defesas os ombros voltavam a ficar quase na altura do pescoço).
-        /// Agora considera o escalonamento das clavículas feito no NarrowShoulders/Physique.
         /// </summary>
         void LowerShoulders()
         {
@@ -2088,8 +2074,7 @@ namespace Craquez
             {
                 if (!rig.bones.TryGetValue(cn, out var clv) || clv.childCount == 0) continue;
                 float cs = Mathf.Sign(Vector3.Dot(clv.GetChild(0).position - rig.spine.position, right));
-                // Reduz a rotação para 18° (era 24°) pois as clavículas já estão escalonadas em NarrowShoulders/Physique
-                _pose.Rotate(clv, Quaternion.AngleAxis(-cs * 15f * k, fwd));
+                _pose.Rotate(clv, Quaternion.AngleAxis(-cs * 18f * k, fwd));   // (24° deixava o ombro caído, abaixo do começo do tronco)
             }
         }
 

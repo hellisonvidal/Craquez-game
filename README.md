@@ -12,7 +12,7 @@ Feito 100% com inteligência artificial, por isso é e sempre será **gratuito**
 
 | | |
 |---|---|
-| **Atletas realistas** | Corpo humano MakeHuman (CC0) com 4 biotipos, rosto variável por jogador (10 formas), 5 cabelos, tons de pele, número na camisa |
+| **Atletas realistas** | Corpo humano MakeHuman (CC0) com 4 biotipos, rosto variável por jogador (10 formas), 5 cabelos, tons de pele, número na camisa; proporções de braço, mão, ombros e pernas acertadas pela referência humana em cada modelo |
 | **Movimentos reais** | Animações de **captura de movimento** (CMU): corrida, trote, caminhada, de costas, marcação, cortes, fintas, giro, passe, chute, voleio — misturadas pela velocidade e direção do atleta |
 | **Uniformes vestidos** | Camisa, calção e meião são peças próprias sobre o corpo: folga, barra por fora do calção, mangas, gola, dobras do tecido. 3 uniformes por time com listras, aros, faixa, metades, riscas, gola e punhos |
 | **Chuteiras** | Modeladas (sola, travas, cano acolchoado, cadarço) com 16 desenhos originais; cada atleta usa a sua ou todos o mesmo modelo |
@@ -22,7 +22,7 @@ Feito 100% com inteligência artificial, por isso é e sempre será **gratuito**
 | **Competições** | 15 torneios (Copa do Mundo, Américas, Eurocopa, Afro-Asiática, Liga dos Campeões, Libertadores, Brasileirão, Copa do Brasil, Sul-Americana, Mundial de Clubes, Supercopa, Mundial e Liga de Futsal, Copa Society, Torneio de Rua) com pontos corridos, grupos e mata-mata, troféus próprios e Mural de Troféus |
 | **Locais** | 15 estádios com identidade própria, 15 quadras de futsal fechadas com tela de proteção e placar eletrônico, 10 campos de society (clube, central, bairro, premium, praia, cobertura, neon, chácara, condomínio, gramado natural) e 15 ruas (prédios, morro, praia, terraço, gaiola, telhado, viaduto, praça, beco, conjunto, estacionamento, terra, porto, vila, linha do trem) com torcedores do lado de fora, pombos e o vira-lata caramelo |
 | **Clima e horário** | Sol, nublado, chuva, tempestade com raios, neve; dia, fim de tarde, noite; clima dinâmico que muda durante o jogo e altera a bola |
-| **Imagem** | URP com sombras, bloom, tonemapping ACES e correção de cor; 3 níveis de qualidade (automático por aparelho) |
+| **Imagem** | Tudo em **cel shading** (faixas de luz duras, brilho e recorte em faixa, contorno nos atletas, bola e objetos); URP com sombras, bloom, tonemapping ACES e correção de cor; 3 níveis de qualidade (automático por aparelho) |
 | **Ligas 2026/27** | 22 ligas (17 de campo + 5 de futsal), 400 clubes, 60 seleções e 8.120 jogadores com atributos e habilidades únicas. Nomes alterados, sem licença |
 | **Táticas** | Formação, mentalidade, pressão e escalação (troca titular ↔ reserva) |
 | **Cerimônia** | Sobrevoo do estádio, entrada dos times e apresentação das escalações |
