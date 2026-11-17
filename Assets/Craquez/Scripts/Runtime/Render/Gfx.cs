@@ -99,6 +99,22 @@ namespace Craquez
             Shader.SetGlobalVector("_ToonOutline", new Vector4(0.011f, 0.004f, 0.06f, 0f));
         }
 
+        /// <summary>Configura bias de sombra na luz principal para evitar "quadrados pretos" (shadow acne).
+        /// Funciona em todas as versões do Unity (diferente de Renderer.shadowBias que exige 2021.2+).</summary>
+        public static void SetMainLightShadowBias(float bias = 0.05f, float normalBias = 0.8f)
+        {
+            var lights = UnityEngine.Object.FindObjectsByType<Light>(FindObjectsSortMode.None);
+            foreach (var l in lights)
+            {
+                if (l.type == LightType.Directional && l.shadows != LightShadows.None)
+                {
+                    l.shadowBias = bias;
+                    l.shadowNormalBias = normalBias;
+                    break; // assume primeira luz direcional com sombras é a principal
+                }
+            }
+        }
+
         /// <summary>Lit com mapa de relevo (normal map) — grama, madeira, tecido, asfalto (toon/cel shading).</summary>
         public static Material LitN(Color c, Texture tex, Texture2D normal, float smooth = 0.2f, float bump = 1f, bool twoSided = false)
         {

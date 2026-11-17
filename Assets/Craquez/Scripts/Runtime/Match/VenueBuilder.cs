@@ -380,11 +380,9 @@ namespace Craquez
             var gb = b.Object("Gramado B", v.pitchMat2, v.root, false);
             ga.GetComponent<MeshRenderer>().receiveShadows = true;
             gb.GetComponent<MeshRenderer>().receiveShadows = true;
-            // bias de sombra para evitar quadrados pretos sob os jogadores
-            ga.GetComponent<MeshRenderer>().shadowBias = 0.05f;
-            gb.GetComponent<MeshRenderer>().shadowBias = 0.05f;
-            ga.GetComponent<MeshRenderer>().shadowNormalBias = 0.8f;
-            gb.GetComponent<MeshRenderer>().shadowNormalBias = 0.8f;
+            // bias de sombra na luz principal para evitar quadrados pretos sob os jogadores
+            // (compatível com todas versões do Unity, diferente de Renderer.shadowBias)
+            Gfx.SetMainLightShadowBias(0.05f, 0.8f);
             // entorno (pista / concreto)
             var ring = new MeshKit();
             float ox = mx + 22f, oz = mz + 22f;
