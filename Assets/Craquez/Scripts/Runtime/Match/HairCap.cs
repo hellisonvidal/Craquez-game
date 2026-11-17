@@ -172,7 +172,7 @@ namespace Craquez
             m.name = src.name + " (curto)";
             var v = m.vertices;
             const float nape = -0.075f;   // abaixo disso (m, em relação aos olhos) o cabelo é recolhido
-            const float brow = 0.035f;    // franja: na frente do rosto, nada abaixo da testa
+            const float brow = 0.042f;    // franja: na frente do rosto, nada abaixo da testa
             for (int i = 0; i < v.Length; i++)
             {
                 var b = bt.InverseTransformPoint(ht.TransformPoint(v[i]));   // espaço do corpo
@@ -180,10 +180,10 @@ namespace Craquez
                 float dy = Vector3.Dot(w, U), dz = Vector3.Dot(w, F);
                 float ny = dy;
                 if (dy < nape) ny = nape + (dy - nape) * 0.22f;
-                if (dz > -0.035f && ny < brow)
+                if (dz > -0.055f && ny < brow)
                 {
-                    // franja (na frente, entre as têmporas): sobe até a testa
-                    float front = Mathf.Clamp01((dz + 0.035f) / 0.03f) * Mathf.Clamp01((0.075f - Mathf.Abs(Vector3.Dot(w, X))) / 0.02f);
+                    // franja (na frente, de têmpora a têmpora — as mechas do lado caíam sobre um olho): sobe até a testa
+                    float front = Mathf.Clamp01((dz + 0.055f) / 0.035f) * Mathf.Clamp01((0.1f - Mathf.Abs(Vector3.Dot(w, X))) / 0.025f);
                     ny = Mathf.Lerp(ny, brow + (ny - brow) * 0.15f, front);
                 }
                 if (ny == dy) continue;
