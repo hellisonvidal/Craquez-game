@@ -293,13 +293,48 @@ namespace Craquez
                 case "skill":
                     switch ((Skill)e.skill)
                     {
-                        case Skill.Drag: anim.Play("Spin", 0.35f, 0.75f, 1.35f); break;
-                        case Skill.Roulette: anim.Play("Spin", 0.2f, 0.95f, 1.2f); break;
+                        // (clipes do Athlete_Anims2 — giro para os dois lados, pivô, arrancada e zigue-zague da CMU —
+                        // com o antigo de reserva se o FBX complementar faltar)
+                        case Skill.Knock:
+                            // arrancada: abaixa o corpo e explode para a frente
+                            if (AthleteAnimator.Has("BreakR")) anim.Play((p.id & 1) == 0 ? "BreakR" : "BreakL", 0.85f, 0.6f, 1.25f, 0.06f);
+                            break;
+                        case Skill.Drag:
+                            // puxada: gira sobre o pé de apoio trazendo a bola para trás
+                            if (AthleteAnimator.Has("Pivot")) anim.Play("Pivot", 0.1f, 0.7f, 1.4f);
+                            else anim.Play("Spin", 0.35f, 0.75f, 1.35f);
+                            break;
+                        case Skill.Roulette:
+                        {
+                            // roleta: gira para o lado do drible (dois giros diferentes para a esquerda)
+                            string sp = p.skillSide > 0 ? ((p.id + view.sim.tick) % 2 == 0 || !AthleteAnimator.Has("Spin2") ? "Spin" : "Spin2")
+                                : AthleteAnimator.Has("SpinR") ? "SpinR" : "Spin";
+                            anim.Play(sp, sp == "Spin" ? 0.2f : 0.15f, 0.95f, 1.2f);
+                            break;
+                        }
                         case Skill.Roll: anim.Play(p.skillSide > 0 ? "CutL" : "CutR", 0.2f, 0.7f, 1.3f); break;
                         case Skill.Stepover: anim.Play(p.skillSide > 0 ? "FeintR" : "FeintL", 0.3f, 0.9f, 1.4f); break;
-                        case Skill.Elastico: anim.Play(p.skillSide > 0 ? "CutR" : "CutL", 0.15f, 0.65f, 1.75f); break;
-                        case Skill.Pedalada: anim.Play(p.skillSide > 0 ? "FeintR" : "FeintL", 0.2f, 0.9f, 1.9f); break;
-                        case Skill.Corte: anim.Play(p.skillSide > 0 ? "CutL" : "CutR", 0.15f, 0.7f, 1.5f); break;
+                        case Skill.Elastico:
+                            // elástico: ameaça um lado, abaixa e sai explodindo para o outro
+                            if (AthleteAnimator.Has("BreakR")) anim.Play(p.skillSide > 0 ? "BreakR" : "BreakL", 0.55f, 0.75f, 1.6f, 0.05f);
+                            else anim.Play(p.skillSide > 0 ? "CutR" : "CutL", 0.15f, 0.65f, 1.75f);
+                            break;
+                        case Skill.Pedalada:
+                            // pedalada: o corpo balança de um lado para o outro, baixo, passando as pernas
+                            if (AthleteAnimator.Has("ZigZag")) anim.Play("ZigZag", 0.3f, 1.25f, 1.6f, 0.08f);
+                            else anim.Play(p.skillSide > 0 ? "FeintR" : "FeintL", 0.2f, 0.9f, 1.9f);
+                            break;
+                        case Skill.Corte:
+                            if (e.kind == "fakeshot" && AthleteAnimator.Has("Shot"))
+                            {
+                                // finta de chute: arma a perna como no chute e para antes do toque; o corte vem
+                                // logo depois (o corpo sai para o lado com o giro do quadril)
+                                float sc = AthleteAnimator.KickContact("Shot");
+                                anim.Play("Shot", Mathf.Max(0f, sc - 0.42f), 0.3f, 1.3f, 0.04f);
+                                _fakeCut = 0.24f;
+                            }
+                            else anim.Play(p.skillSide > 0 ? "CutL" : "CutR", 0.15f, 0.7f, 1.5f);
+                            break;
                         case Skill.Chapeu:
                         case Skill.Caneta:
                         {
@@ -655,6 +690,7 @@ namespace Craquez
         }
 
         float _protest, _help;
+        float _fakeCut;   // finta de chute: segundos até emendar o corte depois de armar a perna
         bool _slideClip, _getUp;
         Vector3 _bump, _bumpVel;   // inclinação do choque (graus, no plano do chão: x/z do mundo)
 
@@ -977,6 +1013,11 @@ namespace Craquez
             if (p.down > 0f) { animSpeed = 0f; animFwd = 0f; guard = false; }   // caído: sem passada
             if (p.isKeeper && (p.saveKind >= 3 || (_saveRec > 0f && _saveKindV >= 3))) { animSpeed = 0f; animFwd = 0f; guard = false; }   // no voo: sem passada
             if (p.isKeeper && p.saveKind > 0 && p.saveKind < 3) guard = true;
+            if (_fakeCut > 0f && anim != null)
+            {
+                _fakeCut -= dt;
+                if (_fakeCut <= 0f && p.skill == Skill.Corte) anim.Play(p.skillSide > 0 ? "CutL" : "CutR", 0.3f, 0.5f, 1.6f, 0.06f);
+            }
             Cuts(dt, spd);
             Touches();
             _pose.Restore();   // tira as correções do quadro anterior antes de avaliar a animação

@@ -1,0 +1,44 @@
+{
+ "SpinR": {
+  "frames": 44,
+  "fps": 30,
+  "loop": false,
+  "speed": 3.184,
+  "source": "102_15"
+ },
+ "Spin2": {
+  "frames": 42,
+  "fps": 30,
+  "loop": false,
+  "speed": 3.711,
+  "source": "102_12"
+ },
+ "BreakR": {
+  "frames": 64,
+  "fps": 30,
+  "loop": false,
+  "speed": 2.287,
+  "source": "102_20"
+ },
+ "BreakL": {
+  "frames": 61,
+  "fps": 30,
+  "loop": false,
+  "speed": 2.43,
+  "source": "102_21"
+ },
+ "Pivot": {
+  "frames": 43,
+  "fps": 30,
+  "loop": false,
+  "speed": 0.962,
+  "source": "102_29"
+ },
+ "ZigZag": {
+  "frames": 81,
+  "fps": 30,
+  "loop": false,
+  "speed": 1.913,
+  "source": "102_26"
+ }
+}

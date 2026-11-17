@@ -32,7 +32,7 @@ namespace Craquez.EditorTools
             mi.meshCompression = ModelImporterMeshCompression.Off;
             mi.optimizeGameObjects = false;
             mi.importConstraints = false;
-            if (assetPath.EndsWith("Athlete_Anims.fbx"))
+            if (IsAnims(assetPath))
             {
                 mi.importAnimation = true;
                 mi.animationCompression = ModelImporterAnimationCompression.KeyframeReduction;
@@ -48,7 +48,7 @@ namespace Craquez.EditorTools
 
         void OnPreprocessAnimation()
         {
-            if (!assetPath.EndsWith("Athlete_Anims.fbx")) return;
+            if (!IsAnims(assetPath)) return;
             var mi = (ModelImporter)assetImporter;
             var loops = LoopTable();
             var clips = mi.defaultClipAnimations;
@@ -68,22 +68,28 @@ namespace Craquez.EditorTools
             mi.clipAnimations = outClips.ToArray();
         }
 
+        /// <summary>FBX de animações: o principal e o complementar (Athlete_Anims2: dribles e fintas extras da CMU).</summary>
+        static bool IsAnims(string path) => path.EndsWith("Athlete_Anims.fbx") || path.EndsWith("Athlete_Anims2.fbx");
+
         static Dictionary<string, bool> LoopTable()
         {
             var d = new Dictionary<string, bool>();
-            var path = AthleteDir + "anims.json";
-            if (!File.Exists(path)) return d;
-            var root = Craquez.Sim.MiniJson.Parse(File.ReadAllText(path)) as Dictionary<string, object>;
-            if (root == null) return d;
-            foreach (var kv in root)
-                if (kv.Value is Dictionary<string, object> m && m.TryGetValue("loop", out var l) && l is bool b) d[kv.Key] = b;
+            foreach (var file in new[] { "anims.json", "anims2.json" })
+            {
+                var path = AthleteDir + file;
+                if (!File.Exists(path)) continue;
+                var root = Craquez.Sim.MiniJson.Parse(File.ReadAllText(path)) as Dictionary<string, object>;
+                if (root == null) continue;
+                foreach (var kv in root)
+                    if (kv.Value is Dictionary<string, object> m && m.TryGetValue("loop", out var l) && l is bool b) d[kv.Key] = b;
+            }
             return d;
         }
 
         /// <summary>Remove curvas de posição/escala (exceto o quadril): o clipe serve a qualquer biotipo.</summary>
         void OnPostprocessAnimation(GameObject root, AnimationClip clip)
         {
-            if (!assetPath.EndsWith("Athlete_Anims.fbx")) return;
+            if (!IsAnims(assetPath)) return;
             foreach (var b in AnimationUtility.GetCurveBindings(clip))
             {
                 bool pos = b.propertyName.StartsWith("m_LocalPosition");

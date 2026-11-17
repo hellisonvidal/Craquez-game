@@ -1,3 +1,26 @@
+## Craquez 2.37.0
+
+Jogo de futebol feito 100% com inteligência artificial, **gratuito**.
+
+### Download
+- **Celular Android**: `Craquez-v2.37.0.apk`
+- **TV (Google TV / Android TV, ex.: TCL C6K)**: `Craquez-TV-v2.37.0.apk` — use este na TV (32 e 64 bits).
+
+### Mudanças
+- **Novas animações de dribles e fintas** (captura de movimento gratuita da CMU, a mesma base já usada no jogo): giro para a direita e um segundo giro para a esquerda, arrancada (abaixa o corpo e explode), pivô sobre o pé de apoio e balanço em zigue-zague. Cada drible ganhou o seu gesto:
+  - **Arrancada** (analógico direito para a frente): abaixa e explode — antes não tinha gesto próprio;
+  - **Puxada**: gira sobre o pé de apoio trazendo a bola (antes usava o mesmo giro da roleta);
+  - **Roleta**: gira para o lado do drible, com dois giros diferentes para a esquerda (antes sempre o mesmo, para o mesmo lado);
+  - **Elástico**: ameaça um lado, abaixa e sai explodindo para o outro;
+  - **Pedalada**: o corpo balança baixo de um lado para o outro;
+  - **Finta de chute**: arma a perna como no chute, para antes do toque e emenda o corte (antes era só um corte).
+  - O gerador (`tools/blender/extra_clips.py`) usa o esqueleto do próprio jogo e foi conferido refazendo um clipe existente (diferença de 0,0°).
+- **Física e contato entre jogadores**:
+  - Quem está caído não é mais "trombado": correr para cima do caído não conta como choque de corpo (antes ele era empurrado, perdia o equilíbrio e às vezes caía de novo) e as colisões não o arrastam pelo gramado — quem está de pé é que sai;
+  - O carrinho não acerta quem já está no chão nem expulso (antes o caído podia sofrer outra falta), não toma a bola de um companheiro e não tira a bola das mãos do goleiro;
+  - Dois jogadores exatamente no mesmo ponto (reposicionamentos) se separam — antes ficavam um dentro do outro para sempre;
+  - Sem choque de corpo durante o carrinho (o contato do carrinho é tratado como desarme/falta).
+
 ## Craquez 2.36.0
 
 Jogo de futebol feito 100% com inteligência artificial, **gratuito**.
