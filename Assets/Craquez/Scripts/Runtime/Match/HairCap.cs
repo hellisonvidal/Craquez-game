@@ -141,6 +141,136 @@ namespace Craquez
             return m;
         }
 
+        static readonly Dictionary<int, Mesh> _short = new Dictionary<int, Mesh>();
+        static readonly Dictionary<int, Texture2D> _scalp = new Dictionary<int, Texture2D>();
+
+        /// <summary>Referencial da cabeça (centro dos olhos, cima, frente, lado) no espaço da malha do corpo.</summary>
+        static void Frame(SkinnedMeshRenderer body, SkinnedMeshRenderer eyes, KitPainter.Axes ax, out Vector3 e, out Vector3 U, out Vector3 F, out Vector3 X, out float k)
+        {
+            var bt = body.transform;
+            var eb = eyes.sharedMesh.bounds;
+            e = bt.InverseTransformPoint(eyes.transform.TransformPoint(eb.center));
+            U = Vector3.zero; U[ax.up] = ax.upSign;
+            F = Vector3.zero; F[ax.dep] = ax.depSign;
+            X = Vector3.Cross(U, F).normalized;
+            k = 1f / Mathf.Max(1e-4f, bt.TransformVector(U).magnitude);
+        }
+
+        /// <summary>
+        /// Cabelo comprido encurtado: o que desce abaixo da nuca é recolhido (termina pouco abaixo das orelhas)
+        /// e a franja que caía sobre os olhos sobe para a testa. Só a posição muda (mesmos ossos e UV).
+        /// </summary>
+        public static Mesh Shorten(SkinnedMeshRenderer hair, SkinnedMeshRenderer body, SkinnedMeshRenderer eyes, KitPainter.Axes ax)
+        {
+            var src = hair.sharedMesh;
+            if (src == null || body == null || eyes == null || eyes.sharedMesh == null) return src;
+            int key = src.GetInstanceID();
+            if (_short.TryGetValue(key, out var have) && have != null) return have;
+            Frame(body, eyes, ax, out var e, out var U, out var F, out var X, out float k);
+            var bt = body.transform; var ht = hair.transform;
+            var m = Object.Instantiate(src);
+            m.name = src.name + " (curto)";
+            var v = m.vertices;
+            const float nape = -0.075f;   // abaixo disso (m, em relação aos olhos) o cabelo é recolhido
+            const float brow = 0.035f;    // franja: na frente do rosto, nada abaixo da testa
+            for (int i = 0; i < v.Length; i++)
+            {
+                var b = bt.InverseTransformPoint(ht.TransformPoint(v[i]));   // espaço do corpo
+                var w = (b - e) / k;
+                float dy = Vector3.Dot(w, U), dz = Vector3.Dot(w, F);
+                float ny = dy;
+                if (dy < nape) ny = nape + (dy - nape) * 0.22f;
+                if (dz > -0.035f && ny < brow)
+                {
+                    // franja (na frente, entre as têmporas): sobe até a testa
+                    float front = Mathf.Clamp01((dz + 0.035f) / 0.03f) * Mathf.Clamp01((0.075f - Mathf.Abs(Vector3.Dot(w, X))) / 0.02f);
+                    ny = Mathf.Lerp(ny, brow + (ny - brow) * 0.15f, front);
+                }
+                if (ny == dy) continue;
+                b += U * ((ny - dy) * k);
+                v[i] = ht.InverseTransformPoint(bt.TransformPoint(b));
+            }
+            m.vertices = v;
+            m.RecalculateBounds();
+            _short[key] = m;
+            return m;
+        }
+
+        /// <summary>
+        /// Máscara (UV da pele) do couro cabeludo: 1 dentro da linha do cabelo, borda suave. O shader do atleta
+        /// pinta essa área com a cor do cabelo, mantendo o desenho da textura.
+        /// </summary>
+        public static Texture2D ScalpMask(SkinnedMeshRenderer body, SkinnedMeshRenderer eyes, KitPainter.Axes ax, int size = 512)
+        {
+            var src = body.sharedMesh;
+            if (src == null || eyes == null || eyes.sharedMesh == null) return null;
+            int key = src.GetInstanceID();
+            if (_scalp.TryGetValue(key, out var have)) return have;
+            Frame(body, eyes, ax, out var e, out var U, out var F, out var X, out float k);
+            var v = src.vertices; var uv = src.uv; var tris = src.triangles;
+            if (uv == null || uv.Length != v.Length) { _scalp[key] = null; return null; }
+            var cov = new float[v.Length];
+            for (int i = 0; i < v.Length; i++)
+            {
+                var w = (v[i] - e) / k;
+                float dx = Vector3.Dot(w, X), dy = Vector3.Dot(w, U), dz = Vector3.Dot(w, F);
+                if (dy < -0.14f || dy > 0.2f || Mathf.Abs(dx) > 0.12f || dz < -0.25f || dz > 0.07f) continue;
+                // mesma linha do cabelo da touca (testa, acima das orelhas, nuca)
+                float line = dz > -0.02f ? 0.05f : Mathf.Lerp(0.05f, -0.075f, S((-0.02f - dz) / 0.12f));
+                line += 0.012f * S((Mathf.Abs(dx) - 0.03f) / 0.03f) * S((dz + 0.03f) / 0.03f);
+                // costeletas: descem um pouco na frente da orelha
+                if (Mathf.Abs(dx) > 0.055f && dz > -0.03f && dz < 0.0f) line -= 0.03f;
+                cov[i] = Mathf.Clamp01((dy - line + 0.012f) / 0.03f);
+            }
+            var px = new float[size * size];
+            for (int t = 0; t + 2 < tris.Length; t += 3)
+            {
+                int a = tris[t], b = tris[t + 1], c = tris[t + 2];
+                if (cov[a] <= 0f && cov[b] <= 0f && cov[c] <= 0f) continue;
+                Vector2 pa = uv[a] * size, pb = uv[b] * size, pc = uv[c] * size;
+                int x0 = Mathf.Max(0, Mathf.FloorToInt(Mathf.Min(pa.x, Mathf.Min(pb.x, pc.x))) - 1), x1 = Mathf.Min(size - 1, Mathf.CeilToInt(Mathf.Max(pa.x, Mathf.Max(pb.x, pc.x))) + 1);
+                int y0 = Mathf.Max(0, Mathf.FloorToInt(Mathf.Min(pa.y, Mathf.Min(pb.y, pc.y))) - 1), y1 = Mathf.Min(size - 1, Mathf.CeilToInt(Mathf.Max(pa.y, Mathf.Max(pb.y, pc.y))) + 1);
+                float den = (pb.y - pc.y) * (pa.x - pc.x) + (pc.x - pb.x) * (pa.y - pc.y);
+                if (Mathf.Abs(den) < 1e-6f) continue;
+                for (int y = y0; y <= y1; y++)
+                    for (int x = x0; x <= x1; x++)
+                    {
+                        float qx = x + 0.5f, qy = y + 0.5f;
+                        float l1 = ((pb.y - pc.y) * (qx - pc.x) + (pc.x - pb.x) * (qy - pc.y)) / den;
+                        float l2 = ((pc.y - pa.y) * (qx - pc.x) + (pa.x - pc.x) * (qy - pc.y)) / den;
+                        float l3 = 1f - l1 - l2;
+                        // (meio pixel de folga: sem fresta nas emendas dos triângulos)
+                        const float eps = -0.04f;
+                        if (l1 < eps || l2 < eps || l3 < eps) continue;
+                        float val = Mathf.Clamp01(l1) * cov[a] + Mathf.Clamp01(l2) * cov[b] + Mathf.Clamp01(l3) * cov[c];
+                        int idx = y * size + x;
+                        if (val > px[idx]) px[idx] = val;
+                    }
+            }
+            // borda suave (um passo de desfoque 3x3)
+            var blur = new float[px.Length];
+            for (int y = 0; y < size; y++)
+                for (int x = 0; x < size; x++)
+                {
+                    float sum = 0f; int n = 0;
+                    for (int oy = -1; oy <= 1; oy++)
+                        for (int ox = -1; ox <= 1; ox++)
+                        {
+                            int xx = x + ox, yy = y + oy;
+                            if (xx < 0 || yy < 0 || xx >= size || yy >= size) continue;
+                            sum += px[yy * size + xx]; n++;
+                        }
+                    blur[y * size + x] = Mathf.Max(px[y * size + x] * 0.6f, sum / n);
+                }
+            var tex = new Texture2D(size, size, TextureFormat.R8, true, true) { wrapMode = TextureWrapMode.Clamp, name = "couro cabeludo" };
+            var bytes = new byte[size * size];
+            for (int i = 0; i < bytes.Length; i++) bytes[i] = (byte)(Mathf.Clamp01(blur[i]) * 255f);
+            tex.SetPixelData(bytes, 0);
+            tex.Apply(true, true);
+            _scalp[key] = tex;
+            return tex;
+        }
+
         /// <summary>Textura de fios (claro/escuro em mechas; cacheado e black power em espirais).</summary>
         static Texture2D Tex(int style)
         {

@@ -1,3 +1,18 @@
+## Craquez 2.36.0
+
+Jogo de futebol feito 100% com inteligência artificial, **gratuito**.
+
+### Download
+- **Celular Android**: `Craquez-v2.36.0.apk`
+- **TV (Google TV / Android TV, ex.: TCL C6K)**: `Craquez-TV-v2.36.0.apk` — use este na TV (32 e 64 bits).
+
+### Mudanças
+- **Cabelos compridos mais curtos**: longo, rabo de cavalo, tranças e chanel agora terminam pouco abaixo das orelhas (o que descia pelas costas é recolhido na nuca) e a franja que caía sobre os olhos sobe para a testa.
+- **Cabeça sem "loiro" na nuca e nas laterais**: a textura de pele dos modelos de pele clara tem o couro cabeludo pintado com uma barba por fazer clara e alaranjada, que aparecia nas bordas do cabelo (nuca, têmporas, costeletas) e parecia cabelo loiro. Agora uma máscara gerada da malha da cabeça pinta essa área na cor do cabelo de cada atleta, mantendo o desenho dos fios.
+- **Texturas dos atletas revisadas**:
+  - Cabelo, sobrancelhas e cílios mantêm a cobertura nos mipmaps: de longe o cabelo não fica mais ralo e com falhas (via-se o couro cabeludo) e as sobrancelhas não somem.
+  - No Android, a pele vai em 2048 com ASTC 4x4 (antes 1024 com ASTC 6x6: o rosto, que ocupa só um canto da textura, ficava borrado e em blocos); cabelo, sobrancelhas e cílios em ASTC 4x4 (borda dos fios sem serrilhado).
+
 ## Craquez 2.35.0
 
 Jogo de futebol feito 100% com inteligência artificial, **gratuito**.

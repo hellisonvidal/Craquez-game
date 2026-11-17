@@ -283,9 +283,11 @@ namespace Craquez
         {
             var smrs = rig.GetComponentsInChildren<SkinnedMeshRenderer>(true);
             Mesh bodyMesh = null, socksMesh = null, bootsMesh = null;
+            SkinnedMeshRenderer bodyR = null, eyesR0 = null;
             foreach (var r in smrs)
             {
-                if (r.name == "Body") bodyMesh = r.sharedMesh;
+                if (r.name == "Body") { bodyMesh = r.sharedMesh; bodyR = r; }
+                if (r.name == "Eyes") eyesR0 = r;
                 if (r.name == "Socks") socksMesh = r.sharedMesh;
                 if (r.name == "Boots") bootsMesh = r.sharedMesh;
             }
@@ -301,8 +303,20 @@ namespace Craquez
                 {
                     case "Body":
                     {
-                        var skin = Shared("skin:" + look.baseName + Teams.Hex(look.skinTint), () =>
-                            Gfx.Athlete(look.skinTint, T(SkinTex[look.baseName]), 0.3f, 1f));
+                        // couro cabeludo da textura (a "barba por fazer" da cabeça, clara/alaranjada nas peles
+                        // claras: de longe parecia cabelo loiro) pintado na cor do cabelo do atleta
+                        var scalp = eyesR0 != null ? HairCap.ScalpMask(smr, eyesR0, axes) : null;
+                        var skin = Shared("skin:" + look.baseName + Teams.Hex(look.skinTint) + Teams.Hex(look.hairColor), () =>
+                        {
+                            var m = Gfx.Athlete(look.skinTint, T(SkinTex[look.baseName]), 0.3f, 1f);
+                            if (scalp != null)
+                            {
+                                m.SetTexture("_ScalpMask", scalp);
+                                var hc = look.hairColor;
+                                m.SetColor("_ScalpColor", new Color(hc.r, hc.g, hc.b, 0.88f));
+                            }
+                            return m;
+                        });
                         var mats = new Material[Mathf.Max(1, smr.sharedMesh.subMeshCount)];
                         for (int i = 0; i < mats.Length; i++) mats[i] = skin;
                         smr.sharedMaterials = mats;
@@ -341,6 +355,10 @@ namespace Craquez
                             // (raspado, undercut e cacheado ficam só com o procedural)
                             bool on = look.hair >= 0 && hn == Hairs[look.hair];
                             smr.gameObject.SetActive(on);
+                            // cabelos compridos (longo, rabo, tranças, chanel) encurtados: terminam na nuca e a
+                            // franja não cobre mais os olhos
+                            if (on && look.hair >= 5 && bodyR != null && eyesR0 != null)
+                                smr.sharedMesh = HairCap.Shorten(smr, bodyR, eyesR0, axes);
                             if (on)
                                 smr.sharedMaterial = Shared("hair:" + hn + Teams.Hex(look.hairColor), () =>
                                     Gfx.Cutout(look.hairColor * 1.15f, T(hn == "afro01" ? "afro_diffuse" : hn + "_diffuse"), 0.3f, 0.02f));   // (fosco: sem o reflexo claro do refletor no alto da cabeça)

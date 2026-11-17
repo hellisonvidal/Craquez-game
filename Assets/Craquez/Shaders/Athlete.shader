@@ -14,6 +14,8 @@ Shader "Craquez/Athlete"
         _BumpScale("Relevo", Float) = 1
         [HDR] _EmissionColor("Emissão", Color) = (0,0,0,1)
         _EmissionMap("Emissão (textura)", 2D) = "white" {}
+        _ScalpMask("Couro cabeludo (máscara)", 2D) = "black" {}
+        _ScalpColor("Cor do couro cabeludo", Color) = (0,0,0,0)
         [HideInInspector] _Surface("__surface", Float) = 0
         [HideInInspector] _AlphaClip("__clip", Float) = 0
         [HideInInspector] _Cull("__cull", Float) = 2

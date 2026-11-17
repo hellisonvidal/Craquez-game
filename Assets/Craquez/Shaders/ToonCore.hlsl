@@ -21,6 +21,12 @@ float4 _ClothDrag;         // xyz = deslocamento da barra (m, mundo) pelo movime
 float4 _ClothFlutter;      // x = amplitude (m), y = frequência, z = fase
 float _OutlineMul;         // espessura do contorno desta peça (0 = padrão)
 
+// couro cabeludo (só atletas): máscara na UV da pele e cor do cabelo (a = força; 0 = desligado)
+#if defined(CRAQUEZ_ATHLETE)
+TEXTURE2D(_ScalpMask); SAMPLER(sampler_ScalpMask);
+half4 _ScalpColor;
+#endif
+
 float4 _ClothTuck;         // camisa por dentro do calção: x = altura da cintura (y do mundo), y = quanto entra (m)
 
 float3 ClothOffset(float3 posWS, float3 nWS)
@@ -140,6 +146,13 @@ half4 ToonFrag(ToonVaryings i, FRONT_FACE_TYPE face : FRONT_FACE_SEMANTIC) : SV_
     half4 albedo = tex * _BaseColor;
 #if defined(_ALPHATEST_ON)
     clip(albedo.a - _Cutoff);
+#endif
+#if defined(CRAQUEZ_ATHLETE)
+    // couro cabeludo na cor do cabelo, mantendo o desenho dos fios da textura (antes ficava claro/alaranjado
+    // e a nuca e as laterais pareciam loiras)
+    half scalp = SAMPLE_TEXTURE2D(_ScalpMask, sampler_ScalpMask, i.uv).r * _ScalpColor.a;
+    half lum = dot(tex.rgb, half3(0.3, 0.59, 0.11));
+    albedo.rgb = lerp(albedo.rgb, _ScalpColor.rgb * (0.55 + 0.9 * lum), scalp);
 #endif
     // SafeNormalize: normal nula (malha degenerada) não vira NaN — o NaN o bloom espalhava em ponto de luz
     half3 n = SafeNormalize(i.normalWS) * IS_FRONT_VFACE(face, 1.0, -1.0);

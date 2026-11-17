@@ -17,7 +17,7 @@ namespace Craquez.EditorTools
         const string AthleteDir = "Assets/Craquez/Resources/Athletes/";
 
         /// <summary>Muda quando as regras mudam: força reimportar os FBX.</summary>
-        public override uint GetVersion() => 3;
+        public override uint GetVersion() => 4;   // (4: cobertura do alfa nos mipmaps e ASTC 4x4 nas texturas dos atletas)
 
         void OnPreprocessModel()
         {
@@ -122,14 +122,25 @@ namespace Craquez.EditorTools
             var ti = (TextureImporter)assetImporter;
             string n = Path.GetFileNameWithoutExtension(assetPath);
             bool skin = n.Contains("skinned");
+            bool eye = n.EndsWith("_eye");   // (brown_eye: íris, sem recorte)
+            bool cut = !skin && !eye;   // cabelo, sobrancelha, cílios: recorte pelo alfa
             ti.mipmapEnabled = true;
-            ti.alphaIsTransparency = !skin;
+            ti.alphaIsTransparency = cut;
             ti.maxTextureSize = skin ? 2048 : 1024;
             ti.anisoLevel = 4;
+            if (cut)
+            {
+                // os mipmaps menores "comiam" o alfa: de longe o cabelo ralo e com falhas (via-se o couro
+                // cabeludo) e as sobrancelhas sumiam. Preserva a cobertura no limiar do recorte (0,3)
+                ti.mipMapsPreserveCoverage = true;
+                ti.alphaTestReferenceValue = 0.3f;
+            }
             var android = ti.GetPlatformTextureSettings("Android");
             android.overridden = true;
-            android.maxTextureSize = skin ? 1024 : 512;
-            android.format = TextureImporterFormat.ASTC_6x6;
+            // pele: o rosto ocupa só um canto do atlas — em 1024 com ASTC 6x6 ficava borrado e em blocos;
+            // texturas com recorte em ASTC 4x4 (o 6x6 deixava a borda dos fios serrilhada)
+            android.maxTextureSize = skin ? 2048 : 1024;
+            android.format = skin || cut ? TextureImporterFormat.ASTC_4x4 : TextureImporterFormat.ASTC_6x6;
             ti.SetPlatformTextureSettings(android);
         }
     }
