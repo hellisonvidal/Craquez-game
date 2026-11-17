@@ -367,7 +367,7 @@ namespace Craquez
         public string CurrentAction { get; private set; }
         public float ActionWeight => _actionW;
         /// <summary>Segundos (de relógio) que faltam para a ação atual acabar.</summary>
-        public float ActionLeft => CurrentAction == null ? 0f : Mathf.Max(0f, (_actionEnd - _actionT) / Mathf.Max(0.01f, _actionRate));
+        public float ActionLeft => CurrentAction == null ? 0f : _actionHold ? float.MaxValue : Mathf.Max(0f, (_actionEnd - _actionT) / Mathf.Max(0.01f, _actionRate));
 
         public AthleteAnimator(Animator animator, string name, int seed = 0)
         {
@@ -415,7 +415,12 @@ namespace Craquez
         }
 
         /// <summary>Dispara uma ação (clipe inteiro ou trecho). start/len em segundos do clipe.</summary>
-        public void Play(string clip, float start = 0f, float len = -1f, float rate = 1f, float fadeIn = 0.08f)
+        /// <summary>
+        /// Toca uma ação por cima da locomoção. hold = no fim, congela no último quadro com peso cheio até
+        /// outra ação ou Stop (caído no chão: antes a captura acabava, o peso caía e o atleta "subia" na
+        /// pose de pé por um instante a cada repetição — tremia e se mexia no chão).
+        /// </summary>
+        public void Play(string clip, float start = 0f, float len = -1f, float rate = 1f, float fadeIn = 0.08f, bool hold = false)
         {
             if (!_valid || !Clips.TryGetValue(clip, out var ci)) return;
             if (_action.IsValid())
@@ -429,6 +434,7 @@ namespace Craquez
             _actionT = Mathf.Clamp(start, 0f, ci.clip.length);
             _actionEnd = len > 0f ? Mathf.Min(ci.clip.length, _actionT + len) : ci.clip.length;
             _actionRate = rate;
+            _actionHold = hold;
             _fadeOut = 0.18f;
             CurrentAction = clip;
             if (_actionW < 0.01f) _actionW = 0.01f;
@@ -436,10 +442,12 @@ namespace Craquez
         }
 
         float _fadeIn = 0.08f;
+        bool _actionHold;
 
         public void Stop(float fade = 0.15f)
         {
             if (CurrentAction == null) return;
+            _actionHold = false;
             _actionEnd = Mathf.Min(_actionEnd, _actionT + fade * _actionRate);
             _fadeOut = fade;
         }
@@ -567,7 +575,14 @@ namespace Craquez
             if (CurrentAction != null)
             {
                 _actionT += dt * _actionRate;
-                if (_actionT >= _actionEnd)
+                if (_actionHold && _actionT >= _actionEnd - 1e-3f)
+                {
+                    // segura a última pose, parada e com peso cheio
+                    _actionT = Mathf.Max(0f, _actionEnd - 1e-3f);
+                    target = 1f;
+                    _action.SetTime(_actionT);
+                }
+                else if (_actionT >= _actionEnd)
                 {
                     CurrentAction = null;
                 }
@@ -575,7 +590,7 @@ namespace Craquez
                 {
                     target = 1f;
                     _action.SetTime(_actionT);
-                    if (_actionEnd - _actionT < _fadeOut * _actionRate) target = (_actionEnd - _actionT) / (_fadeOut * _actionRate);
+                    if (!_actionHold && _actionEnd - _actionT < _fadeOut * _actionRate) target = (_actionEnd - _actionT) / (_fadeOut * _actionRate);
                 }
             }
             float rateW = target > _actionW ? dt / _fadeIn : dt / 0.18f;

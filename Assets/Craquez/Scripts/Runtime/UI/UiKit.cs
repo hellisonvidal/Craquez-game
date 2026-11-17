@@ -308,7 +308,9 @@ namespace Craquez.UI
 
         public static LayoutElement Size(Component c, float minH = -1, float prefH = -1, float flexW = -1, float prefW = -1)
         {
-            var le = c.gameObject.GetComponent<LayoutElement>() ?? c.gameObject.AddComponent<LayoutElement>();
+            // (sem "??": o nulo falso da Unity não é nulo para o C# e o componente nunca era criado no editor)
+            var le = c.gameObject.GetComponent<LayoutElement>();
+            if (le == null) le = c.gameObject.AddComponent<LayoutElement>();
             if (minH >= 0) le.minHeight = minH;
             if (prefH >= 0) le.preferredHeight = prefH;
             if (flexW >= 0) le.flexibleWidth = flexW;
@@ -411,13 +413,37 @@ namespace Craquez.UI
             _onChange = onChange;
             Index = Mathf.Clamp(index, 0, Mathf.Max(0, options.Count - 1));
             caption = UiKit.Label(transform, cap, 30, Theme.BodyBold, Theme.TextDim);
-            caption.rectTransform.Place(0, 0, 0.4f, 1, 26, 0, 0, 0);
+            caption.rectTransform.Place(0, 0, 0.4f, 1, 26, 2, 8, 2);
+            Fit(caption, 30);
             // setas em "botões" redondos, grandes o bastante para o dedo
             Arrow("‹", 0.4f, 0.4f);
+            // valor entre as duas setas (antes ia até 90% da largura e passava por baixo da seta direita;
+            // nomes longos quebravam em linhas que invadiam a opção de baixo)
             value = UiKit.Label(transform, "", 36, Theme.Head, Theme.Text, TextAnchor.MiddleCenter);
-            value.rectTransform.Place(0.48f, 0, 0.9f, 1);
+            value.rectTransform.Place(0.4f, 0, 1f, 1, 64, 2, 70, 2);
+            Fit(value, 36);
             Arrow("›", 1f, 1f);
             Refresh();
+        }
+
+        /// <summary>Texto que encolhe para caber (no máximo duas linhas, sem invadir a linha vizinha).</summary>
+        static void Fit(Text t, int max)
+        {
+            t.resizeTextForBestFit = true;
+            t.resizeTextMinSize = Mathf.Min(16, max);
+            t.resizeTextMaxSize = max;
+            t.verticalOverflow = VerticalWrapMode.Truncate;
+            t.lineSpacing = 0.9f;
+        }
+
+        float _pulse;
+
+        /// <summary>Troca de opção: o valor dá um "pulo" curto (resposta visual ao toque/seta).</summary>
+        void Update()
+        {
+            if (_pulse <= 0f || value == null) return;
+            _pulse = Mathf.Max(0f, _pulse - Time.unscaledDeltaTime * 6f);
+            value.rectTransform.localScale = Vector3.one * (1f + 0.08f * _pulse * _pulse);
         }
 
         void Arrow(string glyph, float x0, float x1)
@@ -456,7 +482,7 @@ namespace Craquez.UI
             if (_options == null || _options.Count == 0) return;
             Index = ((i % _options.Count) + _options.Count) % _options.Count;
             Refresh();
-            if (notify) _onChange?.Invoke(Index);
+            if (notify) { _pulse = 1f; _onChange?.Invoke(Index); }
         }
 
         void Refresh()

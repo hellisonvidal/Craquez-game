@@ -932,7 +932,9 @@ namespace Craquez
             var holder = UiKit.Image(card, Color.white, Theme.Circle, "bola").rectTransform.At(0, 0, 112, 112, 26, 110);
             holder.gameObject.AddComponent<Mask>().showMaskGraphic = false;
             var ballImg = UiKit.Rect(holder, "tex").Place(0, 0, 1, 1).gameObject.AddComponent<RawImage>();
-            ballImg.uvRect = new Rect(0.25f, 0, 0.5f, 1f);   // frente da bola, parada
+            // frente da bola, parada. A textura equiretangular tem o polo norte em v = 0 (linha de baixo da
+            // imagem): sem girar 180° a prévia saía de ponta-cabeça (a "Craquez Pro 26" com o nome invertido)
+            ballImg.uvRect = new Rect(0.75f, 1f, -0.5f, -1f);
             var shine = UiKit.Image(holder, new Color(1, 1, 1, 0.25f), Theme.Soft, "brilho").rectTransform.Place(0.05f, 0.45f, 0.6f, 0.98f);
             var ballName = UiKit.Label(card, "", 30, Theme.HeadItalic, Theme.Text);
             ballName.rectTransform.Place(0, 0, 1, 0, 156, 170, 20, -222);
@@ -1143,13 +1145,24 @@ namespace Craquez
                 int slot = System.Array.IndexOf(tac.lineup, ri);
                 string role = slot >= 0 ? GameModes.RoleFor(formation[slot], slot, mode.keeper) : "RES";
                 string traits = e.t.Count > 0 ? "  <color=#f5c518>+ " + string.Join(", ", e.t) + "</color>" : "";
-                string line = "<b>" + e.num.ToString().PadLeft(2) + "</b>  " + e.n + "   <color=#8fa3bf>" + e.pos + " / " + role + "  •  " + e.ovr + "</color>" + traits;
+                // mentalidade individual e espírito de equipe (os mesmos valores que a partida usa)
+                var tr = Trait.None;
+                foreach (var tn in e.t) if (tn != null && SimPlayer.TraitNames.TryGetValue(tn, out var tv)) tr |= tv;
+                float ea(int k, float d) => e.a != null && e.a.Length > k ? e.a[k] : d;
+                MatchSim.Mindset(e.n, role == "RES" ? e.pos : role, ea(0, 0.7f), ea(4, 0.7f), ea(5, 0.7f), tr, out float ment, out float spir);
+                string mind = "  <color=#7dd3fc>" + MatchSim.MentalityLabel(ment) + "</color> <color=#86efac>· Espírito " + Mathf.RoundToInt(spir * 100f) + "</color>";
+                string line = "<b>" + e.num.ToString().PadLeft(2) + "</b>  " + e.n + "   <color=#8fa3bf>" + e.pos + " / " + role + "  •  " + e.ovr + "</color>" + mind + traits;
                 var b = UiKit.Button(content, "", null, 26, slot >= 0 ? new Color(0.1f, 0.3f, 0.22f) : Theme.PanelLight);
                 var lbl = b.GetComponentInChildren<Text>();
                 lbl.font = Theme.Body;
                 lbl.alignment = TextAnchor.MiddleLeft;
                 lbl.supportRichText = true;
                 lbl.text = line;
+                // (linha mais longa com mentalidade/espírito: encolhe a letra em vez de cortar)
+                lbl.horizontalOverflow = HorizontalWrapMode.Wrap;
+                lbl.resizeTextForBestFit = true;
+                lbl.resizeTextMinSize = 16;
+                lbl.resizeTextMaxSize = 26;
                 UiKit.Size(b, 58, 58);
                 b.onClick.AddListener(() =>
                 {

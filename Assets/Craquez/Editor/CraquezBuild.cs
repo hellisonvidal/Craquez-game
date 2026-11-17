@@ -51,7 +51,7 @@ namespace Craquez.EditorTools
             catch (Exception e) { Debug.LogWarning("Craquez: APIs do Linux: " + e.Message); }
             EditorApplication.delayCall += () =>
             {
-                try { if (!File.Exists(MatDir + "/ToonOutline.mat")) PrepareAssets(); }
+                try { if (!File.Exists(MatDir + "/ToonOutline.mat") || !File.Exists(MatDir + "/ToonTransparent.mat")) PrepareAssets(); }
                 catch (Exception e) { Debug.LogWarning("Craquez: materiais não gerados ainda: " + e.Message); }
             };
         }
@@ -207,6 +207,35 @@ namespace Craquez.EditorTools
                 Transparent(p);
                 Save("Particles", p);
             }
+            // variantes de cel shading pedidas pelo jogo (Gfx.Template): sem estes materiais o shader
+            // não entrava no build e o jogo caía no Toon opaco — poças, sombras de contato e o gramado
+            // gasto viravam quadrados (azuis, pretos e marrons)
+            if (toon != null) Save("Toon", new Material(toon));
+            var tCut = Shader.Find("Craquez/ToonCutout");
+            if (tCut != null)
+            {
+                var m = new Material(tCut);
+                m.SetFloat("_AlphaClip", 1f);
+                m.SetFloat("_Cutoff", 0.4f);
+                m.SetFloat("_Cull", (float)CullMode.Off);
+                m.EnableKeyword("_ALPHATEST_ON");
+                m.renderQueue = (int)RenderQueue.AlphaTest;
+                m.doubleSidedGI = true;
+                Save("ToonCutout", m);
+            }
+            else Debug.LogError("Craquez: shader Craquez/ToonCutout não encontrado");
+            var tTr = Shader.Find("Craquez/ToonTransparent");
+            if (tTr != null)
+            {
+                var m = new Material(tTr);
+                Transparent(m);
+                m.SetShaderPassEnabled("ShadowCaster", false);
+                m.SetShaderPassEnabled("DepthOnly", false);
+                Save("ToonTransparent", m);
+            }
+            else Debug.LogError("Craquez: shader Craquez/ToonTransparent não encontrado");
+            var tSky = Shader.Find("Craquez/ToonSky");
+            if (tSky != null) Save("ToonSky", new Material(tSky));
             if (sky != null)
             {
                 var s = new Material(sky);

@@ -129,8 +129,10 @@ namespace Craquez
             {
                 baseName = b, hair = shaved ? -1 : PickHair(b, hair, R(7), R(17)), hairColor = HairColors[Mathf.Clamp(hc, 0, HairColors.Length - 1)],
                 tape = R(15) < 0.3f ? (R(16) < 0.5f ? 1 : 2) : 0,
-                // touca de volume só por baixo dos cabelos curtos (nos longos ela atravessava); raspado = só a sombra
-                hairStyle = shaved ? 0 : PickHair(b, hair, R(7), R(17)) <= 3 ? 1 : -1,
+                // touca de volume só por baixo dos cabelos curtos; nos longos uma touca rente (estilo 0, não
+                // atravessa os fios) pinta o couro cabeludo — sem ela a pele clara aparecia entre as mechas
+                // e a parte de trás da cabeça parecia loira
+                hairStyle = shaved ? 0 : PickHair(b, hair, R(7), R(17)) <= 3 ? 1 : 0,
                 // camisa por dentro do calção em 90% dos atletas, por fora em 10%
                 untucked = ((h >> 21) & 1023u) % 10u == 0u,
                 faceSeed = (int)h2,
@@ -367,7 +369,7 @@ namespace Craquez
             foreach (var r in smrs) { if (r.name == "Eyes") eyesR = r; else if (r.name == "Eyebrows") browR = r; else if (r.name == "Eyelashes") lashR = r; }
             if (rig.body != null && eyesR != null && bodyMesh != null) FaceRig.Build(rig.body, eyesR, axes, browR, lashR);
             // cabelo com volume e estilo (antes muitos pareciam carecas)
-            if (rig.body != null && eyesR != null && bodyMesh != null && look.hairStyle >= 0) HairCap.Build(rig.body, eyesR, axes, look.hairStyle, look.hairColor * (look.hairStyle == 0 ? 0.8f : 1.15f), quality);
+            if (rig.body != null && eyesR != null && bodyMesh != null && look.hairStyle >= 0) HairCap.Build(rig.body, eyesR, axes, look.hairStyle, look.hairColor * (look.hairStyle == 0 ? 0.8f : 1f), quality);
             rig.untucked = look.untucked;
             // (o número agora vem pintado na camisa)
         }
@@ -409,7 +411,9 @@ namespace Craquez
         {
             if (src == null) return null;
             if (_smoothBoots.TryGetValue(src, out var have) && have != null) return have;
-            var m = Object.Instantiate(src);
+            // malha do modelo é grossa demais: arredondar só os vértices dela deixava as quinas do bico e do
+            // calcanhar (o contorno continuava "quadrado"). Subdivide uma vez e então alisa.
+            var m = Subdivide(src);
             m.name = src.name + " (lisa)";
             var v = m.vertices;
             int n = v.Length;
@@ -451,13 +455,91 @@ namespace Craquez
                 }
                 System.Array.Copy(tmp, p, p.Length);
             }
-            for (int it = 0; it < 4; it++) { Pass(0.5f); Pass(-0.53f); }
+            for (int it = 0; it < 10; it++) { Pass(0.55f); Pass(-0.58f); }
             for (int i = 0; i < n; i++) v[i] = p[id[i]];
             m.vertices = v;
             m.RecalculateNormals();
+            // normais contínuas nas costuras de UV (sem isso cada costura virava uma quina no cel shading)
+            var nr = m.normals;
+            var acc = new Vector3[pos.Count];
+            for (int i = 0; i < n; i++) acc[id[i]] += nr[i];
+            for (int i = 0; i < n; i++) nr[i] = acc[id[i]].sqrMagnitude > 1e-12f ? acc[id[i]].normalized : nr[i];
+            m.normals = nr;
             m.RecalculateBounds();
             _smoothBoots[src] = m;
             return m;
+        }
+
+        /// <summary>
+        /// Subdivisão por ponto médio (cada triângulo vira 4), com UV e pesos dos ossos interpolados.
+        /// Mantém submalhas e bindposes; descarta blend shapes (as chuteiras não têm).
+        /// </summary>
+        static Mesh Subdivide(Mesh src)
+        {
+            var v = new List<Vector3>(src.vertices);
+            var uvSrc = src.uv;
+            var uv = new List<Vector2>(uvSrc != null && uvSrc.Length == v.Count ? uvSrc : new Vector2[v.Count]);
+            var bwSrc = src.boneWeights;
+            bool skinned = bwSrc != null && bwSrc.Length == v.Count;
+            var bw = new List<BoneWeight>(skinned ? bwSrc : new BoneWeight[0]);
+            var mid = new Dictionary<long, int>();
+            int Mid(int a, int b)
+            {
+                long key = a < b ? ((long)a << 32) | (uint)b : ((long)b << 32) | (uint)a;
+                if (mid.TryGetValue(key, out int r)) return r;
+                r = v.Count;
+                v.Add((v[a] + v[b]) * 0.5f);
+                uv.Add((uv[a] + uv[b]) * 0.5f);
+                if (skinned) bw.Add(MixWeights(bw[a], bw[b]));
+                mid[key] = r;
+                return r;
+            }
+            var subs = new List<int[]>();
+            for (int sm = 0; sm < src.subMeshCount; sm++)
+            {
+                var t = src.GetTriangles(sm);
+                var o = new int[t.Length * 4];
+                int k = 0;
+                for (int i = 0; i + 2 < t.Length; i += 3)
+                {
+                    int a = t[i], b = t[i + 1], c = t[i + 2];
+                    int ab = Mid(a, b), bc = Mid(b, c), ca = Mid(c, a);
+                    o[k++] = a; o[k++] = ab; o[k++] = ca;
+                    o[k++] = ab; o[k++] = b; o[k++] = bc;
+                    o[k++] = ca; o[k++] = bc; o[k++] = c;
+                    o[k++] = ab; o[k++] = bc; o[k++] = ca;
+                }
+                subs.Add(o);
+            }
+            var m = new Mesh { name = src.name };
+            if (v.Count > 65000) m.indexFormat = UnityEngine.Rendering.IndexFormat.UInt32;
+            m.SetVertices(v);
+            m.SetUVs(0, uv);
+            if (skinned) { m.boneWeights = bw.ToArray(); m.bindposes = src.bindposes; }
+            m.subMeshCount = subs.Count;
+            for (int i = 0; i < subs.Count; i++) m.SetTriangles(subs[i], i);
+            m.RecalculateNormals();
+            m.RecalculateBounds();
+            return m;
+        }
+
+        static BoneWeight MixWeights(BoneWeight a, BoneWeight b)
+        {
+            var w = new Dictionary<int, float>();
+            void Add(int i, float x) { if (x > 0f) w[i] = (w.TryGetValue(i, out var y) ? y : 0f) + x * 0.5f; }
+            Add(a.boneIndex0, a.weight0); Add(a.boneIndex1, a.weight1); Add(a.boneIndex2, a.weight2); Add(a.boneIndex3, a.weight3);
+            Add(b.boneIndex0, b.weight0); Add(b.boneIndex1, b.weight1); Add(b.boneIndex2, b.weight2); Add(b.boneIndex3, b.weight3);
+            var l = new List<KeyValuePair<int, float>>(w);
+            l.Sort((x, y) => y.Value.CompareTo(x.Value));
+            float sum = 0f;
+            for (int i = 0; i < l.Count && i < 4; i++) sum += l[i].Value;
+            if (sum <= 0f) return a;
+            var r = new BoneWeight();
+            if (l.Count > 0) { r.boneIndex0 = l[0].Key; r.weight0 = l[0].Value / sum; }
+            if (l.Count > 1) { r.boneIndex1 = l[1].Key; r.weight1 = l[1].Value / sum; }
+            if (l.Count > 2) { r.boneIndex2 = l[2].Key; r.weight2 = l[2].Value / sum; }
+            if (l.Count > 3) { r.boneIndex3 = l[3].Key; r.weight3 = l[3].Value / sum; }
+            return r;
         }
 
         static readonly (string a, string b)[] FacePairs =

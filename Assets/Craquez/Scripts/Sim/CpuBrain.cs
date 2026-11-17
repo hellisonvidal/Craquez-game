@@ -297,7 +297,7 @@ namespace Craquez.Sim
                     // alcance do chute: no campo, distâncias de verdade (a maioria dos chutes de dentro ou da entrada
                     // da área; antes chutava de 25-30 m e o goleiro defendia tudo: zero gol em 8 partidas)
                     float baseRange = sim.mode.id == GameModes.Field ? Mathf.Lerp(15f, 19f, skill) : sim.halfLen * Mathf.Lerp(0.4f, 0.55f, skill);
-                    float shootRange = baseRange * (0.72f + 0.45f * sty.shooter + 0.15f * sty.risk) * (p.Has(Trait.LongaDistancia) ? 1.25f : 1f);
+                    float shootRange = baseRange * (0.72f + 0.45f * sty.shooter + 0.15f * sty.risk) * (p.Has(Trait.LongaDistancia) ? 1.25f : 1f) * (1f + 0.1f * sim.Drive(p));   // (ímpeto: perdendo no fim, arrisca de mais longe)
                     var option = BestOption(sim, p, out float optScore);
                     // cara a cara (ninguém de linha entre ele e o gol nem chegando): conduz até perto e só
                     // então finaliza, ou quando o goleiro sai em cima (antes chutava de ~20 m sozinho)
@@ -522,6 +522,7 @@ namespace Craquez.Sim
         struct Style
         {
             public float dribble, passer, shooter, risk;
+            public string who;   // (o id fica com o substituto: refaz o estilo quando muda o atleta)
             public int favorite;   // drible preferido: 0 arrancada, 1 puxada, 2 rolinho, 3 pedalada, 4 giro
         }
 
@@ -529,7 +530,9 @@ namespace Craquez.Sim
 
         Style StyleOf(SimPlayer p)
         {
-            if (_styles.TryGetValue(p.id, out var st)) return st;
+            if (_styles.TryGetValue(p.id, out var st) && st.who == p.name) return st;
+            st = default;
+            st.who = p.name;
             uint h = 2166136261u;   // FNV-1a do nome (determinístico em qualquer plataforma)
             foreach (char ch in p.name ?? "") { h ^= ch; h *= 16777619u; }
             h ^= (uint)p.id * 2654435761u;
@@ -538,6 +541,13 @@ namespace Craquez.Sim
             st.passer = Mathf.Clamp01(p.passing * 0.8f + (p.Has(Trait.Maestro) ? 0.35f : 0f) + (R(1) - 0.5f) * 0.3f);
             st.shooter = Mathf.Clamp01(p.shot * 0.8f + (p.Has(Trait.Finalizador) ? 0.25f : 0f) + (p.Has(Trait.LongaDistancia) ? 0.25f : 0f) + (R(2) - 0.5f) * 0.3f);
             st.risk = R(3);
+            // mentalidade individual e espírito de equipe: o solidário prefere o passe; o ofensivo e
+            // individualista arrisca mais o chute e o drible
+            float spirit = p.teamSpirit - 0.5f;
+            st.passer = Mathf.Clamp01(st.passer + spirit * 0.35f);
+            st.shooter = Mathf.Clamp01(st.shooter + p.mentality * 0.12f - spirit * 0.18f);
+            st.dribble = Mathf.Clamp01(st.dribble - spirit * 0.16f + Mathf.Max(0f, p.mentality) * 0.06f);
+            st.risk = Mathf.Clamp01(st.risk * 0.7f + (p.mentality * 0.5f + 0.5f) * 0.3f);
             st.favorite = p.Has(Trait.Velocista) && R(4) < 0.6f ? 0 : (int)(R(4) * 4.99f);
             _styles[p.id] = st;
             return st;

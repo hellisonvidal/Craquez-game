@@ -43,7 +43,7 @@ namespace Craquez
         void InitializeGoal()
         {
             _postFilter = gameObject.AddComponent<MeshFilter>();
-            _postRenderer = gameObject.GetComponent<MeshRenderer>() ?? gameObject.AddComponent<MeshRenderer>();
+            _postRenderer = gameObject.GetComponent<MeshRenderer>(); if (_postRenderer == null) _postRenderer = gameObject.AddComponent<MeshRenderer>();
 
             // Create goal posts mesh
             var postMesh = CreatePostMesh();

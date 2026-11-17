@@ -943,7 +943,7 @@ namespace Craquez.UI
             {
                 var rt = ch as RectTransform;
                 if (rt == null) continue;
-                var cg = ch.GetComponent<CanvasGroup>() ?? ch.gameObject.AddComponent<CanvasGroup>();
+                var cg = ch.GetComponent<CanvasGroup>(); if (cg == null) cg = ch.gameObject.AddComponent<CanvasGroup>();
                 cg.alpha = 0f;
                 _items.Add((rt, cg, rt.anchoredPosition, Mathf.Min(0.42f, n * 0.045f)));
                 n++;

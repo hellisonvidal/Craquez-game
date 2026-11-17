@@ -16,6 +16,13 @@ namespace Craquez
         {
             if (_templates.TryGetValue(name, out var m) && m != null) return m;
             m = Resources.Load<Material>("Materials/" + name);
+            // build antigo sem a variante toon: usa o equivalente gerado (mesmas propriedades e as
+            // palavras-chave certas) em vez de cair no Toon opaco, que virava quadrado no gramado
+            if (m == null)
+            {
+                string alias = name == "ToonCutout" ? "LitCutout" : name == "ToonTransparent" ? "LitTransparent" : name == "Toon" ? "Lit" : null;
+                if (alias != null) m = Resources.Load<Material>("Materials/" + alias);
+            }
             if (m == null)
             {
                 string shader = name.StartsWith("Unlit") ? "Universal Render Pipeline/Unlit" :
@@ -31,10 +38,38 @@ namespace Craquez
                 if (Shader.Find(shader) == null) shader = "Universal Render Pipeline/Lit";
                 var sh = Shader.Find(shader) ?? Shader.Find("Standard");
                 m = new Material(sh);
+                // sem material-base, o shader vem com os padrões: liga o recorte / a transparência
+                // conforme o nome pedido (sem isso o alfa da textura era ignorado)
+                if (name.Contains("Cutout")) MakeCutout(m);
+                else if (name.Contains("Transparent") || name == "Particles") MakeTransparent(m);
                 Debug.LogWarning("Material base ausente, usando " + shader + ": " + name);
             }
             _templates[name] = m;
             return m;
+        }
+
+        static void MakeCutout(Material m)
+        {
+            m.SetFloat("_AlphaClip", 1f);
+            m.SetFloat("_Cutoff", 0.4f);
+            m.SetFloat("_Cull", 0f);
+            m.EnableKeyword("_ALPHATEST_ON");
+            m.renderQueue = 2450;
+        }
+
+        static void MakeTransparent(Material m)
+        {
+            m.SetFloat("_Surface", 1f);
+            m.SetFloat("_Blend", 0f);
+            m.SetFloat("_SrcBlend", (float)UnityEngine.Rendering.BlendMode.SrcAlpha);
+            m.SetFloat("_DstBlend", (float)UnityEngine.Rendering.BlendMode.OneMinusSrcAlpha);
+            m.SetFloat("_SrcBlendAlpha", (float)UnityEngine.Rendering.BlendMode.One);
+            m.SetFloat("_DstBlendAlpha", (float)UnityEngine.Rendering.BlendMode.OneMinusSrcAlpha);
+            m.SetFloat("_ZWrite", 0f);
+            m.EnableKeyword("_SURFACE_TYPE_TRANSPARENT");
+            m.SetOverrideTag("RenderType", "Transparent");
+            m.SetShaderPassEnabled("ShadowCaster", false);
+            m.renderQueue = 3000;
         }
 
         /// <summary>Material Lit opaco (toon/cel shading).</summary>
@@ -201,9 +236,10 @@ namespace Craquez
             return m;
         }
 
+        /// <summary>Transparente sem luz (sombras de contato, manchas no gramado): URP Unlit com alfa.</summary>
         public static Material UnlitTransparent(Color c, Texture tex = null)
         {
-            var m = new Material(Template("ToonTransparent"));
+            var m = new Material(Template("UnlitTransparent"));
             Set(m, c, tex);
             return m;
         }
