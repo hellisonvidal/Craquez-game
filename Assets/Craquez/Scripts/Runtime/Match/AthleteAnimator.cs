@@ -196,9 +196,12 @@ namespace Craquez
             {
                 if (_clips != null) return _clips;
                 _clips = new Dictionary<string, ClipInfo>();
-                var meta = Resources.Load<TextAsset>("Athletes/anims");
+                // dois FBX: o principal e o complementar (dribles e fintas extras), cada um com o seu json
+                foreach (var (fbx, json) in new[] { ("Athletes/Athlete_Anims", "Athletes/anims"), ("Athletes/Athlete_Anims2", "Athletes/anims2") })
+                {
+                var meta = Resources.Load<TextAsset>(json);
                 var md = meta != null ? Sim.MiniJson.Parse(meta.text) as Dictionary<string, object> : null;
-                foreach (var c in Resources.LoadAll<AnimationClip>("Athletes/Athlete_Anims"))
+                foreach (var c in Resources.LoadAll<AnimationClip>(fbx))
                 {
                     string n = c.name;
                     int bar = n.LastIndexOf('|');
@@ -209,6 +212,7 @@ namespace Craquez
                     var md2 = m as Dictionary<string, object>;
                     _clips[n] = new ClipInfo { clip = c, speed = Sim.MiniJson.F(m, "speed", 0f), loop = md2 != null && md2.TryGetValue("loop", out var l) && l is bool b && b, contact = Sim.MiniJson.F(m, "contact", -1f) };
                     if (md2 != null && md2.TryGetValue("source", out var src) && src is string ss && ss.StartsWith("mixamo:")) _mocap = true;
+                }
                 }
                 if (_clips.Count == 0) Debug.LogError("Nenhuma animação encontrada em Resources/Athletes/Athlete_Anims");
                 return _clips;

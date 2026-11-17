@@ -16,6 +16,16 @@ bpyenv/bin/python tools/blender/retarget.py out/Athlete_afro.blend mocap out --m
 
 Copie os FBX, `anims.json` e as texturas para `Assets/Craquez/Resources/Athletes/`.
 
+### Dribles e fintas complementares (sem refazer tudo)
+
+```bash
+# esqueleto tirado do próprio Athlete_Anims.fbx do jogo; captura CMU do sujeito 102
+bpyenv/bin/python tools/blender/extra_clips.py Assets/Craquez/Resources/Athletes/Athlete_Anims.fbx mocap out --sheet
+```
+
+Gera `Athlete_Anims2.fbx` + `anims2.json` (giro para a direita, segundo giro, arrancadas, pivô e
+zigue-zague), lidos pelo jogo junto com o `Athlete_Anims.fbx`.
+
 ## Cenário (Quaternius, CC0)
 
 ```bash

@@ -2180,7 +2180,10 @@ namespace Craquez.Sim
             foreach (var p in players)
             {
                 if (p.slide <= 0f) continue;
-                if (!p.slideHitBall && ball.z < 0.5f && p.position.Dist(ball.pos) < 0.95f)
+                // (não toma a bola de um companheiro nem das mãos do goleiro)
+                var holder = ball.owner >= 0 ? players[ball.owner] : null;
+                bool canWin = holder == null || (holder.team != p.team && holder.hold <= 0f);
+                if (!p.slideHitBall && canWin && ball.z < 0.5f && p.position.Dist(ball.pos) < 0.95f)
                 {
                     if (ball.owner >= 0) players[ball.owner].stun = 0.35f;
                     ball.owner = -1;
@@ -2192,7 +2195,8 @@ namespace Craquez.Sim
                 }
                 foreach (var o in players)
                 {
-                    if (o.team == p.team || o.stun > 0f || (o.isKeeper && o.hold > 0f)) continue;
+                    // (quem já está no chão ou expulso não leva outro carrinho: antes o caído sofria falta de novo)
+                    if (o.team == p.team || o.stun > 0f || o.down > 0f || o.sentOff || (o.isKeeper && o.hold > 0f)) continue;
                     if (p.position.Dist(o.position) < 0.8f)
                     {
                         if (p.slideHitBall) o.stun = 0.8f;
@@ -2200,7 +2204,7 @@ namespace Craquez.Sim
                         {
                             // chegou junto com a bola: carrinho bom leva a bola antes; senão é falta
                             bool fromBehind = Vector2.Dot(o.facing, (p.position - o.position).Norm()) < -0.45f;
-                            float clean = ball.z < 0.5f && p.position.Dist(ball.pos) < 1.3f ? (fromBehind ? 0.2f : 0.45f) + 0.3f * p.defense + (p.Has(Trait.Carrinho) ? 0.15f : 0f) : 0f;
+                            float clean = canWin && ball.z < 0.5f && p.position.Dist(ball.pos) < 1.3f ? (fromBehind ? 0.2f : 0.45f) + 0.3f * p.defense + (p.Has(Trait.Carrinho) ? 0.15f : 0f) : 0f;
                             if (rng.Chance(clean))
                             {
                                 if (ball.owner >= 0) players[ball.owner].stun = 0.35f;
@@ -4334,6 +4338,15 @@ namespace Craquez.Sim
                     var b = players[j];
                     var d = b.position - a.position;
                     float l = d.magnitude;
+                    if (l <= 0.0001f)
+                    {
+                        // exatamente no mesmo ponto (reposicionamento, saída de bola): antes nunca se separavam e
+                        // ficavam um dentro do outro; agora saem para os lados (direção fixa pelo id: determinístico)
+                        float ang = (a.id * 7 + b.id * 13) * 0.61f;
+                        d = new Vector2(Mathf.Cos(ang), Mathf.Sin(ang)) * 0.001f;
+                        b.position = a.position + d;
+                        l = 0.001f;
+                    }
                     // goleiro em ação (defesa, mergulho, bola nas mãos): o companheiro não o atropela
                     float need = minD;
                     if (a.team == b.team && (a.isKeeper || b.isKeeper))
@@ -4358,7 +4371,9 @@ namespace Craquez.Sim
                         if (a.team != b.team)
                         {
                             float closing = Vector2.Dot(b.vel - a.vel, -d / l);
-                            if (closing > 2.5f && a.bumpCd <= 0f && b.bumpCd <= 0f)
+                            // (trombada só entre quem está de pé: correr para cima do caído não é choque de corpo —
+                            // antes o caído era "trombado", empurrado e às vezes caía de novo)
+                            if (closing > 2.5f && a.bumpCd <= 0f && b.bumpCd <= 0f && a.down <= 0f && b.down <= 0f && a.slide <= 0f && b.slide <= 0f)
                             {
                                 a.bumpCd = b.bumpCd = 0.35f;
                                 // Força baseada em defense, massa (velocidade), e atributos físicos
@@ -4409,6 +4424,9 @@ namespace Craquez.Sim
                         // goleiro (sobretudo com a bola) não é empurrado: quem sai é o outro
                         if (a.isKeeper && !b.isKeeper) wa = a.hold > 0f ? 0f : 0.2f;
                         else if (b.isKeeper && !a.isKeeper) wa = b.hold > 0f ? 1f : 0.8f;
+                        // caído no chão não é empurrado (o corpo dele cuida de afastar os outros): quem está de pé sai
+                        if (a.down > 0f && b.down <= 0f) wa = 0f;
+                        else if (b.down > 0f && a.down <= 0f) wa = 1f;
                         // separa em alguns quadros (sem "estalo" de posição), mas sem deixar atravessar
                         float k = l < minD * 0.6f ? 2f : 1.2f;
                         a.position -= push * k * wa;
