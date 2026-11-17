@@ -404,7 +404,9 @@ namespace Craquez
 
         // ------------------------------------------------------------ queda (falta)
         const float FallStumble = 0.16f, FallDrop = 0.42f, FallRise = 1.1f;   // (levantar: senta, apoia um joelho e fica de pé)
-        float _fallW, _fallSide = 1f;
+        float _fallW, _fallSide = 1f, _downYaw;
+        Vector3 _downPos;
+        bool _wasDown;
         int _fallPhase;   // 0 em pé, 1 tropeço, 2 caindo, 3 no chão, 4 levantando
 
         /// <summary>Fase e progresso da queda a partir do tempo no chão da simulação.</summary>
@@ -512,12 +514,12 @@ namespace Craquez
                     if (_fallStage == 1 && _tripClip && ((anim.CurrentAction != "Trip" && anim.CurrentAction != "Knockback" && anim.CurrentAction != "FallFlat") || anim.ActionLeft < 0.22f))
                     {
                         _fallStage = 2;
-                        anim.Play("FallenIdle", (p.id * 0.31f) % 1f, -1f, 1f, 0.22f);
+                        anim.Play("FallenIdle", (p.id * 0.31f) % 1f, -1f, 1f, 0.22f, true);
                     }
                     break;
                 case 3:
                     if (_fallStage < 2) _fallStage = 2;
-                    if (_fallStage == 2 && anim.CurrentAction != "FallenIdle") anim.Play("FallenIdle", (p.id * 0.31f) % 1f, -1f, 1f, 0.28f);
+                    if (_fallStage == 2 && anim.CurrentAction != "FallenIdle") anim.Play("FallenIdle", (p.id * 0.31f) % 1f, -1f, 1f, 0.28f, true);   // (segura a pose: sem repetir e tremer)
                     break;
                 case 4:
                     if (_fallStage < 3)
@@ -829,6 +831,15 @@ namespace Craquez
             var pos = Vector3.Lerp(_prev, _cur, a);
             // rumo suave (o corpo gira um pouco atrás da direção da simulação)
             float target = Yaw(p.facing);
+            // caído: o corpo não gira no chão atrás do rumo da simulação (antes "rodava" deitado); só na
+            // fase final de levantar volta a acompanhar, devagar
+            bool lying = p.down > 0f && !p.isKeeper;
+            if (lying)
+            {
+                if (!_wasDown) { _downYaw = _yaw; _downPos = Vector3.Lerp(_prev, _cur, view != null ? view.Alpha : 1f); }
+                target = _downYaw;
+            }
+            _wasDown = lying;
             // giro com velocidade angular limitada (mais lento em alta velocidade, como um atleta real)
             float spd = p.vel.magnitude;
             float diff = Mathf.DeltaAngle(_yaw, target);
@@ -837,6 +848,14 @@ namespace Craquez
             float step = Mathf.Clamp(diff * (1f - Mathf.Exp(-dt * 14f)), -maxRate * dt, maxRate * dt);
             _yaw += step;
             _yawRate = Mathf.Lerp(_yawRate, step / Mathf.Max(1e-4f, dt), 1f - Mathf.Exp(-dt * 8f));
+            if (lying)
+            {
+                _yaw = _downYaw; _yawRate = 0f;
+                // posição amortecida: os empurrõezinhos da simulação (corpos que não se sobrepõem, freada)
+                // não fazem o corpo deitado tremer
+                _downPos = Vector3.Lerp(_downPos, pos, 1f - Mathf.Exp(-dt * 8f));
+                pos = _downPos;
+            }
             // inclinação nas curvas e na aceleração
             var acc = (p.vel - _lastVel) / Mathf.Max(1e-4f, dt);
             acc2D = acc;
@@ -845,6 +864,7 @@ namespace Craquez
             // inclinação para dentro da curva (força centrípeta) + aceleração lateral
             float centri = -_yawRate * Mathf.Deg2Rad * spd * 1.6f;
             _lean = Mathf.Lerp(_lean, Mathf.Clamp(-local.x * 0.3f + centri * 0.6f, -7f, 7f), 1f - Mathf.Exp(-dt * 10f));   // corpo firme: inclina pouco e sem atraso
+            if (lying) _lean = 0f;
             _pitch = Mathf.Lerp(_pitch, 0f, 1f - Mathf.Exp(-dt * 5f));
             // aceleração inclina o tronco (na coluna, em LateUpdate), não o corpo inteiro: pés firmes
             // tronco: inclina na arrancada e, em velocidade, fica um pouco à frente (como corredor de verdade)
@@ -890,7 +910,12 @@ namespace Craquez
                 pitch = fb.x; roll = fb.y; lift = fb.z;
                 FallClips(ref pitch, ref roll, ref lift);
             }
-            if (p.down <= 0f) { _getUp = false; _fallStage = 0; }
+            if (p.down <= 0f)
+            {
+                // levantou de repente (cobrança rápida, reinício): solta a pose de caído que estava segura
+                if (_fallStage > 0 && anim != null && anim.CurrentAction == "FallenIdle") anim.Stop(0.25f);
+                _getUp = false; _fallStage = 0;
+            }
             if (_bikeT > 0f)
             {
                 _bikeT -= Time.deltaTime;
@@ -910,6 +935,7 @@ namespace Craquez
                 _bumpVel += (-_bump * 90f - _bumpVel * 12f) * dtB;
                 _bump += _bumpVel * dtB;
                 var shoulder = ShoulderDuel();
+                if (lying) { _bump = _bumpVel = Vector3.zero; shoulder = Vector3.zero; }   // (deitado: sem trombada nem ombro a ombro)
                 var lr = Quaternion.Euler(0f, -_yaw, 0f) * (_bump + shoulder);   // para o referencial do corpo
                 roll += -lr.x;
                 pitch += lr.z;

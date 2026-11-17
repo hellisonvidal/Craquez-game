@@ -175,7 +175,8 @@ namespace Craquez.UI
         /// <summary>Cria o minimapa na parte inferior central da tela.</summary>
         void CreateMinimap(RectTransform root)
         {
-            _minimapRoot = UiKit.Image(root, new Color(0.02f, 0.03f, 0.07f, 0.85f), Theme.RoundSmall, "minimapa").rectTransform
+            // sem moldura: só o campo, translúcido, deixando o jogo aparecer por baixo
+            _minimapRoot = UiKit.Image(root, new Color(0f, 0f, 0f, 0f), null, "minimapa").rectTransform
                 .At(0.5f, 0, 200, 140, 0, 20); // centralizado na parte inferior
             _minimapCg = _minimapRoot.gameObject.AddComponent<CanvasGroup>();
             _minimapCg.alpha = 0f; // começa invisível, aparece durante a partida
@@ -184,27 +185,27 @@ namespace Craquez.UI
 
             // Campo do minimapa (retângulo verde). Obs.: Place recebe âncoras (0..1); tamanho fixo é At
             // (com Place(…, 180, 120) a âncora ia a 180x a tela e o verde cobria metade do jogo)
-            _minimapField = UiKit.Image(_minimapRoot, new Color(0.12f, 0.35f, 0.18f, 1f), Theme.RoundSmall, "campo").rectTransform;
+            _minimapField = UiKit.Image(_minimapRoot, new Color(0.06f, 0.22f, 0.10f, 0.32f), null, "campo").rectTransform;
             _minimapField.At(0.5f, 0.5f, 180, 120); // 180x120 = proporção do campo (1.5:1)
 
             // Linhas do campo (meio-campo, área, círculo central)
-            var halfway = UiKit.Image(_minimapField, new Color(1f, 1f, 1f, 0.25f), null, "meio-campo").rectTransform;
-            halfway.At(0.5f, 0.5f, 2, 120); // linha vertical no meio
+            var halfway = UiKit.Image(_minimapField, new Color(1f, 1f, 1f, 0.18f), null, "meio-campo").rectTransform;
+            halfway.At(0.5f, 0.5f, 1, 120); // linha vertical no meio
 
             // Círculo central
-            var centerCircle = UiKit.Image(_minimapField, new Color(1f, 1f, 1f, 0.15f), Theme.Round, "círculo-central").rectTransform;
+            var centerCircle = UiKit.Image(_minimapField, new Color(1f, 1f, 1f, 0.08f), Theme.Round, "círculo-central").rectTransform;
             centerCircle.At(0.5f, 0.5f, 30, 30); // 30px de diâmetro
 
             // Áreas (grandes áreas)
-            var areaA = UiKit.Image(_minimapField, new Color(1f, 1f, 1f, 0.15f), Theme.RoundSmall, "área-A").rectTransform;
+            var areaA = UiKit.Image(_minimapField, new Color(1f, 1f, 1f, 0.08f), null, "área-A").rectTransform;
             areaA.At(0f, 0.5f, 24, 60); // área do time A (esquerda)
-            var areaB = UiKit.Image(_minimapField, new Color(1f, 1f, 1f, 0.15f), Theme.RoundSmall, "área-B").rectTransform;
+            var areaB = UiKit.Image(_minimapField, new Color(1f, 1f, 1f, 0.08f), null, "área-B").rectTransform;
             areaB.At(1f, 0.5f, 24, 60); // área do time B (direita)
 
             // Gols
-            var goalA = UiKit.Image(_minimapField, new Color(1f, 1f, 1f, 0.5f), null, "gol-A").rectTransform;
+            var goalA = UiKit.Image(_minimapField, new Color(1f, 1f, 1f, 0.35f), null, "gol-A").rectTransform;
             goalA.At(0f, 0.5f, 4, 24); // gol do time A
-            var goalB = UiKit.Image(_minimapField, new Color(1f, 1f, 1f, 0.5f), null, "gol-B").rectTransform;
+            var goalB = UiKit.Image(_minimapField, new Color(1f, 1f, 1f, 0.35f), null, "gol-B").rectTransform;
             goalB.At(1f, 0.5f, 4, 24); // gol do time B
         }
 
@@ -214,7 +215,7 @@ namespace Craquez.UI
             if (_sim == null || _minimapRoot == null) return;
             // Mostra o minimapa durante o jogo
             bool inPlay = _sim.state == MatchState.Playing || _sim.state == MatchState.Restart || _sim.state == MatchState.Foul;
-            _minimapCg.alpha = Mathf.MoveTowards(_minimapCg.alpha, inPlay ? 1f : 0f, Time.unscaledDeltaTime * 2f);
+            _minimapCg.alpha = Mathf.MoveTowards(_minimapCg.alpha, inPlay ? 0.8f : 0f, Time.unscaledDeltaTime * 2f);
             if (_minimapCg.alpha <= 0.01f) return;
 
             // Limite do campo do minimapa (180x120)

@@ -101,6 +101,9 @@ namespace Craquez.Sim
         public bool faceBall, shielding;
         /// <summary>No chão após falta: segundos restantes, total, direção da pancada e tipo de queda (0 frente, 1 costas, 2 lado).</summary>
         public float down, downTotal;
+        /// <summary>Rumo travado enquanto está no chão (o corpo deitado não gira atrás da bola).</summary>
+        public Vector2 downFacing;
+        public bool downLocked;
         public Vector2 fallDir;
         public int fallKind;
         /// <summary>Na queda, rola no chão antes de ficar sentindo.</summary>
@@ -114,6 +117,12 @@ namespace Craquez.Sim
         public float pullT, pulledT;
         /// <summary>Personalidade (0..1): disposição, ousadia, disciplina tática; leitura de jogo (s entre decisões).</summary>
         public float work = 0.5f, flair = 0.5f, discipline = 0.6f, think = 0.35f, thinkT;
+        /// <summary>
+        /// Mentalidade individual (-1 defensiva .. +1 ofensiva): quanto ele se projeta, arrisca o chute e
+        /// sobe além da linha do time. Espírito de equipe (0..1): solidariedade — volta para marcar, prefere
+        /// o passe ao lance individual, dá a mão ao caído e segura a cabeça quando o time está perdendo.
+        /// </summary>
+        public float mentality, teamSpirit = 0.6f;
         /// <summary>IA: decisão atual (aiGoal), alvo suavizado (aiTarget) e deslocamento pessoal na formação.</summary>
         public Vector2 aiGoal, aiTarget, lane;
         public bool aiAttacking;

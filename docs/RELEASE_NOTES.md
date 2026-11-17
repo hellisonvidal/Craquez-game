@@ -1,3 +1,22 @@
+## Craquez 2.35.0
+
+Jogo de futebol feito 100% com inteligência artificial, **gratuito**.
+
+### Download
+- **Celular Android**: `Craquez-v2.35.0.apk`
+- **TV (Google TV / Android TV, ex.: TCL C6K)**: `Craquez-TV-v2.35.0.apk` — use este na TV (32 e 64 bits).
+
+### Mudanças
+- **Fim dos quadrados no gramado (poças azuis, terra marrom e sombras pretas)**: o jogo pedia os materiais de cel shading `ToonCutout` e `ToonTransparent`, que nunca eram gerados no build; sem eles caía no shader opaco e a transparência da textura era ignorada — as poças viravam ladrilhos azuis, o "gramado gasto" do meio e das áreas virava retângulos marrons e a sombra de contato dos atletas e da bola virava um quadrado preto. Agora os materiais são gerados (com recorte/transparência ligados), as sombras usam o transparente sem luz e, se algum faltar, o jogo liga o recorte/transparência pelo nome. O shader de partículas `ToonParticles` também não compilava (incluía um arquivo sem as funções de vértice/fragmento) e foi refeito.
+- **Cabelos**: a touca rente agora também fica por baixo dos cabelos longos (rabo, tranças, chanel) — antes a pele clara do couro cabeludo aparecia entre as mechas e a parte de trás da cabeça parecia loira; o cabelo curto também ficou um pouco menos clarinho sob os refletores. (O recorte do cabelo do modelo dependia do mesmo material que faltava.)
+- **Quedas e levantadas sem tremedeira nem giro**: deitado, o corpo não acompanha mais o rumo da simulação (a IA virava o atleta caído para a bola e ele "rodava" no chão), a posição é amortecida contra os empurrõezinhos de quem passa por perto e não há mais inclinação/trombada aplicadas ao corpo no chão. A pose de caído da captura agora fica segura até a hora de levantar (antes acabava, o peso caía e o atleta "subia" em pé por um instante a cada repetição).
+- **Mentalidade individual e espírito de equipe**: cada atleta tem uma mentalidade (de muito defensivo a muito ofensivo) e um espírito de equipe, vindos da posição, dos atributos, das habilidades (Líder, Maestro, Finalizador, Muralha...) e de um traço próprio. O ofensivo se projeta mais e arrisca o chute e o drible; o solidário prefere o passe, volta para marcar e pressiona com mais vontade, e é quem vai dar a mão ao companheiro caído. O time tem **moral**: sobe com o gol marcado, cai com o sofrido (menos num grupo unido e com líder) e volta ao normal aos poucos; com a moral baixa, os de pouco espírito perdem a cabeça (mais puxões de camisa). Perdendo no fim do jogo, os ofensivos se jogam ao ataque; ganhando, os defensivos recuam. A tela de escalação mostra a mentalidade e o espírito de cada jogador.
+- **Chuteiras arredondadas**: a malha da chuteira é subdividida antes de ser alisada (bico e calcanhar redondos, sem o contorno "quadrado") e as normais ficam contínuas nas costuras (sem quinas no sombreado).
+- **Bola no seletor**: a prévia da bola mostrava a textura de ponta-cabeça (a "Craquez Pro 26" com o nome invertido).
+- **Minimapa**: sem moldura e sem bordas arredondadas, mais transparente (o jogo aparece por baixo).
+- **Menus**: nos seletores, o texto encolhe para caber em vez de quebrar em linhas que invadiam a opção de baixo ("Países / seleções", nomes longos de times, "Cada atleta com a sua"); o valor fica entre as setas (não passa mais por baixo da seta direita) e dá um pulinho ao trocar de opção.
+- **Correções**: o estilo de jogo da CPU era guardado pelo número do atleta e o reserva que entrava herdava o jeito de jogar de quem saiu; `??` com componentes da Unity (o nulo falso não é nulo para o C#) deixava de criar `LayoutElement`/`CanvasGroup`/`MeshRenderer` no editor.
+
 ## Craquez 2.32.0
 
 Jogo de futebol feito 100% com inteligência artificial, **gratuito**.

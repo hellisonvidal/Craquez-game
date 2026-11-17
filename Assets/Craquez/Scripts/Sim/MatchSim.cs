@@ -146,6 +146,9 @@ namespace Craquez.Sim
         public readonly HashSet<int>[] subbedOut = { new HashSet<int>(), new HashSet<int>() };
         /// <summary>Índice do elenco por atleta, para trocas no intervalo/pausa.</summary>
         public int[] teamMentality = { 1, 1 };
+        /// <summary>Moral do time (0..1): sobe com o gol marcado, cai com o sofrido (menos em time unido e com líder).</summary>
+        public float[] teamMorale = { 0.55f, 0.55f };
+        readonly float[] _moraleBase = { 0.55f, 0.55f };
         public int[] teamPress = { 1, 1 };
         /// <summary>Ajuste de rolagem por clima (chuva = bola mais rápida).</summary>
         public float rollScale = 1f;
@@ -253,6 +256,7 @@ namespace Craquez.Sim
                     players.Add(p);
                 }
             }
+            InitMorale();
             kickoffTeam = firstKickoff;
             MakePuddles(seed);
             ResetForKickoff(firstKickoff);
@@ -349,6 +353,77 @@ namespace Craquez.Sim
             p.think = Mathf.Clamp(Mathf.Lerp(0.55f, 0.22f, (p.passing + p.control) * 0.5f) + rng.Range(0f, 0.12f), 0.15f, 0.7f);
             p.thinkT = rng.Range(0f, p.think);
             p.lane = new Vector2(rng.Gauss() * 1.4f, rng.Gauss() * 1.8f) * (1.2f - p.discipline);
+            // mentalidade e espírito de equipe: vêm do atleta (atributos, habilidades, posição e um sorteio fixo
+            // pelo nome) — não mexem na sequência do rng e são os mesmos mostrados na escalação
+            Mindset(p.name, p.isKeeper ? "GK" : p.pos, p.pace, p.control, p.defense, p.traits, out p.mentality, out p.teamSpirit);
+        }
+
+        /// <summary>
+        /// Mentalidade individual (-1 defensiva .. +1 ofensiva) e espírito de equipe (0..1) de um atleta.
+        /// Estático: a tela de escalação calcula os mesmos valores a partir do elenco.
+        /// </summary>
+        public static void Mindset(string name, string pos, float pace, float control, float defense, Trait traits, out float mentality, out float spirit)
+        {
+            uint h = 2166136261u;
+            foreach (char ch in name ?? "") { h ^= ch; h *= 16777619u; }
+            float H(int k) => ((h >> (k * 8)) & 255) / 255f;
+            bool Has(Trait t) => (traits & t) != 0;
+            float roleM = pos == "GK" ? -0.7f : pos == "FW" ? 0.38f : pos == "MF" ? 0.05f : pos == "DF" ? -0.32f : 0f;
+            mentality = Mathf.Clamp(roleM + (control - 0.7f) * 0.8f - (defense - 0.7f) * 0.6f + (Has(Trait.Driblador) ? 0.1f : 0f)
+                + (Has(Trait.Finalizador) ? 0.12f : 0f) + (Has(Trait.Muralha) ? -0.12f : 0f) + (H(0) - 0.5f) * 0.55f, -1f, 1f);
+            spirit = Mathf.Clamp01(0.58f + (Has(Trait.Lider) ? 0.22f : 0f) + (Has(Trait.Maestro) ? 0.05f : 0f) + (Has(Trait.Resistencia) ? 0.06f : 0f)
+                + (defense - 0.7f) * 0.35f + (pace - 0.7f) * 0.15f - (Has(Trait.Driblador) && control > 0.85f ? 0.08f : 0f) + (H(1) - 0.5f) * 0.4f);
+        }
+
+        /// <summary>Rótulo curto da mentalidade (escalação).</summary>
+        public static string MentalityLabel(float m) => m > 0.45f ? "Muito ofensivo" : m > 0.15f ? "Ofensivo" : m < -0.45f ? "Muito defensivo" : m < -0.15f ? "Defensivo" : "Equilibrado";
+
+        /// <summary>Espírito de equipe agora (o do atleta, puxado pela moral do time).</summary>
+        public float Spirit(SimPlayer p) => Mathf.Clamp01(p.teamSpirit * 0.65f + teamMorale[p.team] * 0.35f);
+
+        /// <summary>Disposição efetiva: quem tem espírito de equipe corre mais pelo time (volta, pressiona, acompanha).</summary>
+        public float Effort(SimPlayer p) => Mathf.Clamp01(p.work * Mathf.Lerp(0.82f, 1.18f, Spirit(p)));
+
+        /// <summary>Disciplina efetiva: com a moral baixa, quem tem pouco espírito de equipe perde a cabeça.</summary>
+        public float Discipline(SimPlayer p) => Mathf.Clamp01(p.discipline - Mathf.Max(0f, 0.5f - teamMorale[p.team]) * (1f - p.teamSpirit) * 0.6f);
+
+        /// <summary>
+        /// Ímpeto (-1..1): a mentalidade individual somada ao placar e ao relógio — perdendo no fim, os
+        /// ofensivos (e os de espírito de equipe) se jogam ao ataque; ganhando no fim, os defensivos recuam.
+        /// </summary>
+        public float Drive(SimPlayer p)
+        {
+            float late = halfSeconds > 0f ? Mathf.Clamp01((clock / halfSeconds - 0.55f) / 0.45f) * (half >= 2 ? 1f : 0.35f) : 0f;
+            int diff = score[p.team] - score[1 - p.team];
+            float push = diff < 0 ? late * (0.35f + 0.35f * Mathf.Max(0f, p.mentality) + 0.25f * p.teamSpirit)
+                : diff > 0 ? -late * (0.3f + 0.3f * Mathf.Max(0f, -p.mentality) + 0.2f * p.teamSpirit) : 0f;
+            return Mathf.Clamp(p.mentality * 0.7f + push + (teamMorale[p.team] - 0.55f) * 0.4f, -1f, 1f);
+        }
+
+        /// <summary>Moral inicial: base 0,55, mais com líderes em campo e com o espírito médio do time.</summary>
+        void InitMorale()
+        {
+            for (int t = 0; t < 2; t++)
+            {
+                float sum = 0f; int n = 0, leaders = 0;
+                foreach (var q in players) if (q.team == t) { sum += q.teamSpirit; n++; if (q.Has(Trait.Lider)) leaders++; }
+                float avg = n > 0 ? sum / n : 0.6f;
+                _moraleBase[t] = Mathf.Clamp01(0.45f + (avg - 0.6f) * 0.5f + 0.05f * Mathf.Min(2, leaders));
+                teamMorale[t] = _moraleBase[t];
+            }
+        }
+
+        /// <summary>Gol: a moral de quem marcou sobe; a de quem sofreu cai (menos num time unido e com líder).</summary>
+        void MoraleOnGoal(int scorer)
+        {
+            for (int t = 0; t < 2; t++)
+            {
+                float sum = 0f; int n = 0; bool leader = false;
+                foreach (var q in players) if (q.team == t && !q.sentOff) { sum += q.teamSpirit; n++; leader |= q.Has(Trait.Lider); }
+                float avg = n > 0 ? sum / n : 0.6f;
+                if (t == scorer) teamMorale[t] = Mathf.Clamp01(teamMorale[t] + 0.12f + 0.06f * avg);
+                else teamMorale[t] = Mathf.Clamp01(teamMorale[t] - 0.14f * (1.25f - avg) * (leader ? 0.75f : 1f));
+            }
         }
 
         static void ApplyRoster(SimPlayer p, RosterEntry e)
@@ -2072,13 +2147,13 @@ namespace Craquez.Sim
                         var rel = p.position - car.position;
                         float toGoalCar = Mathf.Abs(halfLen * TeamDir(car.team) - car.position.x), toGoalP = Mathf.Abs(halfLen * TeamDir(car.team) - p.position.x);
                         bool beaten = toGoalCar < toGoalP + 0.3f && rel.magnitude < 0.95f && car.vel.magnitude > 2.2f;
-                        if (beaten && rng.Chance(DT * (0.25f + 0.5f * (1f - p.discipline)))) { p.pulling = car.id; p.pullT = 0f; }
+                        if (beaten && rng.Chance(DT * (0.25f + 0.5f * (1f - Discipline(p))))) { p.pulling = car.id; p.pullT = 0f; }
                     }
                 }
                 if (p.pulling < 0) { p.pullT = 0f; continue; }
                 var o = players[p.pulling];
                 var d = o.position - p.position;
-                if (ball.owner != o.id || d.magnitude > 1.05f || o.down > 0f || (!human && p.pullT > 0.35f + 0.5f * (1f - p.discipline))) { p.pulling = -1; p.pullT = 0f; continue; }
+                if (ball.owner != o.id || d.magnitude > 1.05f || o.down > 0f || (!human && p.pullT > 0.35f + 0.5f * (1f - Discipline(p)))) { p.pulling = -1; p.pullT = 0f; continue; }
                 p.pullT += DT;
                 o.pulledT = 0.12f;
                 o.offBalance = Mathf.Max(o.offBalance, 0.15f);
@@ -2322,14 +2397,17 @@ namespace Craquez.Sim
             else if (!quickRestarts && mode.id != GameModes.Street && rng.Chance(0.85f))
             {
                 // (quase sempre alguém vem dar a mão: um companheiro ou, às vezes, quem fez a falta)
-                bool rival = rng.Chance(0.3f) && !offender.sentOff;
-                SimPlayer h = null; float hd = 13f;
+                // (fair play só de quem tem espírito de equipe; entre os companheiros, vai quem é mais solidário)
+                bool rival = rng.Chance(0.3f) && !offender.sentOff && offender.teamSpirit > 0.45f;
+                SimPlayer h = null; float hd = 13f, best = float.MaxValue;
                 foreach (var q in players)
                 {
                     if (q == victim || q.isKeeper || q.sentOff || q.down > 0f) continue;
                     if (rival ? q != offender : q.team != victim.team) continue;
                     float d = q.position.Dist(victim.position);
-                    if (d < hd) { hd = d; h = q; }
+                    if (d >= 13f) continue;
+                    float sc = d / (0.5f + q.teamSpirit);
+                    if (sc < best) { best = sc; hd = d; h = q; }
                 }
                 if (h != null)
                 {
@@ -2651,6 +2729,8 @@ namespace Craquez.Sim
             float spread = attacking ? (field ? 0.66f : 0.8f) : (field ? 0.46f : 0.62f);
             float tx = baseX * spread + bxRel * (field ? 0.58f : 0.42f) + (attacking ? halfLen * 0.24f : -halfLen * 0.1f);
             tx += (teamMentality[p.team] - 1) * halfLen * 0.09f;
+            // mentalidade individual (com o placar e o relógio): o ofensivo se projeta, o defensivo guarda posição
+            if (!p.isKeeper) tx += Drive(p) * halfLen * (attacking ? 0.045f : 0.025f);
             // mentalidade individual: jogadores de alta disposição e visão ajustam a altura conforme seu papel em campo
             if (!p.isKeeper && Mathf.Abs(ball.pos.y) > 2f)
             {
@@ -2756,7 +2836,7 @@ namespace Craquez.Sim
                     if (helper == p)
                     {
                         var ownGoal = new Vector2(-halfLen * TeamDir(t), 0);
-                        float reach = halfLen * (0.3f + 0.15f * teamPress[t]) * (0.75f + 0.5f * p.work);
+                        float reach = halfLen * (0.3f + 0.15f * teamPress[t]) * (0.75f + 0.5f * Effort(p));
                         if (ctrl[t].helpT > 0f) { target = ball.pos; urgent = true; }
                         else if (teamPress[t] == 2 && p.position.Dist(ball.pos) < halfLen * 0.45f) { target = ball.pos; urgent = true; }
                         else if (p.position.Dist(ball.pos) < reach)
@@ -2781,7 +2861,7 @@ namespace Craquez.Sim
                     p.thinkT = p.think;
                 }
                 // alvo desliza (corridas em curva em vez de zigue-zague)
-                float glide = frozen ? 99f : (pressing ? 12f : 8f + 4f * p.work);
+                float glide = frozen ? 99f : (pressing ? 12f : 8f + 4f * Effort(p));
                 p.aiTarget = frozen || p.aiTarget == Vector2.zero ? p.aiGoal : Vector2.MoveTowards(p.aiTarget, p.aiGoal, glide * DT);
                 target = Spacing(p, p.aiTarget, pressing);
             }
@@ -3196,7 +3276,7 @@ namespace Craquez.Sim
             float v = p.vel.magnitude;
             if (!urgent && v > 1.4f && d > 0.01f && d < v * v / 5f + 0.6f && Vector2.Dot(p.vel / v, to / d) < 0.55f)
                 p.intent = Vector2.zero;
-            float lazy = 1.35f - 0.7f * p.work;   // quem tem mais disposição pega o pique antes
+            float lazy = 1.35f - 0.7f * Effort(p);   // quem tem mais disposição (e espírito de equipe) pega o pique antes
             p.wantSprint = urgent || (d > (p.sprinting ? 7f : 11f) * lazy * (1f + idle) && p.stamina > 0.25f);
             p.faceBall = !urgent && d < 10f && ball.pos.Dist(p.position) < 35f;
         }
@@ -4342,6 +4422,8 @@ namespace Craquez.Sim
                 }
             }
             LyingBodies();
+            // a moral volta devagar ao normal do time (o gol de minutos atrás pesa cada vez menos)
+            for (int t = 0; t < 2; t++) teamMorale[t] = Mathf.MoveTowards(teamMorale[t], _moraleBase[t], DT * 0.004f);
         }
 
         /// <summary>
@@ -4352,6 +4434,18 @@ namespace Craquez.Sim
         void LyingBodies()
         {
             int n = players.Count;
+            // caído: o rumo fica travado no da queda (antes a IA virava o corpo deitado para a bola e ele
+            // girava no chão; o corpo que ocupa o gramado também girava junto)
+            for (int i = 0; i < n; i++)
+            {
+                var p = players[i];
+                if (p.down > 0f && !p.isKeeper)
+                {
+                    if (!p.downLocked) { p.downFacing = p.facing; p.downLocked = true; }
+                    else if (p.downFacing.sqrMagnitude > 0.01f) p.facing = p.downFacing;
+                }
+                else p.downLocked = false;
+            }
             for (int i = 0; i < n; i++)
             {
                 var p = players[i];
@@ -5563,6 +5657,7 @@ namespace Craquez.Sim
         void GoalScored(int t)
         {
             score[t]++;
+            MoraleOnGoal(t);
             // futsal: quem leva o gol jogando com um a menos completa o time
             foreach (var q in players) if (q.team != t && q.sentOff && q.sentOffT > 0f) q.sentOffT = 0.01f;
             lastGoalTeam = t;
