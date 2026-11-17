@@ -461,8 +461,8 @@ namespace Craquez
                     float writhe = 0f;
                     pitch = lying;
                     roll += _fallSide * Mathf.Lerp(sideRoll * _fallSide, 62f, turn) + writhe;
-                    // às vezes rola no chão (uma volta inteira) antes de ficar sentindo
-                    if (p.fallRoll) roll += _fallSide * 360f * Smooth(Mathf.Clamp01(u / 0.3f));
+                    // Removido o rolamento de 360° que fazia o jogador girar no chão
+                    // if (p.fallRoll) roll += _fallSide * 360f * Smooth(Mathf.Clamp01(u / 0.3f));
                     lift = 0.21f + turn * 0.07f;
                     break;
                 }

@@ -43,6 +43,8 @@ Shader "Craquez/ToonParticles"
             #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Lighting.hlsl"
             #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Fog.hlsl"
             #include "Packages/com.unity.render-pipelines.universal/Shaders/Particle/Particle.hlsl"
+            // Força precisão alta para evitar quadrados azuis na chuva
+            #define TOON_HIGHPRECISION 1
             ENDHLSL
         }
     }

@@ -80,7 +80,10 @@ half ToonStep(half x)
 half3 ToonLight(Light l, half3 n, half3 v, half3 albedo, half smooth, half shadowAtten)
 {
     half ndl = dot(n, l.direction);
-    half lit = ToonStep(ndl) * smoothstep(0.35, 0.65, shadowAtten);
+    // shadowAtten suave: evita transição dura (quadrados pretos no corpo)
+    // Aumentado o range do smoothstep para transição mais suave das sombras
+    half sh = smoothstep(0.2, 0.8, shadowAtten);
+    half lit = ToonStep(ndl) * sh;
     half3 band = lerp(_ToonShadowTint.rgb, half3(1, 1, 1), lit);
     half3 c = albedo * band * l.color;
     // brilho especular em faixa (couro, madeira molhada, bola)
@@ -109,10 +112,13 @@ half3 AthleteLight(Light l, half3 n, half3 v, half3 albedo, half smooth, half sk
 {
     half ndl = dot(n, l.direction);
     // shadowAtten suave: evita transição dura (quadrados pretos no corpo)
-    half sh = smoothstep(0.3, 0.7, shadowAtten);
+    // Aumentado o range do smoothstep para transição mais suave das sombras
+    half sh = smoothstep(0.2, 0.8, shadowAtten);
     half lit = ToonStep(ndl) * sh;                          // faixa principal (luz / sombra)
-    half deep = 1.0 - CelBand(ndl, -0.45);                  // sombra funda (lado de trás do corpo)
-    half3 shade = lerp(_ToonShadowTint.rgb, _ToonShadowTint.rgb * 0.78, deep);
+    // Reduzido o "deep" shadow (sombra funda nas costas) para evitar partes pretas nas costas dos jogadores
+    // O fator 0.9 em vez de 1.0 e edge -0.3 em vez de -0.45 suaviza a transição
+    half deep = 0.9 - CelBand(ndl, -0.3) * 0.9;
+    half3 shade = lerp(_ToonShadowTint.rgb, _ToonShadowTint.rgb * 0.85, deep);
     half3 band = lerp(shade, half3(1, 1, 1), lit);
     half3 c = albedo * band * l.color;
     // pele: uma faixa estreita e quente logo depois do limite luz/sombra (o "terminador" do anime)

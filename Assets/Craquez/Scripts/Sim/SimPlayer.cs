@@ -119,7 +119,7 @@ namespace Craquez.Sim
         public bool aiAttacking;
 
         public bool Has(Trait t) => (traits & t) != 0;
-        public float TopSpeed() => Mathf.Lerp(6.4f, 8.8f, pace);
-        public float JogSpeed() => TopSpeed() * 0.64f;
+        public float TopSpeed() => Mathf.Lerp(5.5f, 7.5f, pace);
+        public float JogSpeed() => TopSpeed() * 0.55f;
     }
 }

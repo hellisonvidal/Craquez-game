@@ -45,6 +45,9 @@ Shader "Craquez/ToonTransparent"
             #pragma multi_compile _ _CLUSTER_LIGHT_LOOP
             #include_with_pragmas "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Fog.hlsl"
             #pragma multi_compile_instancing
+            // Força precisão alta para evitar artefatos
+            #pragma prefer_hlslcc gles
+            #define TOON_HIGHPRECISION 1
             #include "ToonCore.hlsl"
             ENDHLSL
         }
