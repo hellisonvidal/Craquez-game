@@ -532,6 +532,9 @@ namespace Craquez
                 sp[0] = 0f; sp[1] = _locoSpeed[IWalk]; sp[2] = _locoSpeed[IJog]; sp[3] = _locoSpeed[IRun];
                 if (sprint) sp[4] = _locoSpeed[ISprint];
                 for (int k = 1; k < sp.Length; k++) sp[k] = Mathf.Max(sp[k] * 1.12f, sp[k - 1] + 0.6f);
+                // pique: a passada do clipe (UAL) é de ~9 m/s, acima do máximo dos atletas (7,5 m/s): a pose
+                // cheia de pique entra a ~6,6 m/s (o ritmo continua casado com a velocidade, sem patinar)
+                if (sprint) sp[4] = Mathf.Min(sp[4], Mathf.Max(sp[3] + 0.6f, 6.6f));
                 var ix = sprint ? Ix5 : Ix4;
                 float s = Mathf.Min(speed, 10.5f);
                 int seg = 0;

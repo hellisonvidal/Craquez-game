@@ -360,6 +360,14 @@ namespace Craquez
                         string hitClip = AthleteAnimator.Has("HitSide") ? "HitSide" : AthleteAnimator.Has("HitBack") ? "HitBack" : null;
                         if (hitClip != null) anim.Play(hitClip, 0.08f, 0.5f, 1.3f, 0.05f);
                     }
+                    else if (e.id == p.id && e.power > 3.2f && anim != null && anim.CurrentAction == null)
+                    {
+                        // choque médio: tranco curto (UAL) — no peito se o contato veio pela frente, a cabeça
+                        // vai para trás se veio de lado/alto (antes só o choque forte tinha reação)
+                        bool front = Vector3.Dot(-away.normalized, transform.forward) > 0.3f;
+                        string mid = front ? "HitChest" : "HitHead";
+                        if (AthleteAnimator.Has(mid)) anim.Play(mid, 0f, -1f, 1.1f, 0.04f);
+                    }
                     break;
                 }
                 case "fooled":
