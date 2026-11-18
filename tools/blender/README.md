@@ -20,11 +20,13 @@ Copie os FBX, `anims.json` e as texturas para `Assets/Craquez/Resources/Athletes
 
 ```bash
 # esqueleto tirado do próprio Athlete_Anims.fbx do jogo; captura CMU do sujeito 102
-bpyenv/bin/python tools/blender/extra_clips.py Assets/Craquez/Resources/Athletes/Athlete_Anims.fbx mocap out --sheet
+bpyenv/bin/python tools/blender/extra_clips.py Assets/Craquez/Resources/Athletes/Athlete_Anims.fbx mocap out \
+    --ual=UAL1_Standard_RM.fbx --sheet   # UAL (Quaternius, CC0): pique e reações a choques
 ```
 
 Gera `Athlete_Anims2.fbx` + `anims2.json` (giro para a direita, segundo giro, arrancadas, pivô e
-zigue-zague), lidos pelo jogo junto com o `Athlete_Anims.fbx`.
+zigue-zague; e, da UAL, o pique e os trancos de choque), lidos pelo jogo junto com o `Athlete_Anims.fbx`
+(um clipe com o mesmo nome substitui o do arquivo principal).
 
 ## Cenário (Quaternius, CC0)
 

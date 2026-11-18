@@ -1,3 +1,17 @@
+## Craquez 2.38.0
+
+Jogo de futebol feito 100% com inteligência artificial, **gratuito**.
+
+### Download
+- **Celular Android**: `Craquez-v2.38.0.apk`
+- **TV (Google TV / Android TV, ex.: TCL C6K)**: `Craquez-TV-v2.38.0.apk` — use este na TV (32 e 64 bits).
+
+### Mudanças
+- **Animações da Universal Animation Library (Quaternius, CC0)** no corpo atual dos atletas:
+  - **Pique de verdade**: tronco à frente e passada longa. Antes o pique era o mesmo clipe da corrida; agora a pose cheia de pique entra a partir de ~6,6 m/s, com o ritmo das passadas casado com a velocidade (sem o pé patinar).
+  - **Trancos em choques médios**: no peito quando o contato vem pela frente, a cabeça vai para trás quando vem de lado (antes só os choques fortes tinham reação).
+  - Comparadas lado a lado com as atuais: o "trote" da UAL é na verdade uma corrida (~6 m/s) e ficou o trote de futebol de antes; a dança e o rolamento não combinam com uma partida e ficaram de fora. A locomoção em 8 direções só existe na versão paga da biblioteca.
+
 ## Craquez 2.37.0
 
 Jogo de futebol feito 100% com inteligência artificial, **gratuito**.

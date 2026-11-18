@@ -9,6 +9,8 @@ O Craquez foi desenvolvido inteiramente com inteligência artificial (Claude, da
 - **CMU Graphics Lab Motion Capture Database** (mocap.cs.cmu.edu): captura de movimento usada nas animações
   (corrida, mudanças de direção, fintas, giros, arrancadas, pivô e zigue-zague dos dribles — sujeito 102: 102_11, 12, 15, 18, 19, 20, 21, 26, 29; chutes). "The data used in this project was obtained from mocap.cs.cmu.edu.
   The database was created with funding from NSF EIA-0196217." Uso livre, inclusive comercial; não pode ser revendida como dado bruto.
+- **Universal Animation Library 1 e 2** (Quaternius, versões gratuitas "Standard"), **CC0 1.0**: pique, reações a choques,
+  carrinho, levantar do chão, empurrão, reclamação e braços cruzados. https://quaternius.itch.io/universal-animation-library
 - **flag-icons** (Panayiotis Lipiridis e colaboradores): bandeiras dos países, licença MIT — ver `docs/licenses/flag-icons-MIT.txt`.
 - **Sons da torcida** (Wikimedia Commons, tratados por `tools/audio/fetch_crowd.py`):
   - "WWS FootballAustriavs.Sweden.ogg" — Work With Sounds / Torsten Nilsson, **CC BY 4.0** (ambiente de partida de futebol)
